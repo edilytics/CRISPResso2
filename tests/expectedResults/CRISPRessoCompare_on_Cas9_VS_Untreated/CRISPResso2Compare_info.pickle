@@ -1,0 +1,164 @@
+(dp1
+S'summary_plot_names'
+p2
+(lp3
+S'1.Editing_comparison'
+p4
+aS'2.Insertions_quantification'
+p5
+aS'2.Deletions_quantification'
+p6
+aS'2.Substitutions_quantification'
+p7
+aS'2.All_modifications_quantification'
+p8
+aS'3.Alleles_frequency_table_around_sgRNA_GGAATCCCTTCTGCAGCACC_top'
+p9
+aS'3.Alleles_frequency_table_around_sgRNA_GGAATCCCTTCTGCAGCACC_bottom'
+p10
+asS'report_location'
+p11
+S'CRISPRessoCompare_on_Cas9_VS_Untreated.html'
+p12
+sS'log_filename'
+p13
+S'CRISPRessoCompare_RUNNING_LOG.txt'
+p14
+sS'args'
+p15
+ccopy_reg
+_reconstructor
+p16
+(cargparse
+Namespace
+p17
+c__builtin__
+object
+p18
+NtRp19
+(dp20
+S'sample_1_name'
+p21
+NsS'max_rows_alleles_around_cut_to_plot'
+p22
+I50
+sS'name'
+p23
+S''
+sS'output_folder'
+p24
+S''
+sS'place_report_in_output_folder'
+p25
+I00
+sS'debug'
+p26
+I01
+sS'crispresso_output_folder_2'
+p27
+S'CRISPRessoBatch_on_FANC/CRISPResso_on_Untreated/'
+p28
+sS'crispresso_output_folder_1'
+p29
+S'CRISPRessoBatch_on_FANC/CRISPResso_on_Cas9/'
+p30
+sS'sample_2_name'
+p31
+NsS'suppress_report'
+p32
+I00
+sS'min_frequency_alleles_around_cut_to_plot'
+p33
+F0.20000000000000001
+sbsS'summary_plot_datas'
+p34
+(dp35
+g10
+(lp36
+(S'Allele comparison table'
+p37
+S'Alleles_frequency_table_around_sgRNA_GGAATCCCTTCTGCAGCACC.txt'
+tp38
+asg6
+(lp39
+(S'Deletions quantification'
+S'Deletions_quantification.txt'
+tp40
+asg8
+(lp41
+(S'Combined modifications (insertions, deletions and substitutions) quantification'
+S'All_modifications_quantification.txt'
+tp42
+asg9
+(lp43
+(g37
+S'Alleles_frequency_table_around_sgRNA_GGAATCCCTTCTGCAGCACC.txt'
+tp44
+asg7
+(lp45
+(S'Substitutions quantification'
+S'Substitutions_quantification.txt'
+tp46
+asg5
+(lp47
+(S'Insertions quantification'
+S'Insertions_quantification.txt'
+tp48
+asg4
+(lp49
+ssS'summary_plot_labels'
+p50
+(dp51
+g10
+S'Distribution comparison of alleles. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site. The proportion and number of reads is shown for each sample on the right, with the values for Cas9 followed by the values for Untreated. Alleles are sorted for enrichment in Untreated.'
+p52
+sg6
+S'Deletions location comparison for amplicon Reference; Top: percent difference; Bottom: p-value.'
+p53
+sg8
+S'Combined modifications (insertions, deletions and substitutions) location comparison for amplicon Reference; Top: percent difference; Bottom: p-value.'
+p54
+sg9
+S'Distribution comparison of alleles. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site. The proportion and number of reads is shown for each sample on the right, with the values for Cas9 followed by the values for Untreated. Alleles are sorted for enrichment in Cas9.'
+p55
+sg7
+S'Substitutions location comparison for amplicon Reference; Top: percent difference; Bottom: p-value.'
+p56
+sg5
+S'Insertions location comparison for amplicon Reference; Top: percent difference; Bottom: p-value.'
+p57
+sg4
+S'Figure 1: Comparison for amplicon Reference; Left: Percentage of modified and unmodified reads in each sample; Right: relative percentage of modified and unmodified reads'
+p58
+ssS'report_filename'
+p59
+g12
+sS'version'
+p60
+S'2.1.0'
+p61
+sS'summary_plot_titles'
+p62
+(dp63
+g10
+S'Alleles enriched in Untreated'
+p64
+sg6
+S'Deletions locations'
+p65
+sg8
+S'Combined modifications (insertions, deletions and substitutions) locations'
+p66
+sg9
+S'Alleles enriched in Cas9'
+p67
+sg7
+S'Substitutions locations'
+p68
+sg5
+S'Insertions locations'
+p69
+sg4
+S'Editing efficiency comparison'
+p70
+ss.

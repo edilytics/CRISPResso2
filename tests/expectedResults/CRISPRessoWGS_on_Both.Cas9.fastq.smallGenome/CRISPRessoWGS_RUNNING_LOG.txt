@@ -1,0 +1,24 @@
+CRISPResso version 2.0.45
+[Command used]:
+/home/cole/.python_guix/z9vxy7xph8py2wydacw30h4k4rdzav54-python2-2.7.17/bin/CRISPRessoWGS -b Both.Cas9.fastq.smallGenome.bam -r smallGenome/smallGenome.fa -f Cas9.regions.txt --debug
+
+[Execution log]:
+Index file for input .bam file exists, skipping generation.
+The index for the reference fasta file is already present! Skipping generation.
+Retrieving reference sequences for amplicons and checking for sgRNAs
+
+Processing each region...
+Extracting reads in:chr11:1024-1273 and creating .bam file: CRISPRessoWGS_on_Both.Cas9.fastq.smallGenome/ANALYZED_REGIONS/REGION_1.bam
+Extracting reads in:chr9:962-1196 and creating .bam file: CRISPRessoWGS_on_Both.Cas9.fastq.smallGenome/ANALYZED_REGIONS/REGION_0.bam
+Running CRISPResso on each region...
+
+The region [HEK3] has enough reads (204) mapped to it!
+
+The region [FANCF] has enough reads (23) mapped to it!
+Running CRISPResso with 1 processes
+Running CRISPResso on region #0/2: CRISPResso -r1 CRISPRessoWGS_on_Both.Cas9.fastq.smallGenome/ANALYZED_REGIONS/REGION_0.fastq.gz -a CCAGGGAAACGCCCATGCAATTAGTCTATTTCTGCTGCAAGTAAGCATGCATTTGTAGGCTTGATGCTTTTTTTCTGCTTCTCCAGCCCTGGCCTGGGTCAATCCTTGGGGCCCAGACTGAGCACGTGATGGCAGAGGAAAGGAAGCCCTGCTTCCTCCAGAGGGCGTCGCAGGACAGCTTTTCCTAGACAGGGGCTAGTATGTGCAGCTCCTGCACCGGGATACTGGTTGACAA -o CRISPRessoWGS_on_Both.Cas9.fastq.smallGenome --name HEK3 --needleman_wunsch_gap_extend -2 --aln_seed_count 5 --plot_window_size 20 --max_rows_alleles_around_cut_to_plot 50 --prime_editing_pegRNA_extension_quantification_window_size 5 --quantification_window_size 1 --quantification_window_center -3 --trimmomatic_command trimmomatic --conversion_nuc_from C --min_bp_quality_or_N 0 --default_min_aln_score 60 --needleman_wunsch_gap_incentive 1 --min_paired_end_reads_overlap 10 --needleman_wunsch_aln_matrix_loc EDNAFULL --prime_editing_pegRNA_scaffold_min_match_length 1 --aln_seed_min 2 --aln_seed_len 10 --needleman_wunsch_gap_open -20 --max_paired_end_reads_overlap 100 --conversion_nuc_to T --flexiguide_homology 80 --flash_command flash --min_single_bp_quality 0 --exclude_bp_from_left 15 --min_average_read_quality 0 --debug --min_frequency_alleles_around_cut_to_plot 0.2 --exclude_bp_from_right 15
+Finished CRISPResso region #0
+Running CRISPResso on region #1/2: CRISPResso -r1 CRISPRessoWGS_on_Both.Cas9.fastq.smallGenome/ANALYZED_REGIONS/REGION_1.fastq.gz -a AGAGCCGTGCGAATGGGGCCATGCCGACCAAAGCGCCGATGGATGTGGCGCAGGTAGCGCGCCCACTGCAAGGCCCGGCGCACGGTGGCGGGGTCCCAGGTGCTGACGTAGGTAGTGCTTGAGACCGCCAGAAGCTCGGAAAAGCGATCCAGGTGCTGCAGAAGGGATTCCATGAGGTGCGCGAAGGCCCTACTTCCGCTTTCACCTTGGAGACGGCGACTCTCTGCGTACTGATTGGAACATCCGCGAA -o CRISPRessoWGS_on_Both.Cas9.fastq.smallGenome --name FANCF --needleman_wunsch_gap_extend -2 --aln_seed_count 5 --plot_window_size 20 --max_rows_alleles_around_cut_to_plot 50 --prime_editing_pegRNA_extension_quantification_window_size 5 --quantification_window_size 1 --quantification_window_center -3 --trimmomatic_command trimmomatic --conversion_nuc_from C --min_bp_quality_or_N 0 --default_min_aln_score 60 --needleman_wunsch_gap_incentive 1 --min_paired_end_reads_overlap 10 --needleman_wunsch_aln_matrix_loc EDNAFULL --prime_editing_pegRNA_scaffold_min_match_length 1 --aln_seed_min 2 --aln_seed_len 10 --needleman_wunsch_gap_open -20 --max_paired_end_reads_overlap 100 --conversion_nuc_to T --flexiguide_homology 80 --flash_command flash --min_single_bp_quality 0 --exclude_bp_from_left 15 --min_average_read_quality 0 --debug --min_frequency_alleles_around_cut_to_plot 0.2 --exclude_bp_from_right 15
+Finished CRISPResso region #1
+Finished all regions
+Analysis Complete!
