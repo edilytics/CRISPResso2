@@ -487,7 +487,7 @@ class CRISPRessoJSONDecoder(json.JSONDecoder):
                 return eval(obj['value'])
             if obj['_type'] == 'range':
                 start, end, step = re.match(
-                    r'range\((\d), (\d)(?:, (\d))?\)', obj['value'],
+                    r'range\((\d+), (\d+)(?:, (\d+))?\)', obj['value'],
                 ).groups()
                 if step is not None:
                     return range(int(start), int(end), int(step))
