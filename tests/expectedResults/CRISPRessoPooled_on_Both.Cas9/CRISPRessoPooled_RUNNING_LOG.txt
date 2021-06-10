@@ -1,6 +1,6 @@
-CRISPResso version 2.1.0
+CRISPResso version 2.1.1
 [Command used]:
-/Users/cole/miniconda3/envs/CRISPResso2/bin/CRISPRessoPooled -r1 Both.Cas9.fastq -f Cas9.amplicons.txt -p 2 --keep_intermediate --min_reads_to_use_region 100 --debug
+/home/kenclem1/anaconda3/envs/crispresso2_dev/bin/CRISPRessoPooled -r1 Both.Cas9.fastq -f Cas9.amplicons.txt -p 2 --keep_intermediate --min_reads_to_use_region 100 --debug
 
 [Execution log]:
 Processing input
@@ -106,7 +106,7 @@ Headers:
     ebwtTotSz: 192
     color: 0
     reverse: 0
-Total time for call to driver() for forward index: 00:00:00
+Total time for call to driver() for forward index: 00:00:01
 Reading reference sizes
   Time reading reference sizes: 00:00:00
 Calculating joined length
@@ -191,13 +191,13 @@ Headers:
     reverse: 1
 Total time for backward call to driver() for mirror index: 00:00:00
 Align reads to the amplicons...
-Alignment command: bowtie2 -x CRISPRessoPooled_on_Both.Cas9/CUSTOM_BOWTIE2_INDEX -p 2  -k 1 --end-to-end -N 0 --np 0  -U CRISPRessoPooled_on_Both.Cas9/Both.Cas9.fastq 2>>CRISPRessoPooled_on_Both.Cas9/CRISPRessoPooled_RUNNING_LOG.txt | samtools view -bS - > CRISPRessoPooled_on_Both.Cas9/CRISPResso_AMPLICONS_ALIGNED.bam
+Alignment command: bowtie2 -x CRISPRessoPooled_on_Both.Cas9/CUSTOM_BOWTIE2_INDEX -p 2  --end-to-end -N 0 --np 0 --mp 3,2 --score-min L,-5,-1.2  -U CRISPRessoPooled_on_Both.Cas9/Both.Cas9.fastq 2>>CRISPRessoPooled_on_Both.Cas9/CRISPRessoPooled_RUNNING_LOG.txt | samtools view -bS - > CRISPRessoPooled_on_Both.Cas9/CRISPResso_AMPLICONS_ALIGNED.bam
 500 reads; of these:
   500 (100.00%) were unpaired; of these:
-    66 (13.20%) aligned 0 times
-    434 (86.80%) aligned exactly 1 time
-    0 (0.00%) aligned >1 times
-86.80% overall alignment rate
+    8 (1.60%) aligned 0 times
+    482 (96.40%) aligned exactly 1 time
+    10 (2.00%) aligned >1 times
+98.40% overall alignment rate
 Demultiplex reads and run CRISPResso on each amplicon...
 
  Processing:FANC

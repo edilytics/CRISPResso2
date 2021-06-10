@@ -1,7 +1,7 @@
 (dp1
 S'command_used'
 p2
-S'/Users/cole/miniconda3/envs/CRISPResso2/bin/CRISPRessoPooled -r1 Both.Cas9.fastq -f Cas9.amplicons.txt -p 2 --keep_intermediate --min_reads_to_use_region 100 --debug'
+S'/home/kenclem1/anaconda3/envs/crispresso2_dev/bin/CRISPRessoPooled -r1 Both.Cas9.fastq -f Cas9.amplicons.txt -p 2 --keep_intermediate --min_reads_to_use_region 100 --debug'
 p3
 sS'summary_plot_datas'
 p4
@@ -146,7 +146,7 @@ NNNI-1
 I-1
 I0
 tbI00
-S'\x00\x00\x00\x00\x00\x00\xf8\x7f\x00\x00\x00\x00\x00\x00\xf8\x7f\x00\x00\x00\x00\x00\x00\xf8\x7f\x00\x00\x00\x00\x00\x00\xf8\x7f\x80\xb4?\xda\x1f\xedF@\x81K\xc0%\xe0\x12K@'
+S'\x00\x00\x00\x00\x00\x00\xf8\x7f\x00\x00\x00\x00\x00\x00\xf8\x7f\x00\x00\x00\x00\x00\x00\xf8\x7f\x00\x00\x00\x00\x00\x00\xf8\x7f\x98\xf5~Y\xef\x97H@i\n\x81\xa6\x10hI@'
 tbag35
 (g36
 (I0
@@ -166,7 +166,7 @@ NNNI-1
 I-1
 I0
 tbI00
-S'\xc7\x00\x00\x00\x00\x00\x00\x00\xeb\x00\x00\x00\x00\x00\x00\x00'
+S'\xf2\x00\x00\x00\x00\x00\x00\x00\xfa\x00\x00\x00\x00\x00\x00\x00'
 tbag35
 (g36
 (I0
@@ -316,11 +316,11 @@ S'Each bar shows the total number of reads allocated to each amplicon. The verti
 p103
 ssS'version'
 p104
-S'2.1.0'
+S'2.1.1'
 p105
 sS'running_time_string'
 p106
-S'0:00:35.580929'
+S'0:00:17.815846'
 p107
 sS'summary_plot_names'
 p108
@@ -331,9 +331,9 @@ asS'all_region_read_counts'
 p110
 (dp111
 g15
-I199
+I242
 sg16
-I235
+I250
 ssS'log_filename'
 p112
 S'CRISPRessoPooled_RUNNING_LOG.txt'
@@ -500,13 +500,15 @@ I00
 sS'discard_guide_positions_overhanging_amplicon_edge'
 p171
 I00
-sS'skip_reporting_problematic_regions'
+sS'use_legacy_bowtie2_options_string'
 p172
 I00
-sS'bowtie2_options_string'
+sS'skip_reporting_problematic_regions'
 p173
-S' -k 1 --end-to-end -N 0 --np 0 '
+I00
+sS'bowtie2_options_string'
 p174
+S''
 sS'expand_allele_plots_by_quantification'
 p175
 I00
@@ -667,12 +669,12 @@ cdatetime
 timedelta
 p234
 (I0
-I35
-I580929
+I17
+I815846
 tRp235
 sS'end_time_string'
 p236
-S'2021-04-09 12:58:29'
+S'2021-05-23 00:26:35'
 p237
 sS'report_location'
 p238
@@ -682,7 +684,7 @@ p239
 cdatetime
 datetime
 p240
-(S'\x07\xe5\x04\t\x0c:\x1d\x0b\xf5\xf7'
+(S'\x07\xe5\x05\x17\x00\x1a#\n\x80R'
 tRp241
 sS'good_region_names'
 p242

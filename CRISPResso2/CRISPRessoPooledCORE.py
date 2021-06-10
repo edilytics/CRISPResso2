@@ -7,13 +7,12 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 
 
 import os
-import errno
 import sys
 from copy import deepcopy
 from datetime import datetime
 import subprocess as sb
 import glob
-import argparse
+import gzip
 import unicodedata
 import string
 import re
@@ -275,7 +274,14 @@ def main():
         parser.add_argument('-p', '--n_processes', type=str, help='Specify the number of processes to use for analysis.\
         Please use with caution since increasing this parameter will significantly increase the memory required to run CRISPResso. Can be set to \'max\'.', default='1')
         parser.add_argument('-x', '--bowtie2_index', type=str, help='Basename of Bowtie2 index for the reference genome', default='')
-        parser.add_argument('--bowtie2_options_string', type=str, help='Override options for the Bowtie2 alignment command', default=' -k 1 --end-to-end -N 0 --np 0 ')
+        # rationale for setting the default scores:
+        # --end-to-end - no clipping, match bonus -ma is set to 0
+        # -N 0 number of mismatches allowed in seed alignment
+        # --np 0 where read (or ref have ambiguous character (N)) penalty is 0
+        # -mp 3,2 mismatch penalty - set max mismatch to -3 to coincide with the gap extension penalty (2 is the default min mismatch penalty)
+        # --score-min L,-5,-3*(1-H) For a given homology score, we allow up to (1-H) mismatches (-3) or gap extensions (-3) and one gap open (-5). This score translates to -5 + -3(1-H)L where L is the sequence length
+        parser.add_argument('--bowtie2_options_string', type=str, help='Override options for the Bowtie2 alignment command. By default, this is " --end-to-end -N 0 --np 0 -mp 3,2 --score-min L,-5,-3(1-H)" where H is the default homology score.', default='')
+        parser.add_argument('--use_legacy_bowtie2_options_string', help='Use legacy (more stringent) Bowtie2 alignment parameters: " -k 1 --end-to-end -N 0 --np 0 ".', action='store_true')
         parser.add_argument('--min_reads_to_use_region',  type=float, help='Minimum number of reads that align to a region to perform the CRISPResso analysis', default=1000)
         parser.add_argument('--skip_failed',  help='Continue with pooled analysis even if one sample fails', action='store_true')
         parser.add_argument('--skip_reporting_problematic_regions', help='Skip reporting of problematic regions. By default, when both amplicons (-f) and genome (-x) are provided, problematic reads that align to the genome but to positions other than where the amplicons align are reported as problematic', action='store_true')
@@ -283,6 +289,7 @@ def main():
         parser.add_argument('--compile_postrun_references', help='If set, a file will be produced which compiles the reference sequences of frequent amplicons.', action='store_true')
         parser.add_argument('--compile_postrun_reference_allele_cutoff', type=float, help='Only alleles with at least this percentage frequency in the population will be reported in the postrun analysis. This parameter is given as a percent, so 30 is 30%%.', default=30)
         parser.add_argument('--alternate_alleles', type=str, help='Path to tab-separated file with alternate allele sequences for pooled experiments. This file has the columns "region_name","reference_seqs", and "reference_names" and gives the reference sequences of alternate alleles that will be passed to CRISPResso for each individual region for allelic analysis. Multiple reference alleles and reference names for a given region name are separated by commas (no spaces).', default='')
+        parser.add_argument('--limit_open_files_for_demux', help='If set, only one file will be opened during demultiplexing of read alignment locations. This will be slightly slower as the reads must be sorted, but may be necessary if the number of amplicons is greater than the number of files that can be opened due to OS constraints.', action='store_true')
 
         args = parser.parse_args()
 
@@ -327,10 +334,20 @@ def main():
             info('Only the bowtie2 reference genome index file was provided. The analysis will be perfomed using only genomic regions where enough reads align.')
         elif args.bowtie2_index and args.amplicons_file:
             RUNNING_MODE='AMPLICONS_AND_GENOME'
-            info('Amplicon description file and bowtie2 reference genome index files provided. The analysis will be perfomed using the reads that are aligned ony to the amplicons provided and not to other genomic regions.')
+            info('Amplicon description file and bowtie2 reference genome index files provided. The analysis will be perfomed using the reads that are aligned only to the amplicons provided and not to other genomic regions.')
         else:
             error('Please provide the amplicons description file (-f or --amplicons_file option) or the bowtie2 reference genome index file (-x or --bowtie2_index option) or both.')
             sys.exit(1)
+
+        bowtie2_options_string = args.bowtie2_options_string
+        if args.bowtie2_options_string == "":
+            if args.use_legacy_bowtie2_options_string:
+                bowtie2_options_string = '-k 1 --end-to-end -N 0 --np 0'
+            else:
+                homology_param = -3 * (1-(args.default_min_aln_score/100.0))
+                bowtie2_options_string = " --end-to-end -N 0 --np 0 --mp 3,2 --score-min L,-5," + str(homology_param) + " "
+
+
 
         if args.alternate_alleles:
             CRISPRessoShared.check_file(args.alternate_alleles)
@@ -636,20 +653,50 @@ def main():
             #align the file to the amplicons (MODE 1)
             info('Align reads to the amplicons...')
             bam_filename_amplicons= _jp('CRISPResso_AMPLICONS_ALIGNED.bam')
-            aligner_command= 'bowtie2 -x %s -p %s %s -U %s 2>>%s | samtools view -bS - > %s' %(custom_index_filename, n_processes, args.bowtie2_options_string, processed_output_filename, log_filename, bam_filename_amplicons)
+            aligner_command= 'bowtie2 -x %s -p %s %s -U %s 2>>%s | samtools view -bS - > %s' %(custom_index_filename, n_processes, bowtie2_options_string, processed_output_filename, log_filename, bam_filename_amplicons)
 
 
             info('Alignment command: ' + aligner_command)
             sb.call(aligner_command, shell=True)
 
-            N_READS_ALIGNED=get_n_aligned_bam(bam_filename_amplicons)
+            N_READS_ALIGNED = get_n_aligned_bam(bam_filename_amplicons)
 
-            s1=r"samtools view -F 4 %s 2>>%s | grep -v ^'@'" % (bam_filename_amplicons, log_filename)
-            s2=r'''|awk '{ gzip_filename=sprintf("gzip >> OUTPUTPATH%s.fastq.gz",$3);\
-            print "@"$1"\n"$10"\n+\n"$11  | gzip_filename;}' '''
+            if args.limit_open_files_for_demux:
+                bam_iter = CRISPRessoShared.get_command_output(
+                    'samtools sort {bam_file} | samtools view -F 4 2>> {log_file}'.format(
+                        bam_file=bam_filename_amplicons,
+                        log_file=log_filename,
+                    ),
+                )
+                curr_file, curr_chr = None, None
+                for bam_line in bam_iter:
+                    bam_line_els = bam_line.split('\t')
+                    line_chr = bam_line_els[2]
 
-            cmd=s1+s2.replace('OUTPUTPATH', _jp(''))
-            sb.call(cmd, shell=True)
+                    # at the first line open new file, or at next amplicon
+                    # close previous file and open new one
+                    if curr_chr != line_chr:
+                        if curr_file is not None:
+                            curr_file.close()
+                        curr_file = gzip.open(
+                            _jp('{0}.fastq.gz'.format(line_chr)),
+                            'wb',
+                        )
+                    curr_file.write('@{read_name}\n{seq}\n+\n{qual}\n'.format(
+                        read_name=bam_line_els[0],
+                        seq=bam_line_els[9],
+                        qual=bam_line_els[10],
+                    ))
+                    curr_chr = line_chr
+                if curr_file is not None:
+                    curr_file.close()
+            else:
+                s1 = r"samtools view -F 4 %s 2>>%s | grep -v ^'@'" % (bam_filename_amplicons,log_filename)
+                s2 = r'''|awk '{ gzip_filename=sprintf("gzip >> OUTPUTPATH%s.fastq.gz",$3);\
+                print "@"$1"\n"$10"\n+\n"$11  | gzip_filename;}' '''
+
+                cmd = s1+s2.replace('OUTPUTPATH', _jp(''))
+                sb.call(cmd, shell=True)
 
             alternate_alleles = {}
             if args.alternate_alleles:
@@ -727,7 +774,7 @@ def main():
                     for idx, row in df_template.iterrows():
                         fastas.write('>%s\n%s\n'%(idx, row.Amplicon_Sequence))
 
-                aligner_command= 'bowtie2 -x %s -p %s %s -f -U %s --no-hd --no-sq 2> %s > %s ' %(args.bowtie2_index, n_processes, args.bowtie2_options_string, \
+                aligner_command= 'bowtie2 -x %s -p %s %s -f -U %s --no-hd --no-sq 2> %s > %s ' %(args.bowtie2_index, n_processes, bowtie2_options_string, \
                     filename_amplicon_seqs_fasta, filename_aligned_amplicons_sam_log, filename_aligned_amplicons_sam)
                 bowtie_status=sb.call(aligner_command, shell=True)
                 if bowtie_status:
@@ -804,7 +851,7 @@ def main():
             else:
                 info('Aligning reads to the provided genome index...')
                 aligner_command= 'bowtie2 -x %s -p %s %s -U %s 2>>%s| samtools view -bS - | samtools sort -@ %d - -o %s' %(args.bowtie2_index, n_processes,
-                    args.bowtie2_options_string, processed_output_filename, log_filename, n_processes, bam_filename_genome)
+                    bowtie2_options_string, processed_output_filename, log_filename, n_processes, bam_filename_genome)
                 info('aligning with command: ' + aligner_command)
                 sb.call(aligner_command, shell=True)
 
@@ -1231,7 +1278,7 @@ def main():
 
 
                     vals = [run_name]
-                    vals.extend([round(unmod_pct, 8), round(mod_pct, 8), n_aligned, n_tot, n_unmod, n_mod, n_discarded, n_insertion, n_deletion, n_substitution, n_only_insertion, n_only_deletion, n_only_substitution, n_insertion_and_deletion, n_insertion_and_substitution, n_deletion_and_substitution, n_insertion_and_deletion_and_substitution])
+                    vals.extend([round(unmod_pct, 8), round(mod_pct, 8), n_tot, n_aligned, n_unmod, n_mod, n_discarded, n_insertion, n_deletion, n_substitution, n_only_insertion, n_only_deletion, n_only_substitution, n_insertion_and_deletion, n_insertion_and_substitution, n_deletion_and_substitution, n_insertion_and_deletion_and_substitution])
                     quantification_summary.append(vals)
 
                     good_region_names.append(run_name)

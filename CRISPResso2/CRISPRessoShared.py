@@ -25,7 +25,7 @@ from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
 
 
-__version__ = "2.0.45"
+__version__ = "2.1.1"
 
 ###EXCEPTIONS############################
 class FlashException(Exception):
@@ -117,6 +117,7 @@ def getCRISPRessoArgParser(parserTitle = "CRISPResso Parameters",requiredParams=
     #    parser.add_argument('--cleavage_offset', type=str, help="Predicted cleavage position for cleaving nucleases with respect to the 3' end of the provided sgRNA sequence. Remember that the sgRNA sequence must be entered without the PAM. The default value of -3 is suitable for the Cas9 system. For alternate nucleases, other cleavage offsets may be appropriate, for example, if using Cpf1 this parameter would be set to 1. To suppress the cleavage offset, enter 'N'.", default=-3)
     parser.add_argument('--exclude_bp_from_left', type=int, help='Exclude bp from the left side of the amplicon sequence for the quantification of the indels', default=15)
     parser.add_argument('--exclude_bp_from_right', type=int, help='Exclude bp from the right side of the amplicon sequence for the quantification of the indels', default=15)
+    parser.add_argument('--use_legacy_insertion_quantification', help='If set, the legacy insertion quantification method will be used (i.e. with a 1bp quantification window, indels at the cut site and 1bp away from the cut site would be quantified). By default (if this parameter is not set) with a 1bp quantification window, only insertions at the cut site will be quantified.', action='store_true')
 
     parser.add_argument('--ignore_substitutions', help='Ignore substitutions events for the quantification and visualization', action='store_true')
     parser.add_argument('--ignore_insertions', help='Ignore insertions events for the quantification and visualization', action='store_true')
@@ -551,10 +552,31 @@ def write_crispresso_info(crispresso_output_file, crispresso2_info):
         json.dump(crispresso2_info, fh, cls=CRISPRessoJSONEncoder)
 
 
-def get_most_frequent_reads(fastq_r1,fastq_r2,number_of_reads_to_consider,flash_command,max_paired_end_reads_overlap,min_paired_end_reads_overlap,debug=False):
+def get_command_output(command):
     """
-    Gets the most frequent amplicon from a fastq file (or after merging a r1 and r2 fastq file)
+    Run a shell command and returns an iter to read the output.
+
+    param:
+        command: shell command to run
+
+    returns:
+        iter to read the output
+    """
+    p = sb.Popen(command,
+                 stdout=sb.PIPE,
+                 stderr=sb.STDOUT, shell=True,
+                 #  encoding='utf-8',universal_newlines=True)
+                 universal_newlines=True,
+                 bufsize=-1)  # bufsize system default
+    return iter(p.stdout.readline, b'')
+
+
+def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, flash_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap, debug=False):
+    """
+    Get the most frequent amplicon from a fastq file (or after merging a r1 and r2 fastq file).
+
     Note: only works on paired end or single end reads (not interleaved)
+
     input:
     fastq_r1: path to fastq r1 (can be gzipped)
     fastq_r2: path to fastq r2 (can be gzipped)
@@ -994,8 +1016,8 @@ def get_amplicon_info_for_guides(ref_seq,guides,guide_mismatches,guide_names,qua
     #first, if exact coordinates have been given, set those
     given_include_idxs = []
     if quantification_window_coordinates is not None:
-        coordinate_include_idxs=[]
-        theseCoords = quantification_window_coordinates.split("_")
+        coordinate_include_idxs = []
+        theseCoords = str(quantification_window_coordinates).split("_")
         for coord in theseCoords:
             coordRE = re.match(r'^(\d+)-(\d+)$', coord)
             if coordRE:
@@ -1244,7 +1266,7 @@ def get_crispresso_header(description, header_str):
         for i in range(len(logo_lines))[::-1]:
             output_line = (pad_string + logo_lines[i].ljust(max_logo_width) + pad_string).center(term_width) + "\n" + output_line
 
-    output_line += '\n'+('[CRISPResso version ' + __version__ + ']').center(term_width) + '\n' + ('[Kendell Clement and Luca Pinello 2020]').center(term_width) + "\n" + ('[For support contact kclement@mgh.harvard.edu]').center(term_width) + "\n"
+    output_line += '\n'+('[CRISPResso version ' + __version__ + ']').center(term_width) + '\n' + ('[Note that starting in version 2.1.0 insertion quantification has been changed\nto only include insertions completely contained by the quantification window.\nTo use the legacy quantification method (i.e. include insertions directly adjacent\nto the quantification window) please use the parameter --use_legacy_insertion_quantification]').center(term_width) + "\n" + ('[For support contact kclement@mgh.harvard.edu]').center(term_width) + "\n"
 
     description_str = ""
     for str in description:
