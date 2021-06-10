@@ -94,8 +94,6 @@ def main():
         #batch specific params
         parser.add_argument('--metadata', type=str, help='Metadata file according to NIST specification', required=True)
         parser.add_argument('-mo', '--meta_output_folder',  help='Directory where analysis output will be stored')
-        parser.add_argument('-p', '--n_processes', type=int, help='Specify the number of processes to use for quantification.\
-        Please use with caution since increasing this parameter will increase the memory required to run CRISPResso.', default=1)
         parser.add_argument('--crispresso_command', help='CRISPResso command to call', default='CRISPResso')
 
         args = parser.parse_args()

@@ -14,17 +14,15 @@ import matplotlib.patches as patches
 import matplotlib.cm as cm
 import matplotlib.gridspec as gridspec
 from collections import defaultdict
+from copy import deepcopy
 import re
 from matplotlib import colors as colors_mpl
 import seaborn as sns
-sns.set_style("white")
-sns.set_context('poster')
-sns.set(font_scale=2.2)
 
 from CRISPResso2 import CRISPRessoShared
 
 def setMatplotlibDefaults():
-    font = {'size'   : 22}
+    font = {'size': 22}
     matplotlib.rc('font', **font)
     matplotlib.use('AGG')
     matplotlib.rcParams['pdf.fonttype'] = 42
@@ -32,6 +30,8 @@ def setMatplotlibDefaults():
     matplotlib.rcParams["font.sans-serif"] = ["Arial", "Liberation Sans", "Bitstream Vera Sans"]
     matplotlib.rcParams["font.family"] = "sans-serif"
     matplotlib.rcParams['axes.facecolor'] = 'white'
+    sns.set(style='white', font_scale=2.2)
+    plt.ioff()
 
 setMatplotlibDefaults()
 
@@ -117,11 +117,10 @@ def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root,save_also_png=
     #fig = plt.figure(figsize=(amp_len,nSamples))
     #fig = plt.figure(figsize=(amp_len,nSamples*2))
     #fig = plt.figure(figsize=(amp_len,(nSamples+1)*2))
-    fig = plt.figure(figsize=((amp_len+10)/2.0, (nSamples+1)*2))
-    ax = fig.add_subplot(111)
+    fig, ax = plt.subplots(figsize=((amp_len+10)/2.0, (nSamples+1)*2))
 
     #remove box around plot
-    for spine in plt.gca().spines.values():
+    for spine in ax.spines.values():
         spine.set_visible(False)
 
 
@@ -212,7 +211,7 @@ def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root,save_also_png=
             )
         ax.text(pos_ind+0.5, ref_y_start + ref_y_height/2.3, ref_seq[pos_ind], horizontalalignment='center', verticalalignment='center')
 
-    plt.tick_params(top=False, bottom=False, left=False, right=False, labelleft=True, labelbottom=False)
+    ax.tick_params(top=False, bottom=False, left=False, right=False, labelleft=True, labelbottom=False)
 
     ax.set_yticks([ref_y_start + ref_y_height/2.0]+[x+0.5 for x in range(1, nSamples+1)])
 #    sampleLabs = list(nuc_pct_df.iloc[[((nSamples-1)-x)*nNucs for x in range(0,nSamples)],0]))
@@ -282,7 +281,7 @@ def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root,save_also_png=
         legend_patches.append(q_win_patch)
 
 
-    plt.legend(handles=legend_patches, loc='center left', ncol=1, bbox_to_anchor=(1, 0.5))
+    ax.legend(handles=legend_patches, loc='center left', ncol=1, bbox_to_anchor=(1, 0.5))
 
 
     ### todo -- if the plot_around_cut is really small (e.g. 2) the plots are blown out of proportion.. this could be fixed here, but not easily
@@ -298,11 +297,1542 @@ def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root,save_also_png=
 #    else:
 #        fig.tight_layout()
 
-    fig.savefig(fig_filename_root+'.pdf')
     fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight')
     if save_also_png:
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
-    plt.close()
+    plt.close(fig)
+
+
+def plot_indel_size_distribution(
+    hdensity,
+    hlengths,
+    center_index,
+    n_this_category,
+    xmin,
+    xmax,
+    title,
+    plot_root,
+    save_also_png=False,
+):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    densityPct_0 = 0.0
+    densityPcts = [0.0] * len(hdensity)
+    if hdensity.sum() > 0:
+        densityPct_0 = hdensity[center_index] / (float(hdensity.sum())) * 100.0
+        densityPcts = hdensity / (float(hdensity.sum())) * 100.0
+    ax.bar(0, densityPct_0, color='red', linewidth=0)
+    barlist = ax.bar(hlengths, densityPcts, align='center', linewidth=0)
+    barlist[center_index].set_color('r')
+
+    ax.set_xlim([xmin, xmax])
+    ax.set_title(title)
+    ax.set_ylabel('Sequences % (no.)')
+    y_label_values = np.round(
+        np.linspace(0, min(100, max(ax.get_yticks())), 6),
+    )
+    ax.set_yticks(y_label_values)
+    ax.set_yticklabels([
+        '%.1f%% (%.0f)' % (pct, pct / 100 * n_this_category)
+        for pct in y_label_values
+    ])
+    ax.set_xlabel('Indel size (bp)')
+    lgd = ax.legend(
+        ['No indel', 'Indel'],
+        loc='center',
+        bbox_to_anchor=(0.5, -0.20),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    lgd.legendHandles[0].set_height(3)
+    lgd.legendHandles[1].set_height(3)
+
+    ax.tick_params(left=True, bottom=True)
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_frequency_deletions_insertions(
+    ref,
+    counts_total,
+    plot_titles,
+    plot_path,
+    xmax_del,
+    xmax_ins,
+    xmax_mut,
+    save_also_png=False,
+):
+    y_values_mut = ref['y_values_mut']
+    x_bins_mut = ref['x_bins_mut']
+    y_values_ins = ref['y_values_ins']
+    x_bins_ins = ref['x_bins_ins']
+    y_values_del = ref['y_values_del']
+    x_bins_del = ref['x_bins_del']
+
+    fig, axs = plt.subplots(1, 3, figsize=(26, 6.5))
+
+    ax = axs[0]
+    ax.bar(
+        x_bins_ins, y_values_ins, align='center', linewidth=0, color=(0, 0, 1),
+    )
+    barlist = ax.bar(
+        x_bins_ins, y_values_ins, align='center', linewidth=0, color=(0, 0, 1),
+    )
+    barlist[0].set_color('r')
+    ax.set_title(plot_titles['ins'])
+    ax.set_xlabel('Size (bp)')
+    ax.set_ylabel('Sequences % (no.)')
+    lgd = ax.legend(
+        ['Non-insertion', 'Insertion'][::-1],
+        bbox_to_anchor=(.82, -0.27),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    lgd.legendHandles[0].set_height(6)
+    lgd.legendHandles[1].set_height(6)
+
+    ax.set_xlim([-1, xmax_ins])
+    y_label_values= np.round(
+        np.linspace(0, min(counts_total, max(ax.get_yticks())), 6),
+    )
+    ax.set_yticks(y_label_values)
+    ax.set_yticklabels(
+        [
+             '%.1f%% (%d)' % (n_reads / counts_total * 100, n_reads)
+             for n_reads in y_label_values
+        ],
+    )
+    ax.tick_params(left=True, bottom=True)
+
+    ax = axs[1]
+    ax.bar(
+        -x_bins_del, y_values_del, align='center', linewidth=0, color=(0, 0, 1),
+    )
+    barlist = ax.bar(
+        -x_bins_del, y_values_del, align='center', linewidth=0, color=(0, 0, 1),
+    )
+    barlist[0].set_color('r')
+    ax.set_title(plot_titles['del'])
+    ax.set_xlabel('Size (bp)')
+    ax.set_ylabel('Sequences % (no.)')
+    lgd = ax.legend(
+        ['Non-deletion', 'Deletion'][::-1],
+        bbox_to_anchor=(.82, -0.27),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    lgd.legendHandles[0].set_height(6)
+    lgd.legendHandles[1].set_height(6)
+
+    ax.set_xlim([-1 * xmax_del, 1])
+    y_label_values = np.round(
+        np.linspace(0, min(counts_total, max(ax.get_yticks())), 6),
+    )
+    ax.set_yticks(y_label_values)
+    ax.set_yticklabels(
+        [
+            '%.1f%% (%d)' % (n_reads / counts_total * 100, n_reads)
+            for n_reads in y_label_values
+        ],
+    )
+    ax.tick_params(left=True, bottom=True)
+
+    ax = axs[2]
+    ax.bar(
+        x_bins_mut, y_values_mut, align='center', linewidth=0, color=(0, 0, 1),
+    )
+    barlist = ax.bar(
+        x_bins_mut, y_values_mut, align='center', linewidth=0, color=(0, 0, 1),
+    )
+    barlist[0].set_color('r')
+    ax.set_title(plot_titles['mut'])
+    ax.set_xlabel('Positions substituted (number)')
+    ax.set_ylabel('Sequences % (no.)')
+    lgd = ax.legend(
+        ['Non-substitution', 'Substitution'][::-1],
+        bbox_to_anchor=(.82, -0.27),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    lgd.legendHandles[0].set_height(6)
+    lgd.legendHandles[1].set_height(6)
+
+    ax.set_xlim([-1, xmax_mut])
+    y_label_values= np.round(
+        np.linspace(0, min(counts_total, max(ax.get_yticks())), 6),
+    )
+    ax.set_yticks(y_label_values)
+    ax.set_yticklabels(
+        [
+            '%.1f%% (%d)' % (n_reads / counts_total * 100, n_reads)
+            for n_reads in y_label_values
+        ],
+    )
+
+    ax.tick_params(left=True, bottom=True)
+    fig.tight_layout()
+    fig.savefig(plot_path + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_path + '.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_amplicon_modifications(
+    all_indelsub_count_vectors,
+    include_idxs_list,
+    cut_points,
+    plot_cut_points,
+    sgRNA_intervals,
+    n_total,
+    n_this_category,
+    ref_name,
+    num_refs,
+    ref_len,
+    y_max,
+    plot_titles,
+    plot_root,
+    save_also_png=False,
+):
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    #shade quantification window
+    if len(include_idxs_list) > 1:
+        lastStart = include_idxs_list[0]
+        lastIdx = include_idxs_list[0]
+        for idx in range(1, len(include_idxs_list)):
+            if include_idxs_list[idx] == lastIdx + 1:
+                lastIdx = include_idxs_list[idx]
+            else:
+                p = matplotlib.patches.Rectangle(
+                    (lastStart - 0.5, 0),
+                    1 + (lastIdx - lastStart),
+                    y_max,
+                    facecolor=(0, 0, 0, 0.05),
+                    edgecolor=(0, 0, 0, 0.25),
+                    linestyle=(0, (5, 2)),
+                    linewidth=2,
+                )
+                ax.add_patch(p)
+                lastStart = include_idxs_list[idx]
+                lastIdx = include_idxs_list[idx]
+        p = matplotlib.patches.Rectangle(
+            (lastStart - 0.5, 0),
+            1 + (lastIdx - lastStart),
+            y_max,
+            facecolor=(0, 0, 0, 0.05),
+            edgecolor=(0, 0, 0, 0.25),
+            linestyle=(0, (5, 2)),
+            linewidth=2,
+            label='Quantification window',
+        )
+        ax.add_patch(p)
+
+    ax.plot(
+        all_indelsub_count_vectors,
+        'r',
+        lw=3,
+        label=plot_titles['combined'],
+    )
+
+    if cut_points:
+        added_legend = False
+        for idx, cut_point in enumerate(cut_points):
+            if not added_legend and plot_cut_points[idx]:
+                ax.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='Predicted cleavage position',
+                )
+                added_legend = True
+            elif plot_cut_points[idx]:
+                ax.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='_nolegend_',
+                )
+
+        for idx, sgRNA_int in enumerate(sgRNA_intervals):
+            if idx == 0:
+                ax.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [0, 0],
+                    lw=10,
+                    c=(0, 0, 0, 0.15),
+                    label='sgRNA',
+                    solid_capstyle='butt',
+                )
+            else:
+                ax.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [0, 0],
+                    lw=10,
+                    c=(0, 0, 0, 0.15),
+                    label='_nolegend_',
+                    solid_capstyle='butt',
+                )
+
+    lgd = ax.legend(
+        loc='center',
+        bbox_to_anchor=(0.5, -0.28),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    ylabel_values = np.arange(0, 1, 1.0 / 6.0)
+    if y_max > 0:
+        y_label_values = np.arange(0, y_max, y_max / 6.0)
+    if num_refs == 1:
+        ax.set_ylabel('Sequences: % Total ( no. )')
+        ax.set_yticks(y_label_values)
+        ax.set_yticklabels(
+            [
+                '%.1f%% (%d)' % (n_reads / float(n_total) * 100, n_reads)
+                for n_reads in y_label_values
+            ],
+        )
+    else:
+        ax.set_ylabel('Sequences: % Total ( % ' + ref_name + ', no. )')
+        ax.set_yticks(y_label_values)
+        ax.set_yticklabels(
+            [
+                '%.1f%% (%.1f%% , %d)' % (
+                    n_reads / float(n_total) * 100,
+                    n_reads / float(n_this_category) * 100,
+                    n_reads,
+                ) for n_reads in y_label_values
+            ],
+        )
+    ax.set_xticks(np.arange(
+        0, ref_len, max(3, (ref_len / 6) - (ref_len / 6) % 5)).astype(int),
+    )
+
+    ax.set_title(plot_titles['main'])
+    ax.set_xlabel('Reference amplicon position (bp)')
+    ax.set_ylim(0, max(1, y_max))
+    ax.set_xlim(0, ref_len - 1)
+    ax.tick_params(left=True, bottom=True)
+
+    fig.savefig(
+        plot_root + '.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight',
+    )
+    if save_also_png:
+        fig.savefig(
+            plot_root + '.png', bbox_extra_artists=(lgd,), bbox_inches='tight',
+        )
+    plt.close(fig)
+
+
+def plot_modification_frequency(
+    include_idxs_list,
+    all_insertion_count_vectors,
+    all_deletion_count_vectors,
+    all_substitution_count_vectors,
+    sgRNA_intervals,
+    ref_len,
+    ref_name,
+    num_refs,
+    n_total,
+    n_this_category,
+    cut_points,
+    plot_cut_points,
+    y_max,
+    plot_title,
+    plot_root,
+    save_also_png=False,
+):
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    #shade quantification window
+    if len(include_idxs_list) > 1:
+        lastStart = include_idxs_list[0]
+        lastIdx = include_idxs_list[0]
+        for idx in range(1, len(include_idxs_list)):
+            if include_idxs_list[idx] == lastIdx + 1:
+                lastIdx = include_idxs_list[idx]
+            else:
+                p = matplotlib.patches.Rectangle(
+                    (lastStart - 0.5, 0),
+                    1 + (lastIdx - lastStart),
+                    y_max,
+                    facecolor=(0, 0, 0, 0.05),
+                    edgecolor=(0, 0, 0, 0.25),
+                    linestyle=(0, (5, 2)),
+                    linewidth=2,
+                )
+                ax.add_patch(p)
+                lastStart = include_idxs_list[idx]
+                lastIdx = include_idxs_list[idx]
+        p = matplotlib.patches.Rectangle(
+            (lastStart - 0.5, 0),
+            1 + (lastIdx - lastStart),
+            y_max,
+            facecolor=(0, 0, 0, 0.05),
+            edgecolor=(0, 0, 0, 0.25),
+            linestyle=(0, (5, 2)),
+            linewidth=2,
+            label='Quantification window',
+        )
+        ax.add_patch(p)
+
+    ax.plot(
+        all_insertion_count_vectors, 'r', lw=3, label='Insertions',
+    )
+    ax.plot(
+        all_deletion_count_vectors, 'm', lw=3, label='Deletions',
+    )
+    ax.plot(
+        all_substitution_count_vectors, 'g', lw=3, label='Substitutions',
+    )
+
+    y_max = max(
+        max(all_insertion_count_vectors),
+        max(all_deletion_count_vectors),
+        max(all_substitution_count_vectors),
+    ) * 1.1
+
+    if cut_points:
+        added_legend = False
+        for idx, cut_point in enumerate(cut_points):
+            if not added_legend and plot_cut_points[idx]:
+                ax.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='Predicted cleavage position',
+                )
+                added_legend = True
+            elif plot_cut_points[idx]:
+                ax.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='_nolegend_',
+                )
+
+        for idx, sgRNA_int in enumerate(sgRNA_intervals):
+            if idx == 0:
+                ax.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [0, 0],
+                    lw=10,
+                    c=(0, 0, 0, 0.15),
+                    label='sgRNA',
+                    solid_capstyle='butt',
+                )
+            else:
+                ax.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [0, 0],
+                    lw=10,
+                    c=(0, 0, 0, 0.15),
+                    label='_nolegend_',
+                    solid_capstyle='butt',
+                )
+
+    lgd = ax.legend(
+        loc='center',
+        bbox_to_anchor=(0.5, -0.33),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    y_label_values = np.arange(0, 1, 1.0 / 6.0)
+    if y_max > 0:
+        y_label_values = np.arange(0, y_max, y_max / 6.0)
+    ax.set_xticks(np.arange(
+        0,
+        ref_len,
+        max(3, (ref_len / 6) - (ref_len / 6) % 5),
+    ).astype(int))
+
+    ax.set_xlabel('Reference amplicon position (bp)')
+    if num_refs == 1:
+        ax.set_ylabel('Sequences: % Total ( no. )')
+        ax.set_yticks(y_label_values)
+        ax.set_yticklabels(
+            [
+                '%.1f%% (%d)' % (n_reads / float(n_total) * 100, n_reads)
+                for n_reads in y_label_values
+            ],
+        )
+    else:
+        ax.set_ylabel('Sequences: % Total ( % '+ ref_name + ', no. )')
+        ax.set_yticks(y_label_values)
+        ax.set_yticklabels(
+            [
+                '%.1f%% (%.1f%% , %d)' % (
+                    n_reads / float(n_total) * 100,
+                    n_reads / float(n_this_category) * 100,
+                    n_reads,
+                ) for n_reads in y_label_values
+            ],
+        )
+
+    ax.set_ylim(0, max(1, y_max))
+    ax.set_xlim(0, ref_len-1)
+    ax.tick_params(left=True, bottom=True)
+
+    ax.set_title(plot_title)
+
+    fig.savefig(
+        plot_root + '.pdf',
+        bbox_extra_artists=(lgd,),
+        pad_inches=1,
+        bbox_inches='tight',
+    )
+    if save_also_png:
+        fig.savefig(
+            plot_root + '.png',
+            bbox_extra_artists=(lgd,),
+            bbox_inches='tight',
+        )
+    plt.close(fig)
+
+
+def plot_quantification_window_locations(
+    insertion_count_vectors,
+    deletion_count_vectors,
+    substitution_count_vectors,
+    include_idxs_list,
+    cut_points,
+    plot_cut_points,
+    sgRNA_intervals,
+    ref_len,
+    num_refs,
+    n_total,
+    n_this_category,
+    ref_name,
+    plot_title,
+    plot_root,
+    save_also_png,
+):
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    y_max = max(
+        max(insertion_count_vectors),
+        max(deletion_count_vectors),
+        max(substitution_count_vectors),
+        1,
+    ) * 1.1
+
+    #shade quantification window
+    if len(include_idxs_list) > 1:
+        lastStart = include_idxs_list[0]
+        lastIdx = include_idxs_list[0]
+        for idx in range(1, len(include_idxs_list)):
+            if include_idxs_list[idx] == lastIdx + 1:
+                lastIdx = include_idxs_list[idx]
+            else:
+                p = matplotlib.patches.Rectangle(
+                    (lastStart -0.5, 0),
+                    1 + (lastIdx - lastStart),
+                    y_max,
+                    facecolor=(0, 0, 0, 0.05),
+                    edgecolor=(0, 0, 0, 0.25),
+                    linestyle=(0, (5, 2)),
+                    linewidth=2,
+                )
+                ax.add_patch(p) #gca = get current axis
+                lastStart = include_idxs_list[idx]
+                lastIdx = include_idxs_list[idx]
+        p = matplotlib.patches.Rectangle(
+            (lastStart -0.5, 0),
+            1 + (lastIdx - lastStart),
+            y_max,
+            facecolor=(0, 0, 0, 0.05),
+            edgecolor=(0, 0, 0, 0.25),
+            linestyle=(0, (5, 2)),
+            linewidth=2,
+            label='Quantification window',
+        )
+        ax.add_patch(p)
+
+    ax.plot(insertion_count_vectors, 'r', linewidth=3, label='Insertions')
+    ax.plot(deletion_count_vectors, 'm', linewidth=3, label='Deletions')
+    ax.plot(
+        substitution_count_vectors, 'g', linewidth=3, label='Substitutions',
+    )
+
+    if cut_points:
+        added_legend = False
+        for idx, cut_point in enumerate(cut_points):
+            if not added_legend and plot_cut_points[idx]:
+                ax.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='Predicted cleavage position',
+                )
+                added_legend = True
+            elif plot_cut_points[idx]:
+                ax.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='_nolegend_',
+                )
+
+        for idx, sgRNA_int in enumerate(sgRNA_intervals):
+            if idx == 0:
+                ax.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [0, 0],
+                    linewidth=10,
+                    c=(0, 0, 0, 0.15),
+                    label='sgRNA',
+                    solid_capstyle='butt',
+                )
+            else:
+                ax.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [0, 0],
+                    linewidth=10,
+                    c=(0, 0, 0, 0.15),
+                    label='_nolegend_',
+                    solid_capstyle='butt',
+                )
+
+    lgd = ax.legend(
+        loc='center',
+        bbox_to_anchor=(0.5, -0.33),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    y_label_values = np.arange(0, 1, 1.0 / 6.0)
+    if y_max > 0:
+        y_label_values = np.arange(0, y_max, y_max / 6.0).astype(int)
+    ax.set_yticks(y_label_values)
+    ax.set_yticklabels(
+        [
+            '%.1f%% (%.1f%% , %d)' % (
+                n_reads / float(n_total) * 100,
+                n_reads / float(n_this_category) * 100,
+                n_reads
+            ) for n_reads in y_label_values
+        ],
+    )
+    ax.set_xticks(
+        np.arange(
+            0, ref_len, max(3, (ref_len / 6) - (ref_len / 6) % 5),
+        ).astype(int),
+    )
+
+    ax.set_xlabel('Reference amplicon position (bp)')
+    if num_refs == 1:
+        ax.set_ylabel('Sequences: % Total ( no. )')
+        ax.set_yticks(y_label_values)
+        ax.set_yticklabels(
+            [
+                '%.1f%% (%d)' % (
+                    n_reads / float(n_total) * 100,
+                    n_reads,
+                ) for n_reads in y_label_values
+            ],
+        )
+    else:
+        ax.set_ylabel('Sequences: % Total ( % '+ref_name+', no. )')
+        ax.set_yticks(y_label_values)
+        ax.set_yticklabels(
+            [
+                '%.1f%% (%.1f%% , %d)' % (
+                    n_reads / float(n_total) * 100,
+                    n_reads / float(n_this_category) * 100,
+                    n_reads,
+                ) for n_reads in y_label_values
+            ],
+        )
+
+    ax.tick_params(left=True, bottom=True)
+
+    ax.set_ylim(0, max(1, y_max))
+    ax.set_xlim(0, ref_len - 1)
+    ax.set_title(plot_title)
+    fig.savefig(
+        plot_root + '.pdf',
+        bbox_extra_artists=(lgd,),
+        pad_inches=1,
+        bbox_inches='tight',
+    )
+    if save_also_png:
+        fig.savefig(
+            plot_root + '.png',
+            bbox_extra_artists=(lgd,),
+            bbox_inches='tight',
+        )
+    plt.close(fig)
+
+
+def plot_position_dependent_indels(
+    insertion_length_vectors,
+    deletion_length_vectors,
+    cut_points,
+    plot_cut_points,
+    ref_len,
+    plot_titles,
+    plot_root,
+    save_also_png,
+):
+    fig, ax = plt.subplots(1, 2, figsize=(24, 10))
+    ax1 = ax[0]
+    markerline, stemlines, baseline = ax1.stem(
+        insertion_length_vectors,
+    )
+    plt.setp(markerline, 'markerfacecolor', 'r', 'markersize', 8)
+    plt.setp(baseline, 'linewidth', 0)
+    plt.setp(stemlines, 'color', 'r', 'linewidth', 3)
+    y_max = max(insertion_length_vectors) * 1.1
+    if cut_points:
+        added_legend = False
+        for idx, cut_point in enumerate(cut_points):
+            if not added_legend and plot_cut_points[idx]:
+                ax1.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='Predicted cleavage position',
+                )
+                added_legend = True
+            elif plot_cut_points[idx]:
+                ax1.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='_nolegend_',
+                )
+
+    ax1.set_xticks(
+        np.arange(
+            0, ref_len, max(3, (ref_len / 6) - (ref_len / 6) % 5),
+        ).astype(int),
+    )
+    ax1.set_xlabel('Reference amplicon position (bp)')
+    ax1.set_ylabel('Average insertion length')
+    ax1.set_ylim(0, max(1, y_max))
+    ax1.set_xlim(0, ref_len - 1)
+    ax1.set_title(plot_titles['ins'])
+    ax1.tick_params(left=True, bottom=True)
+
+    ax2 = ax[1]
+    markerline, stemlines, baseline = ax2.stem(deletion_length_vectors)
+    plt.setp(markerline, 'markerfacecolor', 'm', 'markersize', 8)
+    plt.setp(baseline, 'linewidth', 0)
+    plt.setp(stemlines, 'color', 'm', 'linewidth', 3)
+    y_max = max(deletion_length_vectors) * 1.1
+    if cut_points:
+        added_legend = False
+        for idx, cut_point in enumerate(cut_points):
+            if not added_legend and plot_cut_points[idx]:
+                ax2.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='Predicted cleavage position',
+                )
+                added_legend = True
+            elif plot_cut_points[idx]:
+                ax2.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    lw=2,
+                    label='_nolegend_',
+                )
+
+    ax2.set_xticks(
+        np.arange(
+            0, ref_len, max(3, (ref_len / 6) - (ref_len / 6) % 5),
+        ).astype(int),
+    )
+    ax2.set_xlabel('Reference amplicon position (bp)')
+    ax2.set_ylabel('Average deletion length')
+
+    ymin, ymax = ax2.yaxis.get_view_interval()
+    ax2.set_ylim(ymin=0, ymax=max(1, y_max))
+    ax2.set_xlim(0, ref_len-1)
+    ax2.set_title(plot_titles['del'])
+
+    fig.tight_layout()
+    ax2.tick_params(left=True, bottom=True)
+
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_global_modifications_reference(
+    ref1_all_insertion_count_vectors,
+    ref1_all_deletion_count_vectors,
+    ref1_all_substitution_count_vectors,
+    ref1,
+    include_idxs_list,
+    n_total,
+    ref_len,
+    ref_name,
+    plot_title,
+    plot_root,
+    save_also_png=False,
+):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    ref1_all_insertion_positions = ref1_all_insertion_count_vectors
+    ref1_all_deletion_positions = ref1_all_deletion_count_vectors
+    ref1_all_substitution_positions = ref1_all_substitution_count_vectors
+
+    y_max = max(
+        max(ref1_all_insertion_positions),
+        max(ref1_all_deletion_positions),
+        max(ref1_all_substitution_positions),
+        1,
+    ) * 1.1
+
+    ax.plot(ref1_all_insertion_positions, 'r', linewidth=3, label='Insertions')
+    ax.plot(ref1_all_deletion_positions, 'm', linewidth=3, label='Deletions')
+    ax.plot(
+        ref1_all_substitution_positions,
+        'g',
+        linewidth=3,
+        label='Substitutions',
+    )
+
+    ref1_cut_points = ref1['sgRNA_cut_points']
+    ref1_plot_cut_points = ref1['sgRNA_plot_cut_points']
+    ref1_sgRNA_intervals = ref1['sgRNA_intervals']
+    ref1_include_idxs_list = sorted(list(ref1['include_idxs']))
+    #shade quantification window
+    if len(include_idxs_list) > 1:
+        lastStart = include_idxs_list[0]
+        lastIdx = include_idxs_list[0]
+        for idx in range(1, len(include_idxs_list)):
+            if include_idxs_list[idx] == lastIdx + 1:
+                lastIdx = include_idxs_list[idx]
+            else:
+                p = matplotlib.patches.Rectangle(
+                    (lastStart - 0.5, 0),
+                    1 + (lastIdx - lastStart),
+                    y_max,
+                    facecolor=(0, 0, 0, 0.05),
+                    edgecolor=(0, 0, 0, 0.25),
+                    linestyle=(0, (5, 2)),
+                    linewidth=2,
+                )
+                ax.add_patch(p)
+                lastStart = include_idxs_list[idx]
+                lastIdx = include_idxs_list[idx]
+        p = matplotlib.patches.Rectangle(
+            (lastStart - 0.5, 0),
+            1 + (lastIdx - lastStart),
+            y_max,
+            facecolor=(0, 0, 0, 0.05),
+            edgecolor=(0, 0, 0, 0.25),
+            linestyle=(0, (5, 2)),
+            linewidth=2,
+            label='Quantification window',
+        )
+        ax.add_patch(p)
+
+    if ref1_cut_points:
+        added_legend = False
+        for idx, ref1_cut_point in enumerate(ref1_cut_points):
+            if not added_legend and ref1_plot_cut_points[idx]:
+                ax.plot(
+                    [ref1_cut_point + 0.5, ref1_cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    linewidth=2,
+                    label='Predicted cleavage position',
+                )
+                added_legend = True
+            elif ref1_plot_cut_points[idx]:
+                ax.plot(
+                    [ref1_cut_point + 0.5, ref1_cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    linewidth=2,
+                    label='_nolegend_',
+                )
+
+        for idx, sgRNA_int in enumerate(ref1_sgRNA_intervals):
+            if idx == 0:
+                ax.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [0, 0],
+                    linewidth=10,
+                    c=(0, 0, 0, 0.15),
+                    label='sgRNA',
+                    solid_capstyle='butt',
+                )
+            else:
+                ax.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [0, 0],
+                    linewidth=10,
+                    c=(0, 0, 0, 0.15),
+                    label='_nolegend_',
+                    solid_capstyle='butt',
+                )
+
+    lgd = ax.legend(
+        loc='center',
+        bbox_to_anchor=(0.5, -0.31),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    y_label_values = np.arange(0, 1, 1.0 / 6.0)
+    if y_max > 0:
+        y_label_values = np.arange(0, y_max, y_max / 6.0).astype(int)
+
+    ax.set_ylabel('Sequences: % Total ( no. )')
+    ax.set_yticks(y_label_values)
+    ax.set_yticklabels(
+        [
+            '%.1f%% (%d)' % (
+                n_reads / float(n_total) * 100,
+                n_reads,
+            ) for n_reads in y_label_values
+        ],
+    )
+
+    ax.set_xticks(
+        np.arange(
+            0, ref_len, max(3, (ref_len / 6) - (ref_len / 6) % 5),
+        ).astype(int),
+    )
+    ax.set_xlabel(ref_name + ' position (bp)')
+
+    ax.set_ylim(0, max(1, y_max))
+    ax.set_xlim(0, ref_len-1)
+    ax.tick_params(left=True, bottom=True)
+    fig.savefig(
+        plot_root + '.pdf',
+        bbox_extra_artists=(lgd,),
+        pad_inches=1,
+        bbox_inches='tight',
+    )
+    if save_also_png:
+        fig.savefig(
+            plot_root + '.png',
+            bbox_extra_artists=(lgd,),
+            bbox_inches='tight',
+        )
+    plt.close(fig)
+
+
+def plot_frameshift_analysis(
+    modified_frameshift,
+    modified_non_frameshift,
+    non_modified_non_frameshift,
+    cut_points,
+    plot_cut_points,
+    sgRNA_intervals,
+    exon_intervals,
+    ref_len,
+    ref_name,
+    plot_root,
+    save_also_png=False,
+):
+    fig = plt.figure(figsize=(12, 14))
+    ax1 = plt.subplot2grid((6, 3), (0, 0), colspan=3, rowspan=5)
+
+    patches, texts, autotexts = ax1.pie(
+        [
+            modified_frameshift,
+            modified_non_frameshift,
+            non_modified_non_frameshift,
+        ],
+        labels=[
+            'Frameshift mutation\n(%d reads)' % modified_frameshift,
+            'In-frame mutation\n(%d reads)' % modified_non_frameshift,
+            'Noncoding mutation\n(%d reads)' % non_modified_non_frameshift,
+        ],
+        explode=(0.0, 0.0, 0.0),
+        colors=[
+            (0.89019608,  0.29019608,  0.2, 0.8),
+            (0.99215686,  0.73333333,  0.51764706, 0.8),
+            (0.99607843,  0.90980392,  0.78431373, 0.8),
+        ],
+        autopct='%1.2f%%',
+    )
+
+    ax2 = plt.subplot2grid((6, 3), (5, 0), colspan=3, rowspan=1)
+    ax2.plot(
+        [0, ref_len], [0, 0], '-k', linewidth=2, label=ref_name + ' sequence',
+    )
+
+    for idx, exon_interval in enumerate(exon_intervals):
+        if idx == 0:
+            ax2.plot(
+                exon_interval,
+                [0, 0],
+                '-',
+                linewidth=10,
+                c=(0, 0, 1, 0.5),
+                label='Coding sequence/s',
+                solid_capstyle='butt',
+            )
+        else:
+            ax2.plot(
+                exon_interval,
+                [0, 0],
+                '-',
+                linewidth=10,
+                c=(0, 0, 1, 0.5),
+                label='_nolegend_',
+                solid_capstyle='butt',
+            )
+
+    if cut_points:
+        added_legend = False
+        added_sgRNA_legend = False
+        for idx, cut_point in enumerate(cut_points):
+            if not added_legend and plot_cut_points[idx]:
+                ax2.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    linewidth=2,
+                    label='Predicted cleavage position',
+                )
+                added_legend = True
+            elif plot_cut_points[idx]:
+                ax2.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    linewidth=2,
+                    label='_nolegend_',
+                )
+
+            for idx, sgRNA_int in enumerate(sgRNA_intervals):
+                if not added_sgRNA_legend and idx==0:
+                    ax2.plot(
+                        [sgRNA_int[0], sgRNA_int[1]],
+                        [0, 0],
+                        linewidth=10,
+                        c=(0, 0, 0, 0.15),
+                        label='sgRNA',
+                        solid_capstyle='butt',
+                    )
+                    added_sgRNA_legend = True
+                else:
+                    ax2.plot(
+                        [sgRNA_int[0], sgRNA_int[1]],
+                        [0, 0],
+                        linewidth=10,
+                        c=(0, 0, 0, 0.15),
+                        label='_nolegend_',
+                        solid_capstyle='butt',
+                    )
+
+    ax2.legend(
+        bbox_to_anchor=(0, 0, 1., 0),
+        ncol=1,
+        mode='expand',
+        borderaxespad=0.,
+        numpoints=1,
+    )
+    ax2.set_xlim(0, ref_len)
+    ax2.set_axis_off()
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root+'.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_frameshift_frequency(
+    hists_frameshift,
+    hists_inframe,
+    plot_titles,
+    plot_root,
+    save_also_png=False,
+):
+    fig, ax = plt.subplots(1, 2, figsize=(22, 10))
+    ax1 = ax[0]
+    x, y = map(np.array, zip(*[a for a in hists_frameshift.items()]))
+    if sum(hists_frameshift.values()) != 0:
+        y = y / float(sum(hists_frameshift.values())) * 100
+    ax1.bar(x - 0.1, y)
+    ax1.set_xlim(-30.5, 30.5)
+    ax1.set_frame_on(False)
+    ax1.set_xticks([idx for idx in range(-30, 31) if idx % 3])
+    ax1.tick_params(
+        which='both',      # both major and minor ticks are affected
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelbottom=True,  # labels along the bottom edge are off
+    )
+    ax1.yaxis.tick_left()
+    xmin, xmax = ax1.get_xaxis().get_view_interval()
+    ymin, ymax = ax1.get_yaxis().get_view_interval()
+    ax1.set_xticklabels(
+        map(str, [idx for idx in range(-30, 31) if idx % 3]),
+        rotation='vertical',
+    )
+    ax1.set_title(plot_titles['fs'])
+    ax1.tick_params(axis='both', which='major', labelsize=24)
+    ax1.tick_params(axis='both', which='minor', labelsize=24)
+    ax1.set_ylabel('Sequences % (no.)')
+    y_label_values = np.round(
+        np.linspace(0, min(100, max(ax1.get_yticks())), 6),
+    )
+    ax1.set_yticks(y_label_values)
+    ax1.set_yticklabels(
+        [
+            '%.1f%% (%.0f)' % (
+                pct,
+                pct / 100 * sum(hists_frameshift.values()),
+            ) for pct in y_label_values
+        ],
+    )
+
+    hist_inframe_0 = deepcopy(hists_inframe)
+    hist_inframe_0[0] = 0
+    ax2 = ax[1]
+    x, y = map(np.array, zip(*[a for a in hist_inframe_0.items()]))
+    if sum(hist_inframe_0.values()) > 0:
+        y = y / float(sum(hist_inframe_0.values())) * 100
+    ax2.bar(x - 0.1, y, color=(0, 1, 1, 0.2))
+    ax2.set_xlim(-30.5, 30.5)
+    ax2.set_frame_on(False)
+    ax2.set_xticks([idx for idx in range(-30, 31) if (idx % 3 == 0)])
+    ax2.tick_params(
+        which='both',      # both major and minor ticks are affected
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelbottom=True,  # labels along the bottom edge are off
+    )
+    ax2.yaxis.tick_left()
+    xmin, xmax = ax2.xaxis.get_view_interval()
+    ymin, ymax = ax2.yaxis.get_view_interval()
+    ax2.set_xticklabels(
+        map(str, [idx for idx in range(-30, 31) if (idx % 3 == 0)]),
+        rotation='vertical',
+        horizontalalignment='center',
+    )
+    ax2.set_title(plot_titles['if'])
+    ax2.set_ylabel('Sequences % (no.)')
+    y_label_values = np.round(
+        np.linspace(0, min(100, max(ax2.get_yticks())), 6),
+    )
+    ax2.set_yticks(y_label_values)
+    ax2.set_yticklabels(
+        [
+            '%.1f%% (%.0f)' % (
+                pct,
+                pct / 100 * sum(hist_inframe_0.values()),
+            ) for pct in y_label_values
+        ],
+    )
+
+    ax2.tick_params(axis='both', which='major', labelsize=24)
+    ax2.tick_params(axis='both', which='minor', labelsize=24)
+    ax2.tick_params(left=True, bottom=True)
+    fig.tight_layout()
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_global_frameshift_analysis(
+    global_modified_frameshift,
+    global_modified_non_frameshift,
+    global_non_modified_non_frameshift,
+    plot_root,
+    save_also_png=False,
+):
+    fig, ax = plt.subplots(figsize=(12, 12))
+
+    patches, texts, autotexts = ax.pie(
+        [
+            global_modified_frameshift,
+            global_modified_non_frameshift,
+            global_non_modified_non_frameshift,
+        ],
+        labels=[
+            'Frameshift mutation\n(%d reads)' % global_modified_frameshift,
+            'In-frame mutation\n(%d reads)' % global_modified_non_frameshift,
+            'Noncoding mutation\n(%d reads)' % global_non_modified_non_frameshift,
+        ],
+        explode=(0.0, 0.0, 0.0),
+        colors=[
+            (0.89019608,  0.29019608,  0.2, 0.8),
+            (0.99215686,  0.73333333,  0.51764706, 0.8),
+            (0.99607843,  0.90980392,  0.78431373, 0.8),
+        ],
+        autopct='%1.1f%%',
+    )
+
+    ax.set_axis_off()
+    ax.axis('equal')
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_global_frameshift_in_frame_mutations(
+    global_hists_frameshift,
+    global_hists_inframe,
+    plot_root,
+    save_also_png=False,
+):
+    fig, axs = plt.subplots(2, 1, figsize=(22, 10))
+    ax1 = axs[0]
+    x, y = map(np.array, zip(*[a for a in global_hists_frameshift.items()]))
+    if sum(global_hists_frameshift.values()) != 0:
+        y = y / float(sum(global_hists_frameshift.values())) * 100
+    ax1.bar(x - 0.1, y)
+    ax1.set_xlim(-30.5, 30.5)
+    ax1.set_frame_on(False)
+    ax1.set_xticks([idx for idx in range(-30, 31) if idx % 3])
+    ax1.tick_params(
+        which='both',      # both major and minor ticks are affected
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelbottom=True,  # labels along the bottom edge are off
+    )
+    ax1.yaxis.tick_left()
+    xmin, xmax = ax1.get_xaxis().get_view_interval()
+    ymin, ymax = ax1.get_yaxis().get_view_interval()
+    ax1.set_xticklabels(
+        map(str, [idx for idx in range(-30, 31) if idx % 3]),
+        rotation='vertical',
+    )
+    ax1.set_title('Global Frameshift profile')
+    ax1.tick_params(axis='both', which='major', labelsize=24)
+    ax1.tick_params(axis='both', which='minor', labelsize=24)
+    ax1.tick_params(left=True, bottom=True)
+    ax1.set_ylabel('Sequences % (no.)')
+    y_label_values = np.round(np.linspace(
+        0, min(100, max(ax1.get_yticks())), 6),
+    )
+    ax1.set_yticks(y_label_values)
+    ax1.set_yticklabels(
+        [
+            '%.1f%% (%.0f)' % (
+                pct,
+                pct / 100 * sum(global_hists_frameshift.values()),
+            ) for pct in y_label_values
+        ],
+    )
+
+    global_hists_inframe_no_0 = deepcopy(global_hists_inframe)
+    global_hists_inframe_no_0[0] = 0
+    ax2 = axs[1]
+    x, y = map(np.array, zip(*[a for a in global_hists_inframe_no_0.items()]))
+    if sum(global_hists_inframe_no_0.values()) > 0:
+        y = y / float(sum(global_hists_inframe_no_0.values())) * 100
+    ax2.bar(x - 0.1, y, color=(0, 1, 1, 0.2))
+    ax2.set_xlim(-30.5, 30.5)
+    ax2.set_frame_on(False)
+    ax2.set_xticks([idx for idx in range(-30, 31) if (idx % 3 == 0)])
+    ax2.tick_params(
+        which='both',      # both major and minor ticks are affected
+        left=True,
+        bottom=True,       # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelbottom=True,  # labels along the bottom edge are off)
+    )
+    ax2.yaxis.tick_left()
+    xmin, xmax = ax2.xaxis.get_view_interval()
+    ymin, ymax = ax2.yaxis.get_view_interval()
+    ax2.set_xticklabels(
+        map(str, [idx for idx in range(-30, 31) if (idx % 3 == 0)]),
+        rotation='vertical',
+        horizontalalignment='center',
+    )
+    ax2.set_title('Global In-frame profile')
+    ax2.set_ylabel('Sequences % (no.)')
+    y_label_values = np.round(np.linspace(
+        0, min(100, max(ax2.get_yticks())), 6,
+    ))
+    ax2.set_yticks(y_label_values)
+    ax2.set_yticklabels(
+        [
+            '%.1f%% (%.0f)' % (
+                pct,
+                pct / 100 * sum(global_hists_inframe_no_0.values()),
+            ) for pct in y_label_values
+        ],
+    )
+
+    ax2.tick_params(axis='both', which='major', labelsize=24)
+    ax2.tick_params(axis='both', which='minor', labelsize=24)
+    fig.tight_layout()
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_impact_on_splice_sites(
+    global_splicing_sites_modified,
+    global_count_total,
+    plot_root,
+    save_also_png=False,
+):
+    fig, ax = plt.subplots(figsize=(12, 12))
+    patches, texts, autotexts = ax.pie(
+        [
+            global_splicing_sites_modified,
+            (global_count_total - global_splicing_sites_modified),
+        ],
+        labels=[
+            'Potential splice sites modified\n(%d reads)' % global_splicing_sites_modified,
+            'Unmodified\n(%d reads)' % (global_count_total - global_splicing_sites_modified),
+        ],
+        explode=(0.0, 0),
+        colors=[
+            (0.89019608,  0.29019608,  0.2, 0.8),
+            (0.99607843,  0.90980392,  0.78431373, 0.8),
+        ],
+        autopct='%1.1f%%',
+    )
+    ax.set_axis_off()
+    ax.axis('equal')
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_non_coding_mutations(
+    insertion_count_vectors_noncoding,
+    deletion_count_vectors_noncoding,
+    substitution_count_vectors_noncoding,
+    include_idxs_list,
+    cut_points,
+    plot_cut_points,
+    ref_len,
+    sgRNA_intervals,
+    plot_title,
+    plot_root,
+    save_also_png=False,
+):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    ax.plot(
+        insertion_count_vectors_noncoding,
+        'r',
+        linewidth=3,
+        label='Insertions',
+    )
+    ax.plot(
+        deletion_count_vectors_noncoding,
+        'm',
+        linewidth=3,
+        label='Deletions',
+    )
+    ax.plot(
+        substitution_count_vectors_noncoding,
+        'g',
+        linewidth=3,
+        label='Substitutions',
+    )
+
+    y_max = max(
+        max(insertion_count_vectors_noncoding),
+        max(deletion_count_vectors_noncoding),
+        max(substitution_count_vectors_noncoding),
+    ) * 1.1
+
+    #shade quantification window
+    if len(include_idxs_list) > 1:
+        lastStart = include_idxs_list[0]
+        lastIdx = include_idxs_list[0]
+        for idx in range(1, len(include_idxs_list)):
+            if include_idxs_list[idx] == lastIdx + 1:
+                lastIdx = include_idxs_list[idx]
+            else:
+                p = matplotlib.patches.Rectangle(
+                    (lastStart - 0.5, 0),
+                    1 + (lastIdx - lastStart),
+                    y_max,
+                    facecolor=(0, 0, 0, 0.05),
+                    edgecolor=(0, 0, 0, 0.25),
+                    linestyle=(0, (5, 2)),
+                    linewidth=2,
+                )
+                ax.add_patch(p)
+                lastStart = include_idxs_list[idx]
+                lastIdx = include_idxs_list[idx]
+        p = matplotlib.patches.Rectangle(
+            (lastStart - 0.5, 0),
+            1 + (lastIdx - lastStart),
+            y_max,
+            facecolor=(0, 0, 0, 0.05),
+            edgecolor=(0, 0, 0, 0.25),
+            linestyle=(0, (5, 2)),
+            linewidth=2,
+            label='Quantification window',
+        )
+        ax.add_patch(p)
+
+    if cut_points:
+        added_legend = False
+        added_sgRNA_legend = False
+        for idx, cut_point in enumerate(cut_points):
+            if not added_legend and plot_cut_points[idx]:
+                ax.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    linewidth=2,
+                    label='Predicted cleavage position',
+                )
+                added_legend = True
+            elif plot_cut_points[idx]:
+                ax.plot(
+                    [cut_point + 0.5, cut_point + 0.5],
+                    [0, y_max],
+                    '--k',
+                    linewidth=2,
+                    label='_nolegend_',
+                )
+
+            for idx, sgRNA_int in enumerate(sgRNA_intervals):
+                if not added_sgRNA_legend and idx==0:
+                    ax.plot(
+                        [sgRNA_int[0], sgRNA_int[1]],
+                        [0, 0],
+                        linewidth=10,
+                        c=(0, 0, 0, 0.15),
+                        label='sgRNA',
+                        solid_capstyle='butt',
+                    )
+                    added_sgRNA_legend = True
+                else:
+                    ax.plot(
+                        [sgRNA_int[0], sgRNA_int[1]],
+                        [0, 0],
+                        linewidth=10,
+                        c=(0, 0, 0, 0.15),
+                        label='_nolegend_',
+                        solid_capstyle='butt',
+                    )
+
+    lgd = ax.legend(
+        loc='center',
+        bbox_to_anchor=(0.5, -0.31),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    ax.set_xticks(np.arange(
+        0, ref_len, max(3, (ref_len / 6) - (ref_len / 6) % 5),
+    ).astype(int))
+
+    ax.set_xlabel('Reference amplicon position (bp)')
+    ax.set_ylabel('Sequences (no.)')
+    ax.set_ylim(0, max(1, y_max))
+    ax.set_xlim(0, ref_len-1)
+    ax.set_title(plot_title)
+    ax.tick_params(left=True, bottom=True)
+
+    fig.savefig(
+        plot_root + '.pdf',
+        bbox_extra_artists=(lgd,),
+        pad_inches=1,
+        bbox_inches='tight',
+    )
+    if save_also_png:
+        fig.savefig(
+            plot_root + '.png',
+            bbox_extra_artists=(lgd,),
+            bbox_inches='tight',
+        )
+    plt.close(fig)
+
+
+def plot_potential_splice_sites(
+    splicing_sites_modified,
+    count_total,
+    plot_root,
+    save_also_png=False,
+):
+    fig, ax = plt.subplots(figsize=(12, 12))
+    patches, texts, autotexts = ax.pie(
+        [
+            splicing_sites_modified,
+            (count_total - splicing_sites_modified),
+        ],
+        labels=[
+            'Potential splice sites modified\n(%d reads)' % splicing_sites_modified,
+            'Unmodified\n(%d reads)' % (count_total - splicing_sites_modified),
+        ],
+        explode=(0.0, 0),
+        colors=[
+            (0.89019608,  0.29019608,  0.2, 0.8),
+            (0.99607843,  0.90980392,  0.78431373, 0.8),
+        ],
+        autopct='%1.1f%%',
+    )
+    ax.set_axis_off()
+    ax.axis('equal')
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_scaffold_indel_lengths(
+    df_scaffold_insertion_sizes,
+    plot_root,
+    save_also_png=False,
+):
+    colors = 'b', 'g'
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.hist(
+        [
+            df_scaffold_insertion_sizes['Num_match_scaffold'],
+            df_scaffold_insertion_sizes['Num_gaps'],
+        ],
+        color=colors,
+        bins=range(
+            0,
+            max(
+                df_scaffold_insertion_sizes['Num_match_scaffold'].max(),
+                df_scaffold_insertion_sizes['Num_gaps'].max(),
+            ),
+        ),
+    )
+    ax.set_ylabel('Count')
+    ax.set_xlabel('Length (basepairs)')
+    fig.tight_layout()
+    ax.legend(
+        [
+            'Length matching scaffold',
+            'Insertion length',
+        ],
+        loc='center',
+        bbox_to_anchor=(0.5, -0.35),
+        ncol=1,
+        fancybox=True,
+        shadow=True,
+    )
+    ax.tick_params(left=True, bottom=True)
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
+    plt.close(fig)
+
 
 def get_rows_for_sgRNA_annotation(sgRNA_intervals, amp_len):
     """
@@ -473,11 +2003,10 @@ def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,convers
     color_lookup = get_color_lookup(['A', 'T', 'C', 'G'], alpha=1)
 
 #    fig = plt.figure(figsize=(amp_len/2.0,nSamples*2))
-    fig = plt.figure(figsize=((amp_len+10)/2.0, (nSamples+1)*2))
-    ax = fig.add_subplot(111)
+    fig, ax = plt.subplots(figsize=((amp_len+10)/2.0, (nSamples+1)*2))
 
     #remove box around plot
-    for spine in plt.gca().spines.values():
+    for spine in ax.spines.values():
         spine.set_visible(False)
 
     #draw gray background behind each sample
@@ -546,7 +2075,7 @@ def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,convers
             patches.Rectangle((2+lastStart, q_win_y_start), 1+(lastIdx-lastStart), q_win_y_height, fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2)
             )
 
-    plt.tick_params(top=False, bottom=False, left=False, right=False, labelleft=True, labelbottom=False)
+    ax.tick_params(top=False, bottom=False, left=False, right=False, labelleft=True, labelbottom=False)
 #    plt.tick_params(top='off', bottom='off', left='off', right='off', labelleft='on', labelbottom='off')
 
     ax.set_yticks([ref_y_start + ref_y_height/2.0]+[x+0.5 for x in range(1, nSamples+1)])
@@ -563,7 +2092,7 @@ def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,convers
     cbar_pad = 0.05
 #    cbar_shrink = min(1.0,3/float(nSamples))
     #cbar = plt.colorbar(plt_color_bar,ax=ax,pad=cbar_pad) # using the colorbar info I got from contourf above
-    cbar = plt.colorbar(plt_color_bar, ax=ax, fraction=0.046, pad=0.04) # using the colorbar info I got from contourf above
+    cbar = fig.colorbar(plt_color_bar, ax=ax, fraction=0.046, pad=0.04) # using the colorbar info I got from contourf above
     ticks_at = [x/100.0 for x in range(0, 101, 25)]
     cbar.set_ticks(ticks_at)
     cbar.set_ticklabels([ "{:0.2f}".format(x*max_pct_conversion*100) for x in ticks_at ])
@@ -571,14 +2100,14 @@ def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,convers
     cbar.ax.text(0.02, 0.5, 'Percentage %s to %s conversion'%(from_nuc, to_nuc), rotation=90, verticalalignment='center', horizontalalignment='right')
 
     #title
-    plt.title('%s to %s Conversion Percent'%(from_nuc, to_nuc))
+    ax.set_title('%s to %s Conversion Percent'%(from_nuc, to_nuc))
 
     #throws error here in tight_layout... if the selected reference is too small  (e.g. 5bp)
 #    plt.tight_layout()
     fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight')
     if save_also_png:
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
-    plt.close()
+    plt.close(fig)
 
 
 def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution_base_vectors, plot_title, fig_filename_root, save_also_png, quantification_window_idxs=None):
@@ -615,11 +2144,11 @@ def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution
                 lastIdx = include_idxs_list[idx]
             else:
                 p = matplotlib.patches.Rectangle((lastStart-0.5, 0), 1+(lastIdx-lastStart), y_max, facecolor=(0, 0, 0, 0.05), edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2)
-                plt.gca().add_patch(p) #gca = get current axis
+                ax.add_patch(p)
                 lastStart = include_idxs_list[idx]
                 lastIdx = include_idxs_list[idx]
         p = matplotlib.patches.Rectangle((lastStart-0.5, 0), 1+(lastIdx-lastStart), y_max, facecolor=(0, 0, 0, 0.05), edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2, label='Quantification window')
-        plt.gca().add_patch(p)
+        ax.add_patch(p)
         q_win_patch = patches.Patch(fill=None, facecolor=(0, 0, 0, 0.05), edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2, label='Quantification window')
         legend_patches.append(q_win_patch)
         legend_labels.append('Quantification window')
@@ -630,16 +2159,22 @@ def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution
 #            ax.set_facecolor('lightgray')
 #    lgd=ax.legend((pA[0],pC[0],pG[0],pT[0],pN[0]),('A','C','G','T','N'),ncol=1)
 #    lgd=ax.legend(legend_patches,legend_labels,ncol=1)
-    lgd=ax.legend(handles=legend_patches, labels=legend_labels, loc='upper center', bbox_to_anchor=(0.3, -0.15), ncol=2, fancybox=True, shadow=True)
+    lgd = ax.legend(handles=legend_patches, labels=legend_labels, loc='upper center', bbox_to_anchor=(0.3, -0.15), ncol=2, fancybox=True, shadow=True)
 
     y_label_values= np.round(np.linspace(0, max(y_max, min(max(tots), max(ax.get_yticks()))), 6))# np.arange(0,y_max,y_max/6.0)
-    plt.yticks(y_label_values, ['%.1f%% (%d)' % (n_reads/ref_count*100, n_reads) for n_reads in y_label_values])
-    plt.tick_params(left=True, bottom=True)
+    ax.set_yticks(y_label_values)
+    ax.set_yticklabels(
+        [
+            '%.1f%% (%d)' % (n_reads / ref_count * 100, n_reads)
+            for n_reads in y_label_values
+        ],
+    )
+    ax.tick_params(left=True, bottom=True)
 
-    plt.savefig(fig_filename_root + '.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
     if save_also_png:
-        plt.savefig(fig_filename_root + '.png', bbox_extra_artists=(lgd,), bbox_inches='tight')
-    plt.close()
+        fig.savefig(fig_filename_root + '.png', bbox_extra_artists=(lgd,), bbox_inches='tight')
+    plt.close(fig)
 
 def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png):
     """
@@ -649,24 +2184,28 @@ def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png)
     """
 
     #plot all substitution rates
-    plt.figure(figsize=(8.3, 8))
+    fig, ax = plt.subplots(figsize=(8.3, 8))
 
     alph = ['A', 'C', 'G', 'T', 'N']
     color_lookup = get_color_lookup(alph, alpha=1)
 
-    plt.bar([1, 2, 3], [alt_nuc_counts['A']['C'], alt_nuc_counts['A']['G'], alt_nuc_counts['A']['T']], color=color_lookup['A'])
-    plt.bar([5, 6, 7], [alt_nuc_counts['C']['A'], alt_nuc_counts['C']['G'], alt_nuc_counts['C']['T']], color=color_lookup['C'])
-    plt.bar([9, 10, 11], [alt_nuc_counts['G']['A'], alt_nuc_counts['G']['C'], alt_nuc_counts['G']['T']], color=color_lookup['G'])
-    plt.bar([13, 14, 15], [alt_nuc_counts['T']['A'], alt_nuc_counts['T']['C'], alt_nuc_counts['T']['G']], color=color_lookup['T'])
-    plt.title(plot_title)
-    plt.ylabel('Number of substitutions')
-    plt.xticks([1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15], ['A>C', 'A>G', 'A>T', 'C>A', 'C>G', 'C>T', 'G>A', 'G>C', 'G>T', 'T>A', 'T>C', 'T>G'], rotation='vertical')
-    plt.tick_params(left=True)
+    ax.bar([1, 2, 3], [alt_nuc_counts['A']['C'], alt_nuc_counts['A']['G'], alt_nuc_counts['A']['T']], color=color_lookup['A'])
+    ax.bar([5, 6, 7], [alt_nuc_counts['C']['A'], alt_nuc_counts['C']['G'], alt_nuc_counts['C']['T']], color=color_lookup['C'])
+    ax.bar([9, 10, 11], [alt_nuc_counts['G']['A'], alt_nuc_counts['G']['C'], alt_nuc_counts['G']['T']], color=color_lookup['G'])
+    ax.bar([13, 14, 15], [alt_nuc_counts['T']['A'], alt_nuc_counts['T']['C'], alt_nuc_counts['T']['G']], color=color_lookup['T'])
+    ax.set_title(plot_title)
+    ax.set_ylabel('Number of substitutions')
+    ax.set_xticks([1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15])
+    ax.set_xticklabels(
+        ['A>C', 'A>G', 'A>T', 'C>A', 'C>G', 'C>T', 'G>A', 'G>C', 'G>T', 'T>A', 'T>C', 'T>G'],
+        rotation='vertical',
+    )
+    ax.tick_params(left=True)
 
-    plt.savefig(fig_filename_root + '.pdf', bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', bbox_inches='tight')
     if save_also_png:
-        plt.savefig(fig_filename_root + '.png', bbox_inches='tight')
-    plt.close()
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
+    plt.close(fig)
 
 def plot_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root, save_also_png):
     """
@@ -716,10 +2255,10 @@ def plot_log_nuc_freqs(df_nuc_freq,tot_aln_reads,plot_title,fig_filename_root,sa
             patches.Rectangle((2+lastStart, q_win_y_start), 1+(lastIdx-lastStart), q_win_y_height, fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2)
             )
 
-    plt.savefig(fig_filename_root + '.pdf', bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', bbox_inches='tight')
     if save_also_png:
-        plt.savefig(fig_filename_root + '.png', bbox_inches='tight')
-    plt.close()
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
+    plt.close(fig)
 
 
 def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png):
@@ -758,7 +2297,7 @@ def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, con
         patch = patches.Patch(color=color_lookup[nuc], label=nuc)
         legend_patches.append(patch)
 
-    plt.legend(handles=legend_patches, loc='center left', ncol=1, bbox_to_anchor=(1, 0.5))
+    ax.legend(handles=legend_patches, loc='center left', ncol=1, bbox_to_anchor=(1, 0.5))
 
     ax = plt.subplot(gs[1])
     #draw reference sequence
@@ -778,11 +2317,11 @@ def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, con
     ax.set_yticklabels(['Reference'], va='center')
 
 
-    plt.tight_layout()
+    fig.tight_layout()
     fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight')
     if save_also_png:
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
-    plt.close()
+    plt.close(fig)
 
 def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png):
     '''
@@ -830,7 +2369,7 @@ def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence,
         patch = patches.Patch(color=color_lookup[nuc], label=nuc)
         legend_patches.append(patch)
 
-    plt.legend(handles=legend_patches, loc='center left', ncol=1, bbox_to_anchor=(1, 0.5))
+    ax.legend(handles=legend_patches, loc='center left', ncol=1, bbox_to_anchor=(1, 0.5))
 
     ax = plt.subplot(gs[1])
     #draw reference sequence
@@ -850,11 +2389,11 @@ def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence,
     ax.set_yticklabels(['Reference'], va='center')
 
 
-    plt.tight_layout()
+    fig.tight_layout()
     fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight')
     if save_also_png:
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
-    plt.close()
+    plt.close(fig)
 
 def plot_conversion_at_sel_nucs_not_include_ref_scaled(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png):
     '''
@@ -893,7 +2432,7 @@ def plot_conversion_at_sel_nucs_not_include_ref_scaled(df_subs, ref_name, ref_se
         patch = patches.Patch(color=color_lookup[nuc], label=nuc)
         legend_patches.append(patch)
 
-    plt.legend(handles=legend_patches, loc='center left', ncol=1, bbox_to_anchor=(1, 0.5))
+    ax.legend(handles=legend_patches, loc='center left', ncol=1, bbox_to_anchor=(1, 0.5))
 
     ax = plt.subplot(gs[1])
     #draw reference sequence
@@ -913,11 +2452,11 @@ def plot_conversion_at_sel_nucs_not_include_ref_scaled(df_subs, ref_name, ref_se
     ax.set_yticklabels(['Reference'], va='center')
 
 
-    plt.tight_layout()
+    fig.tight_layout()
     fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight')
     if save_also_png:
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
-    plt.close()
+    plt.close(fig)
 
 ### Allele plot
 #We need to customize the seaborn heatmap class and function
@@ -1191,15 +2730,14 @@ def plot_alleles_heatmap(reference_seq,fig_filename_root,X,annot,y_labels,insert
     N_COLUMNS=plot_nuc_len
 
     if N_ROWS < 1:
-        fig=plt.figure()
-        ax = fig.add_subplot(111)
-        plt.text(0.5, 0.5, 'No Alleles', horizontalalignment='center', verticalalignment='center', transform = ax.transAxes)
+        fig, ax = plt.subplots()
+        fig.text(0.5, 0.5, 'No Alleles', horizontalalignment='center', verticalalignment='center', transform = ax.transAxes)
         ax.set_clip_on(False)
 
-        plt.savefig(fig_filename_root+'.pdf', bbox_inches='tight')
+        fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight')
         if SAVE_ALSO_PNG:
-            plt.savefig(fig_filename_root+'.png', bbox_inches='tight')
-        plt.close()
+            fig.savefig(fig_filename_root+'.png', bbox_inches='tight')
+        plt.close(fig)
         return
 
     sgRNA_rows = []
@@ -1293,10 +2831,10 @@ def plot_alleles_heatmap(reference_seq,fig_filename_root,X,annot,y_labels,insert
     #ax_hm_ref.legend(proxies, descriptions, numpoints=1, markerscale=2, loc='center', bbox_to_anchor=(0.5, 4),ncol=1)
     lgd = ax_hm.legend(proxies, descriptions, numpoints=1, markerscale=2, loc='upper center', bbox_to_anchor=(0.5, 0), ncol=1, fancybox=True, shadow=False)
 
-    plt.savefig(fig_filename_root+'.pdf', bbox_inches='tight', bbox_extra_artists=(lgd,))
+    fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight', bbox_extra_artists=(lgd,))
     if SAVE_ALSO_PNG:
-        plt.savefig(fig_filename_root+'.png', bbox_inches='tight', bbox_extra_artists=(lgd,))
-    plt.close()
+        fig.savefig(fig_filename_root+'.png', bbox_inches='tight', bbox_extra_artists=(lgd,))
+    plt.close(fig)
 
 def plot_alleles_heatmap_hist(reference_seq,fig_filename_root,X,annot,y_labels,insertion_dict,per_element_annot_kws,count_values,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None):
     """
@@ -1678,21 +3216,21 @@ def plot_unmod_mod_pcts(fig_filename_root,df_summary_quantification,save_png,cut
         df = df[df.Reads_aligned > 0]
 
     fig_len = int(5+df.shape[0]*.5)
-    fig=plt.figure(figsize=(12, fig_len))
-    ax = plt.subplot(111)
+    fig, ax =plt.subplots(figsize=(12, fig_len))
     xs = range(df.shape[0])
-    p0 = plt.barh(xs, df['Reads_total'], color='0.8')
-    p1 = plt.barh(xs, df['Unmodified'])
-    p2 = plt.barh(xs, df['Modified'], left=df['Unmodified'])
-    plt.ylabel('Sample')
-    plt.xlabel('Number of reads')
+    p0 = ax.barh(xs, df['Reads_total'], color='0.8')
+    p1 = ax.barh(xs, df['Unmodified'])
+    p2 = ax.barh(xs, df['Modified'], left=df['Unmodified'])
+    ax.set_ylabel('Sample')
+    ax.set_xlabel('Number of reads')
     names = [((name[:20] + "..") if len(name) > 18 else name) for name in df['Name'].values]
-    plt.yticks(xs, names)
+    ax.set_yticks(xs)
+    ax.set_yticklabels(names)
     if max(df['Reads_total'] > 100000):
-        plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+        ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
 
     if cutoff is not None:
-        plt.axvline(cutoff, ls='dashed')
+        ax.axvline(cutoff, ls='dashed')
 
     #if there are rows..
     if df.shape[0] > 0:
@@ -1709,13 +3247,17 @@ def plot_unmod_mod_pcts(fig_filename_root,df_summary_quantification,save_png,cut
             ax.text(rect.get_x()+rect.get_width()+space_val, rect.get_y()+rect.get_height()/2.0, label, ha='left', va='center')
 
         #plt.legend((p0[0], p1[0], p2[0]), ('Total Reads', 'Unmodified', 'Modified'),loc='center', bbox_to_anchor=(0.5, -0.22),ncol=1, fancybox=True, shadow=True)
-        plt.legend((p0[0], p1[0], p2[0]), ('Total Reads', 'Unmodified', 'Modified'), loc='upper center', bbox_to_anchor=(0.5, 0), borderaxespad=3, ncol=1, fancybox=True, shadow=True)
-        plt.tight_layout()
+        fig.legend((p0[0], p1[0], p2[0]), ('Total Reads', 'Unmodified', 'Modified'), loc='upper center', bbox_to_anchor=(0.5, 0), borderaxespad=3, ncol=1, fancybox=True, shadow=True)
 
-    plt.savefig(fig_filename_root+'.pdf', pad_inches=1, bbox_inches='tight')
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    fig.tight_layout()
+
+    fig.savefig(fig_filename_root+'.pdf', pad_inches=1, bbox_inches='tight')
     if save_png:
-        plt.savefig(fig_filename_root+'.png', bbox_inches='tight')
-    plt.close()
+        fig.savefig(fig_filename_root+'.png', bbox_inches='tight')
+    plt.close(fig)
 
 def plot_reads_total(fig_filename_root,df_summary_quantification,save_png,cutoff=None):
     """
@@ -1723,21 +3265,421 @@ def plot_reads_total(fig_filename_root,df_summary_quantification,save_png,cutoff
     """
     df = df_summary_quantification.fillna(0)[::-1]
     fig_len = int(3+df.shape[0]*.5)
-    fig=plt.figure(figsize=(12, fig_len))
-    ax = plt.subplot(111)
+    fig, ax = plt.subplots(figsize=(12, fig_len))
     xs = range(df.shape[0])
-    p1 = plt.barh(xs, df['Reads_total'])
-    plt.ylabel('Sample')
-    plt.xlabel('Number of reads')
+    p1 = ax.barh(xs, df['Reads_total'])
+    ax.set_ylabel('Sample')
+    ax.set_xlabel('Number of reads')
     names = [((name[:20] + "..") if len(name) > 18 else name) for name in df['Name'].values]
-    plt.yticks(xs, names)
+    ax.set_yticks(xs)
+    ax.set_yticklabels(names)
     if max(df['Reads_total'] > 100000):
-        plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+        ax.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
     if cutoff is not None:
-        plt.axvline(cutoff, ls='dashed')
+        ax.axvline(cutoff, ls='dashed')
+
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    fig.tight_layout()
+
+    fig.savefig(fig_filename_root+'.pdf', pad_inches=1, bbox_inches='tight')
+    if save_png:
+        fig.savefig(fig_filename_root+'.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
+                      plot_root, save_png
+                      ):
+    """Plot barplot of total, processed, and aligned reads.
+
+    Parameters
+    ----------
+    N_READS_INPUT : int
+        Number of reads in input fastq
+    N_READS_AFTER_PREPROCESSING : int
+        Number of reads after preprocessing (quality filtering, trimming, etc)
+    N_TOTAL : int
+        Number of total reads used as input to analysis
+    plot_root : str
+        Root to plot output file (suffixes ".pdf" and ".png" will be added)
+    save_png : bool
+        if True, png will be saved as well as pdf
+    """
+    plt.figure(figsize=(12, 12))
+    ax = plt.subplot(111)
+    labels = ['READS\nIN INPUTS\n(%d)' % N_READS_INPUT,
+              'READS AFTER\nPREPROCESSING\n(%d)' % N_READS_AFTER_PREPROCESSING,
+              'READS\nALIGNED\n(%d)' % N_TOTAL]
+    sizes = [N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL]
+    rects = ax.bar(np.arange(len(sizes)), sizes, color='silver')
+    # label each bar
+    for rect in rects:
+        height = rect.get_height()
+        ax.text(rect.get_x() + rect.get_width()/2, height + 0.05,
+                "%.1f%%" % (100*height/N_READS_INPUT),
+                ha='center', va='bottom')
+
+    ax.set_xticks(np.arange(len(sizes)))
+    ax.set_xticklabels(labels)
+    ax.set_ylabel('Sequences % (no.)')
+    y_label_values = np.round(np.linspace(0, max(N_READS_INPUT, max(ax.get_yticks())), 6))
+
+    ax.set_yticks(y_label_values)
+    ax.set_yticklabels(['%.1f%% (%.0f)' % (100*cnt/N_READS_INPUT, cnt) for cnt in y_label_values])
+    # if too many barplots, flip the labels
+    plt.ylim(0, max(sizes)*1.1)
+
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    plt.tick_params(left=True)
     plt.tight_layout()
 
-    plt.savefig(fig_filename_root+'.pdf', pad_inches=1, bbox_inches='tight')
+    plt.savefig(plot_root+'.pdf', pad_inches=1, bbox_inches='tight')
     if save_png:
-        plt.savefig(fig_filename_root+'.png', bbox_inches='tight')
+        plt.savefig(plot_root+'.png', bbox_inches='tight')
     plt.close()
+
+
+def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
+                                    expected_hdr_amplicon_seq, N_TOTAL,
+                                    piechart_plot_root, barplot_plot_root, save_png):
+    """Plot a pie chart and barplot of class assignments for reads.
+
+       Class assignments include: 'MODIFIED','UNMODIFIED','HDR',etc.
+
+    Parameters
+    ----------
+    class_counts_order : list
+        List of classes ordered by the reference as provided by the user
+    class_counts : dict
+        Dict of number of reads in each class e.g. "ref1_UMODIFIDED"->50
+    ref_names : list
+        List of reference names provided by user
+    expected_hdr_amplicon_seq : str
+        Sequence of the expected hdr amplicon
+    N_TOTAL : int
+        Number of total reads used by CRISPResso
+    piechart_plot_root : str
+        Root to plot barplot output file (suffixes ".pdf" and ".png" will be added)
+    barplot_plot_root : str
+        Root to plot barplot output file (suffixes ".pdf" and ".png" will be added)
+    save_png : bool
+        if True, png will be saved as well as pdf
+
+    """
+    labels = []
+    sizes = []
+    for class_name in class_counts_order:
+        if expected_hdr_amplicon_seq != "" and class_name == ref_names[0]+"_MODIFIED":
+            labels.append("NHEJ" + "\n(" + str(class_counts[class_name]) + " reads)")
+        elif expected_hdr_amplicon_seq != "" and class_name == "HDR_MODIFIED":
+            labels.append("Imperfect HDR" + "\n(" + str(class_counts[class_name]) + " reads)")
+        elif expected_hdr_amplicon_seq != "" and class_name == "HDR_UNMODIFIED":
+            labels.append("HDR" + "\n(" + str(class_counts[class_name]) + " reads)")
+        else:
+            display_class_name = class_name
+            if len(ref_names) == 1:
+                display_class_name = display_class_name.replace('Reference_', '')
+
+            labels.append(display_class_name + "\n(" + str(class_counts[class_name]) + " reads)")
+
+        sizes.append(100*class_counts[class_name]/float(N_TOTAL))
+
+    plt.figure(figsize=(12, 12))
+    ax = plt.subplot(111)
+    patches, texts, autotexts = ax.pie(sizes, labels=labels, autopct='%1.2f%%')
+
+    plt.axis('off')
+    plt.axis("equal")
+
+    plt.savefig(piechart_plot_root+'.pdf', pad_inches=1, bbox_inches='tight')
+    if save_png:
+        plt.savefig(piechart_plot_root+'.png', bbox_inches='tight')
+    plt.close()
+
+    # Now the barchart of classes
+    plt.figure(figsize=(12, 12))
+    ax = plt.subplot(111)
+
+    rects = ax.bar(np.arange(len(sizes)), sizes, color='silver')
+    # label each bar
+    for rect in rects:
+        height = rect.get_height()
+        if len(sizes) > 4:
+            #ax.text(rect.get_x() + rect.get_width()/2, height + 0.05,"%.2f%%"%height, ha='center', va='bottom',fontsize=12)
+            ax.text(rect.get_x() + rect.get_width()/2, height + 0.05, "%.2f%%"%height, ha='center', va='bottom')
+        else:
+            ax.text(rect.get_x() + rect.get_width()/2, height + 0.05, "%.2f%%"%height, ha='center', va='bottom')
+
+    ax.set_xticks(np.arange(len(sizes)))
+
+    ax.set_xticklabels(labels)
+    ax.set_xticklabels([X.replace("&", " & ").replace("_UNMODIFIED", " UNMODIFIED").replace("_MODIFIED", " MODIFIED") for X in labels])
+    ax.set_ylabel('Sequences % (no.)')
+    y_label_values = np.round(np.linspace(0, min(100, max(ax.get_yticks())), 6))
+    ax.set_yticks(y_label_values)
+    ax.set_yticklabels(['%.1f%% (%.0f)' % (pct, pct/100*N_TOTAL) for pct in y_label_values])
+    #if too many barplots, flip the labels
+    if len(sizes) > 4:
+        #plt.setp(ax.get_xticklabels(), fontsize=12, rotation='vertical',multialignment='right')
+        plt.setp(ax.get_xticklabels(), rotation='vertical', multialignment='right')
+    plt.ylim(0, max(sizes)*1.1)
+
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    plt.tick_params(left=True)
+    plt.tight_layout()
+
+    plt.savefig(barplot_plot_root+'.pdf', pad_inches=1, bbox_inches='tight')
+    if save_png:
+        plt.savefig(barplot_plot_root+'.png', bbox_inches='tight')
+    plt.close()
+
+
+def plot_class_dsODN_piechart(sizes, labels, plot_root, save_also_png=False):
+    fig, ax = plt.subplots(figsize=(12, 12))
+    patches, texts, autotexts =ax.pie(sizes, labels=labels, autopct='%1.2f%%')
+
+    ax.set_axis_off()
+    ax.set_aspect('equal')
+
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_quantification_comparison_barchart(
+    n_total_1,
+    n_unmodified_1,
+    n_modified_1,
+    n_total_2,
+    n_unmodified_2,
+    n_modified_2,
+    sample_1_name,
+    sample_2_name,
+    plot_titles,
+    plot_path,
+    save_also_png=False,
+):
+    fig, axs = plt.subplots(1, 2, figsize=(30, 15))
+    n_groups = 2
+
+    means_sample_1 = np.array([n_unmodified_1, n_modified_1]) / n_total_1 * 100
+    means_sample_2 = np.array([n_unmodified_2, n_modified_2]) / n_total_2 * 100
+
+    ax1 = axs[0]
+
+    index = np.arange(n_groups)
+    bar_width = 0.35
+
+    opacity = 0.4
+    error_config = {'ecolor': '0.3'}
+
+    rects1 = ax1.bar(
+        index,
+        means_sample_1,
+        bar_width,
+        alpha=opacity,
+        color=(0, 0, 1, 0.4),
+        label=sample_1_name,
+    )
+
+    rects2 = ax1.bar(
+        index + bar_width,
+        means_sample_2,
+        bar_width,
+        alpha=opacity,
+        color=(1, 0, 0, 0.4),
+        label=sample_2_name,
+    )
+
+    ax1.set_ylabel('% Sequences')
+    ax1.set_title(plot_titles['vs'])
+    ax1.set_xticks(index + bar_width / 2.0)
+    ax1.set_xticklabels(('Unmodified', 'Modified'))
+    ax1.legend()
+
+    ax2 = axs[1]
+    ax2.bar(
+        index,
+        means_sample_1 - means_sample_2,
+        bar_width + 0.35,
+        alpha=opacity,
+        color=(0, 1, 1, 0.4),
+        label='',
+    )
+
+    ax2.set_ylabel('% Sequences Difference')
+    ax2.set_title(plot_titles['diff'])
+    ax2.set_xticks(index)
+    ax2.set_xticklabels(('Unmodified', 'Modified'))
+
+    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values()):
+        spine1.set_visible(False)
+        spine2.set_visible(False)
+
+    fig.tight_layout()
+
+    fig.savefig(plot_path + '.pdf', bbox_inches='tight')
+    if save_also_png:
+        fig.savefig(plot_path + '.png', bbox_inches='tight')
+
+
+def plot_quantification_positions(
+    mod_counts_1,
+    tot_counts_1,
+    mod_counts_2,
+    tot_counts_2,
+    len_amplicon,
+    pvalues,
+    consensus_sequence_len,
+    cut_points,
+    sgRNA_intervals,
+    plot_title,
+    plot_path,
+    save_also_png=False,
+):
+    fig, axs = plt.subplots(2, 1, figsize=(20, 10))
+    ax1 = axs[0]
+
+    diff = np.divide(
+        mod_counts_1, tot_counts_1,
+    ) - np.divide(
+        mod_counts_2, tot_counts_2,
+    )
+    diff_plot = ax1.plot(diff, color=(0, 1, 0, 0.4), lw=3, label='Difference')
+    ax1.set_title(plot_title)
+    xticks = np.arange(
+        0,
+        len_amplicon,
+        max(3, (len_amplicon / 6) - (len_amplicon / 6) % 5),
+    ).astype(int)
+    ax1.set_xticks(xticks)
+    ax1.set_ylabel('Sequences Difference %')
+    ax1.set_xlim(xmin=0, xmax=len_amplicon-1)
+
+    pvalues = np.array(pvalues)
+    min_nonzero = np.min(pvalues[np.nonzero(pvalues)])
+    pvalues[pvalues == 0] = min_nonzero
+
+    ax2 = axs[1]
+    pval_plot = ax2.plot(
+        -1 * np.log10(pvalues),
+        color=(1, 0, 0, 0.4),
+        lw=2,
+        label='-log10 P-value',
+    )
+    ax2.set_ylabel('-log10 P-value')
+    ax2.set_xlim(xmin=0, xmax=len_amplicon - 1)
+    ax2.set_xticks(xticks)
+    ax2.set_xlabel('Reference amplicon position (bp)')
+
+    #bonferroni correction
+    corrected_p = -1 * np.log10(0.01 / float(consensus_sequence_len))
+    cutoff_plot = ax2.plot(
+        [0, consensus_sequence_len],
+        [corrected_p, corrected_p],
+        color='k',
+        dashes=(5, 10),
+        label='Bonferronni corrected cutoff',
+    )
+
+    plots = diff_plot + pval_plot + cutoff_plot
+
+    diff_y_min, diff_y_max = ax1.get_ylim()
+    p_y_min, p_y_max = ax2.get_ylim()
+    if cut_points:
+        for idx, cut_point in enumerate(cut_points):
+            if idx==0:
+                plot_cleavage = ax1.plot(
+                    [cut_point, cut_point],
+                    [diff_y_min, diff_y_max],
+                    '--k',
+                    lw=2,
+                    label='Predicted cleavage position',
+                )
+                ax2.plot(
+                    [cut_point, cut_point],
+                    [p_y_min, p_y_max],
+                    '--k',
+                    lw=2,
+                    label='Predicted cleavage position',
+                )
+                plots = plots + plot_cleavage
+            else:
+                ax1.plot(
+                    [cut_point, cut_point],
+                    [diff_y_min, diff_y_max],
+                    '--k',
+                    lw=2,
+                    label='_nolegend_',
+                )
+                ax2.plot(
+                    [cut_point, cut_point],
+                    [diff_y_min, diff_y_max],
+                    '--k',
+                    lw=2,
+                    label='_nolegend_',
+                )
+
+        for idx, sgRNA_int in enumerate(sgRNA_intervals):
+            if idx==0:
+                p2 = ax1.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [diff_y_min, diff_y_min],
+                    lw=10,
+                    c=(0, 0, 0, 0.15),
+                    label='sgRNA',
+                )
+                ax2.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [p_y_min, p_y_min],
+                    lw=10,
+                    c=(0, 0, 0, 0.15),
+                    label='sgRNA',
+                )
+                plots = plots + p2
+            else:
+                ax1.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [diff_y_min, diff_y_min],
+                    lw=10,
+                    c=(0, 0, 0, 0.15),
+                    label='_nolegend_',
+                )
+                ax2.plot(
+                    [sgRNA_int[0], sgRNA_int[1]],
+                    [p_y_min, p_y_min],
+                    lw=10,
+                    c=(0, 0, 0, 0.15),
+                    label='_nolegend_',
+                )
+
+    labs = [p.get_label() for p in plots]
+    lgd = ax2.legend(
+        plots,
+        labs,
+        loc='upper center',
+        bbox_to_anchor=(0.5, -0.2),
+        ncol=1,
+        fancybox=True,
+        shadow=False,
+    )
+    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values()):
+        spine1.set_visible(False)
+        spine2.set_visible(False)
+
+    fig.savefig(
+        plot_path + '.pdf', bbox_inches='tight', bbox_extra_artists=(lgd,),
+    )
+    if save_also_png:
+        fig.savefig(
+            plot_path + '.png', bbox_inches='tight', bbox_extra_artists=(lgd,),
+        )
+
+    plt.close(fig)

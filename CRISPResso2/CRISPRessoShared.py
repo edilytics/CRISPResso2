@@ -20,9 +20,11 @@ import signal
 import subprocess as sb
 import sys
 import unicodedata
+from math import floor, sqrt
 
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
+from CRISPResso2.CRISPRessoMultiProcessing import get_max_processes
 
 
 __version__ = "2.1.1"
@@ -178,6 +180,8 @@ def getCRISPRessoArgParser(parserTitle = "CRISPResso Parameters",requiredParams=
     parser.add_argument('--auto', help='Infer amplicon sequence from most common reads', action='store_true')
     parser.add_argument('--debug', help='Show debug messages', action='store_true')
     parser.add_argument('--no_rerun', help="Don't rerun CRISPResso2 if a run using the same parameters has already been finished.", action='store_true')
+    parser.add_argument('-p', '--n_processes', type=str, help='Specify the number of processes to use for analysis.\
+    Please use with caution since increasing this parameter will significantly increase the memory required to run CRISPResso. Can be set to \'max\'.', default='1')
 
     #processing of aligned bam files
     parser.add_argument('--bam_input', type=str,  help='Aligned reads for processing in bam format', default='')
@@ -249,6 +253,22 @@ def propagate_crispresso_options(cmd, options, params):
                     cmd+=' --%s %s' % (option, str(val))
     return cmd
 
+
+def get_sub_n_processes(argv):
+    if '--suppress_plots' in argv or '--suppress_report' in argv:
+        return 1
+    else:
+        if '-p' in argv:
+            n_processes_index = argv.index('-p') + 1
+        elif '--n_processes' in argv:
+            n_processes_index = argv.index('--n_processes') + 1
+        else:
+            return 1
+        if argv[n_processes_index] == 'max':
+            n_processes = get_max_processes()
+        else:
+            n_processes = int(argv[n_processes_index])
+        return max(1, floor(sqrt(n_processes)))
 
 
 #######

@@ -271,8 +271,6 @@ def main():
         #tool specific optional
         parser.add_argument('--gene_annotations', type=str, help='Gene Annotation Table from UCSC Genome Browser Tables (http://genome.ucsc.edu/cgi-bin/hgTables?command=start), \
         please select as table "knownGene", as output format "all fields from selected table" and as file returned "gzip compressed"', default='')
-        parser.add_argument('-p', '--n_processes', type=str, help='Specify the number of processes to use for analysis.\
-        Please use with caution since increasing this parameter will significantly increase the memory required to run CRISPResso. Can be set to \'max\'.', default='1')
         parser.add_argument('-x', '--bowtie2_index', type=str, help='Basename of Bowtie2 index for the reference genome', default='')
         # rationale for setting the default scores:
         # --end-to-end - no clipping, match bonus -ma is set to 0
@@ -358,6 +356,7 @@ def main():
         else:
             n_processes = int(args.n_processes)
 
+        args.n_processes = CRISPRessoShared.get_sub_n_processes(sys.argv)
 
         ####TRIMMING AND MERGING
         get_name_from_fasta=lambda  x: os.path.basename(x).replace('.fastq', '').replace('.gz', '').replace('.fq', '')

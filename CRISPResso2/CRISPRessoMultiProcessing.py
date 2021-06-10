@@ -40,13 +40,19 @@ def run_crispresso(crispresso_cmds, descriptor, idx):
         logging.info('Finished CRISPResso %s #%d' %(descriptor, idx))
     return return_value
 
-def run_crispresso_cmds(crispresso_cmds,n_processes=1,descriptor = 'region',continue_on_fail=False):
+def run_crispresso_cmds(crispresso_cmds,n_processes="1",descriptor = 'region',continue_on_fail=False):
     """
     input: crispresso_cmds: list of crispresso commands to run
     descriptor: label printed out describing a command e.g. "Could not process 'region' 5" or "Could not process 'batch' 5"
     """
-    logging.info("Running CRISPResso with %d processes" % n_processes)
-    pool = mp.Pool(processes = n_processes)
+    int_n_processes = 1
+    if n_processes == "max":
+        int_n_processes = get_max_processes()
+    else:
+        int_n_processes = int(n_processes)
+
+    logging.info("Running CRISPResso with %d processes" % int_n_processes)
+    pool = mp.Pool(processes=int_n_processes)
     idxs = range(len(crispresso_cmds))
     pFunc = partial(run_crispresso, crispresso_cmds, descriptor)
 

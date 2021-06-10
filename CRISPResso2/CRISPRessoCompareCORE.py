@@ -54,12 +54,6 @@ class DifferentAmpliconLengthException(Exception):
     pass
 ############################
 
-
-
-matplotlib=check_library('matplotlib')
-CRISPRessoPlot.setMatplotlibDefaults()
-
-plt=check_library('pylab')
 np=check_library('numpy')
 pd=check_library('pandas')
 import scipy.stats as stats
@@ -196,9 +190,6 @@ def main():
 
 
             #Quantification comparison barchart
-            fig=plt.figure(figsize=(30, 15))
-            n_groups = 2
-
             N_TOTAL_1 = float(amplicon_info_1[amplicon_name]['Reads_aligned'])
             N_UNMODIFIED_1 = float(amplicon_info_1[amplicon_name]['Unmodified'])
             N_MODIFIED_1 = float(amplicon_info_1[amplicon_name]['Modified'])
@@ -206,54 +197,31 @@ def main():
             N_TOTAL_2 = float(amplicon_info_2[amplicon_name]['Reads_aligned'])
             N_UNMODIFIED_2 = float(amplicon_info_2[amplicon_name]['Unmodified'])
             N_MODIFIED_2 = float(amplicon_info_2[amplicon_name]['Modified'])
-
-
-            means_sample_1= np.array([N_UNMODIFIED_1, N_MODIFIED_1])/N_TOTAL_1*100
-            means_sample_2 = np.array([N_UNMODIFIED_2, N_MODIFIED_2])/N_TOTAL_2*100
-
-            ax1=fig.add_subplot(1, 2, 1)
-
-            index = np.arange(n_groups)
-            bar_width = 0.35
-
-            opacity = 0.4
-            error_config = {'ecolor': '0.3'}
-
-            rects1 = ax1.bar(index, means_sample_1, bar_width,
-                             alpha=opacity,
-                             color=(0, 0, 1, 0.4),
-                             label=sample_1_name)
-
-            rects2 = ax1.bar(index + bar_width, means_sample_2, bar_width,
-                             alpha=opacity,
-                             color=(1, 0, 0, 0.4),
-                             label=sample_2_name)
-
-            plt.ylabel('% Sequences')
-            plt.title(get_plot_title_with_ref_name('%s VS %s' % (sample_1_name, sample_2_name), amplicon_name))
-            plt.xticks(index + bar_width/2.0, ('Unmodified', 'Modified'))
-            plt.legend()
-#            plt.xlim(index[0]-0.2,(index + bar_width)[-1]+bar_width+0.2)
-            plt.tight_layout()
-
-            ax2=fig.add_subplot(1, 2, 2)
-            ax2.bar(index, means_sample_1- means_sample_2, bar_width+0.35,
-                             alpha=opacity,
-                             color=(0, 1, 1, 0.4),
-                             label='')
-
-
-            plt.ylabel('% Sequences Difference')
-            plt.title(get_plot_title_with_ref_name('%s - %s' % (sample_1_name, sample_2_name), amplicon_name))
-            plt.xticks(index, ['Unmodified', 'Modified'])
-
-
-#            plt.xlim(index[0]-bar_width/2, (index+bar_width)[-1]+2*bar_width)
-            plt.tight_layout()
+            plot_titles = {
+                'vs': get_plot_title_with_ref_name(
+                    '%s VS %s' % (sample_1_name, sample_2_name),
+                    amplicon_name,
+                ),
+                'diff': get_plot_title_with_ref_name(
+                    '%s - %s' % (sample_1_name, sample_2_name),
+                    amplicon_name,
+                ),
+            }
             plot_name = '1.'+amplicon_plot_name+'Editing_comparison'
-            plt.savefig(_jp(plot_name)+'.pdf', bbox_inches='tight')
-            if save_png:
-                plt.savefig(_jp(plot_name)+'.png', bbox_inches='tight')
+
+            CRISPRessoPlot.plot_quantification_comparison_barchart(
+                N_TOTAL_1,
+                N_UNMODIFIED_1,
+                N_MODIFIED_1,
+                N_TOTAL_2,
+                N_UNMODIFIED_2,
+                N_MODIFIED_2,
+                sample_1_name,
+                sample_2_name,
+                plot_titles,
+                _jp(plot_name),
+                save_png,
+            )
 
             crispresso2_info['summary_plot_names'].append(plot_name)
             crispresso2_info['summary_plot_titles'][plot_name] = 'Editing efficiency comparison'
@@ -326,64 +294,25 @@ def main():
                 mod_df.to_csv(mod_filename, sep='\t', index=None)
 
                 #plot
-                fig=plt.figure(figsize=(20, 10))
-                ax1 = fig.add_subplot(2, 1, 1)
-
-                diff = np.divide(mod_counts_1, tot_counts_1) - np.divide(mod_counts_2, tot_counts_2)
-                diff_plot = ax1.plot(diff, color=(0, 1, 0, 0.4), lw=3, label='Difference' )
-                ax1.set_title(get_plot_title_with_ref_name('%s: %s - %s' % (mod, sample_1_name, sample_2_name), amplicon_name))
-                ax1.set_xticks(np.arange(0, len_amplicon, max(3, (len_amplicon/6) - (len_amplicon/6)%5)).astype(int))
-                ax1.set_ylabel('Sequences Difference %')
-                ax1.set_xlim(xmin=0, xmax=len_amplicon-1)
-
-                pvalues = np.array(pvalues)
-                min_nonzero = np.min(pvalues[np.nonzero(pvalues)])
-                pvalues[pvalues == 0] = min_nonzero
-                #ax2 = ax1.twinx()
-                ax2 = fig.add_subplot(2, 1, 2)
-                pval_plot = ax2.plot(-1*np.log10(pvalues), color=(1, 0, 0, 0.4), lw=2, label='-log10 P-value')
-                ax2.set_ylabel('-log10 P-value')
-                ax2.set_xlim(xmin=0, xmax=len_amplicon-1)
-                ax2.set_xticks(np.arange(0, len_amplicon, max(3, (len_amplicon/6) - (len_amplicon/6)%5)).astype(int))
-                ax2.set_xlabel('Reference amplicon position (bp)')
-
-
-                #bonferroni correction
-                corrected_p = -1*np.log10(0.01/float(len(consensus_sequence)))
-                cutoff_plot = ax2.plot([0, len(consensus_sequence)], [corrected_p, corrected_p], color='k', dashes=(5, 10), label='Bonferronni corrected cutoff')
-
-                plots = diff_plot + pval_plot + cutoff_plot
-
-                diff_y_min, diff_y_max = ax1.get_ylim()
-                p_y_min, p_y_max = ax2.get_ylim()
-                if cut_points:
-                    for idx, cut_point in enumerate(cut_points):
-                        if idx==0:
-                                plot_cleavage = ax1.plot([cut_point, cut_point], [diff_y_min, diff_y_max], '--k', lw=2, label='Predicted cleavage position')
-                                ax2.plot([cut_point, cut_point], [p_y_min, p_y_max], '--k', lw=2, label='Predicted cleavage position')
-                                plots = plots + plot_cleavage
-                        else:
-                                ax1.plot([cut_point, cut_point], [diff_y_min, diff_y_max], '--k', lw=2, label='_nolegend_')
-                                ax2.plot([cut_point, cut_point], [diff_y_min, diff_y_max], '--k', lw=2, label='_nolegend_')
-
-
-                    for idx, sgRNA_int in enumerate(sgRNA_intervals):
-                        if idx==0:
-                           p2 = ax1.plot([sgRNA_int[0], sgRNA_int[1]], [diff_y_min, diff_y_min], lw=10, c=(0, 0, 0, 0.15), label='sgRNA')
-                           ax2.plot([sgRNA_int[0], sgRNA_int[1]], [p_y_min, p_y_min], lw=10, c=(0, 0, 0, 0.15), label='sgRNA')
-                           plots = plots + p2
-                        else:
-                           ax1.plot([sgRNA_int[0], sgRNA_int[1]], [diff_y_min, diff_y_min], lw=10, c=(0, 0, 0, 0.15), label='_nolegend_')
-                           ax2.plot([sgRNA_int[0], sgRNA_int[1]], [p_y_min, p_y_min], lw=10, c=(0, 0, 0, 0.15), label='_nolegend_')
-
-
-                labs = [p.get_label() for p in plots]
-                lgd=plt.legend(plots, labs, loc='upper center', bbox_to_anchor=(0.5, -0.2), ncol=1, fancybox=True, shadow=False)
-
-                plot_name = '2.'+amplicon_plot_name + mod+'_quantification'
-                plt.savefig(_jp(plot_name+'.pdf'), bbox_inches='tight', bbox_extra_artists=(lgd,))
-                if save_png:
-                    plt.savefig(_jp(plot_name+'.png'), bbox_inches='tight', bbox_extra_artists=(lgd,))
+                plot_title = get_plot_title_with_ref_name(
+                    '%s: %s - %s' % (mod, sample_1_name, sample_2_name),
+                    amplicon_name,
+                )
+                plot_name = '2.' + amplicon_plot_name + mod + '_quantification'
+                CRISPRessoPlot.plot_quantification_positions(
+                    mod_counts_1,
+                    tot_counts_1,
+                    mod_counts_2,
+                    tot_counts_2,
+                    len_amplicon,
+                    pvalues,
+                    len(consensus_sequence),
+                    cut_points,
+                    sgRNA_intervals,
+                    plot_title,
+                    _jp(plot_name),
+                    save_png,
+                )
                 crispresso2_info['summary_plot_names'].append(plot_name)
                 crispresso2_info['summary_plot_titles'][plot_name] = mod_name +' locations'
                 crispresso2_info['summary_plot_labels'][plot_name] = mod_name + ' location comparison for amplicon ' + amplicon_name + '; Top: percent difference; Bottom: p-value.'

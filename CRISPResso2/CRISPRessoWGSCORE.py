@@ -284,8 +284,8 @@ def main():
         parser.add_argument('--skip_failed',  help='Continue with pooled analysis even if one sample fails', action='store_true')
         parser.add_argument('--gene_annotations', type=str, help='Gene Annotation Table from UCSC Genome Browser Tables (http://genome.ucsc.edu/cgi-bin/hgTables?command=start), \
         please select as table "knownGene", as output format "all fields from selected table" and as file returned "gzip compressed"', default='')
-        parser.add_argument('-p', '--n_processes', type=str, help='The number of processes to use for the quantification.\
-        Please use with caution since increasing this parameter will increase the memory required to run CRISPResso. Can be set to \'max\'.', default="1")
+        # parser.add_argument('-p', '--n_processes', type=str, help='The number of processes to use for the quantification.\
+        # Please use with caution since increasing this parameter will increase the memory required to run CRISPResso. Can be set to \'max\'.', default="1")
         parser.add_argument('--crispresso_command', help='CRISPResso command to call', default='CRISPResso')
 
         args = parser.parse_args()
@@ -317,6 +317,8 @@ def main():
             n_processes = CRISPRessoMultiProcessing.get_max_processes()
         else:
             n_processes = int(args.n_processes)
+
+        args.n_processes = CRISPRessoShared.get_sub_n_processes(sys.argv)
 
         #INIT
         get_name_from_bam=lambda  x: os.path.basename(x).replace('.bam', '')
