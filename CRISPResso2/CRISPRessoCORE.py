@@ -4290,6 +4290,18 @@ def main():
                     crispresso2_info['results']['refs'][ref_name]['plot_9_captions'].append("Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the " + sgRNA_legend + ". Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.")
                     crispresso2_info['results']['refs'][ref_name]['plot_9_datas'].append([('Allele frequency table', os.path.basename(allele_filename))])
 
+                    plot_9b_input = {
+                        'reference_seq': ref_seq_around_cut,
+                        'df_alleles': df_to_plot,
+                        'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
+                        'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
+                        'plot_cut_point': plot_cut_point,
+                        'sgRNA_intervals': new_sgRNA_intervals[ind],
+                        'sgRNA_name': sgRNA_names[ind],
+                        'sgRNA_mismatches': sgRNA_mismatches,
+                        'annotate_wildtype_allele': args.annotate_wildtype_allele,
+                    }
+                    CRISPRessoPlot.generate_alleles_graph_json(**plot_9b_input)
                 if not args.crispresso1_mode and args.base_editor_output:
                     ###guide-specific base editor plots
                     plot_ref_seq = ref_seq_around_cut

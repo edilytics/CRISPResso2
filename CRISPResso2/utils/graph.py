@@ -55,7 +55,7 @@ class Graph:
 
         """
         payload.update(
-            {'source_id': source_id, 'target_id': target_id}
+            {'source': source_id, 'target': target_id}
         )
         self.edges[source_id][target_id] = payload
 
@@ -352,6 +352,8 @@ class Graph:
             current_node_group.add(current_node_id)
         elif len(current_node_group) > 1:
             current_group_complete = True
+        elif len(current_node_group) == 1:
+            current_node_group = set()
 
         # Find the next node to search
         if out_neighbors and out_neighbors[0]['id'] in unvisited_nodes:

@@ -5,6 +5,8 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 '''
 
 import os
+import json
+from functools import partial
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -17,10 +19,14 @@ import plotly.express as px
 from collections import defaultdict
 from copy import deepcopy
 import re
+from itertools import islice, tee, zip_longest
 from matplotlib import colors as colors_mpl
 import seaborn as sns
+import subprocess
 
 from CRISPResso2 import CRISPRessoShared
+from CRISPResso2.CRISPRessoCOREResources import find_indels_substitutions
+from CRISPResso2.utils.graph import Graph
 
 def setMatplotlibDefaults():
     font = {'size': 22}
@@ -3025,6 +3031,572 @@ def plot_alleles_table(reference_seq,df_alleles,fig_filename_root,MIN_FREQUENCY=
             if is_ref:
                 y_labels[ix] += annotate_wildtype_allele
     plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, custom_colors)
+
+
+def _get_next(iterable, window=1):
+    items, nexts = tee(iterable, 2)
+    nexts = islice(nexts, window, None)
+    return zip_longest(items, nexts)
+
+
+def _alleles_graph_update_edge(
+    graph,
+    source_id,
+    target_id,
+    num_reads,
+    percent_reads,
+    allele_id,
+):
+    graph.update_edge(
+        source_id, target_id, 'numReads', lambda x: x + num_reads,
+    )
+    graph.update_edge(
+        source_id, target_id, 'percentReads', lambda x: x + percent_reads,
+    )
+    graph.update_edge(
+        source_id, target_id, 'alleleIds', lambda x: x + [allele_id],
+    )
+
+
+def _alleles_graph_update_node(
+    graph,
+    node_id,
+    num_reads,
+    percent_reads,
+    allele_id,
+    node_width,
+):
+    graph.update_node(node_id, 'numReads', lambda x: x + num_reads)
+    graph.update_node(node_id, 'percentReads', lambda x: x + percent_reads)
+    graph.update_node(node_id, 'alleleIds', lambda x: x + [allele_id])
+
+
+def _alleles_graph_check_path(graph, path, node_type):
+    if len(path) < 3:
+        return False
+    for node_id in path[1:-1]:
+        if graph.get_node(node_id)['type'] != node_type:
+            return False
+    return True
+
+
+def _add_deletions_to_alleles_graph(
+    graph,
+    deletion_coordinates,
+    num_reads,
+    percent_reads,
+    allele_id,
+):
+    for deletion_coordinate in deletion_coordinates:
+        deletion_source_id = deletion_coordinate[0] - 1
+        deletion_target_id = deletion_coordinate[1]
+        if graph.is_edge(deletion_source_id, deletion_target_id):
+            _alleles_graph_update_edge(
+                graph,
+                deletion_source_id,
+                deletion_target_id,
+                num_reads,
+                percent_reads,
+                allele_id,
+            )
+        else:
+            graph.add_edge(
+                deletion_source_id,
+                deletion_target_id,
+                type='Deletion',
+                alleleIds=[allele_id],
+                numReads=num_reads,
+                percentReads=percent_reads,
+            )
+
+
+def _add_modification_seq_to_alleles_graph(
+    graph,
+    modification_positions,
+    modification_sizes,
+    modification_type,
+    aligned_read_seq,
+    source_node_id,
+    terminal_node_id,
+    num_reads,
+    percent_reads,
+    allele_id,
+    node_width,
+    is_terminal_indel=None,
+):
+    def calc_ref_position(seq_index):
+        if modification_type == 'Insertion':
+            return modification_source_id + (seq_index / (modification_size + 2))
+        elif modification_type == 'Substitution':
+            return modification_source_id + seq_index
+        elif modification_type == 'Indel':
+            if is_terminal_indel:
+                return modification_source_id + seq_index
+            return seq_index
+
+    for modification_source_id, modification_size in zip(
+        modification_positions, modification_sizes,
+    ):
+        if modification_type == 'Insertion':
+            modification_target_id = modification_source_id + 1
+            modification_seq = aligned_read_seq[
+                modification_source_id + 1:modification_target_id + modification_size
+            ]
+        elif modification_type == 'Substitution':
+            modification_target_id = modification_source_id + modification_size + 1
+            modification_seq = aligned_read_seq[
+                modification_source_id + 1:modification_target_id
+            ]
+        elif modification_type == 'Indel':
+            if is_terminal_indel:
+                modification_target_id = terminal_node_id
+                modification_seq = aligned_read_seq[modification_source_id:]
+            else:
+                modification_target_id = modification_source_id
+                modification_seq = aligned_read_seq[:modification_source_id]
+        potential_paths = [
+            path
+            for path in graph.get_all_paths(
+                modification_source_id, modification_target_id,
+            )
+            if len(path) > 2 and all((
+                graph.get_node(node)['type'] != 'Reference' or
+                graph.get_node(node)['id'] == modification_source_id or
+                graph.get_node(node)['id'] == modification_target_id
+                )
+                for node in path
+            )
+        ]
+        if potential_paths:
+            prev_node_id = modification_source_id
+            for modification_i, (modification_nuc, duplicate_node_index) in enumerate(
+                zip(modification_seq, range(len(potential_paths[0][1:-1]))), 1
+            ):
+                duplicate_path_indexes = [
+                    path_index
+                    for path_index, path in
+                    enumerate(potential_paths)
+                    if graph.get_node(
+                        path[1:-1][duplicate_node_index]
+                    )['name'] == modification_nuc
+                ]
+                if duplicate_path_indexes:
+                    duplicate_node_id = potential_paths[
+                        duplicate_path_indexes[0]
+                    ][1:-1][duplicate_node_index]
+                    if not graph.is_edge(prev_node_id, duplicate_node_id):
+                        graph.add_edge(
+                            prev_node_id,
+                            duplicate_node_id,
+                            type=modification_type,
+                            alleleIds=[allele_id],
+                            numReads=num_reads,
+                            percentReads=percent_reads,
+                        )
+                    else:
+                        _alleles_graph_update_edge(
+                            graph,
+                            prev_node_id,
+                            duplicate_node_id,
+                            num_reads,
+                            percent_reads,
+                            allele_id,
+                        )
+                    _alleles_graph_update_node(
+                        graph,
+                        duplicate_node_id,
+                        num_reads,
+                        percent_reads,
+                        allele_id,
+                        node_width,
+                    )
+                else:
+                    duplicate_node_id = graph.add_node(
+                        name=modification_nuc,
+                        type=modification_type,
+                        alleleIds=[allele_id],
+                        refPosition=calc_ref_position(modification_i),
+                        width=node_width,
+                        numReads=num_reads,
+                        percentReads=percent_reads,
+                    )
+                    graph.add_edge(
+                        prev_node_id,
+                        duplicate_node_id,
+                        type=modification_type,
+                        alleleIds=[allele_id],
+                        numReads=num_reads,
+                        percentReads=percent_reads,
+                    )
+                prev_node_id = duplicate_node_id
+            if modification_target_id < len(aligned_read_seq):
+                if graph.is_edge(prev_node_id, modification_target_id):
+                    _alleles_graph_update_edge(
+                        graph,
+                        prev_node_id,
+                        modification_target_id,
+                        num_reads,
+                        percent_reads,
+                        allele_id,
+                    )
+                else:
+                    graph.add_edge(
+                        prev_node_id,
+                        modification_target_id,
+                        type=modification_type,
+                        alleleIds=[allele_id],
+                        numReads=num_reads,
+                        percentReads=percent_reads,
+                    )
+            else:
+                if graph.is_edge(prev_node_id, terminal_node_id):
+                    _alleles_graph_update_edge(
+                        graph,
+                        prev_node_id,
+                        terminal_node_id,
+                        num_reads,
+                        percent_reads,
+                        allele_id,
+                    )
+                else:
+                    graph.add_edge(
+                        prev_node_id,
+                        terminal_node_id,
+                        type=modification_type,
+                        alleleIds=[allele_id],
+                        numReads=num_reads,
+                        percentReads=percent_reads,
+                    )
+        else:
+            modification_id = graph.add_node(
+                name=modification_seq[0],
+                type=modification_type,
+                alleleIds=[allele_id],
+                refPosition=calc_ref_position(1),
+                width=node_width,
+                numReads=num_reads,
+                percentReads=percent_reads,
+            )
+            graph.add_edge(
+                modification_source_id,
+                modification_id,
+                type=modification_type,
+                alleleIds=[allele_id],
+                numReads=num_reads,
+                percentReads=percent_reads,
+            )
+            source_id = modification_id
+            for modification_i, modification_nuc in enumerate(modification_seq[1:], 2):
+                modification_id = graph.add_node(
+                    name=modification_nuc,
+                    type=modification_type,
+                    alleleIds=[allele_id],
+                    refPosition=calc_ref_position(modification_i),
+                    width=node_width,
+                    numReads=num_reads,
+                    percentReads=percent_reads,
+                )
+                target_id = modification_id
+                graph.add_edge(
+                    source_id,
+                    target_id,
+                    type=modification_type,
+                    alleleIds=[allele_id],
+                    numReads=num_reads,
+                    percentReads=percent_reads,
+                )
+                source_id = modification_id
+
+            if modification_target_id < len(aligned_read_seq):
+                graph.add_edge(
+                    source_id,
+                    modification_target_id,
+                    type=modification_type,
+                    alleleIds=[allele_id],
+                    numReads=num_reads,
+                    percentReads=percent_reads,
+                )
+            else:
+                graph.add_edge(
+                    source_id,
+                    terminal_node_id,
+                    type=modification_type,
+                    alleleIds=[allele_id],
+                    numReads=num_reads,
+                    percentReads=percent_reads,
+                )
+
+
+def _add_indels_to_alleles_graph(
+    graph,
+    source_node_id,
+    terminal_node_id,
+    aligned_read_seq,
+    aligned_ref_seq,
+    num_reads,
+    percent_reads,
+    allele_id,
+    node_width,
+):
+    source_indel_added, terminal_indel_added = False, False
+    indel_matcher = re.compile('(-*-)')
+    for deletion in indel_matcher.finditer(aligned_read_seq):
+        start_index, end_index = deletion.span()
+        if start_index == 0:
+            source_indel_added = True
+            _add_deletions_to_alleles_graph(
+                graph,
+                [(source_node_id + 1, end_index)],
+                num_reads,
+                percent_reads,
+                allele_id,
+            )
+        elif end_index == len(aligned_read_seq):
+            terminal_indel_added = True
+            _add_deletions_to_alleles_graph(
+                graph,
+                [(start_index, terminal_node_id)],
+                num_reads,
+                percent_reads,
+                allele_id,
+            )
+
+    for insertion in indel_matcher.finditer(aligned_ref_seq):
+        start_index, end_index = insertion.span()
+        if start_index == 0:
+            source_indel_added = True
+            _add_modification_seq_to_alleles_graph(
+                graph,
+                [end_index],
+                [end_index - start_index],
+                'Indel',
+                aligned_read_seq,
+                source_node_id,
+                terminal_node_id,
+                num_reads,
+                percent_reads,
+                allele_id,
+                node_width,
+                is_terminal_indel=False,
+            )
+        elif end_index == len(aligned_ref_seq):
+            terminal_indel_added = True
+            _add_modification_seq_to_alleles_graph(
+                graph,
+                [start_index],
+                [end_index - start_index],
+                'Indel',
+                aligned_read_seq,
+                source_node_id,
+                terminal_node_id,
+                num_reads,
+                percent_reads,
+                allele_id,
+                node_width,
+                is_terminal_indel=True,
+            )
+    return source_indel_added, terminal_indel_added
+
+
+def generate_alleles_graph_json(
+    reference_seq,
+    df_alleles,
+    MIN_FREQUENCY=0.5,
+    MAX_N_ROWS=100,
+    plot_cut_point=True,
+    sgRNA_intervals=None,
+    sgRNA_name=None,
+    sgRNA_mismatches=None,
+    annotate_wildtype_allele='****',
+    custom_colors=None,
+):
+    """Generate JSON suitable for plotting a graph-based allele heatmap.
+
+    This function will generate the JSON necessary for a graph-based allele
+    heatmap (a corollary to the plot generated by `plot_alleles_heatmap`).
+    """
+    node_width = 15
+    plot_data = {
+        'alleles': [{'name': 'Reference', 'id': 0, 'seq': reference_seq}],
+    }
+    graph = Graph()
+    for i, nucleotide in enumerate(reference_seq):
+        graph.add_node(
+            name=nucleotide,
+            type='Reference',
+            refPosition=i,
+            width=node_width,
+        )
+    terminal_node_id = graph.add_node(
+        name='Ø',
+        type='Reference',
+        refPosition=len(reference_seq) + 1,
+        width=node_width,
+    )
+    source_node_id = graph.add_node(
+        name='0',
+        type='Reference',
+        refPosition=-1,
+        width=node_width,
+    )
+    for i in range(1, len(reference_seq)):
+        graph.add_edge(i - 1, i, type='Reference')
+    if sgRNA_intervals:
+        plot_data['groups'] = [
+            {
+                'leaves': list(range(
+                    sgRNA_intervals[0], sgRNA_intervals[1] + 1,
+                )),
+                'name': sgRNA_name if sgRNA_name else 'sgRNA',
+            }
+        ]
+    cleavagePosition = int(len(reference_seq) / 2)
+    if plot_cut_point:
+        graph.update_node(
+            cleavagePosition, 'cleavagePosition', lambda _: True,
+        )
+    allele_id = 1
+    reference_num_reads, reference_percent_reads = 0, 0
+    source_indel_present, terminal_indel_present = False, False
+    for aligned_read_seq, row in df_alleles[
+        df_alleles['%Reads'] >= MIN_FREQUENCY
+    ].iterrows():
+        aligned_ref_seq = row['Reference_Sequence']
+        num_reads, percent_reads = row['#Reads'], row['%Reads']
+        if aligned_read_seq == aligned_ref_seq:
+            reference_num_reads = num_reads
+            reference_percent_reads = percent_reads
+        indel_info = find_indels_substitutions(
+            aligned_read_seq,
+            aligned_ref_seq,
+            list(range(len(aligned_read_seq))),
+        )
+
+        _add_deletions_to_alleles_graph(
+            graph,
+            indel_info['deletion_coordinates'],
+            num_reads,
+            percent_reads,
+            allele_id,
+        )
+        _add_modification_seq_to_alleles_graph(
+            graph,
+            indel_info['all_insertion_left_positions'],
+            indel_info['insertion_sizes'],
+            'Insertion',
+            aligned_read_seq,
+            source_node_id,
+            terminal_node_id,
+            num_reads,
+            percent_reads,
+            allele_id,
+            node_width,
+        )
+
+        substitution_groups, current_group = [], []
+        for substitution_position, next_subtitution_position in _get_next(
+            indel_info['substitution_positions'],
+        ):
+            current_group += [substitution_position - 1]
+            if next_subtitution_position and (next_subtitution_position - substitution_position) > 1:
+                substitution_groups += [current_group]
+                current_group = []
+        if current_group:
+            substitution_groups += [current_group]
+        substitution_sizes = [len(g) for g in substitution_groups]
+        substitution_positions = [g[0] for g in substitution_groups]
+        _add_modification_seq_to_alleles_graph(
+            graph,
+            substitution_positions,
+            substitution_sizes,
+            'Substitution',
+            aligned_read_seq,
+            source_node_id,
+            terminal_node_id,
+            num_reads,
+            percent_reads,
+            allele_id,
+            node_width,
+        )
+        source_indel_added, terminal_indel_added = _add_indels_to_alleles_graph(
+            graph,
+            source_node_id,
+            terminal_node_id,
+            aligned_read_seq,
+            aligned_ref_seq,
+            num_reads,
+            percent_reads,
+            allele_id,
+            node_width,
+        )
+        if source_indel_added and not graph.is_edge(source_node_id, 0):
+            source_indel_present = True
+            graph.add_edge(source_node_id, 0, type='Reference')
+        if terminal_indel_added and not graph.is_edge(len(reference_seq) - 1, terminal_node_id):
+            terminal_indel_present = True
+            graph.add_edge(len(reference_seq) - 1, terminal_node_id, type='Reference')
+
+        plot_data['alleles'] += [{
+            'name': 'Allele {0}'.format(allele_id),
+            'id': allele_id,
+            'numReads': num_reads,
+            'percentReads': percent_reads,
+            'seq': aligned_read_seq,
+        }]
+        allele_id += 1
+
+    plot_data['alleles'][0].update({
+        'numReads': reference_num_reads,
+        'percentReads': reference_percent_reads,
+    })
+
+    def split_func(payload):
+        ref_position = payload['refPosition']
+        return abs(ref_position - cleavagePosition) < 1 or (
+            sgRNA_intervals
+            or abs(ref_position - sgRNA_intervals[0]) >= 1
+            or abs(ref_position - sgRNA_intervals[1] + 1) >= 1
+        )
+
+    graph.collapse_components(split_func)
+    for node in graph.nodes.values():
+        node.update({'show': True})
+        if 'collapsedNodes' in node:
+            node.update({'collapsed': False})
+    if not source_indel_present:
+        graph.update_node(source_node_id, 'show', lambda _: False)
+    if not terminal_indel_present:
+        graph.update_node(terminal_node_id, 'show', lambda _: False)
+    plot_data['nodes'] = list(graph.nodes.values())
+    plot_data['links'] = [
+        e
+        for edge in graph.edges.values()
+        for e in edge.values()
+    ]
+    plot_data['setcolaSpec'] = [
+        {
+            'name': 'referenceAlignment',
+            'sets': [{
+                'expr': "node.type === 'Reference' && node.show",
+                'name': 'referenceNodes',
+            }],
+            'forEach': [
+                {'constraint': 'align', 'axis': 'x', 'orientation': 'center'},
+                {'constraint': 'order', 'axis': 'x', 'by': 'refPosition', 'gap': node_width * 2},
+            ],
+        },
+        {
+            'name': 'alleleHorizontalAlignment',
+            'sets': {'partition': 'refPosition'},
+            'forEach': [
+                {'constraint': 'align', 'axis': 'y', 'orientation': 'center'},
+            ],
+        },
+    ]
+    subprocess.run('pbcopy', universal_newlines=True, input=json.dumps(plot_data))
+    breakpoint()
+    return json.dumps(plot_data)
+
 
 def plot_alleles_table_from_file(alleles_file_name,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,annotate_wildtype_allele=''):
     """
