@@ -1,0 +1,118 @@
+{% extends "layout.html" %}
+{% block head %}
+<style>
+.nav-tabs.amp-header {
+  border-bottom:none !important;
+}
+
+.card-header.amp-header {
+  border-bottom:none !important;
+}
+.nav-tabs.amp-header .nav-link.active {
+  background-color:lightsteelblue;
+  border-bottom:lightsteelblue;
+}
+
+.tab-content.amp-body {
+  background-color:lightsteelblue;
+}
+
+@media print {
+   .tab-content > .tab-pane {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+		margin-bottom: 2em !important;
+		page-break-inside: avoid;
+  }
+  .nav-tabs {
+    display:none !important;
+    visibility:hidden !important;
+  }
+  .tab-content.amp-body {
+    background-color:transparent !important;
+  	border:None !important;
+  }
+}
+@media only screen and (max-width: 600px) {
+	.jumbotron img {
+		width:100%
+	}
+}
+</style>
+
+{% endblock %}
+
+{% block content %}
+<div class="row">
+<div class="col-sm-1"></div>
+<div class="col-sm-10">
+
+	<div class="jumbotron" style="background:rgba(0,0,0,0.0); padding:0px" >
+		<div id='jumbotron_content' >
+
+            {% if region_names|length > 0 %}
+            <div class='card text-center mb-2'>
+                <div class='card-header'>
+                    <h5>{{report_name}}</h5>
+                </div>
+                <div class='card-body p-0'>
+                    <div class="list-group list-group-flush">
+                        {% for region_name in region_names %}
+	                    <a href="{{sub_html_files[region_name]}}" class="list-group-item list-group-item-action">{{region_name}}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if reads_summary %}
+            <div class="card text-center mb-2">
+                <div class="card-header">
+                    <h5>{{summary_plot_titles['CRISPRessoPooled_reads_summary']}}</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{{crispresso_data_path}}{{reads_summary}}.pdf"><img src="{{crispresso_data_path}}{{reads_summary}}.png" width="80%"></a>
+                    <label class="labelpadding">{{summary_plot_labels['CRISPRessoPooled_reads_summary']}}</label>
+                    {% for (data_label, data_path) in summary_plot_datas['CRISPRessoPooled_reads_summary'] %}
+                    <p class="m-0"><small>Data: <a href="{{crispresso_data_path}}{{data_path}}" title="{{data_label}}">{{data_label}}</a><a href="{{crispresso_data_path}}{{data_path}}" title="{{data_label}}" download> <span class="fas fa-download" data-toggle="tooltip" title="Download {{data_label}}"></span></a></small></p>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if modification_summary %}
+            <div class="card text-center mb-2">
+                <div class="card-header">
+                    <h5>{{summary_plot_titles['CRISPRessoPooled_modification_summary']}}</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{{crispresso_data_path}}{{modification_summary}}.pdf"><img src="{{crispresso_data_path}}{{modification_summary}}.png" width="80%"></a>
+                    <label class="labelpadding">{{summary_plot_labels['CRISPRessoPooled_modification_summary']}}</label>
+                    {% for (data_label, data_path) in summary_plot_datas['CRISPRessoPooled_modification_summary'] %}
+                    <p class="m-0"><small>Data: <a href="{{crispresso_data_path}}{{data_path}}" title="{{data_label}}">{{data_label}}</a><a href="{{crispresso_data_path}}{{data_path}}" title="{{data_label}}" download> <span class="fas fa-download" data-toggle="tooltip" title="Download {{data_label}}"></span></a></small></p>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+           	<div align="center" class='p-3'>
+			     <a href="/reports_data/{{report_zip_filename}}" class="btn btn-primary" role="button"><i class="fas fa-download"></i> Download report</a>
+			     <a href="{{report_path}}" class="btn btn-primary" role="button"><i class="fas fa-link"></i> Link to report</a>
+                 <button class='btn btn-primary hidden-print' onclick='window.print();'><i class="fas fa-print"></i> Print</button>
+            </div>
+    {# data bit for web version: #}
+    {#
+        			  <p class="m-0"><small>Data: <a href="{{crispresso_data_path}}{{data_path}}">{{data_label}}</a> <a href="{{crispresso_data_path}}{{data_path}}" title="{{data_label}}" download> <span class="fas fa-download" data-toggle='tooltip' title='Download {{data_label}}'><span></a></small></p>
+    #}
+	</div> {# jumbotron_content #} <!-- end jumbotron_content -->
+</div> {# jumbrotron #} <!-- end jumbotron -->
+
+</div> {# column #} <!-- end column -->
+
+<div class="col-sm-1"></div>
+</div>
+{% endblock %}
+
+{% block foot %}
+{% endblock %}
