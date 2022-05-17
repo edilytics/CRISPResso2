@@ -25,39 +25,37 @@ def make_report_from_folder(crispresso_report_file, crispresso_folder, _ROOT):
     make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT)
 
 
-def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
-    # dicts for each amplicon fig_names[amp_name] = [list of fig names]
-    #                        fig_locs[amp_name][fig_name] = figure location
-    #    print('crispresso_report file: ' + crispresso_report_file + ' crispresso_folder : ' + crispresso_folder + ' root: ' + _ROOT)
-    figures = {'names': {}, 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}, 'sgRNA_based_names': {}}
-
-    def add_fig_if_exists(fig_name, fig_root, fig_title, fig_caption, fig_data,
-                          amplicon_fig_names, amplicon_figures):
+def add_fig_if_exists(fig_name, fig_root, fig_title, fig_caption, fig_data,
+                      amplicon_fig_names, amplicon_figures, crispresso_folder):
+    """
+        Helper function to add figure if the file exists
+        if fig at filename exists,
+        amplicon_figs[figname] is set to that file
         """
-            Helper function to add figure if the file exists
-            if fig at filename exists,
-            amplicon_figs[figname] is set to that file
-            """
-        # fullpath=os.path.join(crispresso_folder,fig_root+'.png')
-        pngfullpath = os.path.join(crispresso_folder, fig_root + '.png')
-        htmlfullpath = os.path.join(crispresso_folder, fig_root + '.html')
-        #            print('adding file ' + fig_root + ' at ' + fullpath)
-        if os.path.exists(pngfullpath) or os.path.exists(htmlfullpath):
-            amplicon_fig_names.append(fig_name)
-            # amplicon_fig_locs[fig_name]=os.path.basename(fig_root+'.png')
-            amplicon_figures['locs'][fig_name] = os.path.basename(fig_root)
-            amplicon_figures['titles'][fig_name] = fig_title
-            amplicon_figures['captions'][fig_name] = fig_caption
-            amplicon_figures['datas'][fig_name] = []
-            for (data_caption, data_file) in fig_data:
-                if os.path.exists(os.path.join(crispresso_folder, data_file)):
-                    amplicon_figures['datas'][fig_name].append((data_caption, data_file))
-            if os.path.exists(htmlfullpath):
-                with open(htmlfullpath) as html:
-                    html_string = "<div align='center'>"
-                    html_string += html.read()
-                    html_string += "</div>"
-                amplicon_figures['htmls'][fig_name] = html_string
+    # fullpath=os.path.join(crispresso_folder,fig_root+'.png')
+    pngfullpath = os.path.join(crispresso_folder, fig_root + '.png')
+    htmlfullpath = os.path.join(crispresso_folder, fig_root + '.html')
+    #            print('adding file ' + fig_root + ' at ' + fullpath)
+    if os.path.exists(pngfullpath) or os.path.exists(htmlfullpath):
+        amplicon_fig_names.append(fig_name)
+        # amplicon_fig_locs[fig_name]=os.path.basename(fig_root+'.png')
+        amplicon_figures['locs'][fig_name] = os.path.basename(fig_root)
+        amplicon_figures['titles'][fig_name] = fig_title
+        amplicon_figures['captions'][fig_name] = fig_caption
+        amplicon_figures['datas'][fig_name] = []
+        for (data_caption, data_file) in fig_data:
+            if os.path.exists(os.path.join(crispresso_folder, data_file)):
+                amplicon_figures['datas'][fig_name].append((data_caption, data_file))
+        if os.path.exists(htmlfullpath):
+            with open(htmlfullpath) as html:
+                html_string = "<div align='center'>"
+                html_string += html.read()
+                html_string += "</div>"
+            amplicon_figures['htmls'][fig_name] = html_string
+
+
+def assemble_figs(run_data, crispresso_folder):
+    figures = {'names': {}, 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}, 'sgRNA_based_names': {}}
 
     global_fig_names = []
     for fig in ['1a', '1b', '1c', '1d', '5a', '6a', '8a', '11c']:
@@ -66,7 +64,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
             add_fig_if_exists(fig_name, run_data['results']['general_plots'][fig_name + '_root'], 'Figure ' + fig,
                               run_data['results']['general_plots'][fig_name + '_caption'],
                               run_data['results']['general_plots'][fig_name + '_data'],
-                              global_fig_names, figures)
+                              global_fig_names, figures, crispresso_folder)
 
     amplicons = []
     for amplicon_name in run_data['results']['ref_names']:
@@ -81,7 +79,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
                                   'Figure ' + fig_name,
                                   run_data['results']['refs'][amplicon_name][fig_name + '_caption'],
                                   run_data['results']['refs'][amplicon_name][fig_name + '_data'],
-                                  global_fig_names, amplicon_figures)
+                                  global_fig_names, amplicon_figures, crispresso_folder)
 
         this_sgRNA_based_fig_names = {}
         for fig in ['2b', '9', '10d', '10e', '10f', '10g', '11b']:
@@ -93,7 +91,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
                     add_fig_if_exists(fig_name, plot_root, 'Figure ' + fig_name + ' sgRNA ' + str(idx + 1),
                                       run_data['results']['refs'][amplicon_name]['plot_' + fig + '_captions'][idx],
                                       run_data['results']['refs'][amplicon_name]['plot_' + fig + '_datas'][idx],
-                                      this_fig_names, amplicon_figures)
+                                      this_fig_names, amplicon_figures, crispresso_folder)
             this_sgRNA_based_fig_names[fig] = this_fig_names
 
         figures['names'][amplicon_name] = amplicon_figures['names']
@@ -103,6 +101,15 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
         figures['titles'][amplicon_name] = amplicon_figures['titles']
         figures['captions'][amplicon_name] = amplicon_figures['captions']
         figures['datas'][amplicon_name] = amplicon_figures['datas']
+    data = {'amplicons': amplicons, 'figures': figures}
+    return data
+
+
+def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT, web_version=False):
+    # dicts for each amplicon fig_names[amp_name] = [list of fig names]
+    #                        fig_locs[amp_name][fig_name] = figure location
+    #    print('crispresso_report file: ' + crispresso_report_file + ' crispresso_folder : ' + crispresso_folder + ' root: ' + _ROOT)
+    data = assemble_figs(run_data, crispresso_folder)
 
     report_display_name = ""
     if run_data['running_info']['args'].name != "":
@@ -116,8 +123,8 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
         crispresso_data_path += "/"
 
     report_data = {
-        'amplicons': amplicons,
-        'figures': figures,
+        'amplicons': data['amplicons'],
+        'figures': data['figures'],
         'run_data': run_data,
         'report_display_name': report_display_name,
         'crispresso_data_path': crispresso_data_path,
@@ -247,6 +254,7 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
         batch_folder,
         _ROOT,
         output_title,
+        'batch',
         summary_plots={
             'names': summary_plot_names,
             'titles': summary_plot_titles,
@@ -267,7 +275,7 @@ def make_pooled_report_from_folder(crispresso_report_file, crispresso2_info, fol
     output_title = 'CRISPResso Pooled Output'
     if crispresso2_info['running_info']['args'].name != '':
         output_title += '<br/>{0}'.format(crispresso2_info['running_info']['args'].name)
-    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT)
+    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'pooled')
 
 
 def make_compare_report_from_folder(crispresso_report_file, crispresso2_info, folder, _ROOT):
@@ -275,7 +283,7 @@ def make_compare_report_from_folder(crispresso_report_file, crispresso2_info, fo
     output_title = 'CRISPResso Compare Output'
     if crispresso2_info['running_info']['args'].name != '':
         output_title += '<br/>{0}'.format(crispresso2_info['running_info']['args'].name)
-    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT)
+    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'compare')
 
 
 def make_meta_report_from_folder(crispresso_report_file, crispresso2_info, folder, _ROOT):
@@ -284,7 +292,7 @@ def make_meta_report_from_folder(crispresso_report_file, crispresso2_info, folde
     output_title = 'CRISPresso Meta Output'
     if crispresso2_info['running_info']['args'].name != '':
         output_title += '<br/>{0}'.format(crispresso2_info['running_info']['args'].name)
-    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT,
+    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'meta',
                                   display_names=input_names)
 
 
@@ -293,10 +301,10 @@ def make_wgs_report_from_folder(crispresso_report_file, crispresso2_info, folder
     output_title = 'CRISPResso WGS Output'
     if crispresso2_info['running_info']['args'].name != '':
         output_title += '<br/>{0}'.format(crispresso2_info['running_info']['args'].name)
-    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT)
+    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'wgs')
 
 
-def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, crispresso_report_file, folder, _ROOT,
+def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, crispresso_report_file, folder, _ROOT, crispresso_tool,
                                   display_names=None):
     """
     Prepares information to make a report of multiple CRISPResso runs - like CRISPRessoWGS or CRISPRessoPooled
@@ -369,6 +377,7 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
         folder,
         _ROOT,
         report_name,
+        crispresso_tool,
         summary_plots={
             'names': summary_plot_names,
             'titles': summary_plot_titles,
@@ -385,6 +394,7 @@ def make_multi_report(
     crispresso_folder,
     _ROOT,
     report_name,
+    crispresso_tool,
     window_nuc_pct_quilts=[],
     nuc_pct_quilts=[],
     window_nuc_conv_plots=[],
@@ -409,12 +419,7 @@ def make_multi_report(
     report_name (string): description of report type to be shown at top of report
     crispresso_folder (string): absolute path to the crispresso output
     _ROOT (string): absolute path to the crispresso executable
-
-<<<<<<< HEAD
-    summary_plot (dict): a dict with the following keys:
-=======
     summary_plots (dict): a dict with the following keys:
->>>>>>> origin/master
         names (list): list of plot names - keys for following dicts
         titles (dict): dict of plot_name->plot_title
         labels (dict): dict of plot_name->plot_label
@@ -439,7 +444,14 @@ def make_multi_report(
         loader=FileSystemLoader(os.path.join(_ROOT, 'templates')),
     )
     j2_env.filters['dirname'] = dirname
-    template = j2_env.get_template('multiReport.html')
+    if crispresso_tool == 'batch':
+        template = j2_env.get_template('batchReport.html')
+    elif crispresso_tool == 'pooled':
+        template = j2_env.get_template('pooledReport.html')
+    elif crispresso_tool == 'wgs':
+        template = j2_env.get_template('wgsReport.html')
+    else:
+        template = j2_env.get_template('multiReport.html')
 
     crispresso_data_path = os.path.relpath(
         crispresso_folder, os.path.dirname(crispresso_multi_report_file),
@@ -466,7 +478,10 @@ def make_multi_report(
                 key,
                 default_type,
             )
-
+    web = False
+    if not web:
+        for html in sub_html_files:
+            sub_html_files[html] = crispresso_data_path + sub_html_files[html]
     with open(crispresso_multi_report_file, 'w') as outfile:
         outfile.write(template.render(
             window_nuc_pct_quilts=window_nuc_pct_quilts,

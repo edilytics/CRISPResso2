@@ -75,7 +75,7 @@
 					<div class='card-body'>
             <div class='tab-content'>
   					  <div class="tab-pane fade show active" id="log_aln" role="tabpanel">
-						  {{report_data['figures']['htmls']['plot_1a']}}
+						  {{report_data['figures']['htmls']['plot_1a']|safe}}
 						  <label class="labelpadding">{{report_data['figures']['captions']['plot_1a']}}</label>
 							  {% for (data_label,data_path) in report_data['figures']['datas']['plot_1a'] %}
 							      <p class="m-0"><small>Data: <a href="{{report_data['crispresso_data_path']}}{{data_path}}">{{data_label}}</a></small></p>
