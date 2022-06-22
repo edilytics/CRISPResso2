@@ -66,6 +66,6 @@ def test_paths():
     assert graph.get_path(node_0, node_5) == [node_0, node_1, node_2, node_5]
 
     graph.add_edge(node_0, node_5)
-    graph.get_all_paths(node_0, node_5) == [
-        [node_0, node_1, node_5], [node_0, node_1, node_2, node_5],
+    assert graph.get_all_paths(node_0, node_5) == [
+        [node_0, node_5], [node_0, node_1, node_2, node_5],
     ]
