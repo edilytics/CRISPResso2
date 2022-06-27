@@ -377,7 +377,7 @@ def main():
 
                         merged = pd.merge(df1, df2, on = ['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated'], suffixes=('_' + sample_1_name, '_'+sample_2_name), how='outer')
                         quant_cols = ['#Reads_'+sample_1_name, '%Reads_'+sample_1_name, '#Reads_'+sample_2_name, '%Reads_'+sample_2_name]
-                        merged[quant_cols] = merged[quant_cols].fillna(0)
+                        merged[quant_cols].fillna(0, inplace=True)
                         lfc_error =0.1
                         merged['each_LFC'] = np.log2(((merged['%Reads_'+sample_1_name]+lfc_error)/(merged['%Reads_'+sample_2_name]+lfc_error)).astype(float)).replace([np.inf, np.NaN], 0)
                         merged = merged.reset_index().set_index('Aligned_Sequence')
