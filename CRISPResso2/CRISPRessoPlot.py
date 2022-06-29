@@ -3064,7 +3064,6 @@ def _alleles_graph_update_node(
     num_reads,
     percent_reads,
     allele_id,
-    node_width,
 ):
     graph.update_node(node_id, 'numReads', lambda x: x + num_reads)
     graph.update_node(node_id, 'percentReads', lambda x: x + percent_reads)
@@ -3134,6 +3133,7 @@ def _add_modification_seq_to_alleles_graph(
                 return modification_source_id + seq_index
             return seq_index
 
+    modification_node_ids = set()
     for modification_source_id, modification_size in zip(
         modification_positions, modification_sizes,
     ):
@@ -3208,8 +3208,8 @@ def _add_modification_seq_to_alleles_graph(
                         num_reads,
                         percent_reads,
                         allele_id,
-                        node_width,
                     )
+                    modification_node_ids.add(duplicate_node_id)
                 else:
                     duplicate_node_id = graph.add_node(
                         name=modification_nuc,
@@ -3220,6 +3220,7 @@ def _add_modification_seq_to_alleles_graph(
                         numReads=num_reads,
                         percentReads=percent_reads,
                     )
+                    modification_node_ids.add(duplicate_node_id)
                     graph.add_edge(
                         prev_node_id,
                         duplicate_node_id,
@@ -3277,6 +3278,7 @@ def _add_modification_seq_to_alleles_graph(
                 numReads=num_reads,
                 percentReads=percent_reads,
             )
+            modification_node_ids.add(modification_id)
             graph.add_edge(
                 modification_source_id,
                 modification_id,
@@ -3296,6 +3298,7 @@ def _add_modification_seq_to_alleles_graph(
                     numReads=num_reads,
                     percentReads=percent_reads,
                 )
+                modification_node_ids.add(modification_id)
                 target_id = modification_id
                 graph.add_edge(
                     source_id,
@@ -3325,6 +3328,7 @@ def _add_modification_seq_to_alleles_graph(
                     numReads=num_reads,
                     percentReads=percent_reads,
                 )
+    return modification_node_ids
 
 
 def _add_indels_to_alleles_graph(
@@ -3361,41 +3365,90 @@ def _add_indels_to_alleles_graph(
                 allele_id,
             )
 
+    indel_node_ids = set()
     for insertion in indel_matcher.finditer(aligned_ref_seq):
         start_index, end_index = insertion.span()
         if start_index == 0:
             source_indel_added = True
-            _add_modification_seq_to_alleles_graph(
-                graph,
-                [end_index],
-                [end_index - start_index],
-                'Indel',
-                aligned_read_seq,
-                source_node_id,
-                terminal_node_id,
-                num_reads,
-                percent_reads,
-                allele_id,
-                node_width,
-                is_terminal_indel=False,
+            indel_node_ids = indel_node_ids.union(
+                _add_modification_seq_to_alleles_graph(
+                    graph,
+                    [end_index],
+                    [end_index - start_index],
+                    'Indel',
+                    aligned_read_seq,
+                    source_node_id,
+                    terminal_node_id,
+                    num_reads,
+                    percent_reads,
+                    allele_id,
+                    node_width,
+                    is_terminal_indel=False,
+                )
             )
         elif end_index == len(aligned_ref_seq):
             terminal_indel_added = True
-            _add_modification_seq_to_alleles_graph(
-                graph,
-                [start_index],
-                [end_index - start_index],
-                'Indel',
-                aligned_read_seq,
-                source_node_id,
-                terminal_node_id,
-                num_reads,
-                percent_reads,
-                allele_id,
-                node_width,
-                is_terminal_indel=True,
+            indel_node_ids = indel_node_ids.union(
+                _add_modification_seq_to_alleles_graph(
+                    graph,
+                    [start_index],
+                    [end_index - start_index],
+                    'Indel',
+                    aligned_read_seq,
+                    source_node_id,
+                    terminal_node_id,
+                    num_reads,
+                    percent_reads,
+                    allele_id,
+                    node_width,
+                    is_terminal_indel=True,
+                )
             )
-    return source_indel_added, terminal_indel_added
+    return source_indel_added, terminal_indel_added, indel_node_ids
+
+
+def _add_allele_to_reference_nodes(
+    graph,
+    deletion_coordinates,
+    substitution_positions,
+    substitution_sizes,
+    aligned_read_seq,
+    aligned_ref_seq,
+    num_reads,
+    percent_reads,
+    allele_id,
+):
+    reference_positions = set(range(len(aligned_read_seq)))
+    for deletion in deletion_coordinates:
+        for deletion_position in range(deletion[0], deletion[1]):
+            reference_positions.remove(deletion_position)
+    for substitution_start, substitution_size in zip(substitution_positions, substitution_sizes):
+        substitution_start += 1
+        for substitution_position in range(substitution_start, substitution_start + substitution_size):
+            reference_positions.remove(substitution_position)
+
+    indel_matcher = re.compile('(-*-)')
+    for indel_deletion in indel_matcher.finditer(aligned_read_seq):
+        start_index, end_index = indel_deletion.span()
+        if start_index == 0 or end_index == len(aligned_read_seq):
+            for indel_deletion_position in range(start_index, end_index):
+                reference_positions.remove(indel_deletion_position)
+    for indel_insertion in indel_matcher.finditer(aligned_ref_seq):
+        start_index, end_index = indel_insertion.span()
+        if start_index == 0 or end_index == len(aligned_ref_seq):
+            for indel_deletion_position in range(start_index, end_index):
+                reference_positions.remove(indel_deletion_position)
+
+    for reference_node_id in reference_positions:
+        _alleles_graph_update_node(
+            graph,
+            reference_node_id,
+            num_reads,
+            percent_reads,
+            allele_id,
+        )
+
+    return reference_positions
 
 
 def generate_alleles_graph_json(
@@ -3425,6 +3478,9 @@ def generate_alleles_graph_json(
             name=nucleotide,
             type='Reference',
             refPosition=i,
+            numReads=0,
+            percentReads=0,
+            alleleIds=[],
             width=node_width,
         )
     terminal_node_id = graph.add_node(
@@ -3479,7 +3535,7 @@ def generate_alleles_graph_json(
             percent_reads,
             allele_id,
         )
-        _add_modification_seq_to_alleles_graph(
+        insertion_node_ids = _add_modification_seq_to_alleles_graph(
             graph,
             indel_info['all_insertion_left_positions'],
             indel_info['insertion_sizes'],
@@ -3505,7 +3561,7 @@ def generate_alleles_graph_json(
             substitution_groups += [current_group]
         substitution_sizes = [len(g) for g in substitution_groups]
         substitution_positions = [g[0] for g in substitution_groups]
-        _add_modification_seq_to_alleles_graph(
+        substitution_node_ids = _add_modification_seq_to_alleles_graph(
             graph,
             substitution_positions,
             substitution_sizes,
@@ -3518,7 +3574,7 @@ def generate_alleles_graph_json(
             allele_id,
             node_width,
         )
-        source_indel_added, terminal_indel_added = _add_indels_to_alleles_graph(
+        source_indel_added, terminal_indel_added, indel_node_ids = _add_indels_to_alleles_graph(
             graph,
             source_node_id,
             terminal_node_id,
@@ -3529,6 +3585,18 @@ def generate_alleles_graph_json(
             allele_id,
             node_width,
         )
+        reference_node_ids = _add_allele_to_reference_nodes(
+            graph,
+            indel_info['deletion_coordinates'],
+            substitution_positions,
+            substitution_sizes,
+            aligned_read_seq,
+            aligned_ref_seq,
+            num_reads,
+            percent_reads,
+            allele_id,
+        )
+
         if source_indel_added and not graph.is_edge(source_node_id, 0):
             source_indel_present = True
             graph.add_edge(source_node_id, 0, type='Reference')
@@ -3542,6 +3610,9 @@ def generate_alleles_graph_json(
             'numReads': num_reads,
             'percentReads': percent_reads,
             'seq': aligned_read_seq,
+            'alleleNodeIds': list(reference_node_ids.union(
+                insertion_node_ids, substitution_node_ids, indel_node_ids,
+            )),
         }]
         allele_id += 1
 
