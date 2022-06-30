@@ -6,7 +6,39 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 
 import os
 from jinja2 import Environment, FileSystemLoader
+from jinja_partials import generate_render_partial, render_partial
 from CRISPResso2 import CRISPRessoShared
+
+
+def render_template(template_name, jinja2_env, **data):
+    """Render a template with partials.
+
+    Parameters
+    ----------
+    template_name: str
+        The name of the template to render. For example, if you have a template
+        file called `templates/my_template.html` you would pass in
+        `my_template.html`.
+    jinja2_env: jinja2.Environment
+        The Jinja2 environment being used.
+    **data: keyword arguments of any type
+        Additional keyword arguments that are passed to the template.
+
+    Returns
+    -------
+    The rendered template.
+    """
+    def custom_partial_render(partial_template_name, **partial_data):
+        template = jinja2_env.get_template(partial_template_name)
+        partial_data.update(
+            render_partial=generate_render_partial(
+                custom_partial_render,
+            ),
+        )
+        return template.render(**partial_data)
+    return render_partial(
+        template_name, custom_partial_render, **data,
+    )
 
 
 def make_report_from_folder(crispresso_report_file, crispresso_folder, _ROOT):
@@ -131,6 +163,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT, web_
     }
 
     j2_env = Environment(loader=FileSystemLoader(os.path.join(_ROOT, 'templates')))
+    breakpoint()
     template = j2_env.get_template('report.html')
 
     #    dest_dir = os.path.dirname(crispresso_report_file)
