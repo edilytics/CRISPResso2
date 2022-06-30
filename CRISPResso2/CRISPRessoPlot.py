@@ -3613,6 +3613,13 @@ def generate_alleles_graph_json(
             'alleleNodeIds': list(reference_node_ids.union(
                 insertion_node_ids, substitution_node_ids, indel_node_ids,
             )),
+            'substitutions': indel_info['substitution_positions'],
+            'insertions': list(
+                zip(
+                    indel_info['all_insertion_left_positions'],
+                    indel_info['insertion_sizes'],
+                ),
+            ),
         }]
         allele_id += 1
 
