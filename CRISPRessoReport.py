@@ -163,16 +163,15 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT, web_
     }
 
     j2_env = Environment(loader=FileSystemLoader(os.path.join(_ROOT, 'templates')))
-    breakpoint()
-    template = j2_env.get_template('report.html')
 
     #    dest_dir = os.path.dirname(crispresso_report_file)
     #    shutil.copy2(os.path.join(_ROOT,'templates','CRISPResso_justcup.png'),dest_dir)
     #    shutil.copy2(os.path.join(_ROOT,'templates','favicon.ico'),dest_dir)
 
-    outfile = open(crispresso_report_file, 'w')
-    outfile.write(template.render(report_data=report_data))
-    outfile.close()
+    with open(crispresso_report_file, 'w') as outfile:
+        outfile.write(render_template(
+            'report.html', j2_env, report_data=report_data,
+        ))
 
 
 def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info, batch_folder, _ROOT):
@@ -478,13 +477,13 @@ def make_multi_report(
     )
     j2_env.filters['dirname'] = dirname
     if crispresso_tool == 'batch':
-        template = j2_env.get_template('batchReport.html')
+        template = 'batchReport.html'
     elif crispresso_tool == 'pooled':
-        template = j2_env.get_template('pooledReport.html')
+        template = 'pooledReport.html'
     elif crispresso_tool == 'wgs':
-        template = j2_env.get_template('wgsReport.html')
+        template = 'wgsReport.html'
     else:
-        template = j2_env.get_template('multiReport.html')
+        template = 'multiReport.html'
 
     crispresso_data_path = os.path.relpath(
         crispresso_folder, os.path.dirname(crispresso_multi_report_file),
@@ -516,7 +515,9 @@ def make_multi_report(
         for html in sub_html_files:
             sub_html_files[html] = crispresso_data_path + sub_html_files[html]
     with open(crispresso_multi_report_file, 'w') as outfile:
-        outfile.write(template.render(
+        outfile.write(render_template(
+            template,
+            j2_env,
             window_nuc_pct_quilts=window_nuc_pct_quilts,
             nuc_pct_quilts=nuc_pct_quilts,
             window_nuc_conv_plots=window_nuc_conv_plots,
