@@ -162,7 +162,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT, web_
         'crispresso_data_path': crispresso_data_path,
     }
 
-    j2_env = Environment(loader=FileSystemLoader(os.path.join(_ROOT, 'templates')))
+    j2_env = Environment(loader=FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')))
 
     #    dest_dir = os.path.dirname(crispresso_report_file)
     #    shutil.copy2(os.path.join(_ROOT,'templates','CRISPResso_justcup.png'),dest_dir)
@@ -473,7 +473,7 @@ def make_multi_report(
             dictionary[key] = default_type()
 
     j2_env = Environment(
-        loader=FileSystemLoader(os.path.join(_ROOT, 'templates')),
+        loader=FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')),
     )
     j2_env.filters['dirname'] = dirname
     if crispresso_tool == 'batch':
