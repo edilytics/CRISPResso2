@@ -101,7 +101,7 @@ def assemble_figs(run_data, crispresso_folder):
     amplicons = []
     for amplicon_name in run_data['results']['ref_names']:
         amplicons.append(amplicon_name)
-        amplicon_figures = {'names': [], 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}}
+        amplicon_figures = {'names': [], 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}}
 
         for fig in ['2a', '3a', '3b', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '6', '7', '8', '10a', '10b', '10c',
                     '11a']:
@@ -133,6 +133,7 @@ def assemble_figs(run_data, crispresso_folder):
         figures['titles'][amplicon_name] = amplicon_figures['titles']
         figures['captions'][amplicon_name] = amplicon_figures['captions']
         figures['datas'][amplicon_name] = amplicon_figures['datas']
+        figures['htmls'][amplicon_name] = amplicon_figures['htmls']
     data = {'amplicons': amplicons, 'figures': figures}
     return data
 
