@@ -70,7 +70,7 @@
             {% for plot_name in summary_plot_names %}
             <div class='card text-center mb-2'>
               <div class='card-header'>
-                <h5>{{summary_plot_titles[plot_name]}}</h5>
+                <h5 id="modification_summary_title">{{summary_plot_titles[plot_name]}}</h5>
               </div>
               <div class='card-body' style='max-height:80vh;overflow-y:auto'>
 		      <a href="{{crispresso_data_path}}{{plot_name}}.pdf"><img src="{{crispresso_data_path}}{{plot_name}}.png" width='70%' height='70%'></a>
