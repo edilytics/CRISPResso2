@@ -73,11 +73,7 @@
                 <h5>{{summary_plot_titles[plot_name]}}</h5>
               </div>
               <div class='card-body' style='max-height:80vh;overflow-y:auto'>
-		      <a href="{{crispresso_data_path}}{{plot_name}}.pdf"><img src="{{crispresso_data_path}}{{plot_name}}.png" width='70%' height='70%'></a>
-                <label class="labelpadding">{{summary_plot_labels[plot_name]}}</label>
-							  {% for (data_label,data_path) in summary_plot_datas[plot_name] %}
-							  <p class="m-0"><small>Data: <a href="{{crispresso_data_path}}{{data_path}}">{{data_label}}</a></small></p>
-                {% endfor %}
+                  {{ render_partials('shared/partials/fig_summaries.html', plot_name=plot_name, summary_plot_htmls=summary_plot_htmls, crispresso_data_path=crispresso_data_path, summary_plot_labels=summary_plot_labels, summary_plot_datas=summary_plot_datas) }}
               </div>
             </div>
             {% endfor %}
