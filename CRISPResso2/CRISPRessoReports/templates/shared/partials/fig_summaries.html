@@ -2,7 +2,7 @@
     {% if report_data['htmls'][plot_name] %}
         {{report_data['htmls'][plot_name]|safe}}
     {% else %}
-        <a href="{{report_data['crispresso_data_path']}}{{plot_name}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{plot_name}}.png" width='100%' height='100%'></a>
+        <a href="{{report_data['crispresso_data_path']}}{{plot_name}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{plot_name}}.png" width='70%'></a>
     {% endif %}
     <label class="labelpadding">{{report_data['labels'][plot_name]}}</label>
     {% for (data_label,data_path) in report_data['datas'][plot_name] %}
