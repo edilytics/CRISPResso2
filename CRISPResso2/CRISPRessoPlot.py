@@ -3454,6 +3454,7 @@ def _add_allele_to_reference_nodes(
 def generate_alleles_graph_json(
     reference_seq,
     df_alleles,
+    fig_filename,
     MIN_FREQUENCY=0.5,
     MAX_N_ROWS=100,
     plot_cut_point=True,
@@ -3671,9 +3672,8 @@ def generate_alleles_graph_json(
             ],
         },
     ]
-    subprocess.run('pbcopy', universal_newlines=True, input=json.dumps(plot_data))
-    breakpoint()
-    return json.dumps(plot_data)
+    with open(fig_filename, 'w') as fig_fh:
+        json.dump(plot_data, fig_fh)
 
 
 def plot_alleles_table_from_file(alleles_file_name,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,annotate_wildtype_allele=''):

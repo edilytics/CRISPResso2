@@ -4207,6 +4207,10 @@ def main():
             crispresso2_info['results']['refs'][ref_name]['plot_9_datas'] = []
             crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'] = []
 
+            crispresso2_info['results']['refs'][ref_name]['plot_9b_roots'] = []
+            crispresso2_info['results']['refs'][ref_name]['plot_9b_captions'] = []
+            crispresso2_info['results']['refs'][ref_name]['plot_9b_datas'] = []
+
             crispresso2_info['results']['refs'][ref_name]['plot_10d_roots'] = []
             crispresso2_info['results']['refs'][ref_name]['plot_10d_captions'] = []
             crispresso2_info['results']['refs'][ref_name]['plot_10d_datas'] = []
@@ -4290,9 +4294,11 @@ def main():
                     crispresso2_info['results']['refs'][ref_name]['plot_9_captions'].append("Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the " + sgRNA_legend + ". Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.")
                     crispresso2_info['results']['refs'][ref_name]['plot_9_datas'].append([('Allele frequency table', os.path.basename(allele_filename))])
 
+                    fig_filename = _jp('9b.{0}Alleles_Graph.json'.format(ref_plot_name))
                     plot_9b_input = {
                         'reference_seq': ref_seq_around_cut,
                         'df_alleles': df_to_plot,
+                        'fig_filename': fig_filename,
                         'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
                         'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
                         'plot_cut_point': plot_cut_point,
@@ -4301,7 +4307,19 @@ def main():
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
                     }
-                    CRISPRessoPlot.generate_alleles_graph_json(**plot_9b_input)
+                    if n_processes > 1:
+                        plot_results.append(plot_pool.submit(
+                            CRISPRessoPlot.generate_alleles_graph_json,
+                            **plot_9b_input,
+                        ))
+                    else:
+                        CRISPRessoPlot.generate_alleles_graph_json(
+                            **plot_9b_input,
+                        )
+                    crispresso2_info['results']['refs'][ref_name]['plot_9b_roots'].append(os.path.basename(fig_filename))
+                    crispresso2_info['results']['refs'][ref_name]['plot_9b_captions'].append('Figure 9b: Graph based visualization of the distribution of identified alleles around the cleavage site for the {0}. Each node in the graph represents a nucleotide, and a path (nodes connected by edges) represents a sequence present in one or more of the alleles. Hover over a node (or edge) to see the total frequency of that nucleotide or path. Hover over an allele (row) in the table to see which nodes correspond to it. Dashed lines represent deletions and one can click a node to potentially collapse it with its neighbors.'.format(sgRNA_legend))
+                    crispresso2_info['results']['refs'][ref_name]['plot_9b_datas'].append([('Allele frequency table', os.path.basename(allele_filename))])
+
                 if not args.crispresso1_mode and args.base_editor_output:
                     ###guide-specific base editor plots
                     plot_ref_seq = ref_seq_around_cut
