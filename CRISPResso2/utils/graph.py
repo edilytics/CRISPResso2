@@ -359,7 +359,7 @@ class Graph:
         if out_neighbors and out_neighbors[0]['id'] in unvisited_nodes:
             next_node_id = out_neighbors[0]['id']
         elif in_neighbors and in_neighbors[0]['id'] in unvisited_nodes:
-            next_node_id = out_neighbors[0]['id']
+            next_node_id = in_neighbors[0]['id']
         elif unvisited_nodes:
             next_node_id = min(unvisited_nodes)
             if len(current_node_group) > 1:
