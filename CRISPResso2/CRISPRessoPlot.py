@@ -72,13 +72,30 @@ def get_nuc_color(nuc, alpha):
 
         return (charSum, (1-charSum), (2*charSum*(1-charSum)))
 
-def get_color_lookup(nucs, alpha):
-    colorLookup = {}
-    for nuc in nucs:
-        colorLookup[nuc] = get_nuc_color(nuc, alpha)
-    return colorLookup
+def get_color_lookup(nucs, alpha, custom_colors=None):
+    if custom_colors is None:
+        colorLookup = {}
+        for nuc in nucs:
+            colorLookup[nuc] = get_nuc_color(nuc, alpha)
+        return colorLookup
+    else:
+        get_color = lambda x, y, z: (x / 255.0, y / 255.0, z / 255.0, alpha)
+        colors = {}
+        for nuc in nucs:
+            if nuc == 'INS':
+                rgb = (193, 129, 114)
+            else:
+                rgb = hex_to_rgb(custom_colors[nuc])
+            colors[nuc] = get_color(rgb[0], rgb[1], rgb[2])
+        return colors
 
-def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root,save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True,group_column='Batch'):
+
+def hex_to_rgb(value):
+    value = value.lstrip('#')
+    lv = len(value)
+    return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+
+def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root, custom_colors, save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True,group_column='Batch'):
     """
     Plots a nucleotide quilt with each square showing the percentage of each base at that position in the reference
     nuc_pct_df: dataframe with percents of each base (ACTGN-) at each position
@@ -111,8 +128,9 @@ def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root,save_also_png=
         samplesList.append(nuc_pct_df.iloc[sample_row_start, 0])
 
     # make a color map of fixed colors
-    color_lookup = get_color_lookup(['A', 'T', 'C', 'G', 'N', 'INS', '-'], alpha=1)
-    unchanged_color_lookup = get_color_lookup(['A', 'T', 'C', 'G', 'N', 'INS', '-'], alpha=0.3)
+    color_lookup = get_color_lookup(['A', 'T', 'C', 'G', 'N', 'INS', '-'], alpha=1, custom_colors=custom_colors)
+    unchanged_color_lookup = get_color_lookup(['A', 'T', 'C', 'G', 'N', 'INS', '-'], alpha=0.3,
+                                              custom_colors=custom_colors)
 
     #fig = plt.figure(figsize=(amp_len/2.0,nSamples*2))
     #fig = plt.figure(figsize=(amp_len,nSamples))
@@ -497,6 +515,7 @@ def plot_amplicon_modifications(
     y_max,
     plot_titles,
     plot_root,
+    custom_colors,
     save_also_png=False,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -535,9 +554,9 @@ def plot_amplicon_modifications(
 
     ax.plot(
         all_indelsub_count_vectors,
-        'r',
         lw=3,
         label=plot_titles['combined'],
+        color=custom_colors['del']
     )
 
     if cut_points:
@@ -648,6 +667,7 @@ def plot_modification_frequency(
     y_max,
     plot_title,
     plot_root,
+    custom_colors,
     save_also_png=False,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -685,13 +705,13 @@ def plot_modification_frequency(
         ax.add_patch(p)
 
     ax.plot(
-        all_insertion_count_vectors, 'r', lw=3, label='Insertions',
+        all_insertion_count_vectors, lw=3, label='Insertions', color=custom_colors['ins']
     )
     ax.plot(
-        all_deletion_count_vectors, 'm', lw=3, label='Deletions',
+        all_deletion_count_vectors, lw=3, label='Deletions', color=custom_colors['del']
     )
     ax.plot(
-        all_substitution_count_vectors, 'g', lw=3, label='Substitutions',
+        all_substitution_count_vectors, lw=3, label='Substitutions', color=custom_colors['sub']
     )
 
     y_max = max(
@@ -816,6 +836,7 @@ def plot_quantification_window_locations(
     ref_name,
     plot_title,
     plot_root,
+    custom_colors,
     save_also_png,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -859,11 +880,9 @@ def plot_quantification_window_locations(
         )
         ax.add_patch(p)
 
-    ax.plot(insertion_count_vectors, 'r', linewidth=3, label='Insertions')
-    ax.plot(deletion_count_vectors, 'm', linewidth=3, label='Deletions')
-    ax.plot(
-        substitution_count_vectors, 'g', linewidth=3, label='Substitutions',
-    )
+    ax.plot(insertion_count_vectors, linewidth=3, label='Insertions', color=custom_colors['ins'])
+    ax.plot(deletion_count_vectors, linewidth=3, label='Deletions', color=custom_colors['del'])
+    ax.plot(substitution_count_vectors, linewidth=3, label='Substitutions', color=custom_colors['sub'])
 
     if cut_points:
         added_legend = False
@@ -1089,6 +1108,7 @@ def plot_global_modifications_reference(
     ref_name,
     plot_title,
     plot_root,
+    custom_colors,
     save_also_png=False,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -1103,13 +1123,13 @@ def plot_global_modifications_reference(
         1,
     ) * 1.1
 
-    ax.plot(ref1_all_insertion_positions, 'r', linewidth=3, label='Insertions')
-    ax.plot(ref1_all_deletion_positions, 'm', linewidth=3, label='Deletions')
+    ax.plot(ref1_all_insertion_positions, linewidth=3, label='Insertions', color=custom_colors['ins'])
+    ax.plot(ref1_all_deletion_positions, linewidth=3, label='Deletions', color=custom_colors['del'])
     ax.plot(
         ref1_all_substitution_positions,
-        'g',
         linewidth=3,
         label='Substitutions',
+        color=custom_colors['sub']
     )
 
     ref1_cut_points = ref1['sgRNA_cut_points']
@@ -1659,26 +1679,27 @@ def plot_non_coding_mutations(
     sgRNA_intervals,
     plot_title,
     plot_root,
+    custom_colors,
     save_also_png=False,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
     ax.plot(
         insertion_count_vectors_noncoding,
-        'r',
         linewidth=3,
         label='Insertions',
+        color=custom_colors['ins']
     )
     ax.plot(
         deletion_count_vectors_noncoding,
-        'm',
         linewidth=3,
         label='Deletions',
+        color=custom_colors['del']
     )
     ax.plot(
         substitution_count_vectors_noncoding,
-        'g',
         linewidth=3,
         label='Substitutions',
+        color=custom_colors['sub']
     )
 
     y_max = max(

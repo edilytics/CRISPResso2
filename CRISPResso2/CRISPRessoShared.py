@@ -158,6 +158,24 @@ def getCRISPRessoArgParser(parserTitle = "CRISPResso Parameters",requiredParams=
     parser.add_argument('--place_report_in_output_folder',  help='If true, report will be written inside the CRISPResso output folder. By default, the report will be written one directory up from the report output.', action='store_true')
     parser.add_argument('--suppress_plots',  help='Suppress output plots', action='store_true')
     parser.add_argument('--write_cleaned_report', action='store_true', help=argparse.SUPPRESS)#trims working directories from output in report (for web access)
+    parser.add_argument('--color_nuc_A', type=str, default='#7FC97F',
+                        help='The hex value of the color representing A nucleotides in some plots')
+    parser.add_argument('--color_nuc_T', type=str, default='#BEAED4',
+                        help='The hex value of the color representing T nucleotides in some plots')
+    parser.add_argument('--color_nuc_C', type=str, default='#FDC086',
+                        help='The hex value of the color representing C nucleotides in some plots')
+    parser.add_argument('--color_nuc_G', type=str, default='#FFFF99',
+                        help='The hex value of the color representing G nucleotides in some plots')
+    parser.add_argument('--color_nuc_N', type=str, default='#C8C8C8',
+                        help='The hex value of the color representing N nucleotides in some plots')
+    parser.add_argument('--color_nuc_del', type=str, default='#C1C1C1',
+                        help='The hex value of the color representing deletion of nucleotides in some plots')
+    parser.add_argument('--color_mod_sub', type=str, default='#0000FF',
+                        help='The hex value of the color representing substitutions in some plots')
+    parser.add_argument('--color_mod_ins', type=str, default='#008000',
+                        help='The hex value of the color representing insertions in some plots')
+    parser.add_argument('--color_mod_del', type=str, default='#FF0000',
+                        help='The hex value of the color representing deletions in some plots')
 
     #base editor parameters
     parser.add_argument('--base_editor_output', help='Outputs plots and tables to aid in analysis of base editor studies.', action='store_true')
@@ -1372,3 +1390,13 @@ def get_crispresso_footer():
         output_line = pad_string + logo_lines[i].ljust(max_logo_width) + pad_string + "\n" + output_line
 
     return output_line
+
+def check_custom_colors(args):
+    custom_colors = {'sub': args.color_mod_sub, 'ins': args.color_mod_ins, 'del': args.color_mod_del,
+                     'A': args.color_nuc_A, 'T': args.color_nuc_T, 'C': args.color_nuc_C, 'G': args.color_nuc_G,
+                     'N': args.color_nuc_N, '-': args.color_nuc_del}
+    for key in custom_colors:
+        if custom_colors[key][0] != '#':
+            hex_val = '#' + custom_colors[key]
+            custom_colors[key] = hex_val
+    return custom_colors

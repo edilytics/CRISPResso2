@@ -3274,6 +3274,7 @@ def main():
             info('Making Plots...')
         ###############################################################################################################################################
         save_png = True
+        custom_colors = CRISPRessoShared.check_custom_colors(args)
         if args.suppress_report:
             save_png = False
 
@@ -3510,6 +3511,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'quantification_window_idxs': include_idxs_list,
+                        'custom_colors': custom_colors,
                     }
                     if n_processes > 1:
                         plot_results.append(plot_pool.submit(
@@ -3561,6 +3563,7 @@ def main():
                             'sgRNA_names': sgRNA_names,
                             'sgRNA_mismatches': sgRNA_mismatches,
                             'quantification_window_idxs': new_include_idx,
+                            'custom_colors': custom_colors,
                         }
                         if n_processes > 1:
                             plot_results.append(plot_pool.submit(
@@ -3756,6 +3759,7 @@ def main():
                         ),
                     },
                     'plot_root': plot_root,
+                    'custom_colors': custom_colors,
                     'save_also_png': save_png,
                 }
                 if n_processes > 1:
@@ -3789,6 +3793,7 @@ def main():
                         'Mutation position distribution', ref_name,
                     ),
                     'plot_root': plot_root,
+                    'custom_colors': custom_colors,
                     'save_also_png': save_png,
                 }
                 if n_processes > 1:
@@ -3822,6 +3827,7 @@ def main():
                     ),
                     'ref_name': ref_name,
                     'plot_root': plot_root,
+                    'custom_colors': custom_colors,
                     'save_also_png': save_png,
                 }
                 if n_processes > 1:
@@ -3886,6 +3892,7 @@ def main():
                         'n_total': N_TOTAL,
                         'ref_len': ref_len,
                         'ref_name': ref_names[0],
+                        'custom_colors': custom_colors,
                         'save_also_png': save_png,
                     }
                     if ref_name == ref_names[0]:
@@ -3959,6 +3966,7 @@ def main():
                         'quantification_window_idxs': include_idxs_list,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
+                        'custom_colors': custom_colors,
                     }
                     if n_processes > 1:
                         plot_results.append(plot_pool.submit(
@@ -4080,6 +4088,7 @@ def main():
                             ref_name,
                         ),
                         'plot_root': plot_root,
+                        'custom_colors': custom_colors,
                         'save_also_png': save_png,
                     }
                     if n_processes > 1:
@@ -4276,6 +4285,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
+                        'custom_colors': custom_colors,
                     }
                     if n_processes > 1:
                         plot_results.append(plot_pool.submit(
