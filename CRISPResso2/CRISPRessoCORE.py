@@ -4294,7 +4294,7 @@ def main():
                     crispresso2_info['results']['refs'][ref_name]['plot_9_captions'].append("Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the " + sgRNA_legend + ". Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.")
                     crispresso2_info['results']['refs'][ref_name]['plot_9_datas'].append([('Allele frequency table', os.path.basename(allele_filename))])
 
-                    fig_filename = _jp('9b.{0}Alleles_Graph.json'.format(ref_plot_name))
+                    fig_filename = _jp('9b.{0}Alleles_Graph_around_{1}.json'.format(ref_plot_name, sgRNA_label))
                     plot_9b_input = {
                         'reference_seq': ref_seq_around_cut,
                         'df_alleles': df_to_plot,
