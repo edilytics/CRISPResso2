@@ -4643,6 +4643,7 @@ def main():
                     'sgRNA_names': sgRNA_names,
                     'sgRNA_mismatches': sgRNA_mismatches,
                     'quantification_window_idxs': include_idxs_list,
+                    'custom_colors': custom_style['colors']
                 }
                 if n_processes > 1:
                     plot_results.append(plot_pool.submit(
@@ -4708,6 +4709,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'quantification_window_idxs': new_include_idx,
+                        'custom_colors': custom_style['colors']
                     }
                     if n_processes > 1:
                         plot_results.append(plot_pool.submit(
