@@ -325,9 +325,11 @@ const buildGraphQuilt = (graph, slug) => {
 
     let deletions = createDeletions(svg, setcolaResult)
 
-    createCleavagePosition(svg, setcolaResult)
 
-    createCleavageLabel(svg)
+    if(setcolaResult.nodes.filter(d => d.cleavagePosition).length > 0) {
+      createCleavagePosition(svg, setcolaResult)
+      createCleavageLabel(svg)
+    }
 
     let nodeGroup = createNodeGroup(svg, setcolaResult)
     nodeGroup.raise()
