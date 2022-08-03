@@ -1612,7 +1612,7 @@ def check_custom_style(args):
             print("Cannot read json file '%s', defaulting style parameters." % args.style_json)
             print(e)
     try:
-        with open("CRISPResso2/default_style.json", "r") as json_file:
+        with open("./CRISPResso2/default_style.json", "r") as json_file:
             style = json.load(json_file)
         return style
     except Exception as e:

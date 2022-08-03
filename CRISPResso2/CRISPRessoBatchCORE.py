@@ -111,6 +111,7 @@ def main():
         crispresso_options_for_batch = list(crispresso_options-options_to_ignore)
 
         CRISPRessoShared.check_file(args.batch_settings)
+        custom_style = CRISPRessoShared.check_custom_style(args)
 
         batch_folder_name = os.path.splitext(os.path.basename(args.batch_settings))[0]
         if args.name and args.name != "":
@@ -585,6 +586,7 @@ def main():
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': sub_sgRNA_intervals,
                                 'quantification_window_idxs': include_idxs,
+                                'custom_colors': custom_style['colors'],
                             }
                             if n_processes_for_batch > 1:
                                 process_results.append(process_pool.submit(
@@ -643,6 +645,7 @@ def main():
                             'save_also_png': save_png,
                             'sgRNA_intervals': consensus_sgRNA_intervals,
                             'quantification_window_idxs': include_idxs,
+                            'custom_colors': custom_style['colors'],
                         }
                         if n_processes_for_batch > 1:
                             process_results.append(process_pool.submit(
@@ -697,6 +700,7 @@ def main():
                             'mod_pct_df': modification_percentage_summary_df,
                             'fig_filename_root': this_nuc_pct_quilt_plot_name,
                             'save_also_png': save_png,
+                            'custom_colors': custom_style['colors'],
                         }
                         if n_processes_for_batch > 1:
                             process_results.append(process_pool.submit(
