@@ -36,12 +36,13 @@ const buildGraphQuilt = (graph, slug) => {
   // 348aa7 // blue munsell
   // 26428B // dark cornflower blue
 
+  const seqLength = graph["alleles"][0].seq.length
+
   const quiltSvg = d3.select(tableId)
         .append("svg")
-        .attr("viewBox", [0, -10, 600, 210])
+        .attr("viewBox", `0 -10 ${(seqLength * 10) + 150} ${graph["alleles"].length * 10}`)
         .style("user-select", "none")
 
-  const seqLength = graph["alleles"][0].seq.length
 
   const alleleGroup = quiltSvg.selectAll(`.${slug}_allele`)
         .data(graph["alleles"], d => d.id)
@@ -160,19 +161,24 @@ const buildGraphQuilt = (graph, slug) => {
     updateGraph(svg, d3cola)
   }
 
-  const width = 500,
-        height = 400
+  const width = seqLength * 40,
+        height = seqLength * 5
 
   var svg = d3.select(graphId)
       .append("svg")
-      .attr("preserveAspectRatio", "xMinYMin meet")
       .attr("viewBox", `0 0 ${width} ${height}`)
-      .attr("class", "svg-content")
+
+  // add a background to the entire svg
+  svg.append("rect")
+    .attr("width", "100%")
+    .attr("height", "100%")
+    .attr("fill", "white")
+    .style("opacity", 0.7)
 
   const zoom = d3.zoom()
         .scaleExtent([1 / (width / window.innerWidth) * 0.75, 20])
         .translateExtent([[0, 0], [width / 2, height / 8]])
-        .on("", () => {
+        .on("zoom", () => {
           let transform = d3.event.transform
           transform.x = 0
           transform.y = 0

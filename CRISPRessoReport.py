@@ -110,8 +110,8 @@ def add_d3_fig(
         ]
         with open(json_path) as fig_json_fh:
             amplicon_figures['htmls'][fig_name] = """
-<div id="allele_table_{0}" class="svg-container"></div>
-<div id="allele_graph_{0}" class="svg-container"></div>
+<div id="allele_table_{0}"></div>
+<div id="allele_graph_{0}"></div>
 <script type="text/javascript">const {0} = {1}</script>
             """.format(fig_name, fig_json_fh.read()).strip()
 
