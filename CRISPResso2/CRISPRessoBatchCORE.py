@@ -615,6 +615,7 @@ def main():
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': sub_sgRNA_intervals,
                                     'quantification_window_idxs': include_idxs,
+                                    'custom_colors': custom_style['colors']
                                 }
                                 if n_processes_for_batch > 1:
                                     process_results.append(process_pool.submit(
@@ -673,6 +674,7 @@ def main():
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': consensus_sgRNA_intervals,
                                 'quantification_window_idxs': include_idxs,
+                                'custom_colors': custom_style['colors']
                             }
                             if n_processes_for_batch > 1:
                                 process_results.append(process_pool.submit(
@@ -723,6 +725,7 @@ def main():
                                 'conversion_nuc_from': args.conversion_nuc_from,
                                 'conversion_nuc_to': args.conversion_nuc_to,
                                 'save_also_png': save_png,
+                                'custom_colors': custom_style['colors']
                             }
                             if n_processes_for_batch > 1:
                                 process_results.append(process_pool.submit(
