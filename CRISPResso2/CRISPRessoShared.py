@@ -9,6 +9,8 @@ import datetime
 import errno
 import gzip
 import json
+import sys
+
 import numpy as np
 import os
 import pandas as pd
@@ -24,6 +26,20 @@ from CRISPResso2 import CRISPRessoCOREResources
 
 __version__ = "2.2.9"
 
+import logging
+logging.basicConfig(
+                     format='%(levelname)-5s @ %(asctime)s:\n\t %(message)s \n',
+                     datefmt='%a, %d %b %Y %H:%M:%S',
+                     stream=sys.stderr,
+                     filemode="w"
+                     )
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+error   = logger.critical
+warn    = logger.warning
+debug   = logger.debug
+info    = logger.info
 
 ###EXCEPTIONS############################
 class FlashException(Exception):
@@ -1607,36 +1623,36 @@ def check_custom_style(args):
         try:
             with open(args.style_json, "r") as json_file:
                 style = json.load(json_file)
-            if 'sub' not in style:
-                print("Value for substitutions not provided, defaulting")
-                style['sub'] = '#0000FF'
-            if 'ins' not in style:
-                print("Value for insertions not provided, defaulting")
-                style['ins'] = '#008000'
-            if 'del' not in style:
-                print("Value for deletions not provided, defaulting")
-                style['del'] = '#FF0000'
-            if 'A' not in style:
-                print("Value for nucleotide A not provided, defaulting")
-                style['A'] = '#7FC97F'
-            if 'T' not in style:
-                print("Value for nucleotide T not provided, defaulting")
-                style['T'] = '#BEAED4'
-            if 'C' not in style:
-                print("Value for nucleotide C not provided, defaulting")
-                style['C'] = '#FDC086'
-            if 'G' not in style:
-                print("Value for nucleotide G not provided, defaulting")
-                style['G'] = '#FFFF99'
-            if 'N' not in style:
-                print("Value for nucleotide N not provided, defaulting")
-                style['N'] = '#C8C8C8'
-            if '-' not in style:
-                print("Value for nucleotide deletions not provided, defaulting")
-                style['N'] = '#C1C1C1'
+            if 'sub' not in style['colors'].keys():
+                warn("Value for substitutions not provided, defaulting")
+                style['colors']['sub'] = '#0000FF'
+            if 'ins' not in style['colors'].keys():
+                warn("Value for insertions not provided, defaulting")
+                style['colors']['ins'] = '#008000'
+            if 'del' not in style['colors'].keys():
+                warn("Value for deletions not provided, defaulting")
+                style['colors']['del'] = '#FF0000'
+            if 'A' not in style['colors'].keys():
+                warn("Value for nucleotide A not provided, defaulting")
+                style['colors']['A'] = '#7FC97F'
+            if 'T' not in style['colors'].keys():
+                warn("Value for nucleotide T not provided, defaulting")
+                style['colors']['T'] = '#BEAED4'
+            if 'C' not in style['colors'].keys():
+                warn("Value for nucleotide C not provided, defaulting")
+                style['colors']['C'] = '#FDC086'
+            if 'G' not in style['colors'].keys():
+                warn("Value for nucleotide G not provided, defaulting")
+                style['colors']['G'] = '#FFFF99'
+            if 'N' not in style['colors'].keys():
+                warn("Value for nucleotide N not provided, defaulting")
+                style['colors']['N'] = '#C8C8C8'
+            if '-' not in style['colors'].keys():
+                warn("Value for nucleotide deletions not provided, defaulting")
+                style['colors']['-'] = '#C1C1C1'
             return style
         except Exception as e:
-            print("Cannot read json file '%s', defaulting style parameters." % args.style_json)
+            warn("Cannot read json file '%s', defaulting style parameters." % args.style_json)
             print(e)
     custom_style = {
         "colors": {

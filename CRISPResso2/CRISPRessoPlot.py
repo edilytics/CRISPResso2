@@ -2167,7 +2167,7 @@ def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,convers
     plt.close(fig)
 
 
-def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution_base_vectors, plot_title, fig_filename_root, save_also_png, quantification_window_idxs=None):
+def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution_base_vectors, plot_title, fig_filename_root, save_also_png, custom_colors, quantification_window_idxs=None):
     """
     Plots substitutions across the reference sequece - each position on the x axis reprsents a nucleotide in the reference
     bars at each x posion show the number of times the reference nucleotide was substituted for another reference
@@ -2176,8 +2176,7 @@ def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution
     fig, ax = plt.subplots(figsize=(16, 8))
     ind = np.arange(ref_len)
 
-    alph = ['A', 'C', 'G', 'T', 'N']
-    color_lookup = get_color_lookup(alph, alpha=1)
+    color_lookup = get_color_lookup(['A', 'T', 'C', 'G', 'N', 'INS', '-'], alpha=1, custom_colors=custom_colors)
 
     pA = ax.bar(ind, all_substitution_base_vectors[ref_name+"_A"], color=color_lookup['A'])
     pC = ax.bar(ind, all_substitution_base_vectors[ref_name+"_C"], color=color_lookup['C'], bottom=all_substitution_base_vectors[ref_name+"_A"])
@@ -2233,7 +2232,7 @@ def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution
         fig.savefig(fig_filename_root + '.png', bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.close(fig)
 
-def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png):
+def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png, custom_colors):
     """
     Plots histogram of substitution frequencies for each nucleotide (from nuc X to nuc Y)
     input:
@@ -2243,8 +2242,7 @@ def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png)
     #plot all substitution rates
     fig, ax = plt.subplots(figsize=(8.3, 8))
 
-    alph = ['A', 'C', 'G', 'T', 'N']
-    color_lookup = get_color_lookup(alph, alpha=1)
+    color_lookup = get_color_lookup(['A', 'T', 'C', 'G', 'N', 'INS', '-'], alpha=1, custom_colors=custom_colors)
 
     ax.bar([1, 2, 3], [alt_nuc_counts['A']['C'], alt_nuc_counts['A']['G'], alt_nuc_counts['A']['T']], color=color_lookup['A'])
     ax.bar([5, 6, 7], [alt_nuc_counts['C']['A'], alt_nuc_counts['C']['G'], alt_nuc_counts['C']['T']], color=color_lookup['C'])
@@ -2318,14 +2316,14 @@ def plot_log_nuc_freqs(df_nuc_freq,tot_aln_reads,plot_title,fig_filename_root,sa
     plt.close(fig)
 
 
-def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png):
+def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors):
     '''
     Plots the conversion at selected nucleotides
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'
     At selected nucleotides, the proportion of each base is shown as a barplot
     '''
     nucs = list(df_subs.index)
-    color_lookup = get_color_lookup(nucs, alpha=1)
+    color_lookup = get_color_lookup(['A', 'T', 'C', 'G', 'N', 'INS', '-'], alpha=1, custom_colors=custom_colors)
     amp_len = len(ref_sequence)
 
     fig = plt.figure(figsize=(amp_len, 6))
@@ -2380,14 +2378,14 @@ def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, con
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
-def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png):
+def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors):
     '''
     Plots the conversion at selected nucleotides but ignores non-substitutions (for example at nucs that are 'C' in the reference, bars show the proportion of A T G (not C))
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'
     At selected nucleotides, the proportion of each substitution is shown as a barplot
     '''
     nucs = list(df_subs.index)
-    color_lookup = get_color_lookup(nucs, alpha=1)
+    color_lookup = get_color_lookup(['A', 'T', 'C', 'G', 'N', 'INS', '-'], alpha=1, custom_colors=custom_colors)
     amp_len = len(ref_sequence)
 
     fig = plt.figure(figsize=(amp_len, 6))
@@ -2452,14 +2450,14 @@ def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence,
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
-def plot_conversion_at_sel_nucs_not_include_ref_scaled(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png):
+def plot_conversion_at_sel_nucs_not_include_ref_scaled(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors):
     '''
     Plots the conversion at selected nucleotides not including reference base, scaled by number of events
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'
     At selected nucleotides, the count of each base is shown as a barplot
     '''
     nucs = list(df_subs.index)
-    color_lookup = get_color_lookup(nucs, alpha=1)
+    color_lookup = get_color_lookup(['A', 'T', 'C', 'G', 'N', 'INS', '-'], alpha=1, custom_colors=custom_colors)
     nucs.remove(conversion_nuc_from)
     amp_len = len(ref_sequence)
 

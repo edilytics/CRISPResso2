@@ -4142,6 +4142,7 @@ def main():
                         'fig_filename_root': fig_filename_root,
                         'save_also_png': save_png,
                         'quantification_window_idxs': include_idxs_list,
+                        'custom_colors': custom_style['colors']
                     }
                     if n_processes > 1:
                         plot_results.append(plot_pool.submit(
@@ -4166,7 +4167,8 @@ def main():
                             'Substitution frequency\nin entire amplicon', ref_name,
                         ),
                         'fig_filename_root': fig_filename_root,
-                        'save_also_png': save_png
+                        'save_also_png': save_png,
+                        'custom_colors': custom_style['colors']
                     }
                     if n_processes > 1:
                         plot_results.append(plot_pool.submit(
@@ -4187,7 +4189,8 @@ def main():
                         'alt_nuc_counts': alt_nuc_counts,
                         'plot_title': get_plot_title_with_ref_name('Substitution frequency\nin quantification window', ref_name),
                         'fig_filename_root': fig_filename_root,
-                        'save_also_png': save_png
+                        'save_also_png': save_png,
+                        'custom_colors': custom_style['colors']
                     }
                     if n_processes > 1:
                         plot_results.append(plot_pool.submit(
@@ -4386,6 +4389,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
+                            'custom_colors': custom_style['colors'],
                         }
                         if n_processes > 1:
                             plot_results.append(plot_pool.submit(
@@ -4409,6 +4413,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
+                            'custom_colors': custom_style['colors']
                         }
                         if n_processes > 1:
                             plot_results.append(plot_pool.submit(
@@ -4434,7 +4439,8 @@ def main():
                             ),
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
-                            'save_also_png': save_png
+                            'save_also_png': save_png,
+                            'custom_colors': custom_style['colors']
                         }
                         if n_processes > 1:
                             plot_results.append(plot_pool.submit(
