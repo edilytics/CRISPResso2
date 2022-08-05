@@ -1607,17 +1607,37 @@ def check_custom_style(args):
         try:
             with open(args.style_json, "r") as json_file:
                 style = json.load(json_file)
+            if 'sub' not in style:
+                print("Value for substitutions not provided, defaulting")
+                style['sub'] = '#0000FF'
+            if 'ins' not in style:
+                print("Value for insertions not provided, defaulting")
+                style['ins'] = '#008000'
+            if 'del' not in style:
+                print("Value for deletions not provided, defaulting")
+                style['del'] = '#FF0000'
+            if 'A' not in style:
+                print("Value for nucleotide A not provided, defaulting")
+                style['A'] = '#7FC97F'
+            if 'T' not in style:
+                print("Value for nucleotide T not provided, defaulting")
+                style['T'] = '#BEAED4'
+            if 'C' not in style:
+                print("Value for nucleotide C not provided, defaulting")
+                style['C'] = '#FDC086'
+            if 'G' not in style:
+                print("Value for nucleotide G not provided, defaulting")
+                style['G'] = '#FFFF99'
+            if 'N' not in style:
+                print("Value for nucleotide N not provided, defaulting")
+                style['N'] = '#C8C8C8'
+            if '-' not in style:
+                print("Value for nucleotide deletions not provided, defaulting")
+                style['N'] = '#C1C1C1'
             return style
         except Exception as e:
             print("Cannot read json file '%s', defaulting style parameters." % args.style_json)
             print(e)
-    try:
-        with open("./CRISPResso2/default_style.json", "r") as json_file:
-            style = json.load(json_file)
-        return style
-    except Exception as e:
-        print("Cannot read default_json file, defaulting style parameters.")
-        print(e)
     custom_style = {
         "colors": {
             "sub": "#0000FF", "ins": "#008000", "del": "#FF0000", "A": "#7FC97F", "T": "#BEAED4", "C": "#FDC086",
