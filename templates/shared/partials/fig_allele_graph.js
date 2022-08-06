@@ -414,6 +414,7 @@ const buildGraphQuilt = (graph, slug) => {
                   return `${slug}_link`
                 })
                 .attr("id", d => getLinkId(d))
+                .attr("stroke", "#999999")
                 .style("stroke-width", d => `${widthScale(d.percentReads)}em`)
                 .style("opacity", d => opacityScale(d.percentReads))
 
