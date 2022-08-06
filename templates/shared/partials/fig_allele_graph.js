@@ -111,20 +111,27 @@ const buildGraphQuilt = (graph, slug) => {
   let inactiveAlleles = new Set()
 
   const hideOrShowAlleleGroup = function(d, el, update = false) {
-    let newAlleleOpacity = 1,
-        newGraphOpacity = 1
+    let newAlleleOpacity = 1
     var alleleElements = d3.select(graphId)
         .selectAll(`.${slug}_allele_${d.id}`)
         .data()
     // check if this allele is currently hidden
     if(!inactiveAlleles.has(d.id)) {
       newAlleleOpacity = 0.3
-      newGraphOpacity = 0
       inactiveAlleles.add(d.id)
-      alleleElements = alleleElements.filter(e => e.alleleIds.filter(f => inactiveAlleles.has(f)).length == e.alleleIds.length)
+      alleleElements = alleleElements.filter(e =>
+        e.alleleIds.every(f => inactiveAlleles.has(f))
+      )
     }
     else {
       inactiveAlleles.delete(d.id)
+      // filter the elements if they are already hidden
+      alleleElements = alleleElements.filter(e => {
+        if(e.hasOwnProperty("id")) {
+          return !graph.nodes[e.id].show
+        }
+        return false
+      })
     }
     d3.select(el).style("opacity", newAlleleOpacity)
     alleleElements.forEach(e => {
