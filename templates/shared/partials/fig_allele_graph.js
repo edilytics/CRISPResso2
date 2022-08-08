@@ -151,19 +151,31 @@ const buildGraphQuilt = (graph, slug) => {
     }
   }
 
+  const thisGraph = d3.select(graphId)
   const hoverAlleleGroup = (d, nodeStrokeColor, linkStrokeColor) => {
     if(!inactiveAlleles.has(d.id)) {
-      d3.selectAll(d.alleleNodeIds.map(e => `#${slug}_node_${e}`).join(","))
+      thisGraph
+        .selectAll(d.alleleNodeIds.map(e => `#${slug}_node_${e}`).join(","))
         .select("rect")
         .style("stroke", nodeStrokeColor)
-      d3.selectAll(`.${slug}_link.${slug}_allele_${d.id}`)
+      thisGraph
+        .selectAll(`.${slug}_link.${slug}_allele_${d.id}`)
         .style("stroke", linkStrokeColor)
+      d.alleleNodeIds.forEach((nodeId, i) => {
+        if(i < d.alleleNodeIds.length) {
+          thisGraph
+            .select(`#${slug}_link_${nodeId}_${d.alleleNodeIds[i + 1]}`)
+            .style("stroke", linkStrokeColor)
+          // TODO remove extra reference edges that aren't actually in the allele
+        }
+      })
     }
   }
 
   alleleGroup
     .filter(d => d.name != "Reference")
     .on("click", function(d) { hideOrShowAlleleGroup(d, this, true) })
+  alleleGroup
     .on("mouseover", d => { hoverAlleleGroup(d, color["highlight"], color["highlight"]) })
     .on("mouseout", d => { hoverAlleleGroup(d, "#ffffff", "#999999") })
 
@@ -373,12 +385,14 @@ const buildGraphQuilt = (graph, slug) => {
       let group_padding = nodeHeight * 2
       group
         .attr("x", d => {
-          d3.select(`#${slug}_${d.name}_label`)
+          thisGraph
+            .select(`#${slug}_${d.name}_label`)
             .attr("x", bounds(d.bounds.x))
           return bounds(d.bounds.x) - group_padding / 4
         })
         .attr("y", d => {
-          d3.select(`#${slug}_${d.name}_label`)
+          thisGraph
+            .select(`#${slug}_${d.name}_label`)
             .attr("y", bounds(d.bounds.y) + d.bounds.height() + group_padding)
           return bounds(d.bounds.y) - group_padding / 4
         })
