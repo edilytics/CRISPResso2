@@ -103,6 +103,7 @@ const buildGraphQuilt = (graph, slug) => {
                               .attr("height", 10)
                               .attr("x", (e[0] + 1) * 10)
                               .attr("y", (d.id - 1)* 10)
+                              .attr("class", `${slug}_allele_${d.id}_insertion`)
                               .style("stroke", color["highlight"])
                               .style("fill", "none")
                              )
@@ -134,6 +135,7 @@ const buildGraphQuilt = (graph, slug) => {
       })
     }
     d3.select(el).style("opacity", newAlleleOpacity)
+    d3.select(`.${slug}_allele_${d.id}_insertion`).style("opacity", newAlleleOpacity)
     alleleElements.forEach(e => {
       if(e.hasOwnProperty("id")) {
         graph.nodes[e.id].show = !e.show
