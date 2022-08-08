@@ -49,17 +49,14 @@ const buildGraphQuilt = (graph, slug) => {
         .join(
           enter => {
             let root = enter.append("g")
-            root.attr("fill", "#999999")
-              .attr("stroke", "#999999")
-              .attr("stroke-width", "0.5pt")
-              .style("font-size", "8pt")
-              .style("opacity", 1)
+            root.style("opacity", 1)
               .attr("transform", (d, i) => `translate(0,${i * 10})`)
               .attr("id", d => `${slug}_allele_${d.id}`)
             root.append("text")
               .attr("x", (seqLength * 10) + 2)
               .attr("dy", "-0.2em")
               .style("font-family", "Arial")
+              .style("font-size", "7pt")
               .style("fill", "#262626")
               .text(d => `${d.name}, ${d.numReads} (${d.percentReads.toFixed(2)}%) Reads`)
             return root
