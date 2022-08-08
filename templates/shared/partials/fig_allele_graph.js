@@ -59,6 +59,8 @@ const buildGraphQuilt = (graph, slug) => {
             root.append("text")
               .attr("x", (seqLength * 10) + 2)
               .attr("dy", "-0.2em")
+              .style("font-family", "Arial")
+              .style("fill", "#262626")
               .text(d => `${d.name}, ${d.numReads} (${d.percentReads.toFixed(2)}%) Reads`)
             return root
           },
@@ -74,12 +76,15 @@ const buildGraphQuilt = (graph, slug) => {
             .attr("height", 10)
             .attr("x", (d, i) => i * 10)
             .attr("y", -10)
+            .style("opacity", "0.5")
           root.append("text")
             .attr("x", (d, i) => (i * 10) + 5)
             .attr("text-anchor", "middle")
             .attr("dy", "-0.2em")
             .style("font-size", "6pt")
+            .style("font-family", "Arial")
             .style("stroke-width", "0.3pt")
+            .style("fill", "#262626")
             .text(d => d)
           return root
         })
