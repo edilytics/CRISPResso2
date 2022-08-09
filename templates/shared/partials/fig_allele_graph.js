@@ -36,11 +36,16 @@ const buildGraphQuilt = (graph, slug) => {
   // 348aa7 // blue munsell
   // 26428B // dark cornflower blue
 
-  const seqLength = graph["alleles"][0].seq.length
+  const seqLength = graph["alleles"][0].seq.length,
+        tableCellHeight = 10,
+        tableCellWidth = 10
+        numGuides = graph["groups"].length
+  const guidePadding = tableCellHeight / 2
+  const guideHeight = numGuides > 0 ? (guidePadding * 2) + (numGuides * tableCellHeight) : 0
 
   const quiltSvg = d3.select(tableId)
         .append("svg")
-        .attr("viewBox", `0 -10 ${(seqLength * 10) + 150} ${graph["alleles"].length * 10}`)
+        .attr("viewBox", `0 -10 ${(seqLength * tableCellWidth) + 170} ${(graph["alleles"].length * tableCellHeight) + guideHeight}`)
         .style("user-select", "none")
 
 
@@ -50,10 +55,16 @@ const buildGraphQuilt = (graph, slug) => {
           enter => {
             let root = enter.append("g")
             root.style("opacity", 1)
-              .attr("transform", (d, i) => `translate(0,${i * 10})`)
+              .attr("transform", (d, i) => {
+                if(i == 0) {
+                  return "translate(0,0)"
+                } else {
+                  return `translate(0,${(i * tableCellHeight) + guideHeight})`
+                }
+              })
               .attr("id", d => `${slug}_allele_${d.id}`)
             root.append("text")
-              .attr("x", (seqLength * 10) + 2)
+              .attr("x", (seqLength * tableCellWidth) + 2)
               .attr("dy", "-0.2em")
               .style("font-family", "Arial")
               .style("font-size", "7pt")
@@ -62,20 +73,39 @@ const buildGraphQuilt = (graph, slug) => {
             return root
           },
         )
-
+  const guides = quiltSvg.selectAll(`.${slug}_guide`)
+        .data(graph["groups"], d => d.name)
+        .join(
+          enter => {
+            let root = enter.append("g")
+            root
+              .attr("transform", (d, i) => `translate(${Math.min(...d["leaves"]) * tableCellWidth},${(i * tableCellHeight) + guidePadding})`)
+            root.append("rect")
+              .attr("width", d => d["leaves"].length * tableCellWidth)
+              .attr("height", tableCellHeight)
+              .style("fill", "#D9D9D9")
+            root.append("text")
+              .attr("dx", "0.2em")
+              .attr("dy", "1em")
+              .attr("text-anchor", "start")
+              .style("font-size", "6pt")
+              .text(d => d.hasOwnProperty("name") ? d["name"] : "sgRNA")
+            return root
+          }
+        )
   const alleleSeqGroup = alleleGroup.selectAll(`.${slug}_alleleSeq`)
         .data(d => d.seq, d => d)
         .join(enter => {
           let root = enter.append("g")
           root.append("rect")
             .attr("fill", d => color[d])
-            .attr("width", 10)
-            .attr("height", 10)
-            .attr("x", (d, i) => i * 10)
+            .attr("width", tableCellWidth)
+            .attr("height", tableCellHeight)
+            .attr("x", (d, i) => i * tableCellWidth)
             .attr("y", -10)
             .style("opacity", "0.5")
           root.append("text")
-            .attr("x", (d, i) => (i * 10) + 5)
+            .attr("x", (d, i) => (i * tableCellWidth) + (tableCellWidth / 2))
             .attr("text-anchor", "middle")
             .attr("dy", "-0.2em")
             .style("font-size", "6pt")
@@ -101,10 +131,10 @@ const buildGraphQuilt = (graph, slug) => {
     .each(function(d) {
       d["insertions"].forEach(e => d3.select(`${tableId} > svg`)
                               .insert("rect")
-                              .attr("width", e[1] * 10)
-                              .attr("height", 10)
-                              .attr("x", (e[0] + 1) * 10)
-                              .attr("y", (d.id - 1)* 10)
+                              .attr("width", e[1] * tableCellWidth)
+                              .attr("height", tableCellHeight)
+                              .attr("x", (e[0] + 1) * tableCellWidth)
+                              .attr("y", (d.id - 1)* tableCellHeight)
                               .attr("class", `${slug}_allele_${d.id}_insertion`)
                               .style("stroke", color["highlight"])
                               .style("fill", "none")
