@@ -74,14 +74,14 @@ const buildGraphQuilt = (graph, slug) => {
           },
         )
   const guides = quiltSvg.selectAll(`.${slug}_guide`)
-        .data(graph["groups"], d => d.name)
+        .data(graph["sgRNAs"], d => d)
         .join(
           enter => {
             let root = enter.append("g")
             root
-              .attr("transform", (d, i) => `translate(${Math.min(...d["leaves"]) * tableCellWidth},${(i * tableCellHeight) + guidePadding})`)
+              .attr("transform", (d, i) => `translate(${d["interval"][0] * tableCellWidth},${(d["row"] * tableCellHeight) + guidePadding})`)
             root.append("rect")
-              .attr("width", d => d["leaves"].length * tableCellWidth)
+              .attr("width", d => (d["interval"][1] - d["interval"][0]) * tableCellWidth)
               .attr("height", tableCellHeight)
               .style("fill", "#D9D9D9")
             root.append("text")
@@ -92,6 +92,16 @@ const buildGraphQuilt = (graph, slug) => {
               .text(d => d.hasOwnProperty("name") ? d["name"] : "sgRNA")
             return root
           }
+        )
+        .selectAll(`.${slug}_guide_mismatch`)
+        .data(d => d["mismatch"], d => d)
+        .join(
+          enter => enter.append("rect")
+            .attr("transform", d => `translate(${d * tableCellWidth},0)`)
+            .attr("width", tableCellWidth)
+            .attr("height", tableCellHeight)
+            .style("fill", color["highlight"])
+            .style("opacity", "0.5")
         )
   const alleleSeqGroup = alleleGroup.selectAll(`.${slug}_alleleSeq`)
         .data(d => d.seq, d => d)
@@ -409,22 +419,23 @@ const buildGraphQuilt = (graph, slug) => {
         .attr("x", d => bounds(d.x) - d.width / 2)
         .attr("y", d => bounds(d.y) - nodeHeight / 2)
 
-      let group_padding = nodeHeight * 2
+      let groupPadding = nodeHeight * 2,
+          labelPadding = 12
       group
         .attr("x", d => {
           thisGraph
             .select(`#${slug}_${d.name}_label`)
             .attr("x", bounds(d.bounds.x))
-          return bounds(d.bounds.x) - group_padding / 4
+          return bounds(d.bounds.x) - groupPadding / 4
         })
         .attr("y", d => {
           thisGraph
             .select(`#${slug}_${d.name}_label`)
-            .attr("y", bounds(d.bounds.y) + d.bounds.height() + group_padding)
-          return bounds(d.bounds.y) - group_padding / 4
+            .attr("y", bounds(d.bounds.y) + d.bounds.height() + groupPadding + (d.row * labelPadding))
+          return bounds(d.bounds.y) - groupPadding / 4
         })
-        .attr("width", d => d.bounds.width() + group_padding / 2)
-        .attr("height", d => d.bounds.height() + group_padding / 2)
+        .attr("width", d => d.bounds.width() + groupPadding / 2)
+        .attr("height", d => d.bounds.height() + groupPadding / 2)
 
       nodeGroup.select("text")
         .attr("x", d => bounds(d.x))
