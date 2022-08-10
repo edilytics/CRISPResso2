@@ -4302,8 +4302,8 @@ def main():
                         'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
                         'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
                         'plot_cut_point': plot_cut_point,
-                        'sgRNA_intervals': new_sgRNA_intervals[ind],
-                        'sgRNA_name': sgRNA_names[ind],
+                        'sgRNA_intervals': new_sgRNA_intervals,
+                        'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
                     }
