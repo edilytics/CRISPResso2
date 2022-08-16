@@ -3608,6 +3608,64 @@ def generate_alleles_graph_json(
             allele_id,
             node_width,
         )
+        if 0 in indel_info['substitution_positions']:
+            source_substitution_added = True
+            source_substitution_node_ids = [
+                node['id']
+                for node in graph.find_nodes(
+                    ('refPosition', 0), ('type', 'Substitution'),
+                )
+            ]
+            for source_substitution_node_id in source_substitution_node_ids:
+                if not graph.is_edge(source_node_id, source_substitution_node_id):
+                    graph.add_edge(
+                        source_node_id,
+                        source_substitution_node_id,
+                        type='Substitution',
+                        alleleIds=[allele_id],
+                        numReads=num_reads,
+                        percentReads=percent_reads,
+                    )
+                elif allele_id not in graph.get_node(source_substitution_node_id)['alleleIds']:
+                    _alleles_graph_update_edge(
+                        graph,
+                        source_node_id,
+                        source_substitution_node_id,
+                        num_reads,
+                        percent_reads,
+                        allele_id,
+                    )
+        else:
+            source_substitution_added = False
+        if len(reference_seq) - 1 in indel_info['substitution_positions']:
+            terminal_substitution_added = True
+            terminal_substitution_node_ids = [
+                node['id']
+                for node in graph.find_nodes(
+                    ('refPosition', len(reference_seq) - 1), ('type', 'Substitution'),
+                )
+            ]
+            for terminal_substitution_node_id in terminal_substitution_node_ids:
+                if not graph.is_edge(terminal_substitution_node_id, terminal_node_id):
+                    graph.add_edge(
+                        terminal_substitution_node_id,
+                        terminal_node_id,
+                        type='Substitution',
+                        alleleIds=[allele_id],
+                        numReads=num_reads,
+                        percentReads=percent_reads,
+                    )
+                elif allele_id not in graph.get_node(terminal_substitution_node_id)['alleleIds']:
+                    _alleles_graph_update_edge(
+                        graph,
+                        terminal_substitution_node_id,
+                        terminal_node_id,
+                        num_reads,
+                        percent_reads,
+                        allele_id,
+                    )
+        else:
+            terminal_substitution_added = False
         source_indel_added, terminal_indel_added, indel_node_ids = _add_indels_to_alleles_graph(
             graph,
             source_node_id,
@@ -3631,10 +3689,10 @@ def generate_alleles_graph_json(
             allele_id,
         )
 
-        if source_indel_added and not graph.is_edge(source_node_id, 0):
+        if (source_substitution_added or source_indel_added) and not graph.is_edge(source_node_id, 0):
             source_indel_present = True
             graph.add_edge(source_node_id, 0, type='Reference')
-        if terminal_indel_added and not graph.is_edge(len(reference_seq) - 1, terminal_node_id):
+        if (terminal_substitution_added or terminal_indel_added) and not graph.is_edge(len(reference_seq) - 1, terminal_node_id):
             terminal_indel_present = True
             graph.add_edge(len(reference_seq) - 1, terminal_node_id, type='Reference')
 
