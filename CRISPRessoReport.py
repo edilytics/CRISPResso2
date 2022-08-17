@@ -101,7 +101,7 @@ def assemble_figs(run_data, crispresso_folder):
     amplicons = []
     for amplicon_name in run_data['results']['ref_names']:
         amplicons.append(amplicon_name)
-        amplicon_figures = {'names': [], 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}}
+        amplicon_figures = {'names': [], 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}}
 
         for fig in ['2a', '3a', '3b', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '6', '7', '8', '10a', '10b', '10c',
                     '11a']:
@@ -133,6 +133,7 @@ def assemble_figs(run_data, crispresso_folder):
         figures['titles'][amplicon_name] = amplicon_figures['titles']
         figures['captions'][amplicon_name] = amplicon_figures['captions']
         figures['datas'][amplicon_name] = amplicon_figures['datas']
+        figures['htmls'][amplicon_name] = amplicon_figures['htmls']
     data = {'amplicons': amplicons, 'figures': figures}
     return data
 
@@ -523,10 +524,14 @@ def make_multi_report(
             window_nuc_conv_plots=window_nuc_conv_plots,
             nuc_conv_plots=nuc_conv_plots,
             crispresso_data_path=crispresso_data_path,
-            summary_plot_names=summary_plots['names'],
-            summary_plot_titles=summary_plots['titles'],
-            summary_plot_labels=summary_plots['labels'],
-            summary_plot_datas=summary_plots['datas'],
+            report_data={
+                'names': summary_plots['names'],
+                'titles': summary_plots['titles'],
+                'labels': summary_plots['labels'],
+                'datas': summary_plots['datas'],
+                'htmls': [],
+                'crispresso_data_path': crispresso_data_path,
+            },
             run_names=run_names,
             sub_html_files=sub_html_files,
             report_name=report_name,
