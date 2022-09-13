@@ -1623,15 +1623,15 @@ def check_custom_style(args):
         try:
             with open(args.style_json, "r") as json_file:
                 style = json.load(json_file)
-            if 'sub' not in style['colors'].keys():
+            if 'Substitution' not in style['colors'].keys():
                 warn("Value for substitutions not provided, defaulting")
-                style['colors']['sub'] = '#0000FF'
-            if 'ins' not in style['colors'].keys():
+                style['colors']['Substitution'] = '#0000FF'
+            if 'Insertion' not in style['colors'].keys():
                 warn("Value for insertions not provided, defaulting")
-                style['colors']['ins'] = '#008000'
-            if 'del' not in style['colors'].keys():
+                style['colors']['Insertion'] = '#008000'
+            if 'Deletion' not in style['colors'].keys():
                 warn("Value for deletions not provided, defaulting")
-                style['colors']['del'] = '#FF0000'
+                style['colors']['Deletion'] = '#FF0000'
             if 'A' not in style['colors'].keys():
                 warn("Value for nucleotide A not provided, defaulting")
                 style['colors']['A'] = '#7FC97F'
@@ -1656,7 +1656,7 @@ def check_custom_style(args):
             print(e)
     custom_style = {
         "colors": {
-            "sub": "#0000FF", "ins": "#008000", "del": "#FF0000", "A": "#7FC97F", "T": "#BEAED4", "C": "#FDC086",
+            "Substitution": "#0000FF", "Insertion": "#008000", "Deletion": "#FF0000", "A": "#7FC97F", "T": "#BEAED4", "C": "#FDC086",
             "G": "#FFFF99", "N": "#C8C8C8", "-": "#C1C1C1"
         }
     }
