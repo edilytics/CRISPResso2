@@ -1,8 +1,8 @@
 {
   "colors": {
-    "sub": "#0000FF",
-    "ins": "#008000",
-    "del": "#FF0000",
+    "Substitution": "#0000FF",
+    "Insertion": "#008000",
+    "Deletion": "#FF0000",
     "A": "#7FC97F",
     "T": "#BEAED4",
     "C": "#FDC086",

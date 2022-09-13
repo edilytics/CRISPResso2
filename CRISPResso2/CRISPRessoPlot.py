@@ -711,7 +711,7 @@ def plot_modification_frequency(
         all_deletion_count_vectors, lw=3, label='Deletions', color=custom_colors['del']
     )
     ax.plot(
-        all_substitution_count_vectors, lw=3, label='Substitutions', color=custom_colors['sub']
+        all_substitution_count_vectors, lw=3, label='Substitutions', color=custom_colors['Substitution']
     )
 
     y_max = max(
@@ -880,9 +880,9 @@ def plot_quantification_window_locations(
         )
         ax.add_patch(p)
 
-    ax.plot(insertion_count_vectors, linewidth=3, label='Insertions', color=custom_colors['ins'])
-    ax.plot(deletion_count_vectors, linewidth=3, label='Deletions', color=custom_colors['del'])
-    ax.plot(substitution_count_vectors, linewidth=3, label='Substitutions', color=custom_colors['sub'])
+    ax.plot(insertion_count_vectors, linewidth=3, label='Insertions', color=custom_colors['Insertion'])
+    ax.plot(deletion_count_vectors, linewidth=3, label='Deletions', color=custom_colors['Deletion'])
+    ax.plot(substitution_count_vectors, linewidth=3, label='Substitutions', color=custom_colors['Substitution'])
 
     if cut_points:
         added_legend = False
@@ -1123,13 +1123,13 @@ def plot_global_modifications_reference(
         1,
     ) * 1.1
 
-    ax.plot(ref1_all_insertion_positions, linewidth=3, label='Insertions', color=custom_colors['ins'])
-    ax.plot(ref1_all_deletion_positions, linewidth=3, label='Deletions', color=custom_colors['del'])
+    ax.plot(ref1_all_insertion_positions, linewidth=3, label='Insertions', color=custom_colors['Insertion'])
+    ax.plot(ref1_all_deletion_positions, linewidth=3, label='Deletions', color=custom_colors['Deletion'])
     ax.plot(
         ref1_all_substitution_positions,
         linewidth=3,
         label='Substitutions',
-        color=custom_colors['sub']
+        color=custom_colors['Substitution']
     )
 
     ref1_cut_points = ref1['sgRNA_cut_points']
@@ -1687,19 +1687,19 @@ def plot_non_coding_mutations(
         insertion_count_vectors_noncoding,
         linewidth=3,
         label='Insertions',
-        color=custom_colors['ins']
+        color=custom_colors['Insertion']
     )
     ax.plot(
         deletion_count_vectors_noncoding,
         linewidth=3,
         label='Deletions',
-        color=custom_colors['del']
+        color=custom_colors['Deletion']
     )
     ax.plot(
         substitution_count_vectors_noncoding,
         linewidth=3,
         label='Substitutions',
-        color=custom_colors['sub']
+        color=custom_colors['Substitution']
     )
 
     y_max = max(
