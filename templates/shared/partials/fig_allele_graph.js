@@ -38,9 +38,10 @@ const buildGraphQuilt = (graph, slug) => {
 
   const seqLength = graph["alleles"][0].seq.length,
         tableCellHeight = 10,
-        tableCellWidth = 10
+        tableCellWidth = 10,
         numGuides = graph["groups"].length
-  const guidePadding = tableCellHeight / 2
+  const guidePadding = tableCellHeight / 2,
+        sliderWidth = tableCellWidth * 2
   const guideHeight = numGuides > 0 ? (guidePadding * 2) + (numGuides * tableCellHeight) : 0
 
   const quiltSvg = d3.select(tableId)
@@ -57,9 +58,9 @@ const buildGraphQuilt = (graph, slug) => {
             root.style("opacity", 1)
               .attr("transform", (d, i) => {
                 if(i == 0) {
-                  return "translate(0,0)"
+                  return `translate(${sliderWidth},0)`
                 } else {
-                  return `translate(0,${(i * tableCellHeight) + guideHeight})`
+                  return `translate(${sliderWidth},${(i * tableCellHeight) + guideHeight})`
                 }
               })
               .attr("id", d => `${slug}_allele_${d.id}`)
@@ -79,7 +80,7 @@ const buildGraphQuilt = (graph, slug) => {
           enter => {
             let root = enter.append("g")
             root
-              .attr("transform", (d, i) => `translate(${d["interval"][0] * tableCellWidth},${(d["row"] * tableCellHeight) + guidePadding})`)
+              .attr("transform", (d, i) => `translate(${(d["interval"][0] * tableCellWidth) + sliderWidth},${(d["row"] * tableCellHeight) + guidePadding})`)
             root.append("rect")
               .attr("width", d => (d["interval"][1] - d["interval"][0]) * tableCellWidth)
               .attr("height", tableCellHeight)
@@ -143,8 +144,8 @@ const buildGraphQuilt = (graph, slug) => {
                               .insert("rect")
                               .attr("width", e[1] * tableCellWidth)
                               .attr("height", tableCellHeight)
-                              .attr("x", (e[0] + 1) * tableCellWidth)
-                              .attr("y", (d.id - 1)* tableCellHeight)
+                              .attr("x", ((e[0] + 1) * tableCellWidth) + sliderWidth)
+                              .attr("y", ((d.id - 1) * tableCellHeight) + guideHeight)
                               .attr("class", `${slug}_allele_${d.id}_insertion`)
                               .style("stroke", color["highlight"])
                               .style("fill", "none")
@@ -153,39 +154,153 @@ const buildGraphQuilt = (graph, slug) => {
 
   let inactiveAlleles = new Set()
 
-  const hideOrShowAlleleGroup = function(d, el, update = false) {
-    let newAlleleOpacity = 1
-    var alleleElements = d3.select(graphId)
-        .selectAll(`.${slug}_allele_${d.id}`)
+  const updateAlleleGroup = (alleleId, alleleElements, newOpacity, show) => {
+    d3.select(`#${slug}_allele_${alleleId}`).style("opacity", newOpacity)
+    d3.select(`.${slug}_allele_${alleleId}_insertion`).style("opacity", newOpacity)
+    alleleElements.forEach(d => {
+      if(d.hasOwnProperty("id")) {
+        graph.nodes[d.id].show = show
+      }
+    })
+  }
+  const hideAlleleGroup = alleleId => {
+    let alleleElements = d3.select(graphId)
+        .selectAll(`.${slug}_allele_${alleleId}`)
         .data()
+        .filter(d =>
+          d.alleleIds.every(e => inactiveAlleles.has(e))
+        )
+
+    updateAlleleGroup(alleleId, alleleElements, 0.3, false)
+  }
+  const showAlleleGroup = alleleId => {
+    let alleleElements = d3.select(graphId)
+        .selectAll(`.${slug}_allele_${alleleId}`)
+        .data()
+        .filter(d => {
+          if(d.hasOwnProperty("id")) {
+            return !graph.nodes[d.id].show
+          }
+          return false
+        })
+    updateAlleleGroup(alleleId, alleleElements, 1, true)
+  }
+  const hideOrShowAlleleGroup = function(d, el, update = false) {
     // check if this allele is currently hidden
     if(!inactiveAlleles.has(d.id)) {
-      newAlleleOpacity = 0.3
       inactiveAlleles.add(d.id)
-      alleleElements = alleleElements.filter(e =>
-        e.alleleIds.every(f => inactiveAlleles.has(f))
-      )
+      hideAlleleGroup(d.id)
     }
     else {
       inactiveAlleles.delete(d.id)
       // filter the elements if they are already hidden
-      alleleElements = alleleElements.filter(e => {
-        if(e.hasOwnProperty("id")) {
-          return !graph.nodes[e.id].show
-        }
-        return false
-      })
+      showAlleleGroup(d.id)
     }
-    d3.select(el).style("opacity", newAlleleOpacity)
-    d3.select(`.${slug}_allele_${d.id}_insertion`).style("opacity", newAlleleOpacity)
-    alleleElements.forEach(e => {
-      if(e.hasOwnProperty("id")) {
-        graph.nodes[e.id].show = !e.show
-      }
-    })
     if(update) {
       updateGraph(svg, d3cola)
     }
+  }
+
+  const setupSlider = (v1, v2) => {
+    var sliderVals = [v1, v2]
+    const height = (graph["alleles"].length - 2) * tableCellHeight
+
+    var x = d3.scaleLinear()
+        .domain([1, graph["alleles"].length])
+        .range([0, height])
+        .clamp(true);
+
+    var xMin=x(1),
+        xMax=x(graph["alleles".length])
+
+    var slider = quiltSvg.append("g")
+        .attr("class", "slider")
+        .attr("transform", `translate(${tableCellWidth / 2},${guideHeight}) rotate(90)`);
+
+    slider.append("line")
+      .attr("class", "track")
+      .attr("x1", x.range()[0] + 5)
+      .attr("x2", x.range()[1] + 5)
+      .style("stroke", "#DDDDDD")
+      .style("stroke-width", 8)
+      .style("stroke-linecap", "round")
+
+    var selRange = slider.append("line")
+        .attr("class", "sel-range")
+        .attr("x1", 10 + x(sliderVals[0]))
+        .attr("x2", x(sliderVals[1]))
+        .style("stroke", "#0D6EFD")
+        .style("stroke-width", 8)
+
+    var handle = slider.selectAll("rect")
+        .data([0, 1])
+        .enter().append("rect", ".track-overlay")
+        .attr("class", "handle")
+        .attr("y", -5)
+        .attr("x", d => x(sliderVals[d]))
+        .attr("rx", 3)
+        .attr("height", 10)
+        .attr("width", 10)
+        .style("fill", "#BBBBBB")
+        .call(
+          d3.drag()
+            .on("start", startDrag)
+            .on("drag", drag)
+            .on("end", endDrag)
+        );
+
+    function startDrag(){
+      d3.select(this).raise().classed("active", true);
+    }
+
+    function drag(d){
+      var x1 = d3.event.x
+      if(x1 > xMax){
+        x1 = xMax
+      }
+      else if(x1 < xMin){
+        x1 = xMin
+      }
+      d3.select(this).attr("x", x1)
+      var x2 = x(sliderVals[d == 0 ? 1 : 0])
+      selRange
+        .attr("x1", 10 + x1)
+        .attr("x2", 10 + x2)
+    }
+
+    function endDrag(d){
+      let v = Math.round(x.invert(d3.event.x)),
+          elem = d3.select(this)
+      sliderVals[d] = v
+      let v1 = Math.min(sliderVals[0], sliderVals[1]),
+          v2 = Math.max(sliderVals[0], sliderVals[1])
+      elem.classed("active", false)
+        .attr("x", Math.ceil(x(v) / 10) * 10);
+      selRange
+        .attr("x1", 10 + x(v1))
+        .attr("x2", 10 + x(v2))
+
+      updateAllelesFromSlider(v1, v2)
+      updateGraph(svg, d3cola)
+    }
+
+    const updateAllelesFromSlider = (start, end) => {
+      for(let alleleId = x.domain()[0]; alleleId < x.domain()[1]; alleleId++) {
+        let alleleInRange = alleleId >= start && alleleId <= end
+        /* console.log(`allele: ${alleleId} start: ${start} end: ${end} ${alleleInRange}`) */
+        if(!alleleInRange && !inactiveAlleles.has(alleleId)) {
+          inactiveAlleles.add(alleleId)
+          hideAlleleGroup(alleleId)
+          /* console.log(`Hiding ${alleleId}`) */
+        }
+        else if(alleleInRange && inactiveAlleles.has(alleleId)) {
+          inactiveAlleles.delete(alleleId)
+          showAlleleGroup(alleleId)
+          /* console.log(`Showing ${alleleId}`) */
+        }
+      }
+    }
+    updateAllelesFromSlider(Math.min(sliderVals[0], sliderVals[1]), Math.max(sliderVals[0], sliderVals[1]))
   }
 
   const thisGraph = d3.select(graphId)
@@ -495,23 +610,6 @@ const buildGraphQuilt = (graph, slug) => {
           },
         )
 
-  function getAlignmentBounds(vs, c) {
-    var os = c.offsets;
-    if (c.axis === 'x') {
-      var x = vs[os[0].node].x;
-      c.bounds = new cola.Rectangle(x, x,
-                                    Math.min.apply(Math, os.map(function (o) { return vs[o.node].bounds.y - 20; })),
-                                    Math.max.apply(Math, os.map(function (o) { return vs[o.node].bounds.Y + 20; })));
-    } else if (c.axis === 'y') {
-      var y = vs[os[0].node].y;
-      c.bounds = new cola.Rectangle(
-        Math.min.apply(Math, os.map(function (o) { return vs[o.node].bounds.x - 20; })),
-        Math.max.apply(Math, os.map(function (o) { return vs[o.node].bounds.X + 20; })),
-        y, y);
-    }
-    return c.bounds;
-  }
-
   const createDeletions = (svg, setcolaResult) => svg.selectAll(`.${slug}_deletion`)
         .data(setcolaResult.links.filter(d => d.type === "Deletion"), d => getLinkId(d))
         .join(
@@ -561,6 +659,7 @@ const buildGraphQuilt = (graph, slug) => {
                   return `${slug}_node ${slug}_reference`
                 })
                 .attr("id", d => `${slug}_node_${d.id}`)
+                .attr("cursor", "move")
             group.append("rect")
               .attr("width", d => d.width)
               .attr("height", d => nodeHeight)
@@ -622,6 +721,7 @@ const buildGraphQuilt = (graph, slug) => {
 
   const nodeHeight = 10
 
+  setupSlider(0, 3)
   updateGraph(svg, d3cola)
 
 }
