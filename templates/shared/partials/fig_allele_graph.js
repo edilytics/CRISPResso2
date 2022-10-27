@@ -46,7 +46,7 @@ const buildGraphQuilt = (graph, slug) => {
 
   const quiltSvg = d3.select(tableId)
         .append("svg")
-        .attr("viewBox", `0 -10 ${(seqLength * tableCellWidth) + 170} ${(graph["alleles"].length * tableCellHeight) + guideHeight}`)
+        .attr("viewBox", `0 -10 ${(seqLength * tableCellWidth) + sliderWidth + 170} ${(graph["alleles"].length * tableCellHeight) + guideHeight}`)
         .style("user-select", "none")
 
 
@@ -158,7 +158,10 @@ const buildGraphQuilt = (graph, slug) => {
     d3.select(`#${slug}_allele_${alleleId}`).style("opacity", newOpacity)
     d3.select(`.${slug}_allele_${alleleId}_insertion`).style("opacity", newOpacity)
     alleleElements.forEach(d => {
-      if(d.hasOwnProperty("id")) {
+      if(d.hasOwnProperty("type") && d["type"] === "Deletion") {
+        graph.links[d._linkid].show = show
+      }
+      else if(d.hasOwnProperty("id")) {
         graph.nodes[d.id].show = show
       }
     })
@@ -178,7 +181,10 @@ const buildGraphQuilt = (graph, slug) => {
         .selectAll(`.${slug}_allele_${alleleId}`)
         .data()
         .filter(d => {
-          if(d.hasOwnProperty("id")) {
+          if(d.hasOwnProperty("type") && d["type"] === "Deletion") {
+            return !graph.links[d._linkid].show
+          }
+          else if(d.hasOwnProperty("id")) {
             return !graph.nodes[d.id].show
           }
           return false
@@ -287,16 +293,13 @@ const buildGraphQuilt = (graph, slug) => {
     const updateAllelesFromSlider = (start, end) => {
       for(let alleleId = x.domain()[0]; alleleId < x.domain()[1]; alleleId++) {
         let alleleInRange = alleleId >= start && alleleId <= end
-        /* console.log(`allele: ${alleleId} start: ${start} end: ${end} ${alleleInRange}`) */
         if(!alleleInRange && !inactiveAlleles.has(alleleId)) {
           inactiveAlleles.add(alleleId)
           hideAlleleGroup(alleleId)
-          /* console.log(`Hiding ${alleleId}`) */
         }
         else if(alleleInRange && inactiveAlleles.has(alleleId)) {
           inactiveAlleles.delete(alleleId)
           showAlleleGroup(alleleId)
-          /* console.log(`Showing ${alleleId}`) */
         }
       }
     }
@@ -316,7 +319,7 @@ const buildGraphQuilt = (graph, slug) => {
       d.alleleNodeIds.forEach((nodeId, i) => {
         if(i < d.alleleNodeIds.length) {
           thisGraph
-            .select(`#${slug}_link_${nodeId}_${d.alleleNodeIds[i + 1]}`)
+            .select(`#${slug}_link_${nodeId}_${d.alleleNodeIds[i + 1]}_Reference`)
             .style("stroke", linkStrokeColor)
           // TODO remove extra reference edges that aren't actually in the allele
         }
@@ -340,7 +343,9 @@ const buildGraphQuilt = (graph, slug) => {
   }
 
   const width = seqLength * 40,
-        height = seqLength * 5
+        height = seqLength * 5,
+        nodeHeight = 10,
+        groupPadding = nodeHeight * 2
 
   var svg = d3.select(graphId)
       .append("svg")
@@ -390,9 +395,9 @@ const buildGraphQuilt = (graph, slug) => {
 
   const isVisibleLink = link => {
     if(typeof(link.source) == "number" && typeof(link.target) == "number") {
-      return graph.nodes[link.source].show && graph.nodes[link.target].show
+      return link.show && isVisibleNode(graph.nodes[link.source]) && isVisibleNode(graph.nodes[link.target])
     } else {
-      return graph.nodes[link.source.id].show && graph.nodes[link.target.id].show
+      return link.show && isVisibleNode(graph.nodes[link.source.id]) && isVisibleNode(graph.nodes[link.target.id])
     }
   }
 
@@ -423,7 +428,7 @@ const buildGraphQuilt = (graph, slug) => {
       .forEach(d => graph.groups[d.group_index].leaves.push(d.id))
     const setcolaResult = setcola
           .nodes(graph.nodes)
-          .links(graph.links.filter(isVisibleLink))
+          .links(graph.links)
           .groups(graph.groups)
           .constraints(graph.setcolaSpec)
           .layout()
@@ -492,7 +497,7 @@ const buildGraphQuilt = (graph, slug) => {
     updateGraph(svg, d3cola)
   }
 
-  const bounds = (value) => Math.min(Math.max(30, value), Math.max(width, height))
+  const bounds = (value) => Math.min(Math.max(60, value), Math.max(width, height))
 
   const updateGraph = (svg, d3cola) => {
     let setcolaResult = updateSetcola(d3cola)
@@ -502,7 +507,6 @@ const buildGraphQuilt = (graph, slug) => {
     let link = createLink(svg, setcolaResult)
 
     let deletions = createDeletions(svg, setcolaResult)
-
 
     if(setcolaResult.nodes.filter(d => d.cleavagePosition).length > 0) {
       createCleavagePosition(svg, setcolaResult)
@@ -516,6 +520,14 @@ const buildGraphQuilt = (graph, slug) => {
       .on("click", d => {collapseNode(d, true)})
 
     d3cola.on("tick", () => {
+      // this will ensure that the reference nodes stay in the middle of the viewport
+      graph.nodes = graph.nodes.map(d => {
+        if(d.type === "Reference") {
+          d.y = height / 2
+        }
+        return d
+      })
+
       link
         .attr("x1", d => bounds(d.source.x))
         .attr("y1", d => bounds(d.source.y))
@@ -534,20 +546,12 @@ const buildGraphQuilt = (graph, slug) => {
         .attr("x", d => bounds(d.x) - d.width / 2)
         .attr("y", d => bounds(d.y) - nodeHeight / 2)
 
-      let groupPadding = nodeHeight * 2,
-          labelPadding = 12
       group
         .attr("x", d => {
           thisGraph
             .select(`#${slug}_${d.name}_label`)
             .attr("x", bounds(d.bounds.x))
           return bounds(d.bounds.x) - groupPadding / 4
-        })
-        .attr("y", d => {
-          thisGraph
-            .select(`#${slug}_${d.name}_label`)
-            .attr("y", bounds(d.bounds.y) + d.bounds.height() + groupPadding + (d.row * labelPadding))
-          return bounds(d.bounds.y) - groupPadding / 4
         })
         .attr("width", d => d.bounds.width() + groupPadding / 2)
         .attr("height", d => d.bounds.height() + groupPadding / 2)
@@ -560,9 +564,9 @@ const buildGraphQuilt = (graph, slug) => {
 
   const getLinkId = link => {
     if(typeof(link.source) == "number" && typeof(link.target) == "number") {
-      return `${slug}_link_${link.source}_${link.target}`
+      return `${slug}_link_${link.source}_${link.target}_${link.type}`
     } else {
-      return `${slug}_link_${link.source.id}_${link.target.id}`
+      return `${slug}_link_${link.source.id}_${link.target.id}_${link.type}`
     }
   }
 
@@ -571,7 +575,9 @@ const buildGraphQuilt = (graph, slug) => {
         .join("rect")
         .attr("rx", 8)
         .attr("ry", 8)
+        .attr("y", (height / 2) - (groupPadding / 4))
         .attr("class", `${slug}_group`)
+        .attr("cursor", "move")
         .style("fill", "#888888")
         .style("opacity", 0.5)
         .call(d3cola.drag)
@@ -581,6 +587,7 @@ const buildGraphQuilt = (graph, slug) => {
         .join("text")
         .attr("id", d => `${slug}_${d.name}_label`)
         .attr("class", `${slug}_groupLabel`)
+        .attr("y", (d, i) => (height / 2) + groupPadding + 5 + (15 * i))
         .text(d => d.name)
 
   const createLink = (svg, setcolaResult) => svg.selectAll(`.${slug}_link`)
@@ -597,7 +604,7 @@ const buildGraphQuilt = (graph, slug) => {
                 .attr("id", d => getLinkId(d))
                 .attr("stroke", "#999999")
                 .style("stroke-width", d => `${widthScale(d.percentReads)}em`)
-                .style("opacity", d => opacityScale(d.percentReads))
+                .style("opacity", d => isInvisibleLink(d) ? 0 : opacityScale(d.percentReads))
 
             link.append("title")
               .text(d => {
@@ -608,6 +615,8 @@ const buildGraphQuilt = (graph, slug) => {
               })
             return link
           },
+          update => update
+            .style("opacity", d => isInvisibleLink(d) ? 0 : opacityScale(d.percentReads))
         )
 
   const createDeletions = (svg, setcolaResult) => svg.selectAll(`.${slug}_deletion`)
@@ -615,21 +624,24 @@ const buildGraphQuilt = (graph, slug) => {
         .join(
           enter => {
             let deletion = enter.append("path")
+                .attr("id", d => getLinkId(d))
                 .attr("class", d => {
                   if(d.alleleIds) {
-                    return d.alleleIds.map(i => `${slug}_allele_${i}`).join(" ") + ` ${slug}_deletion ${slug}_link ${getLinkId(d)}`
+                    return d.alleleIds.map(i => `${slug}_allele_${i}`).join(" ") + ` ${slug}_deletion ${slug}_link`
                   }
-                  return `${slug}_deletion ${slug}_link ${getLinkId(d)}`
+                  return `${slug}_deletion ${slug}_link`
                 })
                 .attr("fill", "none")
                 .attr("stroke", "#999999")
                 .attr("stroke-dasharray", "5,5")
                 .style("stroke-width", d => `${widthScale(d.percentReads)}em`)
-                .style("opacity", d => opacityScale(d.percentReads))
+                .style("opacity", d => isInvisibleLink(d) ? 0 : opacityScale(d.percentReads))
             deletion.append("title")
               .text(d => `${d.type} in ${d.numReads} (${d.percentReads.toFixed(2)}%) Reads `)
             return deletion
-          }
+          },
+          update => update
+            .style("opacity", d => isInvisibleLink(d) ? 0 : opacityScale(d.percentReads)),
         )
 
   const createCleavagePosition = (svg, setcolaResult) => svg.selectAll(`#${slug}_cleavage_position`)
@@ -685,8 +697,6 @@ const buildGraphQuilt = (graph, slug) => {
             return group
           },
           update => {
-            update.filter(isInvisibleNode)
-              .remove()
             update.select("rect")
               .style("fill", d => d.collapsed ? "#C8C8C8" : color[d.name])
               .style("fill-opacity", d => opacityScale(d.percentReads))
@@ -719,8 +729,7 @@ const buildGraphQuilt = (graph, slug) => {
           exit => exit.remove()
         )
 
-  const nodeHeight = 10
-
+  updateGraph(svg, d3cola)
   setupSlider(0, 3)
   updateGraph(svg, d3cola)
 
