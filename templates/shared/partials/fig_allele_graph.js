@@ -43,12 +43,12 @@ const buildGraphQuilt = (graph, slug) => {
   const guidePadding = tableCellHeight / 2,
         sliderWidth = tableCellWidth * 2
   const guideHeight = numGuides > 0 ? (guidePadding * 2) + (numGuides * tableCellHeight) : 0
+  const quiltHeight = (graph["alleles"].length * tableCellHeight) + guideHeight
 
   const quiltSvg = d3.select(tableId)
         .append("svg")
-        .attr("viewBox", `0 -10 ${(seqLength * tableCellWidth) + sliderWidth + 170} ${(graph["alleles"].length * tableCellHeight) + guideHeight}`)
+        .attr("viewBox", `0 -10 ${(seqLength * tableCellWidth) + sliderWidth + 170} ${quiltHeight}`)
         .style("user-select", "none")
-
 
   const alleleGroup = quiltSvg.selectAll(`.${slug}_allele`)
         .data(graph["alleles"], d => d.id)
@@ -126,6 +126,29 @@ const buildGraphQuilt = (graph, slug) => {
             .text(d => d)
           return root
         })
+  const quiltCutPoints = quiltSvg.selectAll(`.${slug}_quilt_cut_points`)
+        .data(graph["cut_points"], d => d)
+        .join(
+          enter => {
+            let group = enter.append("g")
+                .attr("class", `${slug}_cut_point`)
+            group.append("line")
+              .attr("stroke-dasharray", "4,4")
+              .attr("stroke-width", 1)
+              .attr("stroke", "#999999")
+              .attr("x1", d => (d.position * tableCellWidth) + sliderWidth)
+              .attr("x2", d => (d.position * tableCellWidth) + sliderWidth)
+              .attr("y1", -10)
+              .attr("y2", quiltHeight)
+
+            group.append("title")
+              .text(d => d.name)
+            /* .attr("dx", d => ((d.position) * tableCellWidth) + sliderWidth + (tableCellWidth / 2))
+             * .attr("y", guidePadding + tableCellHeight)
+             * .style("font-size", "0.5em") */
+            return group
+          }
+        )
 
   // bold face the substitutions
   alleleGroup.filter(d => d.hasOwnProperty("substitutions") && d["substitutions"].length > 0)
@@ -508,10 +531,7 @@ const buildGraphQuilt = (graph, slug) => {
 
     let deletions = createDeletions(svg, setcolaResult)
 
-    if(setcolaResult.nodes.filter(d => d.cleavagePosition).length > 0) {
-      createCleavagePosition(svg, setcolaResult)
-      createCleavageLabel(svg)
-    }
+    let cutPoints = createCutPoints(svg)
 
     let nodeGroup = createNodeGroup(svg, setcolaResult)
     nodeGroup.raise()
@@ -559,6 +579,9 @@ const buildGraphQuilt = (graph, slug) => {
       nodeGroup.select("text")
         .attr("x", d => bounds(d.x))
         .attr("y", d => bounds(d.y) + nodeHeight / 4)
+
+      cutPoints
+        .attr("transform", d => `translate(${setcolaResult.nodes[d.position].x},0)`)
     });
   }
 
@@ -644,20 +667,27 @@ const buildGraphQuilt = (graph, slug) => {
             .style("opacity", d => isInvisibleLink(d) ? 0 : opacityScale(d.percentReads)),
         )
 
-  const createCleavagePosition = (svg, setcolaResult) => svg.selectAll(`#${slug}_cleavage_position`)
-        .data(setcolaResult.nodes.filter(d => d.cleavagePosition))
-        .join("line")
-        .attr("class", `${slug}_guideline`)
-        .attr("stroke-dasharray", "8,8")
-        .attr("stroke-width", 1)
-        .attr("stroke", "#999999")
-
-  const createCleavageLabel = svg => svg.selectAll(`#${slug}_cleavage_label`)
-        .data([{"text": "Predicted cleavage position"}])
-        .join("text")
-        .attr("id", `${slug}_cleavage_label`)
-        .attr("class", `${slug}_group_label`)
-        .text(d => d.text)
+  const createCutPoints = svg => svg.selectAll(`.${slug}_cut_point`)
+        .data(graph["cut_points"], d => d)
+        .join(
+          enter => {
+            let group = enter.append("g")
+                .attr("class", `${slug}_cut_point`)
+            group.append("line")
+              .attr("stroke-dasharray", "8,8")
+              .attr("stroke-width", 1)
+              .attr("stroke", "#999999")
+              .attr("x1", -15)
+              .attr("x2", -15)
+              .attr("y1", -10)
+              .attr("y2", height)
+            group.append("text")
+              .attr("dx", 20)
+              .attr("y", height - 10)
+              .text(d => d.name)
+            return group
+          }
+        )
 
   const createNodeGroup = (svg, setcolaResult) => svg.selectAll(`.${slug}_node`)
         .data(setcolaResult.nodes, d => d["id"])
