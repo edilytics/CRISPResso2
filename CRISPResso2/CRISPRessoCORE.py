@@ -2267,6 +2267,8 @@ def main():
         else:
             aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args)
 
+        #TODO: Check for low alignemnt GuardRail on aln_stats and display messages.
+        
         info('Done!')
 
         if args.prime_editing_pegRNA_scaffold_seq != "":
