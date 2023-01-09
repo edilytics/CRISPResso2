@@ -1661,3 +1661,22 @@ def zip_results(results_folder):
         )
     sb.call(cmd_to_zip, shell=True)
     return
+
+class GuardRail:
+    def __init__(self, message):
+        self.display_warning(message)
+        self.report_warning(message)
+        return message
+
+    def display_warning(message):
+        pass
+
+    def report_warning(message):
+        pass
+
+class OverallReadsAlignedGuardRail(GuardRail):
+    def __init__(self):
+        message = ""
+        self.display_warning(message)
+        self.report_warning(message)
+        return message
