@@ -24,6 +24,23 @@ from CRISPResso2 import CRISPRessoCOREResources
 
 __version__ = "2.2.11a"
 
+import logging
+
+logging.basicConfig(
+                     format='%(levelname)-5s @ %(asctime)s:\n\t %(message)s \n',
+                     datefmt='%a, %d %b %Y %H:%M:%S',
+                     stream=sys.stderr,
+                     filemode="w"
+                     )
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+error   = logger.critical
+warn    = logger.warning
+debug   = logger.debug
+info    = logger.info
+
 
 ###EXCEPTIONS############################
 class FlashException(Exception):
@@ -1662,21 +1679,24 @@ def zip_results(results_folder):
     sb.call(cmd_to_zip, shell=True)
     return
 
-class GuardRail:
-    def __init__(self, message):
-        self.display_warning(message)
-        self.report_warning(message)
-        return message
+def safety_check():
+    readsAlignedGuard = OverallReadsAlignedGuardRail()
+    readsAlignedGuard.safety()
+    return
 
+class GuardRail:
     def display_warning(message):
-        pass
+        Warning(message)
 
     def report_warning(message):
         pass
 
 class OverallReadsAlignedGuardRail(GuardRail):
     def __init__(self):
-        message = ""
-        self.display_warning(message)
-        self.report_warning(message)
-        return message
+        self.message = "Guard Rail Warning: >90% of reads were aligned"
+    
+    def safety(self):
+        #Check if conditions are met
+        #If unsafe
+        self.display_warning(self.message)
+        self.report_warning(self.message)
