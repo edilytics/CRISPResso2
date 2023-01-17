@@ -18,29 +18,12 @@ import shutil
 import signal
 import subprocess as sb
 import unicodedata
+import logging
 
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
 
 __version__ = "2.2.11a"
-
-import logging
-
-logging.basicConfig(
-                     format='%(levelname)-5s @ %(asctime)s:\n\t %(message)s \n',
-                     datefmt='%a, %d %b %Y %H:%M:%S',
-                     stream=sys.stderr,
-                     filemode="w"
-                     )
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-error   = logger.critical
-warn    = logger.warning
-debug   = logger.debug
-info    = logger.info
-
 
 ###EXCEPTIONS############################
 class FlashException(Exception):
@@ -1680,23 +1663,49 @@ def zip_results(results_folder):
     return
 
 def safety_check():
-    readsAlignedGuard = OverallReadsAlignedGuardRail()
-    readsAlignedGuard.safety()
+    overallReadsAlignedGuard = OverallReadsAlignedGuardRail()
+    overallReadsAlignedGuard.safety()
+    lowReadsAlignedToAmpliconGuardRail = LowReadsAlignedToAmpliconGuardRail()
+    lowReadsAlignedToAmpliconGuardRail.safety()
+    highReadsAlignedToAlternateAmplicon = HighReadsAlignedToAlternateAmplicon()
+    highReadsAlignedToAlternateAmplicon.safety()
     return
 
 class GuardRail:
-    def display_warning(message):
-        Warning(message)
+    def display_warning(self):
+        Warning(self.message)
 
-    def report_warning(message):
+    def report_warning(self):
+        #TODO: Add self.message to report.html
         pass
 
 class OverallReadsAlignedGuardRail(GuardRail):
-    def __init__(self):
+    def __init__(self, alignedCutoff=.9):
+        #TODO: Change message to match alignedCutoff
         self.message = "Guard Rail Warning: >90% of reads were aligned"
+        self.alignedCutoff = alignedCutoff
     
+    def safety(self, total_reads, n_read_aligned):
+        if (n_read_aligned/total_reads) < self.alignedCutoff:
+            self.display_warning(self.message)
+            self.report_warning(self.message)
+
+class LowReadsAlignedToAmpliconGuardRail(GuardRail):
+    def __init__(self):
+        self.message = ""
+
     def safety(self):
-        #Check if conditions are met
-        #If unsafe
-        self.display_warning(self.message)
-        self.report_warning(self.message)
+        #TODO: Change safety check
+        if True:
+            self.display_warning(self.message)
+            self.report_warning(self.message)
+
+class HighReadsAlignedToAlternateAmplicon(GuardRail):
+    def __init__(self):
+        self.message = ""
+
+    def safety(self):
+        #TODO: Change safety check
+        if True:
+            self.display_warning(self.message)
+            self.report_warning(self.message)
