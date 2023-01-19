@@ -2266,8 +2266,6 @@ def main():
             aln_stats = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args)
         else:
             aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args)
-
-        #TODO: Check for low alignemnt GuardRail on aln_stats and display messages.
         
         info('Done!')
 
@@ -2707,8 +2705,6 @@ def main():
                         counts_modified_frameshift[ref_name] += variant_count
                         hists_frameshift[ref_name][effective_length] += variant_count
         #done iterating through variant cache objects
-
-
 
         for ref_name in ref_names:
             this_include_idx = refs[ref_name]['include_idxs']
@@ -4625,6 +4621,7 @@ def main():
         crispresso2_info['running_info']['running_time'] = running_time
         crispresso2_info['running_info']['running_time_string'] = running_time_string
 
+        CRISPRessoShared.safety_check(crispresso2_info, aln_stats)
 
         if not args.suppress_report:
             if (args.place_report_in_output_folder):

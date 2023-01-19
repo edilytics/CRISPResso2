@@ -25,7 +25,6 @@ def make_report_from_folder(crispresso_report_file, crispresso_folder, _ROOT):
     make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT)
 
 def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
-
     #dicts for each amplicon fig_names[amp_name] = [list of fig names]
     #                        fig_locs[amp_name][fig_name] = figure location
     fig_names = {} #all except for the figure 1 (which is common to all amplicons)
@@ -114,6 +113,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
         crispresso_data_path += "/";
 
     report_data = {
+        'guardrails': run_data['guardrails'],
         'amplicons': amplicons,
         'fig_names': fig_names,
         'sgRNA_based_fig_names': sgRNA_based_fig_names,
