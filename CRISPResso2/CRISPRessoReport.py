@@ -113,7 +113,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
         crispresso_data_path += "/";
 
     report_data = {
-        'guardrails': run_data['guardrails'],
+        'guardrails': run_data['results']['guardrails'],
         'amplicons': amplicons,
         'fig_names': fig_names,
         'sgRNA_based_fig_names': sgRNA_based_fig_names,

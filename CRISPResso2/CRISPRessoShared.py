@@ -1665,7 +1665,7 @@ def zip_results(results_folder):
 def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    breakpoint()
+    # breakpoint()
     messages = []
     overallReadsAlignedGuard = OverallReadsAlignedGuardRail(logger, alignedCutoff)
     reads_aligned = overallReadsAlignedGuard.safety(aln_stats['N_TOT_READS'], (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']))
@@ -1681,7 +1681,7 @@ def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
     if high_alt_amplicon is not None:
         for message in high_alt_amplicon:
             messages.append(message)
-    crispresso2_info['guardrails'] = messages
+    crispresso2_info['results']['guardrails'] = messages
 
 class GuardRail:
     def __init__(self, logger):
@@ -1747,3 +1747,6 @@ class HighIndelsOutOfQuantificationWindow(GuardRail):
         super().__init__(logger)
         self.message = ""
         self.cutOff = cutOff
+
+    def safety():
+        pass
