@@ -1174,7 +1174,7 @@ def main():
                         if N_READS >= args.min_reads_to_use_region and fastq_filename_region != "":
                             info('\nThe amplicon [%s] has enough reads (%d) mapped to it! Running CRISPResso!\n' % (idx, N_READS))
 
-                            crispresso_cmd = args.crispresso_command + ' -r1 %s -o %s --name %s' % (fastq_filename_region, OUTPUT_DIRECTORY, idx)
+                            crispresso_cmd = args.crispresso_command + ' -r1 %s -o %s --name %s -a %s' % (fastq_filename_region, OUTPUT_DIRECTORY, idx, row['amplicon_seq'])
 
                             this_run_args = deepcopy(args)
                             for column_name in amplicon_input_column_names:
