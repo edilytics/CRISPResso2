@@ -1682,6 +1682,20 @@ def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
     if high_alt_amplicon is not None:
         for message in high_alt_amplicon:
             messages.append(message)
+    # highModsOutOfQuantificationWindow = HighModsOutOfQuantificationWindow(messageHandler, (1 - lowCutoff))
+    # modsOutsideWindow = highModsOutOfQuantificationWindow.safety()
+    # #TODO: Check
+    # lowModsInQuantificationWindow = LowModsInQuantificationWindow(messageHandler, lowCutoff)
+    # modsInsideWindow = lowModsInQuantificationWindow.safety()
+    # #TODO: Check
+    lowRatioOfModsInWindowToOut = LowRatioOfModsInWindowToOut(messageHandler, lowCutoff)
+    ratio = lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
+    if ratio is not None:
+        messages.append(ratio)
+    highRateOfSubstitutions = HighRateOfSubstitutions(messageHandler, (1-lowCutoff))
+    rate = highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
+    if rate is not None:
+        messages.append(rate)
     crispresso2_info['results']['guardrails'] = messages
 
 class GuardRailMessageHandler:
@@ -1698,11 +1712,11 @@ class GuardRailMessageHandler:
 class OverallReadsAlignedGuardRail():
     def __init__(self, messageHandler, cutoff):
         self.messageHandler = messageHandler
-        self.message = " <{val}% of reads were aligned".format(val=(cutoff * 100))
+        self.message = " <={val}% of reads were aligned".format(val=(cutoff * 100))
         self.cutoff = cutoff
     
     def safety(self, total_reads, n_read_aligned):
-        if (n_read_aligned/total_reads) < self.cutoff:
+        if (n_read_aligned/total_reads) <= self.cutoff:
             self.messageHandler.display_warning(self.message)
             return self.messageHandler.report_warning(self.message)
         return None
@@ -1710,14 +1724,14 @@ class OverallReadsAlignedGuardRail():
 class LowReadsAlignedToAmpliconGuardRail():
     def __init__(self, messageHandler, cutoff):
         self.messageHandler = messageHandler
-        self.message = " <{val}% of expected reads were aligned to amplicon: ".format(val=(cutoff * 100))
+        self.message = " <={val}% of expected reads were aligned to amplicon: ".format(val=(cutoff * 100))
         self.cutoff = cutoff
 
     def safety(self, total_reads, amplicons, reads_aln_amplicon):
         expected_per_amplicon = total_reads / len(amplicons)
         messages = []
         for amplicon in amplicons:
-            if reads_aln_amplicon[amplicon] < (expected_per_amplicon * self.cutoff):
+            if reads_aln_amplicon[amplicon] <= (expected_per_amplicon * self.cutoff):
                 amplicon_message = self.message + amplicon
                 self.messageHandler.display_warning(amplicon_message)
                 messages.append(self.messageHandler.report_warning(amplicon_message))
@@ -1728,14 +1742,14 @@ class LowReadsAlignedToAmpliconGuardRail():
 class HighReadsAlignedToAlternateAmplicon():
     def __init__(self, messageHandler, cutoff):
         self.messageHandler = messageHandler
-        self.message = " {val}% more reads than expected were aligned to amplicon: ".format(val=((1-cutoff) * 100))
+        self.message = " >={val}% more reads than expected were aligned to amplicon: ".format(val=((1-cutoff) * 100))
         self.cutoff = cutoff
 
     def safety(self, total_reads, amplicons, reads_aln_amplicon):
         expected_per_amplicon = total_reads / len(amplicons)
         messages = []
         for amplicon in amplicons:
-            if reads_aln_amplicon[amplicon] > (expected_per_amplicon + (expected_per_amplicon * (1 - self.cutoff))):
+            if reads_aln_amplicon[amplicon] >= (expected_per_amplicon + (expected_per_amplicon * (1 - self.cutoff))):
                 amplicon_message = self.message + amplicon
                 self.messageHandler.display_warning(amplicon_message)
                 messages.append(self.messageHandler.report_warning(amplicon_message))
@@ -1746,7 +1760,7 @@ class HighReadsAlignedToAlternateAmplicon():
 class HighModsOutOfQuantificationWindow():
     def __init__(self, messageHandler, cutoff):
         self.messageHandler = messageHandler
-        self.message = " An average {} modifications were outside of the quantification window ".format(cutoff)
+        self.message = " >={}% of modifications were outside of the quantification window ".format(cutoff)
         self.cutoff = cutoff
 
     def safety():
@@ -1755,7 +1769,7 @@ class HighModsOutOfQuantificationWindow():
 class LowModsInQuantificationWindow():
     def __init__(self, messageHandler, cutoff):
         self.messageHandler = messageHandler
-        self.message = ""
+        self.message = " <={}% of modifications were inside of the quantification window ".format(cutoff)
         self.cutoff = cutoff
 
     def safety():
@@ -1764,9 +1778,25 @@ class LowModsInQuantificationWindow():
 class LowRatioOfModsInWindowToOut():
     def __init__(self, messageHandler, cutoff):
         self.messageHandler = messageHandler
-        self.message = ""
+        self.message = " <={}% of modifications were inside of the quantification window ".format(cutoff)
         self.cutoff = cutoff
 
-    def safety():
-        pass
+    def safety(self, mods_in_window, mods_outside_window):
+        total_mods = mods_in_window + mods_outside_window
+        if ((mods_in_window / total_mods) <= self.cutoff):
+            self.messageHandler.display_warning(self.message)
+            return self.messageHandler.report_warning(self.message)
+        return None
+
+class HighRateOfSubstitutions():
+    def __init__(self, messageHandler, cutoff):
+        self.messageHandler = messageHandler
+        self.message = " >={}% of modifications were substitutions. This could potential indicate poor sequencing quality. ".format(cutoff)
+        self.cutoff = cutoff
         
+    def safety(self, mods_in_window, mods_outside_window, global_subs):
+        total_mods = mods_in_window + mods_outside_window
+        if ((global_subs / total_mods) >= self.cutoff):
+            self.messageHandler.display_warning(self.message)
+            return self.messageHandler.report_warning(self.message)
+        return None
