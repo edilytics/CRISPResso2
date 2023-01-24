@@ -1663,9 +1663,27 @@ def zip_results(results_folder):
     return
 
 def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
+    """Check the results of analysis for potential issues and warn the user.
+    Parameters
+    ----------
+    crispresso2_info : dict
+        Dictionary of values describing the analysis
+    aln_stats : dict
+        Dictionary of alignment statistics and modification frequency and location
+    alignedCutoff : float
+        Check value for the percentage of reads aligned vs not aligned
+    lowCutoff : float
+        Cutoff values for other checks such as frequency of substitutions
+
+    Returns
+    -------
+    messages : list
+        List of messages returned from the violated guardrails to be included in the report.
+
+
+    """
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    # breakpoint()
     messages = []
     messageHandler = GuardRailMessageHandler(logger)
     overallReadsAlignedGuard = OverallReadsAlignedGuardRail(messageHandler, alignedCutoff)
@@ -1682,12 +1700,6 @@ def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
     if high_alt_amplicon is not None:
         for message in high_alt_amplicon:
             messages.append(message)
-    # highModsOutOfQuantificationWindow = HighModsOutOfQuantificationWindow(messageHandler, (1 - lowCutoff))
-    # modsOutsideWindow = highModsOutOfQuantificationWindow.safety()
-    # #TODO: Check
-    # lowModsInQuantificationWindow = LowModsInQuantificationWindow(messageHandler, lowCutoff)
-    # modsInsideWindow = lowModsInQuantificationWindow.safety()
-    # #TODO: Check
     lowRatioOfModsInWindowToOut = LowRatioOfModsInWindowToOut(messageHandler, lowCutoff)
     ratio = lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
     if ratio is not None:
@@ -1757,24 +1769,6 @@ class HighReadsAlignedToAlternateAmplicon():
             return messages
         return None
 
-class HighModsOutOfQuantificationWindow():
-    def __init__(self, messageHandler, cutoff):
-        self.messageHandler = messageHandler
-        self.message = " >={}% of modifications were outside of the quantification window ".format(cutoff)
-        self.cutoff = cutoff
-
-    def safety():
-        pass
-
-class LowModsInQuantificationWindow():
-    def __init__(self, messageHandler, cutoff):
-        self.messageHandler = messageHandler
-        self.message = " <={}% of modifications were inside of the quantification window ".format(cutoff)
-        self.cutoff = cutoff
-
-    def safety():
-        pass
-
 class LowRatioOfModsInWindowToOut():
     def __init__(self, messageHandler, cutoff):
         self.messageHandler = messageHandler
@@ -1791,7 +1785,7 @@ class LowRatioOfModsInWindowToOut():
 class HighRateOfSubstitutions():
     def __init__(self, messageHandler, cutoff):
         self.messageHandler = messageHandler
-        self.message = " >={}% of modifications were substitutions. This could potential indicate poor sequencing quality. ".format(cutoff)
+        self.message = " >={}% of modifications were substitutions. This could potentially indicate poor sequencing quality. ".format(cutoff)
         self.cutoff = cutoff
         
     def safety(self, mods_in_window, mods_outside_window, global_subs):
