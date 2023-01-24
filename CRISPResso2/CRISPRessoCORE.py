@@ -276,17 +276,14 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
             payload['ref_name'] = best_match_name
             payload['aln_scores'] = aln_scores
             
-            #Insertions in and out of quantification window
+            #Insertions out of quantification window
             payload['insertions_outside_window'] = len(payload['all_insertion_positions']) - len(payload['insertion_positions'])
-            payload['insertions_in_window'] = len(payload['insertion_positions'])
-            #Deletions in and out of quantification window
+            #Deletions out of quantification window
             payload['deletions_outside_window'] = len(payload['all_deletion_positions']) - len(payload['deletion_positions'])
-            payload['deletions_in_window'] = len(payload['deletion_positions'])
-            #Substitutions in and out of quantification window
+            #Substitutions out of quantification window
             payload['substitutions_outside_window'] = len(payload['all_substitution_positions']) - len(payload['substitution_positions'])
-            payload['substitutions_in_window'] = len(payload['substitution_positions'])
             #Sums
-            payload['mods_in_window'] = payload['substitutions_in_window'] + payload['deletions_in_window'] + payload['insertions_in_window']
+            payload['mods_in_window'] = payload['substitution_n'] + payload['deletion_n'] + payload['insertion_n']
             payload['mods_outside_window'] = payload['substitutions_outside_window'] + payload['deletions_outside_window'] + payload['insertions_outside_window']
 
             # If there is an insertion/deletion/substitution in the quantification window, the read is modified.
@@ -425,6 +422,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     N_COMPUTED_ALN = 0 # not in cache, aligned to at least 1 sequence with min cutoff
     N_COMPUTED_NOTALN = 0 #not in cache, not aligned to any sequence with min cutoff
 
+    N_GLOBAL_SUBS = 0 #number of substitutions across all reads - indicator of sequencing quality
     N_MODS_IN_WINDOW = 0 #number of modifications found inside the quantification window
     N_MODS_OUTSIDE_WINDOW = 0 #number of modifications found outside the quantification window
 
@@ -463,6 +461,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             N_CACHED_ALN+=1
             variantCache[fastq_seq]['count'] += 1
             match_name = variantCache[fastq_seq]['best_match_name']
+            N_GLOBAL_SUBS += variantCache[fastq_seq]['variant_' + match_name]['substitution_n'] + variantCache[fastq_seq]['variant_' + match_name]['substitutions_outside_window']
             N_MODS_IN_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_in_window']
             N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_outside_window']
 
@@ -476,6 +475,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 N_COMPUTED_ALN+=1
                 variantCache[fastq_seq] = new_variant
                 match_name = new_variant['best_match_name']
+                N_GLOBAL_SUBS += new_variant['variant_' + match_name]['substitution_n'] + new_variant['variant_' + match_name]['substitutions_outside_window']
                 N_MODS_IN_WINDOW += new_variant['variant_' + match_name]['mods_in_window']
                 N_MODS_OUTSIDE_WINDOW += new_variant['variant_' + match_name]['mods_outside_window']
                 
@@ -488,6 +488,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                "N_CACHED_NOTALN" : N_CACHED_NOTALN,
                "N_COMPUTED_ALN" : N_COMPUTED_ALN,
                "N_COMPUTED_NOTALN" : N_COMPUTED_NOTALN,
+               "N_GLOBAL_SUBS": N_GLOBAL_SUBS,
                "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
                "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW
                }
