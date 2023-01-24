@@ -273,9 +273,22 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
                 payload = CRISPRessoCOREResources.find_indels_substitutions_legacy(best_match_s1s[idx], best_match_s2s[idx], refs[best_match_name]['include_idxs'])
             else:
                 payload = CRISPRessoCOREResources.find_indels_substitutions(best_match_s1s[idx], best_match_s2s[idx], refs[best_match_name]['include_idxs'])
-
             payload['ref_name'] = best_match_name
             payload['aln_scores'] = aln_scores
+            
+            #Insertions in and out of quantification window
+            payload['insertions_outside_window'] = len(payload['all_insertion_positions']) - len(payload['insertion_positions'])
+            payload['insertions_in_window'] = len(payload['insertion_positions'])
+            #Deletions in and out of quantification window
+            payload['deletions_outside_window'] = len(payload['all_deletion_positions']) - len(payload['deletion_positions'])
+            payload['deletions_in_window'] = len(payload['deletion_positions'])
+            #Substitutions in and out of quantification window
+            payload['substitutions_outside_window'] = len(payload['all_substitution_positions']) - len(payload['substitution_positions'])
+            payload['substitutions_in_window'] = len(payload['substitution_positions'])
+            #Sums
+            payload['mods_in_window'] = payload['substitutions_in_window'] + payload['deletions_in_window'] + payload['insertions_in_window']
+            payload['mods_outside_window'] = payload['substitutions_outside_window'] + payload['deletions_outside_window'] + payload['insertions_outside_window']
+
             # If there is an insertion/deletion/substitution in the quantification window, the read is modified.
             is_modified = False
             if not args.ignore_deletions and payload['deletion_n'] > 0:
@@ -297,6 +310,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
             payload['aln_strand'] = best_match_strands[idx]
 
             new_variant['variant_'+best_match_name] = payload
+            new_variant['best_match_name'] = best_match_name
 
         new_variant['class_name'] = "&".join(class_names)
 
@@ -305,6 +319,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
         new_variant['count'] = 1
         new_variant['aln_scores'] = aln_scores
         new_variant['ref_aln_details'] = ref_aln_details
+        new_variant['best_match_name'] = best_match_name
         new_variant['best_match_score'] = best_match_score
         return new_variant #return new variant with best match score of 0, but include the scores of insufficient alignments
 
@@ -410,6 +425,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     N_COMPUTED_ALN = 0 # not in cache, aligned to at least 1 sequence with min cutoff
     N_COMPUTED_NOTALN = 0 #not in cache, not aligned to any sequence with min cutoff
 
+    N_MODS_IN_WINDOW = 0 #number of modifications found inside the quantification window
+    N_MODS_OUTSIDE_WINDOW = 0 #number of modifications found outside the quantification window
+
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
@@ -435,7 +453,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
 
         N_TOT_READS+=1
-
+        #TODO: Fix variant issue
         #if the sequence has been seen and can't be aligned, skip it
         if (fastq_seq in not_aln):
             N_CACHED_NOTALN += 1
@@ -444,6 +462,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         if (fastq_seq in variantCache):
             N_CACHED_ALN+=1
             variantCache[fastq_seq]['count'] += 1
+            match_name = variantCache[fastq_seq]['best_match_name']
+            N_MODS_IN_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_in_window']
+            N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_outside_window']
 
         #otherwise, create a new variant object, and put it in the cache
         else:
@@ -454,6 +475,10 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             else:
                 N_COMPUTED_ALN+=1
                 variantCache[fastq_seq] = new_variant
+                match_name = new_variant['best_match_name']
+                N_MODS_IN_WINDOW += new_variant['variant_' + match_name]['mods_in_window']
+                N_MODS_OUTSIDE_WINDOW += new_variant['variant_' + match_name]['mods_outside_window']
+                
 
     fastq_handle.close()
 
@@ -462,7 +487,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                "N_CACHED_ALN" : N_CACHED_ALN,
                "N_CACHED_NOTALN" : N_CACHED_NOTALN,
                "N_COMPUTED_ALN" : N_COMPUTED_ALN,
-               "N_COMPUTED_NOTALN" : N_COMPUTED_NOTALN
+               "N_COMPUTED_NOTALN" : N_COMPUTED_NOTALN,
+               "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
+               "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW
                }
     return(aln_stats)
 
