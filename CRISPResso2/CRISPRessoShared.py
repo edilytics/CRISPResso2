@@ -1663,7 +1663,7 @@ def zip_results(results_folder):
     return
 
 def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
-    """Check the results of analysis for potential issues and warn the user.
+    """Check the results of analysis for potential issues and warns the user.
     Parameters
     ----------
     crispresso2_info : dict
@@ -1679,7 +1679,6 @@ def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
     -------
     messages : list
         List of messages returned from the violated guardrails to be included in the report.
-
 
     """
     logger = logging.getLogger(__name__)
@@ -1704,6 +1703,11 @@ def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
     ratio = lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
     if ratio is not None:
         messages.append(ratio)
+    lowAlignmentRatesAtEndsOfAmplicon = LowAlignmentRatesAtEndsOfAmplicon(messageHandler, lowCutoff)
+    aln_rates = lowAlignmentRatesAtEndsOfAmplicon.safety(crispresso2_info['results']['ref_names'], crispresso2_info['results']['refs'], crispresso2_info['results']['alignment_stats']['indelsub_pct_vectors'])
+    if aln_rates is not None:
+        for message in aln_rates:
+            messages.append(message)
     highRateOfSubstitutions = HighRateOfSubstitutions(messageHandler, (1-lowCutoff))
     rate = highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
     if rate is not None:
@@ -1780,6 +1784,30 @@ class LowRatioOfModsInWindowToOut():
         if ((mods_in_window / total_mods) <= self.cutoff):
             self.messageHandler.display_warning(self.message)
             return self.messageHandler.report_warning(self.message)
+        return None
+
+class LowAlignmentRatesAtEndsOfAmplicon():
+    def __init__(self, messageHandler, cutoff):
+        self.messageHandler = messageHandler
+        self.message = " >= 10% of the modifications are in the first and last 10% of the amplicon: ".format(cutoff)
+        self.cutoff = cutoff
+    
+    def safety(self, ref_names, refs, indelsubs):
+        messages = []
+        for ref in ref_names:
+            length = refs[ref]['sequence_length']
+            interest_len = int(round(length * .1, 0))
+            breakpoint()
+            start = indelsubs[ref][:interest_len]
+            end = indelsubs[ref][-interest_len:]
+            ends_mod_rate = sum(start) + sum(end)
+            total_mod_rate = sum(indelsubs[ref])
+            if ends_mod_rate >= (total_mod_rate * .1):
+                amplicon_message = self.message + ref
+                self.messageHandler.display_warning(amplicon_message)
+                messages.append(self.messageHandler.report_warning(amplicon_message))
+        if len(messages) > 0:
+            return messages
         return None
 
 class HighRateOfSubstitutions():
