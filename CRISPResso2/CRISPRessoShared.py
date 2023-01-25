@@ -1797,7 +1797,6 @@ class LowAlignmentRatesAtEndsOfAmplicon():
         for ref in ref_names:
             length = refs[ref]['sequence_length']
             interest_len = int(round(length * .1, 0))
-            breakpoint()
             start = indelsubs[ref][:interest_len]
             end = indelsubs[ref][-interest_len:]
             ends_mod_rate = sum(start) + sum(end)
