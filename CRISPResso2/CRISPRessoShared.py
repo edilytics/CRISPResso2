@@ -1662,7 +1662,7 @@ def zip_results(results_folder):
     sb.call(cmd_to_zip, shell=True)
     return
 
-def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
+def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3, percent=.1):
     """Check the results of analysis for potential issues and warns the user.
     Parameters
     ----------
@@ -1703,7 +1703,7 @@ def safety_check(crispresso2_info, aln_stats, alignedCutoff=.9, lowCutoff=.3):
     ratio = lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
     if ratio is not None:
         messages.append(ratio)
-    lowAlignmentRatesAtEndsOfAmplicon = LowAlignmentRatesAtEndsOfAmplicon(messageHandler, lowCutoff)
+    lowAlignmentRatesAtEndsOfAmplicon = LowAlignmentRatesAtEndsOfAmplicon(messageHandler, percent)
     aln_rates = lowAlignmentRatesAtEndsOfAmplicon.safety(crispresso2_info['results']['ref_names'], crispresso2_info['results']['refs'], crispresso2_info['results']['alignment_stats']['indelsub_pct_vectors'])
     if aln_rates is not None:
         for message in aln_rates:
@@ -1787,21 +1787,22 @@ class LowRatioOfModsInWindowToOut():
         return None
 
 class LowAlignmentRatesAtEndsOfAmplicon():
-    def __init__(self, messageHandler, cutoff):
+    def __init__(self, messageHandler, percentage_start_end):
         self.messageHandler = messageHandler
-        self.message = " >= 10% of the modifications are in the first and last 10% of the amplicon: ".format(cutoff)
-        self.cutoff = cutoff
+        self.message = " The average modification rate in the first and last {}% of the amplicon is greater than the average modification rate in the middle for amplicon: ".format(percentage_start_end)
+        self.percent = percentage_start_end
     
     def safety(self, ref_names, refs, indelsubs):
         messages = []
         for ref in ref_names:
             length = refs[ref]['sequence_length']
-            interest_len = int(round(length * .1, 0))
+            interest_len = int(round(length * self.percent, 0))
             start = indelsubs[ref][:interest_len]
+            middle = indelsubs[ref][interest_len+1:-interest_len]
             end = indelsubs[ref][-interest_len:]
-            ends_mod_rate = sum(start) + sum(end)
-            total_mod_rate = sum(indelsubs[ref])
-            if ends_mod_rate >= (total_mod_rate * .1):
+            ends_mod_ave = (sum(start) + sum(end)) / (len(start) + len(end))
+            middle_mod_ave = sum(middle) / len(middle)
+            if ends_mod_ave >= middle_mod_ave:
                 amplicon_message = self.message + ref
                 self.messageHandler.display_warning(amplicon_message)
                 messages.append(self.messageHandler.report_warning(amplicon_message))
