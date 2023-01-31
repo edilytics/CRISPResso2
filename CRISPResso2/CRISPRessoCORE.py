@@ -316,7 +316,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
         new_variant['count'] = 1
         new_variant['aln_scores'] = aln_scores
         new_variant['ref_aln_details'] = ref_aln_details
-        new_variant['best_match_name'] = best_match_name
+        new_variant['best_match_name'] = 'No match'
         new_variant['best_match_score'] = best_match_score
         return new_variant #return new variant with best match score of 0, but include the scores of insufficient alignments
 
