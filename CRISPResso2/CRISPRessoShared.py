@@ -1673,7 +1673,7 @@ def zip_results(results_folder):
     sb.call(cmd_to_zip, shell=True)
     return
 
-def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, percent=.4, maxRateOfSubs=0):
+def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, percent=.4, maxRateOfSubs=0, guide_len=19, amplicon_len=50):
     # <10,000 reads in input
     # <90% aligned to amplicons
     # 30% up or down from expected per amplicon
@@ -1707,7 +1707,7 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
     totalReadsGuardRail = TotalReadsGuardRail(messageHandler, min_total_reads)
     total_reads = totalReadsGuardRail.safety(aln_stats['N_TOT_READS'])
     if total_reads is not None:
-        message.append(total_reads)
+        messages.append(total_reads)
     overallReadsAlignedGuard = OverallReadsAlignedGuardRail(messageHandler, alignedCutoff)
     reads_aligned = overallReadsAlignedGuard.safety(aln_stats['N_TOT_READS'], (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']))
     if reads_aligned is not None:
@@ -1735,6 +1735,26 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
     rate = highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
     if rate is not None:
         messages.append(rate)
+    amplicons = {}
+    guide_groups = []
+    for name in crispresso2_info['results']['ref_names']:
+        amplicons[name] = crispresso2_info['results']['refs'][name]['sequence_length']
+        guide_groups.append(crispresso2_info['results']['refs'][name]['sgRNA_sequences'])
+    unique_guides = {}
+    for guides in guide_groups:
+        for guide in guides:
+            if guide not in unique_guides.keys():
+                unique_guides[guide] = len(guide)
+    shortAmpliconSequence = ShortSequenceGuardRail(messageHandler, amplicon_len, 'amplicon')
+    ampliconLength = shortAmpliconSequence.safety(amplicons)
+    if ampliconLength is not None:
+        for message in ampliconLength:
+            messages.append(message)
+    shortGuideSequence = ShortSequenceGuardRail(messageHandler, guide_len, 'guide')
+    guideLength = shortGuideSequence.safety(unique_guides)
+    if guideLength is not None:
+        for message in guideLength:
+            messages.append(message)
     crispresso2_info['results']['guardrails'] = messages
 
 class GuardRailMessageHandler:
@@ -1749,12 +1769,13 @@ class GuardRailMessageHandler:
         return html_warning
 
 class TotalReadsGuardRail:
-    def __init__(self, messageHandler):
+    def __init__(self, messageHandler, minimum):
         self.messageHandler = messageHandler
-        self.message = " Low number of total reads: <10,000"
+        self.minimum = minimum
+        self.message = " Low number of total reads: <{}".format(minimum)
 
-    def safety(self, total, minimum):
-        if total < minimum:
+    def safety(self, total):
+        if total < self.minimum:
             self.messageHandler.display_warning(self.message)
             return self.messageHandler.report_warning(self.message)
         return None
@@ -1859,4 +1880,21 @@ class HighRateOfSubstitutionsGuardRail:
         if ((global_subs / total_mods) >= self.cutoff):
             self.messageHandler.display_warning(self.message)
             return self.messageHandler.report_warning(self.message)
+        return None
+
+class ShortSequenceGuardRail:
+    def __init__(self, messageHandler, cutoff, sequence_type):
+        self.messageHandler = messageHandler
+        self.cutoff = cutoff
+        self.message = " {0} length <{1}: ".format(sequence_type, cutoff)
+
+    def safety(self, sequences):
+        messages = []
+        for name, length in sequences.items():
+            if length < self.cutoff:
+                sequence_message = self.message + name
+                self.messageHandler.display_warning(sequence_message)
+                messages.append(self.messageHandler.report_warning(sequence_message))
+        if len(messages) > 0:
+            return messages
         return None
