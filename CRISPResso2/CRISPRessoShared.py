@@ -1673,13 +1673,13 @@ def zip_results(results_folder):
     sb.call(cmd_to_zip, shell=True)
     return
 
-def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, percent=.4, maxRateOfSubs=0, guide_len=19, amplicon_len=50):
+def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, percent=.1, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50):
     # <10,000 reads in input
     # <90% aligned to amplicons
     # 30% up or down from expected per amplicon
     # >1% modification outside of window
     # .2% Subs outside of quantification
-    # >1% of modification at 0 or -1.
+    # >1% of modifications at 0 or -1.
     # If guide < 19, and amplicon < 50 guardrails.
     # If amplicon is significantly longer than reads
     """Check the results of analysis for potential issues and warns the user.
@@ -1703,6 +1703,7 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     messages = []
+
     messageHandler = GuardRailMessageHandler(logger)
     totalReadsGuardRail = TotalReadsGuardRail(messageHandler, min_total_reads)
     total_reads = totalReadsGuardRail.safety(aln_stats['N_TOT_READS'])
@@ -1731,6 +1732,10 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
     if aln_rates is not None:
         for message in aln_rates:
             messages.append(message)
+    highRateOfSubstitutionsOutsideWindowGuardRail = HighRateOfSubstitutionsOutsideWindowGuardRail(messageHandler, outsideWindowMaxSubRate)
+    rate = highRateOfSubstitutionsOutsideWindowGuardRail.safety(aln_stats['N_GLOBAL_SUBS'], aln_stats['N_SUBS_OUTSIDE_WINDOW'])
+    if rate is not None:
+        messages.append(rate)
     highRateOfSubstitutions = HighRateOfSubstitutionsGuardRail(messageHandler, maxRateOfSubs)
     rate = highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
     if rate is not None:
@@ -1865,6 +1870,20 @@ class LowAlignmentRatesAtEndsOfAmpliconGuardRail:
                 messages.append(self.messageHandler.report_warning(amplicon_message))
         if len(messages) > 0:
             return messages
+        return None
+
+class HighRateOfSubstitutionsOutsideWindowGuardRail:
+    def __init__(self, messageHandler, cutoff):
+        self.messageHandler = messageHandler
+        self.message = " >={}% of substitutions were outside of the quantification window. ".format(cutoff * 100)
+        self.cutoff = cutoff
+        
+    def safety(self, global_subs, subs_outside_window):
+        if global_subs == 0:
+            return None
+        if ((subs_outside_window / global_subs) >= self.cutoff):
+            self.messageHandler.display_warning(self.message)
+            return self.messageHandler.report_warning(self.message)
         return None
 
 class HighRateOfSubstitutionsGuardRail:
