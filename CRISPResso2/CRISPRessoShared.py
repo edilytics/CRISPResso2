@@ -1673,15 +1673,8 @@ def zip_results(results_folder):
     sb.call(cmd_to_zip, shell=True)
     return
 
-def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, percent=.01, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50):
-    # <10,000 reads in input
-    # <90% aligned to amplicons
-    # 30% up or down from expected per amplicon
-    # >1% modification outside of window
-    # .2% Subs outside of quantification
-    # >1% of modifications at 0 or -1.
-    # If guide < 19, and amplicon < 50 guardrails.
-    # If amplicon is significantly longer than reads
+def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, modificationsAtEnds=.01, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50):
+    # If amplicon is significantly (1.5x) longer than reads
     """Check the results of analysis for potential issues and warns the user.
     Parameters
     ----------
@@ -1689,10 +1682,25 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
         Dictionary of values describing the analysis
     aln_stats : dict
         Dictionary of alignment statistics and modification frequency and location
+    min_total_reads : int
+        Cutoff value for total reads aligned
     alignedCutoff : float
         Check value for the percentage of reads aligned vs not aligned
-    lowCutoff : float
-        Cutoff values for other checks such as frequency of substitutions
+    alternateAlignment : float
+        Percentage of variance from expected reads to trigger guardrail
+    minRatioOfModsInToOut : float
+        Float representing the acceptable ratio of modifications in the window to out
+    modificationsAtEnds : float
+        The ratio of reads with modifications at the 0 or -1 spot
+    outsideWindowMaxSubRate : float
+        Ratio of subs allowed outside of the window
+    maxRateOfSubs : float
+        Allowed rate of subs accross the entire read
+    guide_len : int
+        Minimum guide length
+    amplicon_len : int 
+        Minimum guide length
+
 
     Returns
     -------
@@ -1730,8 +1738,7 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
     highRateOfModificationAtEndsGuardRail = HighRateOfModificationAtEndsGuardRail(messageHandler, percent)
     aln_rates = highRateOfModificationAtEndsGuardRail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
     if aln_rates is not None:
-        for message in aln_rates:
-            messages.append(message)
+        messages.append(message)
     highRateOfSubstitutionsOutsideWindowGuardRail = HighRateOfSubstitutionsOutsideWindowGuardRail(messageHandler, outsideWindowMaxSubRate)
     rate = highRateOfSubstitutionsOutsideWindowGuardRail.safety(aln_stats['N_GLOBAL_SUBS'], aln_stats['N_SUBS_OUTSIDE_WINDOW'])
     if rate is not None:
