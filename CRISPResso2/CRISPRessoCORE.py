@@ -422,7 +422,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
            -allelic varaints if two variants are known to exist
 
         """
-
     N_TOT_READS = 0
     N_CACHED_ALN = 0 # read was found in cache
     N_CACHED_NOTALN = 0 #read was found in 'not aligned' cache
