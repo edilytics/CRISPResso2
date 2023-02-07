@@ -275,6 +275,12 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
                 payload = CRISPRessoCOREResources.find_indels_substitutions(best_match_s1s[idx], best_match_s2s[idx], refs[best_match_name]['include_idxs'])
             payload['ref_name'] = best_match_name
             payload['aln_scores'] = aln_scores
+
+            payload['irregular_ends'] = False
+            if best_match_s1s[idx][0] == '-' or best_match_s2s[idx][0] == '-' or best_match_s1s[idx][0] != best_match_s2s[idx][0]:
+                payload['irregular_ends'] = True
+            elif best_match_s1s[idx][0] == '-' or best_match_s2s[idx][0] == '-' or best_match_s1s[idx][0] != best_match_s2s[idx][0]:
+                payload['irregular_ends'] = True
             
             #Insertions out of quantification window
             payload['insertions_outside_window'] = len(payload['all_insertion_positions']) - len(payload['insertion_positions'])
@@ -427,6 +433,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     N_SUBS_OUTSIDE_WINDOW = 0
     N_MODS_IN_WINDOW = 0 #number of modifications found inside the quantification window
     N_MODS_OUTSIDE_WINDOW = 0 #number of modifications found outside the quantification window
+    N_READS_IRREGULAR_ENDS = 0 #number of reads with modifications at the 0 or -1 position
 
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
@@ -467,6 +474,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['substitutions_outside_window']
             N_MODS_IN_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_in_window']
             N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_outside_window']
+            if variantCache[fastq_seq]['variant_' + match_name]['irregular_ends']:
+                N_READS_IRREGULAR_ENDS += 1
 
         #otherwise, create a new variant object, and put it in the cache
         else:
@@ -482,6 +491,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 N_SUBS_OUTSIDE_WINDOW += new_variant['variant_' + match_name]['substitutions_outside_window']
                 N_MODS_IN_WINDOW += new_variant['variant_' + match_name]['mods_in_window']
                 N_MODS_OUTSIDE_WINDOW += new_variant['variant_' + match_name]['mods_outside_window']
+                if new_variant['variant_' + match_name]['irregular_ends']:
+                    N_READS_IRREGULAR_ENDS += 1
                 
 
     fastq_handle.close()
@@ -495,7 +506,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                "N_GLOBAL_SUBS": N_GLOBAL_SUBS,
                "N_SUBS_OUTSIDE_WINDOW": N_SUBS_OUTSIDE_WINDOW,
                "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
-               "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW
+               "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
+               "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS
                }
     return(aln_stats)
 

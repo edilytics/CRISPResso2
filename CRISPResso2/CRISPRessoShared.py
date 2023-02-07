@@ -1673,7 +1673,7 @@ def zip_results(results_folder):
     sb.call(cmd_to_zip, shell=True)
     return
 
-def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, percent=.1, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50):
+def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, percent=.01, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50):
     # <10,000 reads in input
     # <90% aligned to amplicons
     # 30% up or down from expected per amplicon
@@ -1727,8 +1727,8 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
     ratio = lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
     if ratio is not None:
         messages.append(ratio)
-    lowAlignmentRatesAtEndsOfAmplicon = LowAlignmentRatesAtEndsOfAmpliconGuardRail(messageHandler, percent)
-    aln_rates = lowAlignmentRatesAtEndsOfAmplicon.safety(crispresso2_info['results']['ref_names'], crispresso2_info['results']['refs'], crispresso2_info['results']['alignment_stats']['indelsub_pct_vectors'])
+    highRateOfModificationAtEndsGuardRail = HighRateOfModificationAtEndsGuardRail(messageHandler, percent)
+    aln_rates = highRateOfModificationAtEndsGuardRail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
     if aln_rates is not None:
         for message in aln_rates:
             messages.append(message)
@@ -1848,28 +1848,16 @@ class LowRatioOfModsInWindowToOutGuardRail:
             return self.messageHandler.report_warning(self.message)
         return None
 
-class LowAlignmentRatesAtEndsOfAmpliconGuardRail:
+class HighRateOfModificationAtEndsGuardRail:
     def __init__(self, messageHandler, percentage_start_end):
         self.messageHandler = messageHandler
-        self.message = " The average modification rate in the first and last {}% of the amplicon is greater than the average modification rate in the middle for amplicon: ".format(percentage_start_end * 100)
+        self.message = " >={}% of reads have modifications at the start or end. ".format(percentage_start_end * 100)
         self.percent = percentage_start_end
     
-    def safety(self, ref_names, refs, indelsubs):
-        messages = []
-        for ref in ref_names:
-            length = refs[ref]['sequence_length']
-            interest_len = int(round(length * self.percent, 0))
-            start = indelsubs[ref][:interest_len]
-            middle = indelsubs[ref][interest_len+1:-interest_len]
-            end = indelsubs[ref][-interest_len:]
-            ends_mod_ave = (sum(start) + sum(end)) / (len(start) + len(end))
-            middle_mod_ave = sum(middle) / len(middle)
-            if ends_mod_ave >= middle_mod_ave:
-                amplicon_message = self.message + ref
-                self.messageHandler.display_warning(amplicon_message)
-                messages.append(self.messageHandler.report_warning(amplicon_message))
-        if len(messages) > 0:
-            return messages
+    def safety(self, tot_reads, irregular_reads):
+        if (irregular_reads / tot_reads) >= self.percent:
+            self.messageHandler.display_warning(self.message)
+            return self.messageHandler.report_warning(self.message)
         return None
 
 class HighRateOfSubstitutionsOutsideWindowGuardRail:
