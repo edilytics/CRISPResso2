@@ -433,6 +433,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     N_MODS_IN_WINDOW = 0 #number of modifications found inside the quantification window
     N_MODS_OUTSIDE_WINDOW = 0 #number of modifications found outside the quantification window
     N_READS_IRREGULAR_ENDS = 0 #number of reads with modifications at the 0 or -1 position
+    READ_LENGTH = 0
 
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
@@ -486,6 +487,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 N_COMPUTED_ALN+=1
                 variantCache[fastq_seq] = new_variant
                 match_name = new_variant['best_match_name']
+                if READ_LENGTH == 0:
+                    READ_LENGTH = len(new_variant['variant_' + match_name]['aln_seq'])
                 N_GLOBAL_SUBS += new_variant['variant_' + match_name]['substitution_n'] + new_variant['variant_' + match_name]['substitutions_outside_window']
                 N_SUBS_OUTSIDE_WINDOW += new_variant['variant_' + match_name]['substitutions_outside_window']
                 N_MODS_IN_WINDOW += new_variant['variant_' + match_name]['mods_in_window']
@@ -506,7 +509,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                "N_SUBS_OUTSIDE_WINDOW": N_SUBS_OUTSIDE_WINDOW,
                "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
                "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
-               "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS
+               "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
+               "READ_LENGTH": READ_LENGTH
                }
     return(aln_stats)
 

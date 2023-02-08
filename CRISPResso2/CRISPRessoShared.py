@@ -1673,7 +1673,7 @@ def zip_results(results_folder):
     sb.call(cmd_to_zip, shell=True)
     return
 
-def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, modificationsAtEnds=.01, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50):
+def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, modificationsAtEnds=.01, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50, ampliconToReadLen = 1.5):
     # If amplicon is significantly (1.5x) longer than reads
     """Check the results of analysis for potential issues and warns the user.
     Parameters
@@ -1700,6 +1700,8 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
         Minimum guide length
     amplicon_len : int 
         Minimum guide length
+    ampliconToReadLen : float
+        Comparison value between amplicons and reads
 
 
     Returns
@@ -1735,7 +1737,7 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
     ratio = lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
     if ratio is not None:
         messages.append(ratio)
-    highRateOfModificationAtEndsGuardRail = HighRateOfModificationAtEndsGuardRail(messageHandler, percent)
+    highRateOfModificationAtEndsGuardRail = HighRateOfModificationAtEndsGuardRail(messageHandler, modificationsAtEnds)
     aln_rates = highRateOfModificationAtEndsGuardRail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
     if aln_rates is not None:
         messages.append(message)
@@ -1766,6 +1768,11 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
     guideLength = shortGuideSequence.safety(unique_guides)
     if guideLength is not None:
         for message in guideLength:
+            messages.append(message)
+    longAmpliconShortReadsGuardRail = LongAmpliconShortReadsGuardRail(messageHandler, ampliconToReadLen)
+    ampliconLongerThanRead = longAmpliconShortReadsGuardRail.safety(amplicons, aln_stats['READ_LENGTH'])
+    if ampliconLongerThanRead is not None:
+        for message in ampliconLongerThanRead:
             messages.append(message)
     crispresso2_info['results']['guardrails'] = messages
 
@@ -1910,5 +1917,22 @@ class ShortSequenceGuardRail:
                 self.messageHandler.display_warning(sequence_message)
                 messages.append(self.messageHandler.report_warning(sequence_message))
         if len(messages) > 0:
+            return messages
+        return None
+
+class LongAmpliconShortReadsGuardRail:
+    def __init__(self, messageHandler, cutoff):
+        self.messageHandler = messageHandler
+        self.cutoff = cutoff
+        self.message = " Amplicon length is greater than {}x the length of the reads: ".format(cutoff)
+
+    def safety(self, amplicons, read_len):
+        messages = []
+        for name, length in amplicons.items():
+            if length > (read_len * self.cutoff):
+                sequence_message = self.message + name
+                self.messageHandler.display_warning(sequence_message)
+                messages.append(self.messageHandler.report_warning(sequence_message))
+        if len(messages) != 0:
             return messages
         return None
