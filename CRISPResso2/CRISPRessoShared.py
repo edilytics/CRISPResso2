@@ -1761,18 +1761,36 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
 
 
 class GuardRailMessageHandler:
-    """"""
+    """Class to handle message storage and display for guardrails"""
     def __init__(self, logger):
-        """Create the message handler with the correct logger and an empty message array to collect html divs for the report"""
+        """Create the message handler with an empty message array to collect html divs for the report
+        
+        Parameters:
+        ------------
+        logger : logger
+            logger object used to display messages
+        """
         self.logger = logger
         self.messages = []
 
     def display_warning(self, message):
-        """Send the message to the logger to be displayed"""
+        """Send the message to the logger to be displayed
+        
+        Parameters:
+        -----------
+        message : string
+            Related guardrail message
+        """
         self.logger.warning(message)
 
     def report_warning(self, message):
-        """Create and store the html message to display on the report"""
+        """Create and store the html message to display on the report
+        
+        Parameters:
+        -----------
+        message : string
+            Related guardrail message
+        """
         html_warning = '<div class="alert alert-danger"><strong>Guardrail Warning!</strong>{0}</div>'.format(message)
         self.messages.append(html_warning)
 
@@ -1782,20 +1800,28 @@ class GuardRailMessageHandler:
 
 
 class TotalReadsGuardRail:
-    """
-    
-    """
+    """Guardrail class: check that the number of reasd are above a minimum"""
     def __init__(self, messageHandler, minimum):
-        """
+        """Assign variables and create guardrail message
         
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        minimum : int
+            The comparison integer to determine if there are sufficent reads
         """
         self.messageHandler = messageHandler
         self.minimum = minimum
         self.message = " Low number of total reads: <{}".format(minimum)
 
     def safety(self, total):
-        """
-        
+        """Safety check, if total is below minimum send warnings
+
+        Parameters:
+        -----------
+        total : int
+            The total reads, unaligned and aligned
         """
         if total < self.minimum:
             self.messageHandler.display_warning(self.message)
@@ -1803,20 +1829,30 @@ class TotalReadsGuardRail:
 
 
 class OverallReadsAlignedGuardRail:
-    """
-    
-    """
+    """Guardrail class: check if enough reads are aligned"""
     def __init__(self, messageHandler, cutoff):
-        """
-        
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of percentage of minimum reads to be aligned
         """
         self.messageHandler = messageHandler
         self.message = " <={val}% of reads were aligned".format(val=(cutoff * 100))
         self.cutoff = cutoff
     
     def safety(self, total_reads, n_read_aligned):
-        """
-        
+        """Safety check, if total_reads divided by n_reads_aligned is lower than the cutoff
+
+        Parameters:
+        -----------
+        total : int
+            Total reads, unaligned and aligned
+        n_read_aligned : int
+            Total aligned reads
         """
         if total_reads == 0:
             return
@@ -1826,12 +1862,33 @@ class OverallReadsAlignedGuardRail:
 
 
 class LowReadsAlignedToAmpliconGuardRail:
+    """Guardrail class: check if the distribution of reads is roughly even across amplicons"""
     def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of the accepted percentage deviation down from the expected distribution
+        """
         self.messageHandler = messageHandler
         self.message = " <={val}% of expected reads were aligned to amplicon: ".format(val=(cutoff * 100))
         self.cutoff = cutoff
 
     def safety(self, total_reads, amplicons, reads_aln_amplicon):
+        """Safety check, if total_reads divided by n_reads_aligned is lower than the total_reads divided by the number of amplicons
+        
+        Parameters:
+        -----------
+        total_reads : int
+            Total reads, unaligned and aligned
+        amplicons : list
+            A list of the names of the amplicons
+        reads_aln_amplicon : dict
+            A dictionary with the names of amplicons as the key and the number of reads aligned as the value
+        """
         expected_per_amplicon = total_reads / len(amplicons)
         for amplicon in amplicons:
             if reads_aln_amplicon[amplicon] <= (expected_per_amplicon * self.cutoff):
@@ -1841,12 +1898,33 @@ class LowReadsAlignedToAmpliconGuardRail:
 
 
 class HighReadsAlignedToAlternateAmpliconGuardRail:
+    """Guardrail class: check if the distribution of reads is roughly even across amplicons"""
     def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of the accepted percentage deviation up from the expected distribution
+        """
         self.messageHandler = messageHandler
         self.message = " >={val}% more reads than expected were aligned to amplicon: ".format(val=(cutoff * 100))
         self.cutoff = cutoff
 
     def safety(self, total_reads, amplicons, reads_aln_amplicon):
+        """Safety check, if total_reads divided by n_reads_aligned is higher than the total_reads divided by the number of amplicons
+        
+        Parameters:
+        -----------
+        total_reads : int
+            Total reads, unaligned and aligned
+        amplicons : list
+            A list of the names of the amplicons
+        reads_aln_amplicon : dict
+            A dictionary with the names of amplicons as the key and the number of reads aligned as the value
+        """
         expected_per_amplicon = total_reads / len(amplicons)
         for amplicon in amplicons:
             if reads_aln_amplicon[amplicon] >= (expected_per_amplicon * self.cutoff):
@@ -1856,12 +1934,31 @@ class HighReadsAlignedToAlternateAmpliconGuardRail:
 
 
 class LowRatioOfModsInWindowToOutGuardRail:
+    """Guardrail class: check the ratio of modifications in the quantification window to out of it"""
     def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of the maximum percentage of modifications outside of the quantification window
+        """
         self.messageHandler = messageHandler
         self.message = " <={}% of modifications were inside of the quantification window ".format(cutoff * 100)
         self.cutoff = cutoff
 
     def safety(self, mods_in_window, mods_outside_window):
+        """Safety check, if the modifications in the window are below a ratio of the total
+        
+        Parameters:
+        -----------
+        mods_in_window : int
+            The number of mods in the quantification window
+        mods_outside_window : int
+            The number of mods outside of the quantification window
+        """
         total_mods = mods_in_window + mods_outside_window
         if total_mods == 0:
             return
@@ -1871,26 +1968,64 @@ class LowRatioOfModsInWindowToOutGuardRail:
 
 
 class HighRateOfModificationAtEndsGuardRail:
+    """Guardrail class: check the ratio of modifications in the quantification window to out of it"""
     def __init__(self, messageHandler, percentage_start_end):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        percentage_start_end : float
+            The float representation of the maximum percentage reads that have modifications on either end
+        """
         self.messageHandler = messageHandler
         self.message = " >={}% of reads have modifications at the start or end. ".format(percentage_start_end * 100)
         self.percent = percentage_start_end
     
-    def safety(self, tot_reads, irregular_reads):
-        if tot_reads == 0:
+    def safety(self, total_reads, irregular_reads):
+        """Safety check, comparison between the number of irregular reads to total reads
+        
+        Parameters:
+        -----------
+        total_reads : int
+            The number of mods in the quantification window
+        irregular_reads : int
+            The number of mods outside of the quantification window
+        """
+        if total_reads == 0:
             return
-        if (irregular_reads / tot_reads) >= self.percent:
+        if (irregular_reads / total_reads) >= self.percent:
             self.messageHandler.display_warning(self.message)
             self.messageHandler.report_warning(self.message)
 
 
 class HighRateOfSubstitutionsOutsideWindowGuardRail:
+    """Guardrail class: check the ratio of global substitutions to substitutions outside of the quantification window"""
     def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of how many of the total substitutions can be outside of the quantification window
+        """
         self.messageHandler = messageHandler
         self.message = " >={}% of substitutions were outside of the quantification window. ".format(cutoff * 100)
         self.cutoff = cutoff
         
     def safety(self, global_subs, subs_outside_window):
+        """Safety check, comparison between the number of global subs to subs outside of the quantification window
+        
+        Parameters:
+        -----------
+        global_subs : int
+            The number of mods in the quantification window
+        subs_outside_window : int
+            The number of mods outside of the quantification window
+        """
         if global_subs == 0:
             return
         if ((subs_outside_window / global_subs) >= self.cutoff):
@@ -1899,12 +2034,33 @@ class HighRateOfSubstitutionsOutsideWindowGuardRail:
 
 
 class HighRateOfSubstitutionsGuardRail:
+    """Guardrail class: check the ratio of global substitutions to total modifications"""
     def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of how many of the total modifications can be subsitutions
+        """
         self.messageHandler = messageHandler
         self.message = " >={}% of modifications were substitutions. This could potentially indicate poor sequencing quality. ".format(cutoff * 100)
         self.cutoff = cutoff
         
     def safety(self, mods_in_window, mods_outside_window, global_subs):
+        """Safety check, comparison between subsitutions and total modifications
+        
+        Parameters:
+        -----------
+        mods_in_window : int
+            Modifications inside of the quantification window
+        mods_outside_window : int
+            Modifications outside of the quantification window
+        global_subs : int
+            Total subsitutions across all reads
+        """
         total_mods = mods_in_window + mods_outside_window
         if total_mods == 0:
             return
@@ -1914,12 +2070,31 @@ class HighRateOfSubstitutionsGuardRail:
 
 
 class ShortSequenceGuardRail:
+    """Guardrail class: Check to make sure that sequences (amplicons and guides) are above a certain length"""
     def __init__(self, messageHandler, cutoff, sequence_type):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : int
+            Integer value to measure the length of the sequence
+        sequence_type : string
+            Amplicon or guide
+        """
         self.messageHandler = messageHandler
         self.cutoff = cutoff
         self.message = " {0} length <{1}: ".format(sequence_type, cutoff)
 
     def safety(self, sequences):
+        """Safety check, comparison between sequence lengths and minimum lengths
+        
+        Parameters:
+        -----------
+        sequences : dict
+            Dictionary with the name of the sequence as the key and the length of the sequence as the value
+        """
         for name, length in sequences.items():
             if length < self.cutoff:
                 sequence_message = self.message + name
@@ -1928,12 +2103,32 @@ class ShortSequenceGuardRail:
 
 
 class LongAmpliconShortReadsGuardRail:
+    """Guardrail class: Check to make sure that the reads are close in size to amplicons"""
     def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The value multiplied by the read length to make sure the amplicon isn't too much longer than the reads.
+            
+        """
         self.messageHandler = messageHandler
         self.cutoff = cutoff
         self.message = " Amplicon length is greater than {}x the length of the reads: ".format(cutoff)
 
     def safety(self, amplicons, read_len):
+        """Safety check, comparison between amplicon length and read length
+        
+        Parameters:
+        -----------
+        amplicons : dict
+            Dictionary with the name of the amplicon as the key and the length of the sequence as the value
+        read_len : int
+            Average length of reads
+        """
         for name, length in amplicons.items():
             if length > (read_len * self.cutoff):
                 sequence_message = self.message + name
