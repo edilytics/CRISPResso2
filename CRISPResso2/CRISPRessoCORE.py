@@ -283,13 +283,13 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
                 payload['irregular_ends'] = True
             
             #Insertions out of quantification window
-            payload['insertions_outside_window'] = len(payload['all_insertion_positions']) - len(payload['insertion_positions'])
+            payload['insertions_outside_window'] = (len(payload['all_insertion_positions'])/2) - (len(payload['insertion_positions'])/2)
             #Deletions out of quantification window
             payload['deletions_outside_window'] = len(payload['all_deletion_coordinates']) - len(payload['deletion_coordinates'])
             #Substitutions out of quantification window
             payload['substitutions_outside_window'] = len(payload['all_substitution_positions']) - len(payload['substitution_positions'])
             #Sums
-            payload['total_mods'] = (len(payload['all_insertion_positions']) / 2) + len(payload['all_deletion_coordinates']) + len(payload['all_substitution_positions'])
+            payload['total_mods'] = (len(payload['all_insertion_positions'])/2) + len(payload['all_deletion_coordinates']) + len(payload['all_substitution_positions'])
             payload['mods_in_window'] = payload['substitution_n'] + payload['deletion_n'] + payload['insertion_n']
             payload['mods_outside_window'] = payload['total_mods'] - payload['mods_in_window']
 
@@ -460,7 +460,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
 
         N_TOT_READS+=1
-        #TODO: Fix variant issue
         #if the sequence has been seen and can't be aligned, skip it
         if (fastq_seq in not_aln):
             N_CACHED_NOTALN += 1
@@ -4699,7 +4698,7 @@ def main():
         crispresso2_info['running_info']['running_time'] = running_time
         crispresso2_info['running_info']['running_time_string'] = running_time_string
 
-        CRISPRessoShared.safety_check(crispresso2_info, aln_stats)
+        CRISPRessoShared.safety_check(crispresso2_info, aln_stats, logger=logger)
 
         if not args.suppress_report:
             if (args.place_report_in_output_folder):
