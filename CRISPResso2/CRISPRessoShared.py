@@ -19,6 +19,7 @@ import signal
 import subprocess as sb
 import unicodedata
 import logging
+from inspect import getmodule, stack
 
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
@@ -1673,15 +1674,17 @@ def zip_results(results_folder):
     sb.call(cmd_to_zip, shell=True)
     return
 
-def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, modificationsAtEnds=.01, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50, ampliconToReadLen = 1.5):
-    # If amplicon is significantly (1.5x) longer than reads
+def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, modificationsAtEnds=.01, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50, ampliconToReadLen = 1.5):
     """Check the results of analysis for potential issues and warns the user.
+
     Parameters
     ----------
     crispresso2_info : dict
         Dictionary of values describing the analysis
     aln_stats : dict
         Dictionary of alignment statistics and modification frequency and location
+    logger : logger
+        Logger from the calling function for logging messages
     min_total_reads : int
         Cutoff value for total reads aligned
     alignedCutoff : float
@@ -1710,106 +1713,117 @@ def safety_check(crispresso2_info, aln_stats, min_total_reads=10000, alignedCuto
         List of messages returned from the violated guardrails to be included in the report.
 
     """
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    messages = []
-
+    if logger is None:
+        # this line noise will get the name of the module from which this
+        # function was called, and thereby the correct logger
+        logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
     messageHandler = GuardRailMessageHandler(logger)
+    
     totalReadsGuardRail = TotalReadsGuardRail(messageHandler, min_total_reads)
-    total_reads = totalReadsGuardRail.safety(aln_stats['N_TOT_READS'])
-    if total_reads is not None:
-        messages.append(total_reads)
+    totalReadsGuardRail.safety(aln_stats['N_TOT_READS'])
+
     overallReadsAlignedGuard = OverallReadsAlignedGuardRail(messageHandler, alignedCutoff)
-    reads_aligned = overallReadsAlignedGuard.safety(aln_stats['N_TOT_READS'], (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']))
-    if reads_aligned is not None:
-        messages.append(reads_aligned)
+    overallReadsAlignedGuard.safety(aln_stats['N_TOT_READS'], (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']))
+
     lowReadsAlignedToAmpliconGuardRail = LowReadsAlignedToAmpliconGuardRail(messageHandler, alignedCutoff)
-    low_reads_aligned = lowReadsAlignedToAmpliconGuardRail.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['ref_names'], crispresso2_info['results']['alignment_stats']['counts_total'])
-    if low_reads_aligned is not None:
-        for message in low_reads_aligned:
-            messages.append(message)
+    lowReadsAlignedToAmpliconGuardRail.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['ref_names'], crispresso2_info['results']['alignment_stats']['counts_total'])
+    
     highReadsAlignedToAlternateAmplicon = HighReadsAlignedToAlternateAmpliconGuardRail(messageHandler, alternateAlignment)
-    high_alt_amplicon = highReadsAlignedToAlternateAmplicon.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['ref_names'], crispresso2_info['results']['alignment_stats']['counts_total'])
-    if high_alt_amplicon is not None:
-        for message in high_alt_amplicon:
-            messages.append(message)
+    highReadsAlignedToAlternateAmplicon.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['ref_names'], crispresso2_info['results']['alignment_stats']['counts_total'])
+    
     lowRatioOfModsInWindowToOut = LowRatioOfModsInWindowToOutGuardRail(messageHandler, minRatioOfModsInToOut)
-    ratio = lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
-    if ratio is not None:
-        messages.append(ratio)
+    lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
+    
     highRateOfModificationAtEndsGuardRail = HighRateOfModificationAtEndsGuardRail(messageHandler, modificationsAtEnds)
-    aln_rates = highRateOfModificationAtEndsGuardRail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
-    if aln_rates is not None:
-        messages.append(message)
+    highRateOfModificationAtEndsGuardRail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
+    
     highRateOfSubstitutionsOutsideWindowGuardRail = HighRateOfSubstitutionsOutsideWindowGuardRail(messageHandler, outsideWindowMaxSubRate)
-    rate = highRateOfSubstitutionsOutsideWindowGuardRail.safety(aln_stats['N_GLOBAL_SUBS'], aln_stats['N_SUBS_OUTSIDE_WINDOW'])
-    if rate is not None:
-        messages.append(rate)
+    highRateOfSubstitutionsOutsideWindowGuardRail.safety(aln_stats['N_GLOBAL_SUBS'], aln_stats['N_SUBS_OUTSIDE_WINDOW'])
+    
     highRateOfSubstitutions = HighRateOfSubstitutionsGuardRail(messageHandler, maxRateOfSubs)
-    rate = highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
-    if rate is not None:
-        messages.append(rate)
+    highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
+    
     amplicons = {}
     guide_groups = []
     for name in crispresso2_info['results']['ref_names']:
         amplicons[name] = crispresso2_info['results']['refs'][name]['sequence_length']
         guide_groups.append(crispresso2_info['results']['refs'][name]['sgRNA_sequences'])
-    unique_guides = {}
-    for guides in guide_groups:
-        for guide in guides:
-            if guide not in unique_guides.keys():
-                unique_guides[guide] = len(guide)
+    unique_guides = dict.fromkeys({guide for group in guide_groups for guide in group}, 0)
+    for key in unique_guides.keys():
+        unique_guides[key] = len(key)
     shortAmpliconSequence = ShortSequenceGuardRail(messageHandler, amplicon_len, 'amplicon')
-    ampliconLength = shortAmpliconSequence.safety(amplicons)
-    if ampliconLength is not None:
-        for message in ampliconLength:
-            messages.append(message)
+    shortAmpliconSequence.safety(amplicons)
     shortGuideSequence = ShortSequenceGuardRail(messageHandler, guide_len, 'guide')
-    guideLength = shortGuideSequence.safety(unique_guides)
-    if guideLength is not None:
-        for message in guideLength:
-            messages.append(message)
+    shortGuideSequence.safety(unique_guides)
     longAmpliconShortReadsGuardRail = LongAmpliconShortReadsGuardRail(messageHandler, ampliconToReadLen)
-    ampliconLongerThanRead = longAmpliconShortReadsGuardRail.safety(amplicons, aln_stats['READ_LENGTH'])
-    if ampliconLongerThanRead is not None:
-        for message in ampliconLongerThanRead:
-            messages.append(message)
-    crispresso2_info['results']['guardrails'] = messages
+    longAmpliconShortReadsGuardRail.safety(amplicons, aln_stats['READ_LENGTH'])
+    crispresso2_info['results']['guardrails'] = messageHandler.get_messages()
+
 
 class GuardRailMessageHandler:
+    """"""
     def __init__(self, logger):
+        """Create the message handler with the correct logger and an empty message array to collect html divs for the report"""
         self.logger = logger
+        self.messages = []
 
     def display_warning(self, message):
+        """Send the message to the logger to be displayed"""
         self.logger.warning(message)
 
     def report_warning(self, message):
+        """Create and store the html message to display on the report"""
         html_warning = '<div class="alert alert-danger"><strong>Guardrail Warning!</strong>{0}</div>'.format(message)
-        return html_warning
+        self.messages.append(html_warning)
+
+    def get_messages(self):
+        """Return the messages accumulated by the message handler"""
+        return self.messages
+
 
 class TotalReadsGuardRail:
+    """
+    
+    """
     def __init__(self, messageHandler, minimum):
+        """
+        
+        """
         self.messageHandler = messageHandler
         self.minimum = minimum
         self.message = " Low number of total reads: <{}".format(minimum)
 
     def safety(self, total):
+        """
+        
+        """
         if total < self.minimum:
             self.messageHandler.display_warning(self.message)
-            return self.messageHandler.report_warning(self.message)
-        return None
+            self.messageHandler.report_warning(self.message)
+
 
 class OverallReadsAlignedGuardRail:
+    """
+    
+    """
     def __init__(self, messageHandler, cutoff):
+        """
+        
+        """
         self.messageHandler = messageHandler
         self.message = " <={val}% of reads were aligned".format(val=(cutoff * 100))
         self.cutoff = cutoff
     
     def safety(self, total_reads, n_read_aligned):
+        """
+        
+        """
+        if total_reads == 0:
+            return
         if (n_read_aligned/total_reads) <= self.cutoff:
             self.messageHandler.display_warning(self.message)
-            return self.messageHandler.report_warning(self.message)
-        return None
+            self.messageHandler.report_warning(self.message)
+
 
 class LowReadsAlignedToAmpliconGuardRail:
     def __init__(self, messageHandler, cutoff):
@@ -1819,15 +1833,12 @@ class LowReadsAlignedToAmpliconGuardRail:
 
     def safety(self, total_reads, amplicons, reads_aln_amplicon):
         expected_per_amplicon = total_reads / len(amplicons)
-        messages = []
         for amplicon in amplicons:
             if reads_aln_amplicon[amplicon] <= (expected_per_amplicon * self.cutoff):
                 amplicon_message = self.message + amplicon
                 self.messageHandler.display_warning(amplicon_message)
-                messages.append(self.messageHandler.report_warning(amplicon_message))
-        if len(messages) > 0:
-            return messages
-        return None
+                self.messageHandler.report_warning(amplicon_message)
+
 
 class HighReadsAlignedToAlternateAmpliconGuardRail:
     def __init__(self, messageHandler, cutoff):
@@ -1837,15 +1848,12 @@ class HighReadsAlignedToAlternateAmpliconGuardRail:
 
     def safety(self, total_reads, amplicons, reads_aln_amplicon):
         expected_per_amplicon = total_reads / len(amplicons)
-        messages = []
         for amplicon in amplicons:
             if reads_aln_amplicon[amplicon] >= (expected_per_amplicon * self.cutoff):
                 amplicon_message = self.message + amplicon
                 self.messageHandler.display_warning(amplicon_message)
-                messages.append(self.messageHandler.report_warning(amplicon_message))
-        if len(messages) > 0:
-            return messages
-        return None
+                self.messageHandler.report_warning(amplicon_message)
+
 
 class LowRatioOfModsInWindowToOutGuardRail:
     def __init__(self, messageHandler, cutoff):
@@ -1856,11 +1864,11 @@ class LowRatioOfModsInWindowToOutGuardRail:
     def safety(self, mods_in_window, mods_outside_window):
         total_mods = mods_in_window + mods_outside_window
         if total_mods == 0:
-            return None
+            return
         if ((mods_in_window / total_mods) <= self.cutoff):
             self.messageHandler.display_warning(self.message)
-            return self.messageHandler.report_warning(self.message)
-        return None
+            self.messageHandler.report_warning(self.message)
+
 
 class HighRateOfModificationAtEndsGuardRail:
     def __init__(self, messageHandler, percentage_start_end):
@@ -1869,10 +1877,12 @@ class HighRateOfModificationAtEndsGuardRail:
         self.percent = percentage_start_end
     
     def safety(self, tot_reads, irregular_reads):
+        if tot_reads == 0:
+            return
         if (irregular_reads / tot_reads) >= self.percent:
             self.messageHandler.display_warning(self.message)
-            return self.messageHandler.report_warning(self.message)
-        return None
+            self.messageHandler.report_warning(self.message)
+
 
 class HighRateOfSubstitutionsOutsideWindowGuardRail:
     def __init__(self, messageHandler, cutoff):
@@ -1882,11 +1892,11 @@ class HighRateOfSubstitutionsOutsideWindowGuardRail:
         
     def safety(self, global_subs, subs_outside_window):
         if global_subs == 0:
-            return None
+            return
         if ((subs_outside_window / global_subs) >= self.cutoff):
             self.messageHandler.display_warning(self.message)
-            return self.messageHandler.report_warning(self.message)
-        return None
+            self.messageHandler.report_warning(self.message)
+
 
 class HighRateOfSubstitutionsGuardRail:
     def __init__(self, messageHandler, cutoff):
@@ -1897,11 +1907,11 @@ class HighRateOfSubstitutionsGuardRail:
     def safety(self, mods_in_window, mods_outside_window, global_subs):
         total_mods = mods_in_window + mods_outside_window
         if total_mods == 0:
-            return None
+            return
         if ((global_subs / total_mods) >= self.cutoff):
             self.messageHandler.display_warning(self.message)
-            return self.messageHandler.report_warning(self.message)
-        return None
+            self.messageHandler.report_warning(self.message)
+
 
 class ShortSequenceGuardRail:
     def __init__(self, messageHandler, cutoff, sequence_type):
@@ -1910,15 +1920,12 @@ class ShortSequenceGuardRail:
         self.message = " {0} length <{1}: ".format(sequence_type, cutoff)
 
     def safety(self, sequences):
-        messages = []
         for name, length in sequences.items():
             if length < self.cutoff:
                 sequence_message = self.message + name
                 self.messageHandler.display_warning(sequence_message)
-                messages.append(self.messageHandler.report_warning(sequence_message))
-        if len(messages) > 0:
-            return messages
-        return None
+                self.messageHandler.report_warning(sequence_message)
+
 
 class LongAmpliconShortReadsGuardRail:
     def __init__(self, messageHandler, cutoff):
@@ -1927,12 +1934,8 @@ class LongAmpliconShortReadsGuardRail:
         self.message = " Amplicon length is greater than {}x the length of the reads: ".format(cutoff)
 
     def safety(self, amplicons, read_len):
-        messages = []
         for name, length in amplicons.items():
             if length > (read_len * self.cutoff):
                 sequence_message = self.message + name
                 self.messageHandler.display_warning(sequence_message)
-                messages.append(self.messageHandler.report_warning(sequence_message))
-        if len(messages) != 0:
-            return messages
-        return None
+                self.messageHandler.report_warning(sequence_message)
