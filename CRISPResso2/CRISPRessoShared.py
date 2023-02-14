@@ -1705,13 +1705,6 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
         Minimum guide length
     ampliconToReadLen : float
         Comparison value between amplicons and reads
-
-
-    Returns
-    -------
-    messages : list
-        List of messages returned from the violated guardrails to be included in the report.
-
     """
     if logger is None:
         # this line noise will get the name of the module from which this
@@ -1743,6 +1736,7 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
     highRateOfSubstitutions = HighRateOfSubstitutionsGuardRail(messageHandler, maxRateOfSubs)
     highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
     
+    # Get amplicon and guide sequences and lengths
     amplicons = {}
     guide_groups = []
     for name in crispresso2_info['results']['ref_names']:
@@ -1751,12 +1745,16 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
     unique_guides = dict.fromkeys({guide for group in guide_groups for guide in group}, 0)
     for key in unique_guides.keys():
         unique_guides[key] = len(key)
+        
     shortAmpliconSequence = ShortSequenceGuardRail(messageHandler, amplicon_len, 'amplicon')
     shortAmpliconSequence.safety(amplicons)
+
     shortGuideSequence = ShortSequenceGuardRail(messageHandler, guide_len, 'guide')
     shortGuideSequence.safety(unique_guides)
+
     longAmpliconShortReadsGuardRail = LongAmpliconShortReadsGuardRail(messageHandler, ampliconToReadLen)
     longAmpliconShortReadsGuardRail.safety(amplicons, aln_stats['READ_LENGTH'])
+
     crispresso2_info['results']['guardrails'] = messageHandler.get_messages()
 
 
