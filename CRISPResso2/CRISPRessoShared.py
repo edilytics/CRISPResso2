@@ -1702,7 +1702,7 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
     guide_len : int
         Minimum guide length
     amplicon_len : int 
-        Minimum guide length
+        Minimum amplicon length
     ampliconToReadLen : float
         Comparison value between amplicons and reads
     """
@@ -1711,6 +1711,30 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
         # function was called, and thereby the correct logger
         logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
     messageHandler = GuardRailMessageHandler(logger)
+
+    # Get amplicon and guide sequences and lengths
+    amplicons = {}
+    guide_groups = set()
+    for name in crispresso2_info['results']['ref_names']:
+        amplicons[name] = crispresso2_info['results']['refs'][name]['sequence_length']
+        guide_groups.update(crispresso2_info['results']['refs'][name]['sgRNA_sequences'])
+    unique_guides = {guide: len(guide) for guide in guide_groups}
+
+    # guard_rails = [
+    #     (TotalReadsGuardRail(messageHandler, min_total_reads), {'total_reads': aln_stats['N_TOT_READS']}), 
+    #     (OverallReadsAlignedGuardRail(messageHandler, alignedCutoff), {'total_reads': aln_stats['N_TOT_READS'], 'n_read_aligned': (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN'])}),
+    #     (LowReadsAlignedToAmpliconGuardRail(messageHandler, alignedCutoff), {'total_reads': aln_stats['N_TOT_READS'], 'reads_aln_amplicon': crispresso2_info['results']['alignment_stats']['counts_total']}),
+    #     (HighReadsAlignedToAlternateAmpliconGuardRail(messageHandler, alternateAlignment), {'total_reads': aln_stats['N_TOT_READS'], 'reads_aln_amplicon': crispresso2_info['results']['alignment_stats']['counts_total']}),
+    #     (LowRatioOfModsInWindowToOutGuardRail(messageHandler, minRatioOfModsInToOut), {'mods_in_window': aln_stats['N_MODS_IN_WINDOW'], 'mods_outside_window': aln_stats['N_MODS_OUTSIDE_WINDOW']}),
+    #     (HighRateOfModificationAtEndsGuardRail(messageHandler, modificationsAtEnds), {'total_reads': (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), 'irregular_reads': aln_stats['N_READS_IRREGULAR_ENDS']}),
+    #     (HighRateOfSubstitutionsOutsideWindowGuardRail(messageHandler, outsideWindowMaxSubRate), {'global_subs': aln_stats['N_GLOBAL_SUBS'], 'subs_outside_window': aln_stats['N_SUBS_OUTSIDE_WINDOW']}),
+    #     (HighRateOfSubstitutionsGuardRail(messageHandler, maxRateOfSubs), {'mods_in_window': aln_stats['N_MODS_IN_WINDOW'], 'mods_outside_window': aln_stats['N_MODS_OUTSIDE_WINDOW'], 'global_subs': aln_stats['N_GLOBAL_SUBS']}),
+    #     (ShortSequenceGuardRail(messageHandler, amplicon_len, 'amplicon'), {'sequences': amplicons}),
+    #     (ShortSequenceGuardRail(messageHandler, guide_len, 'guide'), {'sequences': unique_guides}),
+    #     (LongAmpliconShortReadsGuardRail(messageHandler, ampliconToReadLen), {'amplicons': amplicons, 'read_len': aln_stats['READ_LENGTH']})
+    # ]
+
+    # map(lambda guard_rail : guard_rail[0].safety(**guard_rail[1]), guard_rails)
     
     totalReadsGuardRail = TotalReadsGuardRail(messageHandler, min_total_reads)
     totalReadsGuardRail.safety(aln_stats['N_TOT_READS'])
@@ -1719,10 +1743,10 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
     overallReadsAlignedGuard.safety(aln_stats['N_TOT_READS'], (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']))
 
     lowReadsAlignedToAmpliconGuardRail = LowReadsAlignedToAmpliconGuardRail(messageHandler, alignedCutoff)
-    lowReadsAlignedToAmpliconGuardRail.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['ref_names'], crispresso2_info['results']['alignment_stats']['counts_total'])
+    lowReadsAlignedToAmpliconGuardRail.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['alignment_stats']['counts_total'])
     
     highReadsAlignedToAlternateAmplicon = HighReadsAlignedToAlternateAmpliconGuardRail(messageHandler, alternateAlignment)
-    highReadsAlignedToAlternateAmplicon.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['ref_names'], crispresso2_info['results']['alignment_stats']['counts_total'])
+    highReadsAlignedToAlternateAmplicon.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['alignment_stats']['counts_total'])
     
     lowRatioOfModsInWindowToOut = LowRatioOfModsInWindowToOutGuardRail(messageHandler, minRatioOfModsInToOut)
     lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
@@ -1735,16 +1759,6 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
     
     highRateOfSubstitutions = HighRateOfSubstitutionsGuardRail(messageHandler, maxRateOfSubs)
     highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
-    
-    # Get amplicon and guide sequences and lengths
-    amplicons = {}
-    guide_groups = []
-    for name in crispresso2_info['results']['ref_names']:
-        amplicons[name] = crispresso2_info['results']['refs'][name]['sequence_length']
-        guide_groups.append(crispresso2_info['results']['refs'][name]['sgRNA_sequences'])
-    unique_guides = dict.fromkeys({guide for group in guide_groups for guide in group}, 0)
-    for key in unique_guides.keys():
-        unique_guides[key] = len(key)
         
     shortAmpliconSequence = ShortSequenceGuardRail(messageHandler, amplicon_len, 'amplicon')
     shortAmpliconSequence.safety(amplicons)
@@ -1798,7 +1812,7 @@ class GuardRailMessageHandler:
 
 
 class TotalReadsGuardRail:
-    """Guardrail class: check that the number of reasd are above a minimum"""
+    """Guardrail class: check that the number of reads are above a minimum"""
     def __init__(self, messageHandler, minimum):
         """Assign variables and create guardrail message
         
@@ -1813,15 +1827,15 @@ class TotalReadsGuardRail:
         self.minimum = minimum
         self.message = " Low number of total reads: <{}".format(minimum)
 
-    def safety(self, total):
+    def safety(self, total_reads):
         """Safety check, if total is below minimum send warnings
 
         Parameters:
         -----------
-        total : int
+        total_reads : int
             The total reads, unaligned and aligned
         """
-        if total < self.minimum:
+        if total_reads < self.minimum:
             self.messageHandler.display_warning(self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -1847,7 +1861,7 @@ class OverallReadsAlignedGuardRail:
 
         Parameters:
         -----------
-        total : int
+        total_reads : int
             Total reads, unaligned and aligned
         n_read_aligned : int
             Total aligned reads
@@ -1875,21 +1889,19 @@ class LowReadsAlignedToAmpliconGuardRail:
         self.message = " <={val}% of expected reads were aligned to amplicon: ".format(val=(cutoff * 100))
         self.cutoff = cutoff
 
-    def safety(self, total_reads, amplicons, reads_aln_amplicon):
+    def safety(self, total_reads, reads_aln_amplicon):
         """Safety check, if total_reads divided by n_reads_aligned is lower than the total_reads divided by the number of amplicons
         
         Parameters:
         -----------
         total_reads : int
             Total reads, unaligned and aligned
-        amplicons : list
-            A list of the names of the amplicons
         reads_aln_amplicon : dict
             A dictionary with the names of amplicons as the key and the number of reads aligned as the value
         """
-        expected_per_amplicon = total_reads / len(amplicons)
-        for amplicon in amplicons:
-            if reads_aln_amplicon[amplicon] <= (expected_per_amplicon * self.cutoff):
+        expected_per_amplicon = total_reads / len(reads_aln_amplicon.keys())
+        for amplicon, aligned in reads_aln_amplicon.items():
+            if aligned <= (expected_per_amplicon * self.cutoff):
                 amplicon_message = self.message + amplicon
                 self.messageHandler.display_warning(amplicon_message)
                 self.messageHandler.report_warning(amplicon_message)
@@ -1911,21 +1923,19 @@ class HighReadsAlignedToAlternateAmpliconGuardRail:
         self.message = " >={val}% more reads than expected were aligned to amplicon: ".format(val=(cutoff * 100))
         self.cutoff = cutoff
 
-    def safety(self, total_reads, amplicons, reads_aln_amplicon):
+    def safety(self, total_reads, reads_aln_amplicon):
         """Safety check, if total_reads divided by n_reads_aligned is higher than the total_reads divided by the number of amplicons
         
         Parameters:
         -----------
         total_reads : int
             Total reads, unaligned and aligned
-        amplicons : list
-            A list of the names of the amplicons
         reads_aln_amplicon : dict
             A dictionary with the names of amplicons as the key and the number of reads aligned as the value
         """
-        expected_per_amplicon = total_reads / len(amplicons)
-        for amplicon in amplicons:
-            if reads_aln_amplicon[amplicon] >= (expected_per_amplicon * self.cutoff):
+        expected_per_amplicon = total_reads / len(reads_aln_amplicon.keys())
+        for amplicon, aligned in reads_aln_amplicon.items():
+            if aligned >= (expected_per_amplicon * self.cutoff):
                 amplicon_message = self.message + amplicon
                 self.messageHandler.display_warning(amplicon_message)
                 self.messageHandler.report_warning(amplicon_message)
