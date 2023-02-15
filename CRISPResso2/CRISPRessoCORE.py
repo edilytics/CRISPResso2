@@ -279,7 +279,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
             payload['irregular_ends'] = False
             if best_match_s1s[idx][0] == '-' or best_match_s2s[idx][0] == '-' or best_match_s1s[idx][0] != best_match_s2s[idx][0]:
                 payload['irregular_ends'] = True
-            elif best_match_s1s[idx][0] == '-' or best_match_s2s[idx][0] == '-' or best_match_s1s[idx][0] != best_match_s2s[idx][0]:
+            elif best_match_s1s[idx][-1] == '-' or best_match_s2s[idx][-1] == '-' or best_match_s1s[idx][-1] != best_match_s2s[idx][-1]:
                 payload['irregular_ends'] = True
             
             #Insertions out of quantification window
@@ -468,12 +468,12 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         if (fastq_seq in variantCache):
             N_CACHED_ALN+=1
             variantCache[fastq_seq]['count'] += 1
-            match_name = variantCache[fastq_seq]['best_match_name']
-            N_GLOBAL_SUBS += variantCache[fastq_seq]['variant_' + match_name]['substitution_n'] + variantCache[fastq_seq]['variant_' + match_name]['substitutions_outside_window']
-            N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['substitutions_outside_window']
-            N_MODS_IN_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_in_window']
-            N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_outside_window']
-            if variantCache[fastq_seq]['variant_' + match_name]['irregular_ends']:
+            match_name = "variant_" + variantCache[fastq_seq]['best_match_name']
+            N_GLOBAL_SUBS += variantCache[fastq_seq][match_name]['substitution_n'] + variantCache[fastq_seq][match_name]['substitutions_outside_window']
+            N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['substitutions_outside_window']
+            N_MODS_IN_WINDOW += variantCache[fastq_seq][match_name]['mods_in_window']
+            N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['mods_outside_window']
+            if variantCache[fastq_seq][match_name]['irregular_ends']:
                 N_READS_IRREGULAR_ENDS += 1
 
         #otherwise, create a new variant object, and put it in the cache
@@ -485,14 +485,14 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             else:
                 N_COMPUTED_ALN+=1
                 variantCache[fastq_seq] = new_variant
-                match_name = new_variant['best_match_name']
+                match_name = "variant_" + new_variant['best_match_name']
                 if READ_LENGTH == 0:
-                    READ_LENGTH = len(new_variant['variant_' + match_name]['aln_seq'])
-                N_GLOBAL_SUBS += new_variant['variant_' + match_name]['substitution_n'] + new_variant['variant_' + match_name]['substitutions_outside_window']
-                N_SUBS_OUTSIDE_WINDOW += new_variant['variant_' + match_name]['substitutions_outside_window']
-                N_MODS_IN_WINDOW += new_variant['variant_' + match_name]['mods_in_window']
-                N_MODS_OUTSIDE_WINDOW += new_variant['variant_' + match_name]['mods_outside_window']
-                if new_variant['variant_' + match_name]['irregular_ends']:
+                    READ_LENGTH = len(new_variant[match_name]['aln_seq'])
+                N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
+                N_SUBS_OUTSIDE_WINDOW += new_variant[match_name]['substitutions_outside_window']
+                N_MODS_IN_WINDOW += new_variant[match_name]['mods_in_window']
+                N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
+                if new_variant[match_name]['irregular_ends']:
                     N_READS_IRREGULAR_ENDS += 1
                 
 
@@ -582,12 +582,12 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             if (fastq_seq in variantCache):
                 N_CACHED_ALN+=1
                 variantCache[fastq_seq]['count'] += 1
-                match_name = variantCache[fastq_seq]['best_match_name']
-                N_GLOBAL_SUBS += variantCache[fastq_seq]['variant_' + match_name]['substitution_n'] + variantCache[fastq_seq]['variant_' + match_name]['substitutions_outside_window']
-                N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['substitutions_outside_window']
-                N_MODS_IN_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_in_window']
-                N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq]['variant_' + match_name]['mods_outside_window']
-                if variantCache[fastq_seq]['variant_' + match_name]['irregular_ends']:
+                match_name = "variant_" + variantCache[fastq_seq]['best_match_name']
+                N_GLOBAL_SUBS += variantCache[fastq_seq][match_name]['substitution_n'] + variantCache[fastq_seq][match_name]['substitutions_outside_window']
+                N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['substitutions_outside_window']
+                N_MODS_IN_WINDOW += variantCache[fastq_seq][match_name]['mods_in_window']
+                N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['mods_outside_window']
+                if variantCache[fastq_seq][match_name]['irregular_ends']:
                     N_READS_IRREGULAR_ENDS += 1
                 #sam_line_els[5] = variantCache[fastq_seq]['sam_cigar']
                 sam_line_els.append(variantCache[fastq_seq]['crispresso2_annotation'])
@@ -650,14 +650,14 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
 
                     variantCache[fastq_seq] = new_variant
 
-                    match_name = new_variant['best_match_name']
+                    match_name = 'variant+' + new_variant['best_match_name']
                     if READ_LENGTH == 0:
-                        READ_LENGTH = len(new_variant['variant_' + match_name]['aln_seq'])
-                    N_GLOBAL_SUBS += new_variant['variant_' + match_name]['substitution_n'] + new_variant['variant_' + match_name]['substitutions_outside_window']
-                    N_SUBS_OUTSIDE_WINDOW += new_variant['variant_' + match_name]['substitutions_outside_window']
-                    N_MODS_IN_WINDOW += new_variant['variant_' + match_name]['mods_in_window']
-                    N_MODS_OUTSIDE_WINDOW += new_variant['variant_' + match_name]['mods_outside_window']
-                    if new_variant['variant_' + match_name]['irregular_ends']:
+                        READ_LENGTH = len(new_variant[match_name]['aln_seq'])
+                    N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
+                    N_SUBS_OUTSIDE_WINDOW += new_variant[match_name]['substitutions_outside_window']
+                    N_MODS_IN_WINDOW += new_variant[match_name]['mods_in_window']
+                    N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
+                    if new_variant[match_name]['irregular_ends']:
                         N_READS_IRREGULAR_ENDS += 1
 
     output_sam = output_bam+".sam"
