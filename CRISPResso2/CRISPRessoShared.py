@@ -123,8 +123,7 @@ def getCRISPRessoArgParser(parserTitle="CRISPResso Parameters", requiredParams={
     parser.add_argument('--file_prefix', help='File prefix for output plots and tables', default='')
     parser.add_argument('-n', '--name',
                         help='Output name of the report (default: the name is obtained from the filename of the fastq file/s used in input)',
-                        default='',
-                        required='name' in requiredParams)
+                        default='')
     parser.add_argument('-o', '--output_folder', help='Output folder to use for the analysis (default: current folder)',
                         default='')
 
@@ -137,13 +136,13 @@ def getCRISPRessoArgParser(parserTitle="CRISPResso Parameters", requiredParams={
     parser.add_argument('--trimmomatic_command', type=str, help='Command to run trimmomatic', default='trimmomatic')
     parser.add_argument('--trimmomatic_options_string', type=str,
                         help='Override options for Trimmomatic, e.g. "ILLUMINACLIP:/data/NexteraPE-PE.fa:0:90:10:0:true"',
-                        default=''),
+                        default='')
     parser.add_argument('--flash_command', type=str, help='Command to run flash', default='flash')
     parser.add_argument('--min_paired_end_reads_overlap', type=int,
                         help='Parameter for the FLASH read merging step. Minimum required overlap length between two reads to provide a confident overlap. ',
                         default=10)
     parser.add_argument('--max_paired_end_reads_overlap', type=int,
-                        help='DEPRECATED in v2.2.11.',
+                        help='Parameter for the FLASH merging step.  Maximum overlap length expected in approximately 90%% of read pairs. Please see the FLASH manual for more information.',
                         default=100)
     parser.add_argument('--stringent_flash_merging',
                         help='Use stringent parameters for flash merging. In the case where flash could merge R1 and R2 reads ambiguously, the expected overlap is calculated as 2*average_read_length - amplicon_length. The flash parameters for --min-overlap and --max-overlap will be set to prefer merged reads with length within 10bp of the expected overlap. These values override the --min_paired_end_reads_overlap or --max_paired_end_reads_overlap CRISPResso parameters.',
@@ -989,7 +988,7 @@ def guess_guides(amplicon_sequence,fastq_r1,fastq_r2,number_of_reads_to_consider
     tuple of (putative guide, boolean is_base_editor)
     or (None, None)
     """
-    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, flash_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap, split_interleaved_input=split_interleaved_input)
+    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, flash_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap,split_interleaved_input=split_interleaved_input)
 
     amp_len = len(amplicon_sequence)
     gap_incentive = np.zeros(amp_len + 1, dtype=int)
