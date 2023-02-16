@@ -132,22 +132,22 @@ def getCRISPRessoArgParser(parserTitle="CRISPResso Parameters", requiredParams={
     parser.add_argument('--split_interleaved_input', '--split_paired_end',
                         help='Splits a single fastq file containing paired end reads into two files before running CRISPResso',
                         action='store_true')
-    parser.add_argument('--trim_sequences', help='Enable the trimming of Illumina adapters with fastp',
+    parser.add_argument('--trim_sequences', help='Enable the trimming of Illumina adapters with Trimmomatic',
                         action='store_true')
-    parser.add_argument('--trimmomatic_command', type=str, help='DEPRECATED in v2.2.11, use `--fastp_command`')
-    parser.add_argument('--fastp_command', type=str, help='Command to run fast', default='fastp')
-    parser.add_argument('--trimmomatic_options_string', type=str, help='DEPRECATED in v2.2.11, use `--fastp_options_string`')
-    parser.add_argument('--fastp_options_string', type=str,
-                        help='Override options for fastp, e.g. "--length_required 70 --umi"',
-                        default='')
-    parser.add_argument('--flash_command', type=str, help='DEPRECATED in v2.2.11, use `--fastp_command`')
+    parser.add_argument('--trimmomatic_command', type=str, help='Command to run trimmomatic', default='trimmomatic')
+    parser.add_argument('--trimmomatic_options_string', type=str,
+                        help='Override options for Trimmomatic, e.g. "ILLUMINACLIP:/data/NexteraPE-PE.fa:0:90:10:0:true"',
+                        default=''),
+    parser.add_argument('--flash_command', type=str, help='Command to run flash', default='flash')
     parser.add_argument('--min_paired_end_reads_overlap', type=int,
-                        help='Parameter for the fastp read merging step. Minimum required overlap length between two reads to provide a confident overlap. ',
+                        help='Parameter for the FLASH read merging step. Minimum required overlap length between two reads to provide a confident overlap. ',
                         default=10)
     parser.add_argument('--max_paired_end_reads_overlap', type=int,
                         help='DEPRECATED in v2.2.11.',
                         default=100)
-    parser.add_argument('--stringent_flash_merging', help='DEPRECATED in v2.2.11.', action='store_true')
+    parser.add_argument('--stringent_flash_merging',
+                        help='Use stringent parameters for flash merging. In the case where flash could merge R1 and R2 reads ambiguously, the expected overlap is calculated as 2*average_read_length - amplicon_length. The flash parameters for --min-overlap and --max-overlap will be set to prefer merged reads with length within 10bp of the expected overlap. These values override the --min_paired_end_reads_overlap or --max_paired_end_reads_overlap CRISPResso parameters.',
+                        action='store_true')
     parser.add_argument('--force_merge_pairs', help=argparse.SUPPRESS,
                         action='store_true')  # help=Force-merges R1 and R2 if they cannot be merged using flash (use with caution -- may create non-biological apparent indels at the joining site)
 
@@ -786,7 +786,7 @@ def get_command_output(command):
             break
 
 
-def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, split_interleaved_input=False, debug=False):
+def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, flash_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap, split_interleaved_input=False, debug=False):
     """
     Get the most frequent amplicon from a fastq file (or after merging a r1 and r2 fastq file).
 
@@ -796,7 +796,8 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
     fastq_r1: path to fastq r1 (can be gzipped)
     fastq_r2: path to fastq r2 (can be gzipped)
     number_of_reads_to_consider: number of reads from the top of the file to examine
-    min_paired_end_reads_overlap: min overlap in bp for fastp (merging) r1 and r2
+    min_paired_end_reads_overlap: min overlap in bp for flashing (merging) r1 and r2
+    max_paired_end_reads_overlap: max overlap in bp for flashing (merging) r1 and r2
 
     returns:
     list of amplicon strings sorted by order in format:
@@ -848,37 +849,28 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
 
     view_cmd_1 = 'cat'
     if fastq_r1.endswith('.gz'):
-        view_cmd_1 = 'gunzip -c'
+        view_cmd_1 = 'zcat'
     file_generation_command = "%s %s | head -n %d " % (view_cmd_1, fastq_r1, number_of_reads_to_consider * 4)
 
     if fastq_r2:
         view_cmd_2 = 'cat'
         if fastq_r2.endswith('.gz'):
-            view_cmd_2 = 'gunzip -c'
+            view_cmd_2 = 'zcat'
         max_overlap_param = ""
         min_overlap_param = ""
+        if max_paired_end_reads_overlap:
+            max_overlap_param = "--max-overlap=" + str(max_paired_end_reads_overlap)
         if min_paired_end_reads_overlap:
-            min_overlap_param = "--overlap_len_require {0}".format(min_paired_end_reads_overlap)
-
-        file_generation_command = "{paste} | {head} | paste - - - - | {awk} | {fastp}".format(
-            paste="bash -c 'paste <({view_cmd_1} \"{fastq_r1}\") <({view_cmd_2} \"{fastq_r2}\")'".format(
-                view_cmd_1=view_cmd_1, fastq_r1=fastq_r1, view_cmd_2=view_cmd_2, fastq_r2=fastq_r2,
-            ),
-            head='head -n {num_reads}'.format(
-                num_reads=number_of_reads_to_consider * 4,
-            ),
-            awk="awk -v OFS=\"\\n\" -v FS=\"\\t\" '{{print($1,$3,$5,$7,$2,$4,$6,$8)}}'",
-            fastp='{fastp_command} --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering --stdin --interleaved_in --merge {min_overlap_param} --stdout 2>/dev/null'.format(
-                fastp_command=fastp_command,
-                min_overlap_param=min_overlap_param,
-            ),
-        )
+            min_overlap_param = "--min-overlap=" + str(min_paired_end_reads_overlap)
+        file_generation_command = "bash -c 'paste <(%s \"%s\") <(%s \"%s\")' | head -n %d | paste - - - - | awk -v OFS=\"\\n\" -v FS=\"\\t\" '{print($1,$3,$5,$7,$2,$4,$6,$8)}' | %s - --interleaved-input --allow-outies %s %s --to-stdout 2>/dev/null " % (
+        view_cmd_1, fastq_r1, view_cmd_2, fastq_r2, number_of_reads_to_consider * 4, flash_command, max_overlap_param,
+        min_overlap_param)
     count_frequent_cmd = file_generation_command + " | awk '((NR-2)%4==0){print $1}' | sort | uniq -c | sort -nr "
 
     def default_sigpipe():
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
-    if debug:
+    if (debug):
         print('command used: ' + count_frequent_cmd)
 
     piped_commands = count_frequent_cmd.split("|")
@@ -895,10 +887,6 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
     if len(seq_lines) == 0 or seq_lines == ['']:
         raise AutoException('Cannot parse any frequent amplicons sequences.')
 
-    if fastq_r2:
-        os.remove('fastp.html')
-        os.remove('fastp.json')
-
     if split_interleaved_input:
         os.remove(output_r1)
         os.remove(output_r2)
@@ -906,15 +894,16 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
     return seq_lines
 
 
-def guess_amplicons(fastq_r1,fastq_r2,number_of_reads_to_consider,fastp_command,min_paired_end_reads_overlap,aln_matrix,needleman_wunsch_gap_open,needleman_wunsch_gap_extend,split_interleaved_input=False,min_freq_to_consider=0.2,amplicon_similarity_cutoff=0.95):
+def guess_amplicons(fastq_r1,fastq_r2,number_of_reads_to_consider,flash_command,max_paired_end_reads_overlap,min_paired_end_reads_overlap,aln_matrix,needleman_wunsch_gap_open,needleman_wunsch_gap_extend,split_interleaved_input=False,min_freq_to_consider=0.2,amplicon_similarity_cutoff=0.95):
     """
     guesses the amplicons used in an experiment by examining the most frequent read (giant caveat -- most frequent read should be unmodified)
     input:
     fastq_r1: path to fastq r1 (can be gzipped)
     fastq_r2: path to fastq r2 (can be gzipped)
     number_of_reads_to_consider: number of reads from the top of the file to examine
-    fastp_command: command to call fastp
-    min_paired_end_reads_overlap: min overlap in bp for fastp (merging) r1 and r2
+    flash_command: command to call flash
+    min_paired_end_reads_overlap: min overlap in bp for flashing (merging) r1 and r2
+    max_paired_end_reads_overlap: max overlap in bp for flashing (merging) r1 and r2
     aln_matrix: matrix specifying alignment substitution scores in the NCBI format
     needleman_wunsch_gap_open: alignment penalty assignment used to determine similarity of two sequences
     needleman_wunsch_gap_extend: alignment penalty assignment used to determine similarity of two sequences
@@ -925,7 +914,7 @@ def guess_amplicons(fastq_r1,fastq_r2,number_of_reads_to_consider,fastp_command,
     returns:
     list of putative amplicons
     """
-    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, split_interleaved_input=split_interleaved_input)
+    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, flash_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap, split_interleaved_input=split_interleaved_input)
 
     curr_amplicon_id = 1
 
@@ -970,7 +959,7 @@ def guess_amplicons(fastq_r1,fastq_r2,number_of_reads_to_consider,fastp_command,
     return amplicon_seq_arr
 
 
-def guess_guides(amplicon_sequence,fastq_r1,fastq_r2,number_of_reads_to_consider,fastp_command,
+def guess_guides(amplicon_sequence,fastq_r1,fastq_r2,number_of_reads_to_consider,flash_command,max_paired_end_reads_overlap,
             min_paired_end_reads_overlap,exclude_bp_from_left,exclude_bp_from_right,
             aln_matrix,needleman_wunsch_gap_open,needleman_wunsch_gap_extend,
             min_edit_freq_to_consider=0.1,min_edit_fold_change_to_consider=3,
@@ -982,8 +971,9 @@ def guess_guides(amplicon_sequence,fastq_r1,fastq_r2,number_of_reads_to_consider
     fastq_r1: path to fastq r1 (can be gzipped)
     fastq_r2: path to fastq r2 (can be gzipped)
     number_of_reads_to_consider: number of reads from the top of the file to examine
-    fastp_command: command to call fastp
-    min_paired_end_reads_overlap: min overlap in bp for fastp (merging) r1 and r2
+    flash_command: command to call flash
+    min_paired_end_reads_overlap: min overlap in bp for flashing (merging) r1 and r2
+    max_paired_end_reads_overlap: max overlap in bp for flashing (merging) r1 and r2
     exclude_bp_from_left: number of bp to exclude from the left side of the amplicon sequence for the quantification of the indels
     exclude_bp_from_right: number of bp to exclude from the right side of the amplicon sequence for the quantification of the indels
     aln_matrix: matrix specifying alignment substitution scores in the NCBI format
@@ -999,7 +989,7 @@ def guess_guides(amplicon_sequence,fastq_r1,fastq_r2,number_of_reads_to_consider
     tuple of (putative guide, boolean is_base_editor)
     or (None, None)
     """
-    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap,split_interleaved_input=split_interleaved_input)
+    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, flash_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap, split_interleaved_input=split_interleaved_input)
 
     amp_len = len(amplicon_sequence)
     gap_incentive = np.zeros(amp_len + 1, dtype=int)
@@ -1719,22 +1709,6 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
         amplicons[name] = crispresso2_info['results']['refs'][name]['sequence_length']
         guide_groups.update(crispresso2_info['results']['refs'][name]['sgRNA_sequences'])
     unique_guides = {guide: len(guide) for guide in guide_groups}
-
-    # guard_rails = [
-    #     (TotalReadsGuardRail(messageHandler, min_total_reads), {'total_reads': aln_stats['N_TOT_READS']}), 
-    #     (OverallReadsAlignedGuardRail(messageHandler, alignedCutoff), {'total_reads': aln_stats['N_TOT_READS'], 'n_read_aligned': (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN'])}),
-    #     (LowReadsAlignedToAmpliconGuardRail(messageHandler, alignedCutoff), {'total_reads': aln_stats['N_TOT_READS'], 'reads_aln_amplicon': crispresso2_info['results']['alignment_stats']['counts_total']}),
-    #     (HighReadsAlignedToAlternateAmpliconGuardRail(messageHandler, alternateAlignment), {'total_reads': aln_stats['N_TOT_READS'], 'reads_aln_amplicon': crispresso2_info['results']['alignment_stats']['counts_total']}),
-    #     (LowRatioOfModsInWindowToOutGuardRail(messageHandler, minRatioOfModsInToOut), {'mods_in_window': aln_stats['N_MODS_IN_WINDOW'], 'mods_outside_window': aln_stats['N_MODS_OUTSIDE_WINDOW']}),
-    #     (HighRateOfModificationAtEndsGuardRail(messageHandler, modificationsAtEnds), {'total_reads': (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), 'irregular_reads': aln_stats['N_READS_IRREGULAR_ENDS']}),
-    #     (HighRateOfSubstitutionsOutsideWindowGuardRail(messageHandler, outsideWindowMaxSubRate), {'global_subs': aln_stats['N_GLOBAL_SUBS'], 'subs_outside_window': aln_stats['N_SUBS_OUTSIDE_WINDOW']}),
-    #     (HighRateOfSubstitutionsGuardRail(messageHandler, maxRateOfSubs), {'mods_in_window': aln_stats['N_MODS_IN_WINDOW'], 'mods_outside_window': aln_stats['N_MODS_OUTSIDE_WINDOW'], 'global_subs': aln_stats['N_GLOBAL_SUBS']}),
-    #     (ShortSequenceGuardRail(messageHandler, amplicon_len, 'amplicon'), {'sequences': amplicons}),
-    #     (ShortSequenceGuardRail(messageHandler, guide_len, 'guide'), {'sequences': unique_guides}),
-    #     (LongAmpliconShortReadsGuardRail(messageHandler, ampliconToReadLen), {'amplicons': amplicons, 'read_len': aln_stats['READ_LENGTH']})
-    # ]
-
-    # map(lambda guard_rail : guard_rail[0].safety(**guard_rail[1]), guard_rails)
     
     totalReadsGuardRail = TotalReadsGuardRail(messageHandler, min_total_reads)
     totalReadsGuardRail.safety(aln_stats['N_TOT_READS'])
