@@ -650,7 +650,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
 
                     variantCache[fastq_seq] = new_variant
 
-                    match_name = 'variant+' + new_variant['best_match_name']
+                    match_name = 'variant_' + new_variant['best_match_name']
                     if READ_LENGTH == 0:
                         READ_LENGTH = len(new_variant[match_name]['aln_seq'])
                     N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
@@ -801,7 +801,7 @@ def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, 
                 fastq_out_handle.write(fastq_id+fastq_seq+"\n"+fastq_plus+crispresso2_annotation+"\n"+fastq_qual)
 
                 variantCache[fastq_seq] = new_variant
-                match_name = 'variant+' + new_variant['best_match_name']
+                match_name = 'variant_' + new_variant['best_match_name']
                 if READ_LENGTH == 0:
                     READ_LENGTH = len(new_variant[match_name]['aln_seq'])
                 N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
@@ -1028,7 +1028,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
                 sam_out_handle.write("\t".join(new_sam_entry)+"\n")  # write cached alignment with modified read id and qual
 
                 variantCache[fastq_seq] = new_variant
-                match_name = 'variant+' + new_variant['best_match_name']
+                match_name = 'variant_' + new_variant['best_match_name']
                 if READ_LENGTH == 0:
                     READ_LENGTH = len(new_variant[match_name]['aln_seq'])
                 N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
@@ -1042,7 +1042,6 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         fastq_id = fastq_input_handle.readline().strip()[1:]
     fastq_input_handle.close()
     sam_out_handle.close()
-
     sort_and_index_cmd = 'samtools sort ' + sam_out + ' -o ' + bam_output + ' && samtools index ' + bam_output
     sort_bam_status = sb.call(sort_and_index_cmd, shell=True)
     if sort_bam_status:
