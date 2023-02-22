@@ -1619,7 +1619,7 @@ def get_crispresso_footer():
 
 
 def check_custom_style(args):
-    custom_style =  {
+    style =  {
         "colors": {
                 'Substitution': '#0000FF',
                 'Insertion': '#008000',
@@ -1637,15 +1637,19 @@ def check_custom_style(args):
         try:
             with open(args.style_json, "r") as json_file:
                 style = json.load(json_file)
-            style = json.load(json_file)
+            custom_style = json.load(json_file)
+
+            if 'colors' not in custom_style.keys():
+                warn("Json file does not contain the colors key. Defaulting all values.")
+                return style
     
-            for key in custom_style['colors']:
-                if key not in style['colors']:
+            for key in style['colors']:
+                if key not in custom_style['colors']:
                     warn(f"Value for {key} not provided, defaulting")
-                    style['colors'][key] = custom_style['colors'][key]
+                    custom_style['colors'][key] = style['colors'][key]
     
-            return style
+            return custom_style
         except Exception as e:
             warn("Cannot read json file '%s', defaulting style parameters." % args.style_json)
             print(e)
-    return custom_style
+    return style
