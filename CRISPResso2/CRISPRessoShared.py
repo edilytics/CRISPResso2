@@ -1619,6 +1619,24 @@ def get_crispresso_footer():
 
 
 def check_custom_style(args):
+    """Check if the style_json argument was provided. If so load the styling from the file, otherwise load default styles.
+    
+    Parameters:
+    -------------
+    args : dict
+        All arguments passed into the crispresso run.
+
+    Returns:
+    -------------
+    style : dict
+        A dict with a 'colors' key that contains hex color values for different report items.
+    
+    -OR-
+    
+    custom_style : dict
+        A dict with a 'colors' key that contains hex color values for different report items loaded from a user provided json file.
+
+    """
     style =  {
         "colors": {
                 'Substitution': '#0000FF',
