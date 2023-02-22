@@ -1619,45 +1619,33 @@ def get_crispresso_footer():
 
 
 def check_custom_style(args):
+    custom_style =  {
+        "colors": {
+                'Substitution': '#0000FF',
+                'Insertion': '#008000',
+                'Deletion': '#FF0000',
+                'A': '#7FC97F',
+                'T': '#BEAED4',
+                'C': '#FDC086',
+                'G': '#FFFF99',
+                'N': '#C8C8C8',
+                '-': '#C1C1C1'
+                }
+            
+            }
     if args.style_json:
         try:
             with open(args.style_json, "r") as json_file:
                 style = json.load(json_file)
-            if 'Substitution' not in style['colors'].keys():
-                warn("Value for substitutions not provided, defaulting")
-                style['colors']['Substitution'] = '#0000FF'
-            if 'Insertion' not in style['colors'].keys():
-                warn("Value for insertions not provided, defaulting")
-                style['colors']['Insertion'] = '#008000'
-            if 'Deletion' not in style['colors'].keys():
-                warn("Value for deletions not provided, defaulting")
-                style['colors']['Deletion'] = '#FF0000'
-            if 'A' not in style['colors'].keys():
-                warn("Value for nucleotide A not provided, defaulting")
-                style['colors']['A'] = '#7FC97F'
-            if 'T' not in style['colors'].keys():
-                warn("Value for nucleotide T not provided, defaulting")
-                style['colors']['T'] = '#BEAED4'
-            if 'C' not in style['colors'].keys():
-                warn("Value for nucleotide C not provided, defaulting")
-                style['colors']['C'] = '#FDC086'
-            if 'G' not in style['colors'].keys():
-                warn("Value for nucleotide G not provided, defaulting")
-                style['colors']['G'] = '#FFFF99'
-            if 'N' not in style['colors'].keys():
-                warn("Value for nucleotide N not provided, defaulting")
-                style['colors']['N'] = '#C8C8C8'
-            if '-' not in style['colors'].keys():
-                warn("Value for nucleotide deletions not provided, defaulting")
-                style['colors']['-'] = '#C1C1C1'
+            style = json.load(json_file)
+    
+            for key in custom_style['colors']:
+                if key not in style['colors']:
+                    warn(f"Value for {key} not provided, defaulting")
+                    style['colors'][key] = custom_style['colors'][key]
+    
             return style
         except Exception as e:
             warn("Cannot read json file '%s', defaulting style parameters." % args.style_json)
             print(e)
-    custom_style = {
-        "colors": {
-            "Substitution": "#0000FF", "Insertion": "#008000", "Deletion": "#FF0000", "A": "#7FC97F", "T": "#BEAED4", "C": "#FDC086",
-            "G": "#FFFF99", "N": "#C8C8C8", "-": "#C1C1C1"
-        }
-    }
     return custom_style
