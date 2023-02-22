@@ -275,7 +275,7 @@ def getCRISPRessoArgParser(parserTitle="CRISPResso Parameters", requiredParams={
     parser.add_argument('--suppress_plots', help='Suppress output plots', action='store_true')
     parser.add_argument('--write_cleaned_report', action='store_true',
                         help=argparse.SUPPRESS)  # trims working directories from output in report (for web access)
-    parser.add_argument('--style_json', help='File path to JSON file with styling elements', type=str)
+    parser.add_argument('--config_file', help='File path to JSON file with config elements', type=str)
 
     # base editor parameters
     parser.add_argument('--base_editor_output',
@@ -1618,8 +1618,8 @@ def get_crispresso_footer():
     return output_line
 
 
-def check_custom_style(args):
-    """Check if the style_json argument was provided. If so load the styling from the file, otherwise load default styles.
+def check_custom_configs(args):
+    """Check if the config_json argument was provided. If so load the styling from the file, otherwise load default styles.
     
     Parameters:
     -------------
@@ -1651,9 +1651,9 @@ def check_custom_style(args):
                 }
             
             }
-    if args.style_json:
+    if args.config_json:
         try:
-            with open(args.style_json, "r") as json_file:
+            with open(args.config_json, "r") as json_file:
                 style = json.load(json_file)
             custom_style = json.load(json_file)
 
@@ -1668,6 +1668,6 @@ def check_custom_style(args):
     
             return custom_style
         except Exception as e:
-            warn("Cannot read json file '%s', defaulting style parameters." % args.style_json)
+            warn("Cannot read json file '%s', defaulting style parameters." % args.config_json)
             print(e)
     return style
