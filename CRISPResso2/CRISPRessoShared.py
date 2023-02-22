@@ -1618,8 +1618,8 @@ def get_crispresso_footer():
     return output_line
 
 
-def check_custom_configs(args):
-    """Check if the config_json argument was provided. If so load the styling from the file, otherwise load default styles.
+def check_custom_config(args):
+    """Check if the config_json argument was provided. If so load the configurations from the file, otherwise load default configurations.
     
     Parameters:
     -------------
@@ -1637,7 +1637,7 @@ def check_custom_configs(args):
         A dict with a 'colors' key that contains hex color values for different report items loaded from a user provided json file.
 
     """
-    style =  {
+    config =  {
         "colors": {
                 'Substitution': '#0000FF',
                 'Insertion': '#008000',
@@ -1654,20 +1654,19 @@ def check_custom_configs(args):
     if args.config_json:
         try:
             with open(args.config_json, "r") as json_file:
-                style = json.load(json_file)
-            custom_style = json.load(json_file)
+                custom_config = json.load(json_file)
 
-            if 'colors' not in custom_style.keys():
+            if 'colors' not in custom_config.keys():
                 warn("Json file does not contain the colors key. Defaulting all values.")
-                return style
+                return config
     
-            for key in style['colors']:
-                if key not in custom_style['colors']:
+            for key in config['colors']:
+                if key not in custom_config['colors']:
                     warn(f"Value for {key} not provided, defaulting")
-                    custom_style['colors'][key] = style['colors'][key]
+                    custom_config['colors'][key] = config['colors'][key]
     
-            return custom_style
+            return custom_config
         except Exception as e:
             warn("Cannot read json file '%s', defaulting style parameters." % args.config_json)
             print(e)
-    return style
+    return config
