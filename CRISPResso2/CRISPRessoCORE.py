@@ -3274,7 +3274,7 @@ def main():
             info('Making Plots...')
         ###############################################################################################################################################
         save_png = True
-        custom_style = CRISPRessoShared.check_custom_style(args)
+        custom_style = CRISPRessoShared.check_custom_config(args)
         if args.suppress_report:
             save_png = False
 
