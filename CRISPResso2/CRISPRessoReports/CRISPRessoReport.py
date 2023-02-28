@@ -86,6 +86,36 @@ def add_fig_if_exists(fig_name, fig_root, fig_title, fig_caption, fig_data,
             amplicon_figures['htmls'][fig_name] = html_string
 
 
+def add_d3_fig(
+    fig_name,
+    fig_root,
+    fig_title,
+    fig_caption,
+    fig_data,
+    amplicon_fig_names,
+    amplicon_figures,
+    crispresso_folder,
+):
+    # fig_root is the json data path
+    json_path = os.path.join(crispresso_folder, fig_root)
+    if os.path.exists(json_path):
+        amplicon_fig_names.append(fig_name)
+        amplicon_figures['locs'][fig_name] = os.path.basename(fig_root)
+        amplicon_figures['titles'][fig_name] = fig_title
+        amplicon_figures['captions'][fig_name] = fig_caption
+        amplicon_figures['datas'][fig_name] = [
+            (data_caption, data_file)
+            for data_caption, data_file in fig_data
+            if os.path.exists(os.path.join(crispresso_folder, data_file))
+        ]
+        with open(json_path) as fig_json_fh:
+            amplicon_figures['htmls'][fig_name] = """
+<div id="allele_table_{0}"></div>
+<div id="allele_graph_{0}"></div>
+<script type="text/javascript">const {0} = {1}</script>
+            """.format(fig_name, fig_json_fh.read()).strip()
+
+
 def assemble_figs(run_data, crispresso_folder):
     figures = {'names': {}, 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}, 'sgRNA_based_names': {}}
 
@@ -125,6 +155,23 @@ def assemble_figs(run_data, crispresso_folder):
                                       run_data['results']['refs'][amplicon_name]['plot_' + fig + '_datas'][idx],
                                       this_fig_names, amplicon_figures, crispresso_folder)
             this_sgRNA_based_fig_names[fig] = this_fig_names
+
+        for fig in ['9b']:
+            d3_fig_names = []
+            if 'plot_{0}_roots'.format(fig) in run_data['results']['refs'][amplicon_name]:
+                for idx, plot_root in enumerate(run_data['results']['refs'][amplicon_name]['plot_{0}_roots'.format(fig)]):
+                    fig_name = 'plot_{0}_{1}_{2}'.format(fig, amplicon_name, idx)
+                    add_d3_fig(
+                        fig_name,
+                        plot_root,
+                        'Figure {0} sgRNA {1}'.format(fig_name, idx + 1),
+                        run_data['results']['refs'][amplicon_name]['plot_{0}_captions'.format(fig)][idx],
+                        run_data['results']['refs'][amplicon_name]['plot_{0}_datas'.format(fig)][idx],
+                        d3_fig_names,
+                        amplicon_figures,
+                        crispresso_folder,
+                    )
+            this_sgRNA_based_fig_names[fig] = d3_fig_names
 
         figures['names'][amplicon_name] = amplicon_figures['names']
         figures['sgRNA_based_names'][amplicon_name] = this_sgRNA_based_fig_names
@@ -530,6 +577,7 @@ def make_multi_report(
                 'titles': summary_plots['titles'],
                 'labels': summary_plots['labels'],
                 'datas': summary_plots['datas'],
+                'htmls': [],
                 'crispresso_data_path': crispresso_data_path,
             },
             run_names=run_names,
