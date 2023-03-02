@@ -3792,11 +3792,10 @@ def generate_alleles_graph_json_from_df(
     alleles = alleles[alleles['%Reads'] >= MIN_FREQUENCY].reset_index()
     alleles.index = range(1, len(alleles) + 1)
 
-    # TODO create single dataframe with more dimensions
     read_seqs = set_index_and_columns(alleles['Aligned_Sequence'].str.split('', expand=True).iloc[:, 1:-1])
     reference_seqs = set_index_and_columns(alleles['Reference_Sequence'].str.split('', expand=True).iloc[:, 1:-1])
-    insertions = set_index_and_columns(alleles['Reference_Sequence'].str.split('', expand=True).iloc[:, 1:-1] == '-')
-    deletions = set_index_and_columns(alleles['Aligned_Sequence'].str.split('', expand=True).iloc[:, 1:-1] == '-')
+    insertions = reference_seqs == '-'
+    deletions = read_seqs == '-'
 
     matches = (read_seqs == reference_seqs) | insertions
     substitutions = (read_seqs != reference_seqs) & ~insertions & ~deletions
@@ -3953,7 +3952,7 @@ def generate_alleles_graph_json_from_df(
             numReads=alleles.loc[allele_ids, '#Reads'].sum(),
             percentReads=alleles.loc[allele_ids, '%Reads'].sum(),
         )
-        for substitution_index, substitution_ref_position in enumerate(range(substitution_start + 1, substitution_end), 1):
+        for substitution_index, substitution_ref_position in enumerate(range(substitution_start + 1, substitution_end + 1), 1):
             substitution_node_ids += [graph.add_node(
                 name=substitution_seq[substitution_index],
                 type='Substitution',
@@ -3973,7 +3972,7 @@ def generate_alleles_graph_json_from_df(
 
         graph.add_edge(
             substitution_node_ids[-1],
-            substitution_end + 1 if substitution_end < len(reference_seq) else terminal_node_id,
+            substitution_end + 1 if substitution_end < (len(reference_seq) - 1) else terminal_node_id,
             type='Substitution',
             alleleIds=allele_ids,
             numReads=alleles.loc[allele_ids, '#Reads'].sum(),
@@ -3996,12 +3995,13 @@ def generate_alleles_graph_json_from_df(
             ] += [allele_id]
 
     for (insertion_start, insertion_seq), allele_ids in insertion_alleles.items():
+        insertion_ref_position = lambda i: insertion_start + ((i + 1) / (len(insertion_seq) + 2))
         insertion_node_ids = []
         insertion_node_ids += [graph.add_node(
             name=insertion_seq[0],
             type='Insertion',
             alleleIds=allele_ids,
-            refPosition=insertion_start + ((insertion_start + 1) / (len(insertion_seq) + 2)),
+            refPosition=insertion_ref_position(0),
             numReads=alleles.loc[allele_ids, '#Reads'].sum(),
             percentReads=alleles.loc[allele_ids, '%Reads'].sum(),
         )]
@@ -4018,7 +4018,7 @@ def generate_alleles_graph_json_from_df(
                 name=insertion_nucleotide,
                 type='Insertion',
                 alleleIds=allele_ids,
-                refPosition=insertion_start + ((insertion_index + 1) / len(insertion_seq) + 2),
+                refPosition=insertion_ref_position(insertion_index),
                 numReads=alleles.loc[allele_ids, '#Reads'].sum(),
                 percentReads=alleles.loc[allele_ids, '%Reads'].sum(),
             )]
@@ -4033,7 +4033,7 @@ def generate_alleles_graph_json_from_df(
 
         graph.add_edge(
             insertion_node_ids[-1],
-            insertion_start + len(insertion_seq) if insertion_start < len(reference_seq) else terminal_node_id,
+            insertion_start + 1 if (insertion_start + len(insertion_seq)) < (len(reference_seq) - 1) else terminal_node_id,
             type='Insertion',
             alleleIds=allele_ids,
             numReads=alleles.loc[allele_ids, '#Reads'].sum(),
@@ -4054,8 +4054,8 @@ def generate_alleles_graph_json_from_df(
             'percentReads': alleles.loc[allele_id, '%Reads'],
             'seq': alleles.loc[allele_id, 'Aligned_Sequence'],
             'alleleNodeIds': allele_node_ids[allele_id],
-            # TODO Calculate substituions
-            # TODO Calculate insertions
+            'substitutions': [i for s in substitution_groups[allele_id] for i in s] if allele_id in substitution_groups else [],
+            'insertions': [(i[0] - 1, len(i)) for i in insertion_groups[allele_id]] if allele_id in insertion_groups else [],
         }]
 
     def split_func(payload):
@@ -4101,7 +4101,6 @@ def generate_alleles_graph_json_from_df(
             ],
         },
     ]
-    breakpoint()
 
     with open(fig_filename, 'w') as fig_fh:
         json.dump(plot_data, fig_fh, cls=CRISPRessoShared.CRISPRessoJSONEncoder)
