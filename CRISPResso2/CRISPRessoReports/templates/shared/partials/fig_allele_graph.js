@@ -580,8 +580,10 @@ const buildGraphQuilt = (graph, slug) => {
         .attr("x", d => bounds(d.x))
         .attr("y", d => bounds(d.y) + nodeHeight / 4)
 
-      cutPoints
-        .attr("transform", d => `translate(${setcolaResult.nodes[d.position].x},0)`)
+      if(cutPoints) {
+        cutPoints
+          .attr("transform", d => `translate(${setcolaResult.nodes[d.position].x},0)`)
+      }
     });
   }
 
