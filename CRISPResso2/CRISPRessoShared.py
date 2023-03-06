@@ -1619,7 +1619,7 @@ def get_crispresso_footer():
 
 
 def check_custom_config(args):
-    """Check if the config_json argument was provided. If so load the configurations from the file, otherwise load default configurations.
+    """Check if the config_file argument was provided. If so load the configurations from the file, otherwise load default configurations.
     
     Parameters:
     -------------
@@ -1651,9 +1651,9 @@ def check_custom_config(args):
                 }
             
             }
-    if args.config_json:
+    if args.config_file:
         try:
-            with open(args.config_json, "r") as json_file:
+            with open(args.config_file, "r") as json_file:
                 custom_config = json.load(json_file)
 
             if 'colors' not in custom_config.keys():
@@ -1667,6 +1667,6 @@ def check_custom_config(args):
     
             return custom_config
         except Exception as e:
-            warn("Cannot read json file '%s', defaulting style parameters." % args.config_json)
+            warn("Cannot read json file '%s', defaulting style parameters." % args.config_file)
             print(e)
     return config
