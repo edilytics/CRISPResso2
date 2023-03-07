@@ -10,6 +10,7 @@ import errno
 import gzip
 import json
 import sys
+import importlib.util
 
 import numpy as np
 import os
@@ -1648,9 +1649,13 @@ def check_custom_config(args):
                 'G': '#FFFF99',
                 'N': '#C8C8C8',
                 '-': '#C1C1C1'
-                }
-            
+                }        
             }
+    #Check if crispresso.pro is installed
+    try:
+        spec = importlib.util.find_spec("crispressoPro")
+    except:
+        return config
     if args.config_file:
         try:
             with open(args.config_file, "r") as json_file:
