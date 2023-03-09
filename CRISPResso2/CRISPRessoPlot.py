@@ -3517,8 +3517,9 @@ class AlleleGraph:
             self.plot_data['groups'] = []
 
     def add_reference_seq_to_graph(self):
+        source_or_terminal_insertions = self.calculate_source_or_terminal_insertions()
         for nucleotide_index, nucleotide in enumerate(self.reference_seq):
-            matching_allele_ids = self.matches.iloc[:, nucleotide_index][self.matches.iloc[:, nucleotide_index]].index
+            matching_allele_ids = self.matches.iloc[:, nucleotide_index][self.matches.iloc[:, nucleotide_index] & ~source_or_terminal_insertions.iloc[:, nucleotide_index]].index
             self.graph.add_node(
                 name=nucleotide,
                 type='Reference',
@@ -3530,6 +3531,15 @@ class AlleleGraph:
 
         for i in range(1, len(self.reference_seq)):
             self.graph.add_edge(i - 1, i, type='Reference')
+
+    def calculate_source_or_terminal_insertions(self):
+        """Returns a dataframe of booleans indicating whether an insertion occurs at the start or end of a read.
+        """
+        source_or_terminal_insertions = self.insertions.copy()
+        source_or_terminal_insertions.loc[:, :] = False
+        source_or_terminal_insertion_present_alleles = (self.insertions.iloc[:, 0] | self.insertions.iloc[:, -1])
+        source_or_terminal_insertions.loc[source_or_terminal_insertion_present_alleles, :] = self.insertions[source_or_terminal_insertion_present_alleles]
+        return source_or_terminal_insertions
 
     def add_source_and_terminal_nodes(self):
         self.terminal_node_id = self.graph.add_node(
@@ -3544,7 +3554,6 @@ class AlleleGraph:
         )
 
     def remove_source_and_terminal_nodes(self):
-        breakpoint()
         source_neighbors = self.graph.get_outgoing_neighbors(self.source_node_id)
         if not source_neighbors:
             self.graph.nodes[self.source_node_id]['show'] = False

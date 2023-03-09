@@ -240,7 +240,7 @@ const buildGraphQuilt = (graph, slug) => {
         .clamp(true);
 
     var xMin=x(1),
-        xMax=x(graph["alleles".length])
+        xMax=x(graph["alleles"].length)
 
     var slider = quiltSvg.append("g")
         .attr("class", "slider")
@@ -330,6 +330,8 @@ const buildGraphQuilt = (graph, slug) => {
   }
 
   const thisGraph = d3.select(graphId)
+  const alleleInsertions = Object.fromEntries(graph["alleles"].slice(1).map(d => [d.id, new Set(d.insertions.map(e => e[0]))]))
+  alleleInsertions[0] = new Set()
   const hoverAlleleGroup = (d, nodeStrokeColor, linkStrokeColor) => {
     if(!inactiveAlleles.has(d.id)) {
       thisGraph
@@ -339,12 +341,11 @@ const buildGraphQuilt = (graph, slug) => {
       thisGraph
         .selectAll(`.${slug}_link.${slug}_allele_${d.id}`)
         .style("stroke", linkStrokeColor)
-      d.alleleNodeIds.forEach((nodeId, i) => {
-        if(i < d.alleleNodeIds.length) {
+      d3.pairs(d.alleleNodeIds).forEach(([sourceNodeId, targetNodeId]) => {
+        if(!alleleInsertions[d.id].has(sourceNodeId)) {
           thisGraph
-            .select(`#${slug}_link_${nodeId}_${d.alleleNodeIds[i + 1]}_Reference`)
+            .select(`#${slug}_link_${sourceNodeId}_${targetNodeId}_Reference`)
             .style("stroke", linkStrokeColor)
-          // TODO remove extra reference edges that aren't actually in the allele
         }
       })
     }
