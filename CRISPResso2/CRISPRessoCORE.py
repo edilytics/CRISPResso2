@@ -3175,7 +3175,7 @@ def main():
                 refs[ref_name]['ref_plot_name'] = ref_plot_name
                 continue
 
-            if len(ref_plot_name) > 21 and not args.suppress_amplicon_name_truncation: 
+            if len(ref_plot_name) > 21 and not args.suppress_amplicon_name_truncation:
                 ref_plot_name = ref_plot_name[0:21] #truncate to 21 characters if too long to avoid filename issues
 
             #make sure (truncated) ref plot name is unique
@@ -4250,25 +4250,27 @@ def main():
                     fig_filename = _jp('9b.{0}Alleles_Graph_around_{1}.json'.format(ref_plot_name, sgRNA_label))
                     plot_9b_input = {
                         'reference_seq': ref_seq_around_cut,
-                        'df_alleles': df_to_plot,
+                        'alleles': df_to_plot,
                         'fig_filename': fig_filename,
-                        'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
-                        'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
+                        'min_frequency': args.min_frequency_alleles_around_cut_to_plot,
+                        'max_n_rows': args.max_rows_alleles_around_cut_to_plot,
                         'plot_cut_point': plot_cut_point,
                         'sgRNA_intervals': new_sgRNA_intervals,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
                     }
+                    def plot_9b(plot_9b_input):
+                        allele_graph  = CRISPRessoPlot.AlleleGraph(**plot_9b_input)
+                        allele_graph.write_plot_data()
+
                     if n_processes > 1:
                         plot_results.append(plot_pool.submit(
-                            CRISPRessoPlot.generate_alleles_graph_json,
+                            plot_9b,
                             **plot_9b_input,
                         ))
                     else:
-                        CRISPRessoPlot.generate_alleles_graph_json(
-                            **plot_9b_input,
-                        )
+                        plot_9b(plot_9b_input)
                     crispresso2_info['results']['refs'][ref_name]['plot_9b_roots'].append(os.path.basename(fig_filename))
                     crispresso2_info['results']['refs'][ref_name]['plot_9b_captions'].append('Figure 9b: Graph based visualization of the distribution of identified alleles around the cleavage site for the {0}. Each node in the graph represents a nucleotide, and a path (nodes connected by edges) represents a sequence present in one or more of the alleles. Hover over a node (or edge) to see the total frequency of that nucleotide or path. Hover over an allele (row) in the table to see which nodes correspond to it. Dashed lines represent deletions and one can click a node to potentially collapse it with its neighbors.'.format(sgRNA_legend))
                     crispresso2_info['results']['refs'][ref_name]['plot_9b_datas'].append([('Allele frequency table', os.path.basename(allele_filename))])

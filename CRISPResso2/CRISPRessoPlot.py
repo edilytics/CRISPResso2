@@ -6,6 +6,7 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 
 import os
 import json
+from dataclasses import dataclass
 from functools import partial
 import numpy as np
 import pandas as pd
@@ -23,6 +24,7 @@ from itertools import islice, repeat, tee, zip_longest
 from matplotlib import colors as colors_mpl
 import seaborn as sns
 import subprocess
+from typing import List, Optional
 
 from CRISPResso2 import CRISPRessoShared
 from CRISPResso2.CRISPRessoCOREResources import find_indels_substitutions
@@ -3407,367 +3409,402 @@ def _add_indels_to_alleles_graph(
     return source_indel_added, terminal_indel_added, indel_node_ids
 
 
-def _add_allele_to_reference_nodes(
-    graph,
-    deletion_coordinates,
-    substitution_positions,
-    substitution_sizes,
-    aligned_read_seq,
-    aligned_ref_seq,
-    num_reads,
-    percent_reads,
-    allele_id,
-):
-    reference_positions = set(range(len(aligned_read_seq)))
-    for deletion in deletion_coordinates:
-        for deletion_position in range(deletion[0], deletion[1]):
-            reference_positions.remove(deletion_position)
-    for substitution_start, substitution_size in zip(substitution_positions, substitution_sizes):
-        substitution_start += 1
-        for substitution_position in range(substitution_start, substitution_start + substitution_size):
-            reference_positions.remove(substitution_position)
+@dataclass
+class AlleleGraph:
+    reference_seq: str
+    alleles: pd.DataFrame
+    fig_filename: str
+    min_frequency: float = 0.5
+    max_n_rows: int = 100
+    plot_cut_point: bool = True
+    sgRNA_intervals: Optional[List] = None
+    sgRNA_names: Optional[List] = None
+    sgRNA_mismatches: Optional[List] = None
+    annotate_wildtype_allele: str = '****'
+    custom_colors: Optional[dict] = None
 
-    indel_matcher = re.compile('(-*-)')
-    for indel_deletion in indel_matcher.finditer(aligned_read_seq):
-        start_index, end_index = indel_deletion.span()
-        if start_index == 0 or end_index == len(aligned_read_seq):
-            for indel_deletion_position in range(start_index, end_index):
-                reference_positions.remove(indel_deletion_position)
-    for indel_insertion in indel_matcher.finditer(aligned_ref_seq):
-        start_index, end_index = indel_insertion.span()
-        if start_index == 0 or end_index == len(aligned_ref_seq):
-            for indel_deletion_position in range(start_index, end_index):
-                reference_positions.remove(indel_deletion_position)
+    def __post_init__(self):
+        self.alleles = self.alleles[self.alleles['%Reads'] >= self.min_frequency].reset_index().head(self.max_n_rows)
+        self.alleles.index = range(1, len(self.alleles) + 1)
+        self.graph = Graph()
+        self.plot_data = {}
+        self.set_read_and_reference_seqs()
+        self.calculate_mutations()
 
-    for reference_node_id in reference_positions:
-        _alleles_graph_update_node(
-            graph,
-            reference_node_id,
-            num_reads,
-            percent_reads,
-            allele_id,
+    def set_read_and_reference_seqs(self):
+        self.read_seqs = self.set_index_and_columns(
+            self.alleles['Aligned_Sequence'].str.split('', expand=True).iloc[:, 1:-1],
+        )
+        self.reference_seqs = self.set_index_and_columns(
+            self.alleles['Reference_Sequence'].str.split('', expand=True).iloc[:, 1:-1],
         )
 
-    return reference_positions
+    def calculate_mutations(self):
+        self.insertions = self.reference_seqs == '-'
+        self.deletions = self.read_seqs == '-'
+        self.matches = (self.read_seqs == self.reference_seqs) | self.insertions
+        self.substitutions = (self.read_seqs != self.reference_seqs) & ~self.insertions & ~self.deletions
+        self.insertion_offset = self.insertions.apply(lambda i: i.cumsum(), axis=1)
+
+    def set_index_and_columns(self, dataframe):
+        dataframe.index = range(1, len(dataframe) + 1)
+        return dataframe.set_axis(range(dataframe.shape[1]), axis=1, copy=False)
+
+    def write_plot_data(self):
+        self.construct_plot_data()
+        with open(self.fig_filename, 'w') as fh:
+            json.dump(self.plot_data, fh, cls=CRISPRessoShared.CRISPRessoJSONEncoder)
+
+    def construct_plot_data(self):
+        self.construct_graph()
+        self.add_alleles()
+        self.plot_data['nodes'] = list(self.graph.nodes.values())
+        self.plot_data['links'] = [
+            e
+            for edge in self.graph.edges.values()
+            for e in edge.values()
+        ]
+        self.add_setcola_spec()
+
+    def construct_graph(self):
+        self.add_sgRNA_groups()
+        self.add_reference_seq_to_graph()
+        self.add_source_and_terminal_nodes()
+        self.add_cut_point()
+        self.add_deletions_to_graph()
+        self.add_substitutions_to_graph()
+        self.add_insertions_to_graph()
+        self.collapse_components()
+        self.update_node_attributes()
+        self.remove_source_and_terminal_nodes()
+        self.update_edge_attributes()
+
+    def add_sgRNA_groups(self):
+        if self.sgRNA_intervals:
+            sgRNA_rows = get_rows_for_sgRNA_annotation(self.sgRNA_intervals, len(self.reference_seq)).tolist()
+            self.plot_data['sgRNAs'] = [
+                {
+                    'interval': (sgRNA_interval[0], sgRNA_interval[1] + 1),
+                    'name': sgRNA_name,
+                    'mismatch': sgRNA_mismatch,
+                    'row': sgRNA_row,
+                }
+                for sgRNA_interval, sgRNA_name, sgRNA_mismatch, sgRNA_row in
+                zip(
+                    self.sgRNA_intervals,
+                    self.sgRNA_names,
+                    self.sgRNA_mismatches,
+                    sgRNA_rows,
+                )
+                if sgRNA_interval[0] > 0 and sgRNA_interval[1] < len(self.reference_seq)
+            ]
+            self.plot_data['groups'] = [
+                {
+                    'leaves': list(range(sgRNA_interval[0], sgRNA_interval[1] + 1)),
+                    'name': sgRNA_name if sgRNA_name else 'sgRNA',
+                    'row': sgRNA_row,
+                }
+                for sgRNA_interval, sgRNA_name, sgRNA_row in
+                zip(
+                    self.sgRNA_intervals,
+                    self.sgRNA_names,
+                    sgRNA_rows,
+                )
+                if sgRNA_interval[0] > 0 and sgRNA_interval[1] < len(self.reference_seq)
+            ]
+        else:
+            self.plot_data['sgRNAs'] = []
+            self.plot_data['groups'] = []
+
+    def add_reference_seq_to_graph(self):
+        for nucleotide_index, nucleotide in enumerate(self.reference_seq):
+            matching_allele_ids = self.matches.iloc[:, nucleotide_index][self.matches.iloc[:, nucleotide_index]].index
+            self.graph.add_node(
+                name=nucleotide,
+                type='Reference',
+                refPosition=nucleotide_index,
+                numReads=self.alleles.loc[matching_allele_ids, '#Reads'].sum(),
+                percentReads=self.alleles.loc[matching_allele_ids, '%Reads'].sum(),
+                alleleIds=matching_allele_ids.tolist(),
+            )
+
+        for i in range(1, len(self.reference_seq)):
+            self.graph.add_edge(i - 1, i, type='Reference')
+
+    def add_source_and_terminal_nodes(self):
+        self.terminal_node_id = self.graph.add_node(
+            name='Ø',
+            type='Reference',
+            refPosition=len(self.reference_seq) + 1,
+        )
+        self.source_node_id = self.graph.add_node(
+            name='0',
+            type='Reference',
+            refPosition=-1,
+        )
+
+    def remove_source_and_terminal_nodes(self):
+        breakpoint()
+        source_neighbors = self.graph.get_outgoing_neighbors(self.source_node_id)
+        if not source_neighbors:
+            self.graph.nodes[self.source_node_id]['show'] = False
+        else:
+            self.graph.add_edge(self.source_node_id, 1, type='Reference')
+        terminal_neighbors = self.graph.get_incoming_neighbors(self.terminal_node_id)
+        if not terminal_neighbors:
+            self.graph.nodes[self.terminal_node_id]['show'] = False
+        else:
+            self.graph.add_edge(len(self.reference_seq) - 1, self.terminal_node_id, type='Reference')
+
+    def add_cut_point(self):
+        if self.plot_cut_point:
+            self.graph.update_node(
+                int(len(self.reference_seq) / 2), 'cleavagePosition', lambda _: True,
+            )
+
+    def add_deletions_to_graph(self):
+        for (deletion_start, deletion_end), allele_ids in self.get_deletion_alleles_by_position().items():
+            if deletion_start == 0:
+                deletion_start = self.source_node_id
+            else:
+                deletion_start -= 1
+            if deletion_end == len(self.reference_seq):
+                deletion_end = self.terminal_node_id
+            else:
+                deletion_end += 1
+
+            self.graph.add_edge(
+                deletion_start,
+                deletion_end,
+                type='Deletion',
+                alleleIds=allele_ids,
+                numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+            )
+
+    def get_deletion_alleles_by_position(self):
+        deletion_alleles_by_position = defaultdict(list)
+        for allele_id, deletion_group in self.get_groups_of_modifications(self.deletions).items():
+            for d in deletion_group:
+                deletion_alleles_by_position[(self.get_reference_position(allele_id, d[0]), self.get_reference_position(allele_id, d[-1]))] += [allele_id]
+        return deletion_alleles_by_position
+
+    def add_substitutions_to_graph(self):
+        for (substitution_start, substitution_end, substitution_seq), allele_ids in self.get_substitution_alleles_by_position_and_seq().items():
+            substitution_node_ids = []
+            substitution_node_ids += [self.graph.add_node(
+                name=substitution_seq[0],
+                type='Substitution',
+                alleleIds=allele_ids,
+                refPosition=substitution_start,
+                numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+            )]
+            self.graph.add_edge(
+                substitution_start - 1 if substitution_start > 0 else source_node_id,
+                substitution_node_ids[-1],
+                type='Substitution',
+                alleleIds=allele_ids,
+                numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+            )
+            for substitution_index, substitution_ref_position in enumerate(range(substitution_start + 1, substitution_end + 1), 1):
+                substitution_node_ids += [self.graph.add_node(
+                    name=substitution_seq[substitution_index],
+                    type='Substitution',
+                    alleleIds=allele_ids,
+                    refPosition=substitution_ref_position,
+                    numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                    percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+                )]
+                self.graph.add_edge(
+                    substitution_node_ids[-2],
+                    substitution_node_ids[-1],
+                    type='Substitution',
+                    alleleIds=allele_ids,
+                    numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                    percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+                )
+
+            self.graph.add_edge(
+                substitution_node_ids[-1],
+                substitution_end + 1 if substitution_end < (len(self.reference_seq) - 1) else self.terminal_node_id,
+                type='Substitution',
+                alleleIds=allele_ids,
+                numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+            )
+
+    def get_substitution_alleles_by_position_and_seq(self):
+        substitution_groups = self.get_groups_of_modifications(self.substitutions)
+        substitution_alleles_by_position_and_seq = defaultdict(list)
+        for allele_id, substitution_group in substitution_groups.items():
+            for s in substitution_group:
+                substitution_alleles_by_position_and_seq[
+                    (
+                        self.get_reference_position(allele_id, s[0]),
+                        self.get_reference_position(allele_id, s[-1]),
+                        self.read_seqs.loc[allele_id, s[0]:s[-1]].str.cat(),
+                    )
+                ] += [allele_id]
+        return substitution_alleles_by_position_and_seq
+
+    def add_insertions_to_graph(self):
+        for (insertion_start, insertion_seq), allele_ids in self.get_insertion_alleles_by_position_and_seq().items():
+            insertion_ref_position = lambda i: insertion_start + ((i + 1) / (len(insertion_seq) + 2))
+            insertion_node_ids = []
+            insertion_node_ids += [self.graph.add_node(
+                name=insertion_seq[0],
+                type='Insertion',
+                alleleIds=allele_ids,
+                refPosition=insertion_ref_position(0),
+                numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+            )]
+            self.graph.add_edge(
+                insertion_start if insertion_start > 0 else source_node_id,
+                insertion_node_ids[-1],
+                type='Insertion',
+                alleleIds=allele_ids,
+                numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+            )
+            for insertion_index, insertion_nucleotide in enumerate(insertion_seq[1:], 1):
+                insertion_node_ids += [self.graph.add_node(
+                    name=insertion_nucleotide,
+                    type='Insertion',
+                    alleleIds=allele_ids,
+                    refPosition=insertion_ref_position(insertion_index),
+                    numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                    percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+                )]
+                self.graph.add_edge(
+                    insertion_node_ids[-2],
+                    insertion_node_ids[-1],
+                    type='Insertion',
+                    alleleIds=allele_ids,
+                    numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                    percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+                )
+
+            self.graph.add_edge(
+                insertion_node_ids[-1],
+                insertion_start + 1 if (insertion_start + len(insertion_seq)) < (len(self.reference_seq) - 1) else self.terminal_node_id,
+                type='Insertion',
+                alleleIds=allele_ids,
+                numReads=self.alleles.loc[allele_ids, '#Reads'].sum(),
+                percentReads=self.alleles.loc[allele_ids, '%Reads'].sum(),
+            )
+
+    def get_insertion_alleles_by_position_and_seq(self):
+        insertion_groups = self.get_groups_of_modifications(self.insertions)
+        insertion_alleles_by_position_and_seq = defaultdict(list)
+        for allele_id, insertion_group in insertion_groups.items():
+            for i in insertion_group:
+                insertion_alleles_by_position_and_seq[
+                    (
+                        self.get_reference_position(allele_id, i[0]),
+                        self.read_seqs.loc[allele_id, i[0]:i[-1]].str.cat(),
+                    )
+                ] += [allele_id]
+        return insertion_alleles_by_position_and_seq
+
+    def get_reference_position(self, allele_id, reference_position):
+        return reference_position - self.insertion_offset.loc[allele_id, reference_position]
+
+    def add_alleles(self):
+        allele_node_ids = self.get_allele_node_ids()
+        substitution_groups = self.get_groups_of_modifications(self.substitutions)
+        insertion_groups = self.get_groups_of_modifications(self.insertions)
+        reference_allele = self.get_allele_matching_reference()
+        self.plot_data['alleles'] = [{
+            'name': 'Reference',
+            'id': 0,
+            'seq': self.reference_seq,
+            'alleleNodeIds': [node['id'] for node in self.graph.find_nodes(('type', 'Reference'))],
+            'numReads': reference_allele['#Reads'].iloc[0] if not reference_allele.empty else 0,
+            'percentReads': reference_allele['%Reads'].iloc[0] if not reference_allele.empty else 0,
+        }]
+        self.plot_data['alleles'].extend([
+            {
+                'name': 'Allele {0}'.format(allele_id),
+                'id': allele_id,
+                'numReads': self.alleles.loc[allele_id, '#Reads'],
+                'percentReads': self.alleles.loc[allele_id, '%Reads'],
+                'seq': self.alleles.loc[allele_id, 'Aligned_Sequence'],
+                'alleleNodeIds': allele_node_ids[allele_id],
+                'substitutions': [i for s in substitution_groups[allele_id] for i in s] if allele_id in substitution_groups else [],
+                'insertions': [(i[0] - 1, len(i)) for i in insertion_groups[allele_id]] if allele_id in insertion_groups else [],
+            }
+            for allele_id in self.alleles.index
+        ])
+
+    def get_allele_node_ids(self):
+        allele_node_ids = defaultdict(list)
+        for node_id, node in self.graph.nodes.items():
+            if 'alleleIds' in node:
+                for allele_id in node['alleleIds']:
+                    allele_node_ids[allele_id] += [node_id]
+        return allele_node_ids
+
+    def get_allele_matching_reference(self):
+        return self.alleles.loc[
+            self.alleles['Aligned_Sequence'] == self.reference_seq,
+        ]
+
+    def get_groups_of_modifications(self, dataframe):
+        return dataframe[dataframe.any(axis=1)].apply(
+            lambda d: d[d].groupby((1 - d).cumsum()).groups.values(),
+            axis=1,
+        )
+
+    def collapse_components(self):
+        def split_func(payload):
+            ref_position = payload['refPosition']
+            return abs(ref_position - int(len(self.reference_seq) / 2)) < 1 or (
+                self.sgRNA_intervals or
+                abs(ref_position - self.sgRNA_intervals[0]) >= 1 or
+                abs(ref_position - self.sgRNA_intervals[1] + 1) >= 1
+            )
+
+        self.graph.collapse_components(split_func)
+
+    def update_node_attributes(self):
+        for node in self.graph.nodes.values():
+            node.update({'show': True, 'width': 15})
+            if 'collapsedNodes' in node:
+                node.update({'collapsed': False})
+
+    def update_edge_attributes(self):
+        for source_node_id in self.graph.edges:
+            for target_node_id in self.graph.edges[source_node_id]:
+                self.graph.edges[source_node_id][target_node_id].update({'show': True})
+
+    def add_setcola_spec(self):
+        self.plot_data['setcolaSpec'] = [
+            {
+                'name': 'referenceAlignment',
+                'sets': [{
+                    'expr': "node.type === 'Reference' && node.show",
+                    'name': 'referenceNodes',
+                }],
+                'forEach': [
+                    {'constraint': 'align', 'axis': 'x', 'orientation': 'center'},
+                    {'constraint': 'order', 'axis': 'x', 'by': 'refPosition', 'gap': 15 * 2},
+                ],
+            },
+            {
+                'name': 'alleleHorizontalAlignment',
+                'sets': {'partition': 'refPosition'},
+                'forEach': [
+                    {'constraint': 'align', 'axis': 'y', 'orientation': 'center'},
+                ],
+            },
+        ]
+
 
 
 def generate_alleles_graph_json(
-    reference_seq,
-    alleles,
-    fig_filename,
-    MIN_FREQUENCY=0.5,
-    MAX_N_ROWS=100,
-    plot_cut_point=True,
-    sgRNA_intervals=None,
-    sgRNA_names=None,
-    sgRNA_mismatches=None,
-    annotate_wildtype_allele='****',
-    custom_colors=None,
-):
-    """Generate JSON suitable for plotting a graph-based allele heatmap.
-
-    This function will generate the JSON necessary for a graph-based allele
-    heatmap (a corollary to the plot generated by `plot_alleles_heatmap`).
-    """
-    node_width = 15
-
-    graph = Graph()
-    for i, nucleotide in enumerate(reference_seq):
-        graph.add_node(
-            name=nucleotide,
-            type='Reference',
-            refPosition=i,
-            numReads=0,
-            percentReads=0,
-            alleleIds=[],
-            width=node_width,
-        )
-    sgRNA_rows = get_rows_for_sgRNA_annotation(
-        sgRNA_intervals, len(reference_seq),
-    ).tolist()
-    plot_data = {
-        'alleles': [{
-            'name': 'Reference',
-            'id': 0,
-            'seq': reference_seq,
-            'alleleNodeIds': list(graph.nodes.keys()),
-        }],
-        'sgRNAs': [
-            {
-                'interval': (sgRNA_interval[0], sgRNA_interval[1] + 1),
-                'name': sgRNA_name,
-                'mismatch': sgRNA_mismatch,
-                'row': sgRNA_row,
-            }
-            for sgRNA_interval, sgRNA_name, sgRNA_mismatch, sgRNA_row in
-            zip(
-                sgRNA_intervals,
-                sgRNA_names,
-                sgRNA_mismatches,
-                sgRNA_rows,
-            )
-            if sgRNA_interval[0] > 0 and sgRNA_interval[1] < len(reference_seq)
-        ] if sgRNA_intervals else [],
-    }
-    terminal_node_id = graph.add_node(
-        name='Ø',
-        type='Reference',
-        refPosition=len(reference_seq) + 1,
-        width=node_width,
-    )
-    source_node_id = graph.add_node(
-        name='0',
-        type='Reference',
-        refPosition=-1,
-        width=node_width,
-    )
-    for i in range(1, len(reference_seq)):
-        graph.add_edge(i - 1, i, type='Reference')
-    if sgRNA_intervals:
-        plot_data['groups'] = [
-            {
-                'leaves': list(range(
-                    sgRNA_interval[0], sgRNA_interval[1] + 1,
-                )),
-                'name': sgRNA_name if sgRNA_name else 'sgRNA',
-                'row': sgRNA_row,
-            }
-            for sgRNA_interval, sgRNA_name, sgRNA_row in
-            zip(
-                sgRNA_intervals,
-                sgRNA_names,
-                sgRNA_rows,
-            )
-            if sgRNA_interval[0] > 0 and sgRNA_interval[1] < len(reference_seq)
-        ]
-    cleavagePosition = int(len(reference_seq) / 2)
-    if plot_cut_point:
-        graph.update_node(
-            cleavagePosition, 'cleavagePosition', lambda _: True,
-        )
-    allele_id = 1
-    reference_num_reads, reference_percent_reads = 0, 0
-    source_indel_present, terminal_indel_present = False, False
-    for aligned_read_seq, row in alleles[
-        alleles['%Reads'] >= MIN_FREQUENCY
-    ].iterrows():
-        aligned_ref_seq = row['Reference_Sequence']
-        num_reads, percent_reads = row['#Reads'], row['%Reads']
-        if aligned_read_seq == aligned_ref_seq:
-            reference_num_reads = num_reads
-            reference_percent_reads = percent_reads
-        indel_info = find_indels_substitutions(
-            aligned_read_seq,
-            aligned_ref_seq,
-            list(range(len(aligned_read_seq))),
-        )
-
-        _add_deletions_to_alleles_graph(
-            graph,
-            indel_info['deletion_coordinates'],
-            num_reads,
-            percent_reads,
-            allele_id,
-        )
-        insertion_node_ids = _add_modification_seq_to_alleles_graph(
-            graph,
-            indel_info['all_insertion_left_positions'],
-            indel_info['insertion_sizes'],
-            'Insertion',
-            aligned_read_seq,
-            source_node_id,
-            terminal_node_id,
-            num_reads,
-            percent_reads,
-            allele_id,
-            node_width,
-        )
-
-        substitution_groups, current_group = [], []
-        for substitution_position, next_subtitution_position in _get_next(
-            indel_info['substitution_positions'],
-        ):
-            current_group += [substitution_position - 1]
-            if next_subtitution_position and (next_subtitution_position - substitution_position) > 1:
-                substitution_groups += [current_group]
-                current_group = []
-        if current_group:
-            substitution_groups += [current_group]
-        substitution_sizes = [len(g) for g in substitution_groups]
-        substitution_positions = [g[0] for g in substitution_groups]
-        substitution_node_ids = _add_modification_seq_to_alleles_graph(
-            graph,
-            substitution_positions,
-            substitution_sizes,
-            'Substitution',
-            aligned_read_seq,
-            source_node_id,
-            terminal_node_id,
-            num_reads,
-            percent_reads,
-            allele_id,
-            node_width,
-        )
-        if 0 in indel_info['substitution_positions']:
-            source_substitution_added = True
-            source_substitution_node_ids = [
-                node['id']
-                for node in graph.find_nodes(
-                    ('refPosition', 0), ('type', 'Substitution'),
-                )
-            ]
-            for source_substitution_node_id in source_substitution_node_ids:
-                if not graph.is_edge(source_node_id, source_substitution_node_id):
-                    graph.add_edge(
-                        source_node_id,
-                        source_substitution_node_id,
-                        type='Substitution',
-                        alleleIds=[allele_id],
-                        numReads=num_reads,
-                        percentReads=percent_reads,
-                    )
-                elif allele_id not in graph.get_node(source_substitution_node_id)['alleleIds']:
-                    _alleles_graph_update_edge(
-                        graph,
-                        source_node_id,
-                        source_substitution_node_id,
-                        num_reads,
-                        percent_reads,
-                        allele_id,
-                    )
-        else:
-            source_substitution_added = False
-        if len(reference_seq) - 1 in indel_info['substitution_positions']:
-            terminal_substitution_added = True
-            terminal_substitution_node_ids = [
-                node['id']
-                for node in graph.find_nodes(
-                    ('refPosition', len(reference_seq) - 1), ('type', 'Substitution'),
-                )
-            ]
-            for terminal_substitution_node_id in terminal_substitution_node_ids:
-                if not graph.is_edge(terminal_substitution_node_id, terminal_node_id):
-                    graph.add_edge(
-                        terminal_substitution_node_id,
-                        terminal_node_id,
-                        type='Substitution',
-                        alleleIds=[allele_id],
-                        numReads=num_reads,
-                        percentReads=percent_reads,
-                    )
-                elif allele_id not in graph.get_node(terminal_substitution_node_id)['alleleIds']:
-                    _alleles_graph_update_edge(
-                        graph,
-                        terminal_substitution_node_id,
-                        terminal_node_id,
-                        num_reads,
-                        percent_reads,
-                        allele_id,
-                    )
-        else:
-            terminal_substitution_added = False
-        source_indel_added, terminal_indel_added, indel_node_ids = _add_indels_to_alleles_graph(
-            graph,
-            source_node_id,
-            terminal_node_id,
-            aligned_read_seq,
-            aligned_ref_seq,
-            num_reads,
-            percent_reads,
-            allele_id,
-            node_width,
-        )
-        reference_node_ids = _add_allele_to_reference_nodes(
-            graph,
-            indel_info['deletion_coordinates'],
-            substitution_positions,
-            substitution_sizes,
-            aligned_read_seq,
-            aligned_ref_seq,
-            num_reads,
-            percent_reads,
-            allele_id,
-        )
-
-        if (source_substitution_added or source_indel_added) and not graph.is_edge(source_node_id, 0):
-            source_indel_present = True
-            graph.add_edge(source_node_id, 0, type='Reference')
-        if (terminal_substitution_added or terminal_indel_added) and not graph.is_edge(len(reference_seq) - 1, terminal_node_id):
-            terminal_indel_present = True
-            graph.add_edge(len(reference_seq) - 1, terminal_node_id, type='Reference')
-
-        plot_data['alleles'] += [{
-            'name': 'Allele {0}'.format(allele_id),
-            'id': allele_id,
-            'numReads': num_reads,
-            'percentReads': percent_reads,
-            'seq': aligned_read_seq,
-            'alleleNodeIds': list(reference_node_ids.union(
-                insertion_node_ids, substitution_node_ids, indel_node_ids,
-            )),
-            'substitutions': indel_info['substitution_positions'],
-            'insertions': list(
-                zip(
-                    indel_info['all_insertion_left_positions'],
-                    indel_info['insertion_sizes'],
-                ),
-            ),
-        }]
-        allele_id += 1
-
-    plot_data['alleles'][0].update({
-        'numReads': reference_num_reads,
-        'percentReads': reference_percent_reads,
-    })
-
-    def split_func(payload):
-        ref_position = payload['refPosition']
-        return abs(ref_position - cleavagePosition) < 1 or (
-            sgRNA_intervals
-            or abs(ref_position - sgRNA_intervals[0]) >= 1
-            or abs(ref_position - sgRNA_intervals[1] + 1) >= 1
-        )
-
-    graph.collapse_components(split_func)
-    for node in graph.nodes.values():
-        node.update({'show': True})
-        if 'collapsedNodes' in node:
-            node.update({'collapsed': False})
-    if not source_indel_present:
-        graph.update_node(source_node_id, 'show', lambda _: False)
-    if not terminal_indel_present:
-        graph.update_node(terminal_node_id, 'show', lambda _: False)
-    plot_data['nodes'] = list(graph.nodes.values())
-    plot_data['links'] = [
-        e
-        for edge in graph.edges.values()
-        for e in edge.values()
-    ]
-    plot_data['setcolaSpec'] = [
-        {
-            'name': 'referenceAlignment',
-            'sets': [{
-                'expr': "node.type === 'Reference' && node.show",
-                'name': 'referenceNodes',
-            }],
-            'forEach': [
-                {'constraint': 'align', 'axis': 'x', 'orientation': 'center'},
-                {'constraint': 'order', 'axis': 'x', 'by': 'refPosition', 'gap': node_width * 2},
-            ],
-        },
-        {
-            'name': 'alleleHorizontalAlignment',
-            'sets': {'partition': 'refPosition'},
-            'forEach': [
-                {'constraint': 'align', 'axis': 'y', 'orientation': 'center'},
-            ],
-        },
-    ]
-    with open(fig_filename, 'w') as fig_fh:
-        json.dump(plot_data, fig_fh)
-
-
-def generate_alleles_graph_json_from_df(
     reference_seq,
     alleles,
     fig_filename,
@@ -3803,20 +3840,7 @@ def generate_alleles_graph_json_from_df(
     insertion_offset = insertions.apply(lambda x: x.cumsum(), axis=1)
 
     graph = Graph()
-    for nucleotide_index, nucleotide in enumerate(reference_seq):
-        matching_allele_ids = matches.iloc[:, nucleotide_index][matches.iloc[:, nucleotide_index]].index
-        graph.add_node(
-            name=nucleotide,
-            type='Reference',
-            refPosition=nucleotide_index,
-            numReads=alleles.loc[matching_allele_ids, '#Reads'].sum(),
-            percentReads=alleles.loc[matching_allele_ids, '%Reads'].sum(),
-            alleleIds=matching_allele_ids.tolist(),
-            width=node_width,
-        )
-
-    for i in range(1, len(reference_seq)):
-        graph.add_edge(i - 1, i, type='Reference')
+    add_reference_seq_to_graph(graph, alleles, matches, reference_seq)
 
     sgRNA_rows = get_rows_for_sgRNA_annotation(
         sgRNA_intervals, len(reference_seq),
@@ -3933,7 +3957,6 @@ def generate_alleles_graph_json_from_df(
                 )
             ] += [allele_id]
 
-    source_substitution_added, target_substitution_added = False, False
     for (substitution_start, substitution_end, substitution_seq), allele_ids in substitution_alleles.items():
         substitution_node_ids = []
         substitution_node_ids += [graph.add_node(
@@ -4068,7 +4091,7 @@ def generate_alleles_graph_json_from_df(
 
     graph.collapse_components(split_func)
     for node in graph.nodes.values():
-        node.update({'show': True})
+        node.update({'show': True, 'width': 15})
         if 'collapsedNodes' in node:
             node.update({'collapsed': False})
 
@@ -4104,6 +4127,23 @@ def generate_alleles_graph_json_from_df(
 
     with open(fig_filename, 'w') as fig_fh:
         json.dump(plot_data, fig_fh, cls=CRISPRessoShared.CRISPRessoJSONEncoder)
+
+def add_reference_seq_to_graph(graph, alleles, matches, reference_seq):
+    for nucleotide_index, nucleotide in enumerate(reference_seq):
+        matching_allele_ids = matches.iloc[:, nucleotide_index][matches.iloc[:, nucleotide_index]].index
+        graph.add_node(
+            name=nucleotide,
+            type='Reference',
+            refPosition=nucleotide_index,
+            numReads=alleles.loc[matching_allele_ids, '#Reads'].sum(),
+            percentReads=alleles.loc[matching_allele_ids, '%Reads'].sum(),
+            alleleIds=matching_allele_ids.tolist(),
+        )
+
+    for i in range(1, len(reference_seq)):
+        graph.add_edge(i - 1, i, type='Reference')
+
+
 
 
 def plot_alleles_table_from_file(alleles_file_name,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,annotate_wildtype_allele=''):
