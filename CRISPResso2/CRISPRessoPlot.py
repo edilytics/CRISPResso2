@@ -174,8 +174,9 @@ def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root,save_also_png=
                             ax.text(x_start+0.55, y_start + obs_pct/2.0, format(pct*100, '.1f'), horizontalalignment='center', verticalalignment='center', rotation=90)
                         y_start += obs_pct
 
+    mod_pct_df_indexed = mod_pct_df.set_index([group_column,'Modification'])
     #add insertions
-    for pos_ind in range(2, amp_len+1): #iterate over all nucleotide positions in the sequence (0=Batch, 1=Nucleotide, so start at 2)
+    for pos_ind in range(2, amp_len+1): #iterate over all nucleotide positions in the sequence (0=Batch, 1=Modification, so start at 2)
         x_start = pos_ind + 0.7
         x_end = pos_ind + 1.3
         for i in range(nSamples): #iterate over all samples
@@ -184,9 +185,8 @@ def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root,save_also_png=
             sample_row_start = nNucs * i
             y_start = nSamples - i
 
+            ins_pct = float(mod_pct_df_indexed.loc[sampleName,'Insertions_Left'][pos_ind-2])
 
-            ins_pct = float(mod_pct_df.loc[(mod_pct_df[group_column] == sampleName) &
-                    (mod_pct_df['Modification'] == "Insertions_Left")].iloc[:, pos_ind])
             if ins_pct > min_plot_pct:
                 obs_pct = ins_pct * plotPct
                 ax.add_patch(
@@ -2507,7 +2507,7 @@ class Custom_HeatMapper(sns.matrix._HeatMapper):
 
         if annot is not None:
             if per_element_annot_kws is None:
-                self.per_element_annot_kws=np.empty_like(annot, dtype=np.object)
+                self.per_element_annot_kws=np.empty_like(annot, dtype=object)
                 self.per_element_annot_kws[:]=dict()
             else:
                 self.per_element_annot_kws=per_element_annot_kws
@@ -2641,7 +2641,7 @@ def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
                    (row['Reference_Sequence'][i_sub]!=idx[i_sub]) and \
                    (row['Reference_Sequence'][i_sub]!='-') and\
                    (idx[i_sub]!='-')]
-        to_append=np.array([{}]*len(idx), dtype=np.object)
+        to_append=np.array([{}]*len(idx), dtype=object)
         to_append[ idxs_sub]={'weight':'bold', 'color':'black','size':16}
         per_element_annot_kws.append(to_append)
 
@@ -2693,7 +2693,7 @@ def prep_alleles_table_compare(df_alleles, sample_name_1, sample_name_2, MAX_N_R
                    (row['Reference_Sequence'][i_sub]!=idx[i_sub]) and \
                    (row['Reference_Sequence'][i_sub]!='-') and\
                    (idx[i_sub]!='-')]
-        to_append=np.array([{}]*len(idx), dtype=np.object)
+        to_append=np.array([{}]*len(idx), dtype=object)
         to_append[ idxs_sub]={'weight':'bold', 'color':'black','size':16}
         per_element_annot_kws.append(to_append)
 
@@ -3198,7 +3198,7 @@ def plot_nucleotide_quilt_from_folder(crispresso_output_folder,fig_filename_root
 
         mod_pcts = {}
         for key in mod_counts:
-            mod_pcts[key] = np.array(mod_counts[key]).astype(np.float)/float(mod_counts['Total'][0])
+            mod_pcts[key] = np.array(mod_counts[key]).astype(float)/float(mod_counts['Total'][0])
 
         modification_percentage_summary = []
         for mod in ['Insertions', 'Insertions_Left', 'Deletions', 'Substitutions', 'All_modifications']:
