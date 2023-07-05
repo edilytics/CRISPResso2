@@ -4409,6 +4409,7 @@ def main():
             global_hists_frameshift = Counter()
             global_hists_frameshift[0] = 0  # fill with at least the zero value (in case there are no others)
             global_hists_inframe = Counter()
+
             global_hists_inframe[0] = 0
 
             global_count_total = 0
