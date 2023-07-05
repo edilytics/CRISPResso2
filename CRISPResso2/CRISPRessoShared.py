@@ -24,7 +24,7 @@ from inspect import getmodule, stack
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
 
-__version__ = "2.2.11a"
+__version__ = "2.2.12"
 
 ###EXCEPTIONS############################
 class FlashException(Exception):
@@ -67,6 +67,55 @@ class InstallationException(Exception):
     pass
 
 #########################################
+
+class StatusFormatter(logging.Formatter):
+    def format(self, record):
+        record.percent_complete = ''
+        if record.args and 'percent_complete' in record.args:
+            record.percent_complete = '{0:.2f}% '.format(record.args['percent_complete'])
+            self.last_percent_complete = record.percent_complete
+        elif hasattr(self, 'last_percent_complete'): # if we don't have a percent complete, use the last one
+            record.percent_complete = self.last_percent_complete
+        return super().format(record)
+
+
+class StatusHandler(logging.FileHandler):
+    def __init__(self, filename):
+        super().__init__(filename, 'w')
+        self.setFormatter(StatusFormatter('%(percent_complete)s%(message)s'))
+
+    def emit(self, record):
+        """Overwrite the existing file and write the new log."""
+        if self.stream is None:  # log file is empty
+            self.stream = self._open()
+        else:  # log file is not empty, overwrite
+            self.stream.seek(0)
+        logging.StreamHandler.emit(self, record)
+        self.stream.truncate()
+
+
+class LogStreamHandler(logging.StreamHandler):
+    def __init__(self, stream=None):
+        super().__init__(stream)
+        self.setFormatter(logging.Formatter(
+            '%(levelname)-5s @ %(asctime)s:\n\t %(message)s \n',
+            datefmt='%a, %d %b %Y %H:%M:%S',
+        ))
+        self.setLevel(logging.INFO)
+
+
+def set_console_log_level(logger, level, debug=False):
+    for handler in logger.handlers:
+        if isinstance(handler, LogStreamHandler):
+            if level == 4 or debug:
+                handler.setLevel(logging.DEBUG)
+            elif level == 3:
+                handler.setLevel(logging.INFO)
+            elif level == 2:
+                handler.setLevel(logging.WARNING)
+            elif level == 1:
+                handler.setLevel(logging.ERROR)
+            break
 
 
 def getCRISPRessoArgParser(parserTitle="CRISPResso Parameters", requiredParams={}):
@@ -124,8 +173,11 @@ def getCRISPRessoArgParser(parserTitle="CRISPResso Parameters", requiredParams={
     parser.add_argument('-n', '--name',
                         help='Output name of the report (default: the name is obtained from the filename of the fastq file/s used in input)',
                         default='')
+    parser.add_argument("--suppress_amplicon_name_truncation",help="If set, amplicon names will not be truncated when creating output filename prefixes. If not set, amplicon names longer than 21 characters will be truncated when creating filename prefixes.",
+                        action='store_true')
     parser.add_argument('-o', '--output_folder', help='Output folder to use for the analysis (default: current folder)',
                         default='')
+    parser.add_argument('-v', '--verbosity', type=int, help='Verbosity level of output to the console (1-4), 4 is the most verbose', default=3)
 
     ## read preprocessing params
     parser.add_argument('--split_interleaved_input', '--split_paired_end',
@@ -347,7 +399,10 @@ def propagate_crispresso_options(cmd, options, params, paramInd=None):
         if option:
             if option in params:
                 if paramInd is None:
-                    val = getattr(params, option)
+                    if type(params) == dict:
+                        val = params[option]
+                    else:
+                        val = getattr(params, option)
                 else:
                     val = params.loc[paramInd, option]
                 if val is None:
@@ -394,11 +449,10 @@ def capitalize_sequence(x):
     return str(x).upper() if not pd.isnull(x) else x
 
 
-def slugify(value):  # adapted from the Django project
-
+def slugify(value):
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
-    value = re.sub(rb'[^\w\s-]', b'_', value).strip()
-    value = re.sub(rb'[-\s]+', b'-', value)
+    value = re.sub(rb'[\s\'*"/\\\[\]:;|,<>?]', b'_', value).strip()
+    value = re.sub(rb'_{2,}', b'_', value)
 
     return value.decode('utf-8')
 
@@ -461,13 +515,10 @@ def get_ref_length_from_cigar(cigar_string):
 
 def clean_filename(filename):
     # get a clean name that we can use for a filename
-    # validFilenameChars = "+-_.() %s%s" % (string.ascii_letters, string.digits)
+    validFilenameChars = "+-_.()%s%s" % (string.ascii_letters, string.digits)
     filename = str(filename).replace(' ', '_')
-    validFilenameChars = "_.%s%s" % (string.ascii_letters, string.digits)
-
     cleanedFilename = unicodedata.normalize('NFKD', filename)
-    return ''.join(c for c in cleanedFilename if c in validFilenameChars)
-
+    return(''.join(c for c in cleanedFilename if c in validFilenameChars))
 
 def check_file(filename):
     try:
@@ -1622,7 +1673,7 @@ def get_crispresso_header(description, header_str):
                 term_width) + "\n" + output_line
 
     output_line += '\n' + ('[CRISPResso version ' + __version__ + ']').center(term_width) + '\n' + (
-        '[Note that starting in version 2.3.0 FLASh and Trimmomatic will be replaced by fastp for read merging and trimming. Accordingly, the --flash_command and --trimmomatic_command parameters will be replaced with --fastp_command. Also, --trimmomatic_options_string will be replaced with --fastp_options_string.]').center(
+        '[Note that starting in version 2.3.0 FLASh and Trimmomatic will be replaced by fastp for read merging and trimming. Accordingly, the --flash_command and --trimmomatic_command parameters will be replaced with --fastp_command. Also, --trimmomatic_options_string will be replaced with --fastp_options_string.\n\nAlso in version 2.3.0, when running CRISPRessoPooled in mixed-mode (amplicon file and genome are provided) the default behavior will be as if the --demultiplex_only_at_amplicons parameter is provided. This change means that reads and amplicons do not need to align to the exact locations.]').center(
         term_width) + "\n" + ('[For support contact kclement@mgh.harvard.edu or support@edilytics.com]').center(term_width) + "\n"
 
     description_str = ""

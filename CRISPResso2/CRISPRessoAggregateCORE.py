@@ -23,15 +23,11 @@ from CRISPResso2.CRISPRessoMultiProcessing import get_max_processes, run_plot
 
 
 import logging
-logging.basicConfig(
-                     format='%(levelname)-5s @ %(asctime)s:\n\t %(message)s \n',
-                     datefmt='%a, %d %b %Y %H:%M:%S',
-                     stream=sys.stderr,
-                     filemode="w"
-                     )
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
+logger.addHandler(CRISPRessoShared.LogStreamHandler())
+
 error   = logger.critical
 warn    = logger.warning
 debug   = logger.debug
@@ -70,14 +66,16 @@ ___________________________________
         Please use with caution since increasing this parameter will significantly increase the memory required to run CRISPResso. Can be set to \'max\'.', default='1')
 
         parser.add_argument('--debug', help='Show debug messages', action='store_true')
+        parser.add_argument('-v', '--verbosity', type=int, help='Verbosity level of output to the console (1-4), 4 is the most verbose', default=3)
 
         args = parser.parse_args()
+
+        CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
         output_folder_name='CRISPRessoAggregate_on_%s' % args.name
         OUTPUT_DIRECTORY=os.path.abspath(output_folder_name)
 
-
-        _jp=lambda filename: os.path.join(OUTPUT_DIRECTORY, filename) #handy function to put a file in the output directory
+        _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename) #handy function to put a file in the output directory
 
         try:
              info('Creating Folder %s' % OUTPUT_DIRECTORY)
@@ -87,6 +85,7 @@ ___________________________________
 
         log_filename=_jp('CRISPRessoAggregate_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
+        logger.addHandler(CRISPRessoShared.StatusHandler(_jp('CRISPRessoAggregate_status.txt')))
 
         with open(log_filename, 'w+') as outfile:
               outfile.write('[Command used]:\n%s\n\n[Execution log]:\n' % ' '.join(sys.argv))
@@ -106,14 +105,18 @@ ___________________________________
         else:
             n_processes = int(args.n_processes)
 
-        process_pool = ProcessPoolExecutor(n_processes)
-        process_results = []
+        if n_processes > 1:
+            process_pool = ProcessPoolExecutor(n_processes)
+            process_futures = []
+        else:
+            process_pool = None
+            process_futures = None
 
         plot = partial(
             run_plot,
             num_processes=n_processes,
             process_pool=process_pool,
-            process_results=process_results,
+            process_futures=process_futures,
         )
 
         #glob returns paths including the original prefix
@@ -203,7 +206,7 @@ ___________________________________
                         warn('Could not process WGS folder ' + folder)
                         not_imported_count += 1
 
-        info('Read ' + str(successfully_imported_count) + ' folders (' + str(not_imported_count) + ' not imported)')
+        info('Read ' + str(successfully_imported_count) + ' folders (' + str(not_imported_count) + ' not imported)', {'percent_complete': 10})
 
         save_png = True
         if args.suppress_report:
@@ -282,6 +285,8 @@ ___________________________________
             window_nuc_conv_plot_names = []
             nuc_conv_plot_names = []
 
+            percent_complete_start, percent_complete_end = 11, 90
+            percent_complete_step = (percent_complete_end - percent_complete_start) / len(all_amplicons)
             #report for amplicons that appear multiple times
             for amplicon_index, amplicon_seq in enumerate(all_amplicons):
                 amplicon_name = amplicon_names[amplicon_seq]
@@ -290,7 +295,8 @@ ___________________________________
                 if amplicon_counts[amplicon_seq] < 2:
                     continue
 
-                info('Reporting summary for amplicon: "' + amplicon_name + '"')
+                percent_complete = percent_complete_start + (amplicon_index * percent_complete_step)
+                info('Reporting summary for amplicon: "' + amplicon_name + '"', {'percent_complete': percent_complete})
 
                 consensus_sequence = ""
                 nucleotide_frequency_summary = []
@@ -689,6 +695,7 @@ ___________________________________
 
             quantification_summary=[]
             #summarize amplicon modifications
+            debug('Summarizing amplicon modifications...', {'percent_complete': 92})
             samples_quantification_summary_by_amplicon_filename = _jp('CRISPRessoAggregate_quantification_of_editing_frequency_by_amplicon.txt') #this file has separate lines for each amplicon in each run
             with open(samples_quantification_summary_by_amplicon_filename, 'w') as outfile:
                 wrote_header = False
@@ -760,7 +767,7 @@ ___________________________________
 
             if not args.suppress_plots:
                 plot_root = _jp("CRISPRessoAggregate_reads_summary")
-
+                debug('Plotting reads summary...', {'percent_complete': 94})
                 reads_total_input = {
                     'fig_filename_root': plot_root,
                     'df_summary_quantification': df_summary_quantification,
@@ -794,6 +801,7 @@ ___________________________________
                 crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('CRISPRessoAggregate summary', os.path.basename(samples_quantification_summary_filename)), ('CRISPRessoAggregate summary by amplicon', os.path.basename(samples_quantification_summary_by_amplicon_filename))]
 
             #summarize alignment
+            debug('Summarizing alignment...', {'percent_complete': 96})
             with open(_jp('CRISPRessoAggregate_mapping_statistics.txt'), 'w') as outfile:
                 wrote_header = False
                 for crispresso2_folder in crispresso2_folders:
@@ -842,10 +850,16 @@ ___________________________________
             crispresso2Aggregate_info_file, crispresso2_info,
         )
 
-        wait(process_results)
-        process_pool.shutdown()
+        if n_processes > 1:
+            wait(process_futures)
+            if args.debug:
+                debug('Plot pool results:')
+                for future in process_futures:
+                    debug('future: ' + str(future))
+            future_results = [f.result() for f in process_futures] #required to raise exceptions thrown from within future
+            process_pool.shutdown()
 
-        info('Analysis Complete!')
+        info('Analysis Complete!', {'percent_complete': 100})
         print(CRISPRessoShared.get_crispresso_footer())
         sys.exit(0)
 
