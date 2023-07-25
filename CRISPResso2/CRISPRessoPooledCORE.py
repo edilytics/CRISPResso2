@@ -680,6 +680,7 @@ def main():
                 if not match:
                     has_unmatched_header_el = True
                     warn(f'Unable to find matches for header value "{head}". Using the default header values and order.')
+                    break
                 else:
                     has_header = True
                     headers.append(lowercase_default_amplicon_headers[match[0]])
