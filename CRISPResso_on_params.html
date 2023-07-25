@@ -1,0 +1,2036 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>CRISPResso2</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="description" content="CRISPResso2: Analysis of genome editing outcomes from deep sequencing data">
+		<meta name="author" content="Kendell Clement and Luca Pinello">
+		<link href='https://fonts.googleapis.com/css?family=Montserrat|Ranga:700' rel='stylesheet' type='text/css'>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" integrity="sha512-GQGU0fMMi238uA+a/bdWJfpUGKUkBdgfFdgBm72SUQ6BeyWjoY/ton0tEjH+OSH9iP4Dfh+7HM0I9f5eR0L/4w==" crossorigin="anonymous" referrerpolicy="no-referrer" />		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.3.5/jquery.fancybox.min.css" />
+		<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.13/css/all.css" integrity="sha384-DNOHZ68U8hZfKXOrtjWvjxusGo9WQnrNx2sqG0tfsghAvtVlRW3tvkXWZh58N9jp" crossorigin="anonymous">
+		<link rel="stylesheet" href="/static/css/main.css">
+
+		<!-- Global site tag (gtag.js) - Google Analytics -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=UA-136070922-1"></script>
+		<script>
+		 window.dataLayer = window.dataLayer || [];
+		 function gtag(){dataLayer.push(arguments);}
+		 gtag('js', new Date());
+
+		 gtag('config', 'UA-136070922-1');
+		</script>
+
+		<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+		<script src="https://cdn.plot.ly/plotly-2.11.1.min.js"></script>
+		<style>
+			body {
+				font-family: 'Montserrat', sans-serif !important;
+			
+			}
+			@media (max-width:1015px)
+			{
+				#crispresso_h
+				{
+					font-size:5rem;
+					font-weight:300;
+					line-height:1.2;
+				}
+				#left_help_div
+				{
+					display:none
+				}
+				#top_help_div
+				{
+					display:block
+				}
+			}
+			@media (min-width:1015px)
+			{
+				#crispresso_h
+				{
+					font-size:8rem;
+					font-weight:300;
+					line-height:1.2;
+				}
+				#left_help_div
+				{
+					display:block
+				}
+				#top_help_div
+				{
+					display:none
+				}
+			}
+		</style>
+
+
+		<!-- Always force latest IE rendering engine (even in intranet) & Chrome Frame
+		Remove this if you use the .htaccess -->
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+		<!-- Replace favicon.ico & apple-touch-icon.png in the root of your domain and delete these references -->
+		
+		<link rel="shortcut icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAABILAAASCwAAAAAAAAAAAAD//////////////////////v7+//v7+//7+vr/8/Ly//v6+v/7+/v//v7+/////////////////////////////////////////////v7+///////AwcH/gYSE/3t+fv9+gYD/paWl//39/f/+/v7//v7+/////////////////////////////v7+///////z8/P/hYiI/5adnP+Xn57/lZ6d/42Tk//X19f///////39/f/+/v7///////////////////////39/f//////ury7/5GWlv+psK//nqWk/6Cnpv+osa//kpeW/8rMy//+/v7//////////////////////////////////////5ibm/+orq3/o6mo/5+mpf+gpqT/rLOx/5Wbmf95fnz/oKSj/+7u7v///////v7+///////+/v7///////Hy8v+boKD/s7q5/6yzsf+qsbD/q7Gw/7K5uP+gpqT/mZub/7i7u/+mqan///////7+/v///////v7+///////d3t7/lpyb/5abmv90enn/cXZ2/3N4d/+Ijo7/pKup/4uQj/+Znpz/s7W0///////+/v7///////7+/v//////4+Pj/4aKh/+Ahn//a3Fq/2dtZv9tcmz/i5GK/42Sjv+goaH/5Obl//b29v///////////////////////v7+///////t7u7/1tfW/8nMyf/Ex8T/yczJ/83Qzf/a29r/+fn5///////+/v7/////////////////////////////////+fn5//z8/P/m5ub/9vb2//n5+f/y8vL//f39///////9/f3////////////////////////////4+Pj/5+fn/+np6f//////5OTk/+/v7//k5OT/+vr6/+fn5//l5eX/+vr6//////////////////7+/v//////5ubm//X19f///////f39/+Tk5P//////5eXl//j4+P//////8fHx/+Tk5P///////v7+////////////2dnZ/8nJyf///////////+/v7//IyMj///////Pz8//m5ub///////////+9vb3/09PT////////////+fn5/9DQ0P/39/f////////////c3Nz/sLCw///////7+/v/sLCw//n5+f//////+Pj4/+Hh4f/+/v7/////////////////////////////////8/Pz//X19f///////////8/Pz//o6Oj///////39/f///////////////////////f39///////////////////////+/v7////////////+/v7//v7+/////////////v7+////////////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==" />
+		
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+	<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+	
+<style>
+.nav-tabs.amp-header {
+  border-bottom:none !important;
+}
+
+.card-header.amp-header {
+  border-bottom:none !important;
+}
+.nav-tabs.amp-header .nav-link.active {
+  background-color:lightsteelblue;
+  border-bottom:lightsteelblue;
+}
+
+.pre-scrollable {
+    max-height: 340px;
+    overflow-y: auto;
+    background-color: #f8f8f8;
+    text-align: left
+}
+
+.tab-content.amp-body {
+  background-color:lightsteelblue;
+}
+
+@media print {
+   .tab-content > .tab-pane {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+		margin-bottom: 2em !important;
+		page-break-inside: avoid;
+  }
+  .nav-tabs {
+    display:none !important;
+    visibility:hidden !important;
+  }
+  .tab-content.amp-body {
+    background-color:transparent !important;
+  	border:None !important;
+  }
+}
+@media only screen and (max-width: 600px) {
+	.jumbotron img {
+		width:100%
+	}
+}
+</style>
+
+
+
+	</head>
+
+	<body>
+		
+
+	
+	
+
+	<div class="container">
+			<div class="row pb-2">
+				<div class="col-sm-1"></div>
+				
+					<div class="col-sm-3 crispresso_cup"> <a href='https://crispresso2.pinellolab.org'><img class='img-fluid' src="https://crispresso.pinellolab.partners.org/static/imgs/CRISPResso_justcup.png" width="80%"></a>
+				
+					</div>
+				<div class="col-sm-7" >
+					<a href='/' style="text-decoration:none !important; color:rgb(33, 37, 41)"><h1 id='crispresso_h' style="font-family:'Ranga', sans-serif">CRISPResso2 </h1></a>
+					<h3 style="margin-top: -0.5em;padding-right: 2em;">Analysis of genome editing outcomes from deep sequencing data</h3>
+				</div>
+				<div class="col-sm-1">
+				</div>
+			</div>
+
+
+		
+
+			<div id='top_help_div'>
+				<div class="row">
+					<div class="col-sm-1" style="margin-right: 4em;"></div>
+					<div class='col-sm-10 pb-2 crispresso_body_div'>
+					 
+					</div>
+					<div class="col-sm-1"></div>
+				</div>
+			</div>
+
+			
+<div class="col-sm-1"></div>
+<center><div class="col-sm-10">
+	<div class="jumbotron h-100 p-5 rounded-3" style="background:rgba(0,0,0,0.0); padding:0px" >
+		<div id='jumbotron_content' >
+			<div class='card text-center mb-2'>
+				<div class='card-header'>
+					
+					<h5>params</h5>
+					
+					<h5>CRISPResso2 run information</h5>
+					<ul class="nav nav-tabs justify-content-center card-header-tabs" id="log-tab" role="tablist">
+						<li class="nav-item">
+						<button class="nav-link active" id="log_aln-tab" data-bs-toggle="tab" data-bs-target="#log_aln" role="tab" aria-controls="log_aln" aria-selected="true">Alignment statistics</button>
+						</li>
+						<li class="nav-item">
+						<button class="nav-link" id="log_params-tab" data-bs-toggle="tab" data-bs-target="#log_params" role="tab" aria-controls="log_params" aria-selected="false">Run Parameters</button>
+						</li>
+					</ul>
+				</div>
+				<div class='card-body'>
+					<div class='tab-content'>
+						<div class="tab-pane fade show active" id="log_aln" role="tabpanel">
+							<div id="fig_plot_1a">
+    
+        
+            
+            <a href="CRISPResso_on_params/1a.Read_barplot.pdf"><img src="CRISPResso_on_params/1a.Read_barplot.png" width='40%' height='40%' ></a>
+                    
+        
+        <label class="labelpadding">Figure 1a: The number of reads in input fastqs, after preprocessing, and after alignment to amplicons.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/CRISPResso_mapping_statistics.txt">Mapping statistics</a></small></p>
+        
+    
+</div>
+						</div>
+						<div class="tab-pane fade text-start" id="log_params" role="tabpanel">
+  <p>CRISPResso version: 2.2.13</p>
+  <p>Run completed: 2023-07-25 14:53:48</p>
+  <p>Amplicon sequence: <pre class='pre-scrollable'>CGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCACCTGGATCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG</pre></p>
+  
+  <p>Guide sequence: <pre class='pre-scrollable'>GGAATCCCTTCTGCAGCACC</pre></p>
+  
+  <p>Command used: <pre class='pre-scrollable'>/home/snichol2/micromamba/envs/c2/bin/CRISPResso -r1 ../CRISPResso2_tests/cli_integration_tests/inputs/FANC.Cas9.fastq -a CGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCACCTGGATCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG -g GGAATCCCTTCTGCAGCACC -e CGGCCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCTGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG -c GGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCACCTGGATCGCTTTT --dump -qwc 20-30_45-50 -q 30 --default_min_aln_score 80 -an FANC -n params --base_edit -fg AGCCTTGCAGTGGGCGCGCTA,CCCACTGAAGGCCC --dsODN GCTAGATTTCCCAAGAAGA -gn hi -fgn dear -p max --debug</pre></p>
+  <p>Parameters: <pre class='pre-scrollable'>allele_plot_pcts_only_for_assigned_reference: False
+aln_seed_count: 5
+aln_seed_len: 10
+aln_seed_min: 2
+amplicon_min_alignment_score: 
+amplicon_name: FANC
+amplicon_seq: CGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCACCTGGATCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG
+annotate_wildtype_allele: 
+assign_ambiguous_alignments_to_first_reference: False
+auto: False
+bam_chr_loc: 
+bam_input: 
+bam_output: False
+base_editor_output: True
+bowtie2_index: 
+coding_seq: GGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCACCTGGATCGCTTTT
+conversion_nuc_from: C
+conversion_nuc_to: T
+crispresso1_mode: False
+debug: True
+default_min_aln_score: 80
+discard_guide_positions_overhanging_amplicon_edge: False
+discard_indel_reads: False
+dsODN: GCTAGATTTCCCAAGAAGA
+dump: True
+exclude_bp_from_left: 15
+exclude_bp_from_right: 15
+expand_allele_plots_by_quantification: False
+expand_ambiguous_alignments: False
+expected_hdr_amplicon_seq: CGGCCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCTGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG
+fastq_output: False
+fastq_r1: ../CRISPResso2_tests/cli_integration_tests/inputs/FANC.Cas9.fastq
+fastq_r2: 
+file_prefix: 
+flash_command: flash
+flexiguide_homology: 80
+flexiguide_name: dear
+flexiguide_seq: AGCCTTGCAGTGGGCGCGCTA,CCCACTGAAGGCCC
+force_merge_pairs: False
+guide_name: hi
+guide_seq: GGAATCCCTTCTGCAGCACC
+ignore_deletions: False
+ignore_insertions: False
+ignore_substitutions: False
+keep_intermediate: False
+max_paired_end_reads_overlap: 100
+max_rows_alleles_around_cut_to_plot: 50
+min_average_read_quality: 30
+min_bp_quality_or_N: 0
+min_frequency_alleles_around_cut_to_plot: 0.2
+min_paired_end_reads_overlap: 10
+min_single_bp_quality: 0
+n_processes: max
+name: params
+needleman_wunsch_aln_matrix_loc: EDNAFULL
+needleman_wunsch_gap_extend: -2
+needleman_wunsch_gap_incentive: 1
+needleman_wunsch_gap_open: -20
+no_rerun: False
+output_folder: 
+place_report_in_output_folder: False
+plot_histogram_outliers: False
+plot_window_size: 20
+prime_editing_nicking_guide_seq: 
+prime_editing_override_prime_edited_ref_seq: 
+prime_editing_override_sequence_checks: False
+prime_editing_pegRNA_extension_quantification_window_size: 5
+prime_editing_pegRNA_extension_seq: 
+prime_editing_pegRNA_scaffold_min_match_length: 1
+prime_editing_pegRNA_scaffold_seq: 
+prime_editing_pegRNA_spacer_seq: 
+quantification_window_center: -3
+quantification_window_coordinates: 20-30_45-50
+quantification_window_size: 1
+save_also_png: False
+split_interleaved_input: False
+stringent_flash_merging: False
+suppress_amplicon_name_truncation: False
+suppress_plots: False
+suppress_report: False
+trim_sequences: False
+trimmomatic_command: trimmomatic
+trimmomatic_options_string: 
+use_legacy_insertion_quantification: False
+verbosity: 3
+write_cleaned_report: False
+write_detailed_allele_table: False
+zip_output: False</pre></p>
+  <p class='text-center m-0'><small><a href="CRISPResso_on_params/CRISPResso_RUNNING_LOG.txt">Running log</a></small></p>
+</div>
+					</div>
+				</div>
+			</div>
+
+			<div class='card text-center mb-2'>
+				<div class='card-header'>
+					<h5>Allele assignments</h5>
+					<ul class="nav nav-tabs justify-content-center card-header-tabs" id="aln-tab" role="tablist">
+						<li class="nav-item">
+							<button class="nav-link active" id="aln_pie-tab" data-bs-toggle="tab" data-bs-target="#aln_pie" role="tab" aria-controls="aln_pie" aria-selected="true">Piechart</button>
+						</li>
+						<li class="nav-item">
+							<button class="nav-link" id="aln_bar-tab" data-bs-toggle="tab" data-bs-target="#aln_bar" role="tab" aria-controls="aln_bar" aria-selected="false">Barplot</button>
+						</li>
+    						
+						<li class="nav-item">
+							<button class="nav-link" id="aln_dsODN-tab" data-bs-toggle="tab" data-bs-target="#aln_dsODN" role="tab" aria-controls="aln_dsODN" aria-selected="false">dsODN</button>
+						</li>
+              			
+					</ul>
+				</div>
+				<div class='card-body'>
+					<div class="tab-content" id="tabContent">
+						<div class="tab-pane fade show active" id="aln_pie" role="tabpanel" aria-labelledby="aln_pie-tab">
+							<div id="fig_plot_1b">
+    
+        
+            
+            <a href="CRISPResso_on_params/1b.Alignment_pie_chart.pdf"><img src="CRISPResso_on_params/1b.Alignment_pie_chart.png" width='40%' height='40%' ></a>
+                    
+        
+        <label class="labelpadding">Figure 1b: Alignment and editing frequency of reads as determined by the percentage and number of sequence reads showing unmodified and modified alleles. NHEJ reads align more closely to the unmodified reference sequence, but have mutations present in the specified quantification window. HDR reads align to the HDR reference sequence and have no mutations in the specified quantification window. Imperfect HDR reads have mutations in the specified window. AMBIGUOUS reads align equally well to the unmodified and HDR reference sequences.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/CRISPResso_quantification_of_editing_frequency.txt">Quantification of editing</a></small></p>
+        
+    
+</div>
+						</div>
+						<div class="tab-pane fade" id="aln_bar" role="tabpanel" aria-labelledby="aln_bar-tab">
+							<div id="fig_plot_1c">
+    
+        
+            
+            <a href="CRISPResso_on_params/1c.Alignment_barplot.pdf"><img src="CRISPResso_on_params/1c.Alignment_barplot.png" width='40%' height='40%' ></a>
+                    
+        
+        <label class="labelpadding">Figure 1c: Alignment and editing frequency of reads as determined by the percentage and number of sequence reads showing unmodified and modified alleles.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/CRISPResso_quantification_of_editing_frequency.txt">Quantification of editing</a></small></p>
+        
+    
+</div>
+						</div>
+    						
+						<div class="tab-pane fade" id="aln_dsODN" role="tabpanel" aria-labelledby="aln_dsODN-tab">
+							<div id="fig_plot_1d">
+    
+        
+            
+            <a href="CRISPResso_on_params/1d.Detection_of_dsODN.pdf"><img src="CRISPResso_on_params/1d.Detection_of_dsODN.png" width='85%' height='85%' ></a>
+                    
+        
+        <label class="labelpadding">Figure 1d: Frequency of detection of dsODN GCTAGATTTCCCAAGAAGA</label>
+        
+    
+</div>
+						</div>
+              			
+					</div>
+				</div>
+			</div> 
+
+        		
+			
+			<div class='card text-center mb-2'>
+				<div class='card-header'>
+					<h5>Global frameshift analysis</h5>
+				</div>
+				<div class='card-body'>
+					<div id="fig_plot_5a">
+    
+        
+            
+            <a href="CRISPResso_on_params/5a.Global_frameshift_in-frame_mutations_pie_chart.pdf"><img src="CRISPResso_on_params/5a.Global_frameshift_in-frame_mutations_pie_chart.png" width='85%' height='85%' ></a>
+                    
+        
+        <label class="labelpadding">Figure 5a: Frameshift analysis of coding sequence reads affected by modifications for all reads. Unmodified reference reads are excluded from this plot, and all HDR reads are included in this plot.</label>
+        
+    
+</div>
+				</div>
+			</div>
+			
+
+			
+			<div class='card text-center mb-2'>
+				<div class='card-header'>
+					<h5>Global frameshift mutagenesis profiles</h5>
+				</div>
+				<div class='card-body'>
+					<div id="fig_plot_6a">
+    
+        
+            
+            <a href="CRISPResso_on_params/6a.Global_frameshift_in-frame_mutation_profiles.pdf"><img src="CRISPResso_on_params/6a.Global_frameshift_in-frame_mutation_profiles.png" width='85%' height='85%' ></a>
+                    
+        
+        <label class="labelpadding">Figure 6a: Frameshift and in-frame mutagenesis profiles for all reads indicating position affected by modification. The y axis shows the number of reads and percentage of all reads in that category (frameshifted (top) or in-frame (bottom)). 0 reads with no length modifications are not shown.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Indel_histogram.txt">Indel histogram for FANC</a></small></p>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Indel_histogram.txt">Indel histogram for HDR</a></small></p>
+        
+    
+</div>
+				</div>
+			</div>
+			
+
+			
+			<div class='card text-center mb-2'>
+				<div class='card-header'>
+					<h5>Global splicing analysis</h5>
+				</div>
+				<div class='card-body'>
+					<div id="fig_plot_8a">
+    
+        
+            
+            <a href="CRISPResso_on_params/8a.Global_potential_splice_sites_pie_chart.pdf"><img src="CRISPResso_on_params/8a.Global_potential_splice_sites_pie_chart.png" width='85%' height='85%' ></a>
+                    
+        
+        <label class="labelpadding">Figure 8a: Predicted impact on splice sites for all reads. Potential splice sites modified refers to reads in which the either of the two intronic positions adjacent to exon junctions are disrupted.</label>
+        
+    
+</div>
+				</div>
+			</div>
+			
+			
+
+			
+			
+			<div class='card text-center mb-2'>
+				<div class='card-header'>
+					
+					<h5>HDR summary report (all reads aligned to FANC)</h5>
+					
+				</div>
+				<div class='card-body'>
+					<div id="fig_plot_4g">
+    
+        
+        
+            <a href="CRISPResso_on_params/4g.HDR_nucleotide_percentage_quilt.pdf"><img src="CRISPResso_on_params/4g.HDR_nucleotide_percentage_quilt.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4g: Nucleotide distribution across all amplicons. At each base in the reference amplicon, the percentage of each base as observed in sequencing reads is shown (A = green; C = orange; G = yellow; T = purple). Black bars show the percentage of reads for which that base was deleted. Brown bars between bases show the percentage of reads having an insertion at that position.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Reads_from_all_amplicons_nucleotide_percent_table.txt">Nucleotide percentage table for all reads aligned to FANC</a></small></p>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Reads_from_all_amplicons_modification_percent_table.txt">Modification percentage table for all reads aligned to FANC</a></small></p>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Nucleotide_frequency_table.txt">Nucleotide frequency table for FANC</a></small></p>
+        
+    
+</div>
+				</div>
+			</div>
+			
+            		
+
+			
+			
+
+			
+			
+
+			
+			
+
+			
+	        
+			<p>Reads are aligned to each amplicon sequence separately. Quantification and visualization of these reads are shown for each amplicon below:</p>
+			<div id='amplicons-card' class='card text-center mb-2'>
+				<div class='card-header amp-header'>
+					<h5>Amplicons</h5>
+					<ul class="nav nav-tabs amp-header card-header-tabs" id="nav-tab" role="tablist">
+					
+						
+						<li class="nav-item">
+							<button class="nav-link active" id="pills_FANC_tab" data-bs-toggle="tab" data-bs-target="#div_FANC" role="tab" aria-controls="div_FANC" aria-selected="true">FANC</button>
+						</li>
+						
+					
+						
+						<li class="nav-item">
+							<button class="nav-link" id="pills_HDR_tab" data-bs-toggle="tab" data-bs-target="#div_HDR" role="tab" aria-controls="div_HDR" aria-selected="false">HDR</button>
+						</li>
+						
+					
+					</ul>
+				</div>
+				 
+
+
+				
+				<div class="tab-content pt-3 pr-3 pl-3 amp-body card-body" id="nav-tabContent">
+				
+
+				
+					 
+					<div class="tab-pane fade show active" id="div_FANC" role="tabpanel" aria-labelledby="pills_FANC_tab">
+            			<div class="d-none d-print-block"><h3>Reads aligning to FANC</h3></div> 
+					
+
+		      				<div class='card text-center mb-2'>
+      							<div class='card-header'>
+								
+      								<h5>Nucleotide composition for FANC</h5>
+								
+      							</div>
+      							<div class='card-body'>
+								
+								<div class='div_zoom_outer d-none d-md-block' style="height:100px;border:1px solid #DDDDDD;position:relative">
+									<div id="zoomview_nucs_FANC" style="position:absolute;left:0;height:100%;width:100%;background-image: url(CRISPResso_on_params/2a.FANC.Nucleotide_percentage_quilt.png);background-size:auto 100%;background-repeat:no-repeat;"></div>
+  										<div class="d-lg-none" style="overflow-x:scroll;overflow-y:hidden;position:absolute;width:100%;height:100%">
+	  										<img src="CRISPResso_on_params/2a.FANC.Nucleotide_percentage_quilt.png" style='height:100%'>
+  										</div>
+								</div>
+									<div style='position:relative;display:inline-block;width:95%'>
+										<a href="CRISPResso_on_params/2a.FANC.Nucleotide_percentage_quilt.pdf">
+    									<div id='zoomlens_nucs_FANC' class="d-none d-lg-block" style='float: left;position: absolute;left: 0px;top: 0px;z-index: 1000;border: 1px solid #DDDDDD;height:100%;width:10%'></div>
+    										<img id='tozoom_nucs_FANC' src="CRISPResso_on_params/2a.FANC.Nucleotide_percentage_quilt.png" width='100%' style='position:relative'></a>
+										</div>
+										<label class="labelpadding">
+  										<span class='d-none d-md-block'>Hover your mouse over the bottom image to zoom in on a specific region.</span><br>
+  											Figure 2a: Nucleotide distribution across amplicon. At each base in the reference amplicon, the percentage of each base as observed in sequencing reads is shown (A = green; C = orange; G = yellow; T = purple). Black bars show the percentage of reads for which that base was deleted. Brown bars between bases show the percentage of reads having an insertion at that position.
+										</label>
+							  			
+							  			<p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Nucleotide_frequency_table.txt">Nucleotide frequency table</a></small></p>
+                						
+								
+
+								
+  									
+									<div id="fig_plot_2b_0">
+    
+        
+        
+            <a href="CRISPResso_on_params/2b.FANC.Nucleotide_percentage_quilt_around_hi.pdf"><img src="CRISPResso_on_params/2b.FANC.Nucleotide_percentage_quilt_around_hi.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 2b: Nucleotide distribution around the hi (GGAATCCCTTCTGCAGCACC).</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Quantification_window_nucleotide_frequency_table.txt">Nucleotide frequency in quantification window</a></small></p>
+        
+    
+</div>
+  									
+									<div id="fig_plot_2b_1">
+    
+        
+        
+            <a href="CRISPResso_on_params/2b.FANC.Nucleotide_percentage_quilt_around_dear.pdf"><img src="CRISPResso_on_params/2b.FANC.Nucleotide_percentage_quilt_around_dear.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 2b: Nucleotide distribution around the dear (AGCCTTGCAGTGGGCGCGCTA).</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Quantification_window_nucleotide_frequency_table.txt">Nucleotide frequency in quantification window</a></small></p>
+        
+    
+</div>
+  									
+									<div id="fig_plot_2b_2">
+    
+        
+        
+            <a href="CRISPResso_on_params/2b.FANC.Nucleotide_percentage_quilt_around_sgRNA_CCCACTGAAGGCCC.pdf"><img src="CRISPResso_on_params/2b.FANC.Nucleotide_percentage_quilt_around_sgRNA_CCCACTGAAGGCCC.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 2b: Nucleotide distribution around the sgRNA CCCACTGAAGGCCC.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Quantification_window_nucleotide_frequency_table.txt">Nucleotide frequency in quantification window</a></small></p>
+        
+    
+</div>
+  									
+								
+            		</div>
+					</div> 
+
+  						<div class='card text-center mb-2'>
+  							<div class='card-header'>
+								
+      							<h5>Modification lengths for FANC</h5>
+								
+  								<ul class="nav nav-tabs justify-content-center card-header-tabs" id="aln-tab" role="tablist">
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#FANC_3a" role="tab" aria-controls="FANC_3a" aria-selected="true">Summary</button>
+  						  			</li>
+            								
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#FANC_3b" role="tab" aria-controls="FANC_3b" aria-selected="false">Indels</button>
+  						  			</li>
+            						
+  								</ul>
+  							</div>
+  							<div class='card-body'>
+								<div class="tab-content" id="pills-tabContent">
+									
+  						  			<div class="tab-pane fade show active" id="FANC_3a" role="tabpanel">
+							  			<div id="fig_plot_3a">
+    
+        
+        
+            <a href="CRISPResso_on_params/3a.FANC.Indel_size_distribution.pdf"><img src="CRISPResso_on_params/3a.FANC.Indel_size_distribution.png" width='40%' height='40%' ></a>
+             
+        
+        <label class="labelpadding">Figure 3a: Frequency distribution of alleles with indels (blue) and without indels (red).</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Indel_histogram.txt">Indel histogram</a></small></p>
+        
+    
+</div>
+						  			</div>
+									
+
+									
+  						  			<div class="tab-pane fade" id="FANC_3b" role="tabpanel">
+							  			<div id="fig_plot_3b">
+    
+        
+        
+            <a href="CRISPResso_on_params/3b.FANC.Insertion_deletion_substitutions_size_hist.pdf"><img src="CRISPResso_on_params/3b.FANC.Insertion_deletion_substitutions_size_hist.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 3b: Left panel, frequency distribution of sequence modifications that increase read length with respect to the reference amplicon, classified as insertions (positive indel size). Middle panel, frequency distribution of sequence modifications that reduce read length with respect to the reference amplicon, classified as deletions (negative indel size). Right panel, frequency distribution of sequence modifications that do not alter read length with respect to the reference amplicon, which are classified as substitutions (number of substituted positions shown).</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Insertion_histogram.txt">Insertions frequency</a></small></p>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Deletion_histogram.txt">Deletions Frequency</a></small></p>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Substitution_histogram.txt">Substitutions Frequency</a></small></p>
+        
+    
+</div>
+						  			</div>
+									
+  								</div>
+  							</div> 
+  						</div> 
+
+						<div class='card text-center mb-2'>
+  							<div class='card-header'>
+								
+  								<h5>Indel characterization for FANC</h5>
+								
+  								<ul class="nav nav-tabs justify-content-center card-header-tabs" id="indel-characterization-tabs" role="tablist">
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#FANC_4a" role="tab" aria-controls="FANC_4a" aria-selected="true">All Modifications Combined</button>
+  						  			</li>
+            								
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#FANC_4b" role="tab" aria-controls="FANC_4b" aria-selected="false">All Modifications by Type</button>
+  						  			</li>
+            								
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#FANC_4c" role="tab" aria-controls="FANC_4c" aria-selected="false">Modifications in Quantification Window</button>
+  						  			</li>
+            								
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#FANC_4d" role="tab" aria-controls="FANC_4d" aria-selected="false">Indel Lengths</button>
+  						  			</li>
+            								
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#FANC_4e" role="tab" aria-controls="FANC_4e" aria-selected="false">All reads aligned to FANC</button>
+  						  			</li>
+								 	
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#FANC_4f" role="tab" aria-controls="FANC_4f" aria-selected="false">HDR reads aligned to FANC</button>
+  						  			</li>
+									
+  								</ul>
+  							</div> 
+  							<div class='card-body'>
+  								<div class="tab-content" id="pills-tabContent">
+									
+									<div class="tab-pane fade" id="FANC_4a" role="tabpanel">
+										<div id="fig_plot_4a">
+    
+        
+        
+            <a href="CRISPResso_on_params/4a.FANC.Combined_insertion_deletion_substitution_locations.pdf"><img src="CRISPResso_on_params/4a.FANC.Combined_insertion_deletion_substitution_locations.png" width='40%' height='40%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4a: Combined frequency of any modification across the amplicon. Modifications outside of the quantification window are also shown.</label>
+        
+    
+</div>
+									</div>
+									
+									
+									<div class="tab-pane fade show active" id="FANC_4b" role="tabpanel">
+										<div id="fig_plot_4b">
+    
+        
+        
+            <a href="CRISPResso_on_params/4b.FANC.Insertion_deletion_substitution_locations.pdf"><img src="CRISPResso_on_params/4b.FANC.Insertion_deletion_substitution_locations.png" width='40%' height='40%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4b: Frequency of insertions (red), deletions (purple), and substitutions (green) across the entire amplicon, including modifications outside of the quantification window.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Modification_count_vectors.txt">Modification frequency</a></small></p>
+        
+    
+</div>
+									</div>
+									
+									
+									<div class="tab-pane fade" id="FANC_4c" role="tabpanel">
+										<div id="fig_plot_4c">
+    
+        
+        
+            <a href="CRISPResso_on_params/4c.FANC.Quantification_window_insertion_deletion_substitution_locations.pdf"><img src="CRISPResso_on_params/4c.FANC.Quantification_window_insertion_deletion_substitution_locations.png" width='40%' height='40%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4c: Frequency of insertions (red), deletions (purple), and substitutions (green) across the entire amplicon, considering only modifications that overlap with the quantification window.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Quantification_window_modification_count_vectors.txt">Modification frequency in quantification window</a></small></p>
+        
+    
+</div>
+									</div>
+									
+
+									
+									<div class="tab-pane fade" id="FANC_4d" role="tabpanel">
+										<div id="fig_plot_4d">
+    
+        
+        
+            <a href="CRISPResso_on_params/4d.FANC.Position_dependent_average_indel_size.pdf"><img src="CRISPResso_on_params/4d.FANC.Position_dependent_average_indel_size.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4d: Position dependent insertion size(left) and deletion size (right), including only modifications that overlap with the quantification window.</label>
+        
+    
+</div>
+									</div>
+									
+
+									
+									<div class="tab-pane fade" id="FANC_4e" role="tabpanel">
+										<div id="fig_plot_4e">
+    
+        
+        
+            <a href="CRISPResso_on_params/4e.FANC.Global_mutations_in_all_reads.pdf"><img src="CRISPResso_on_params/4e.FANC.Global_mutations_in_all_reads.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4e: Positions of modifications in all reads when aligned to the reference sequence (FANC). Insertions: red, deletions: purple, substitutions: green. All modifications (including those outside the quantification window) are shown.</label>
+        
+    
+</div>
+									</div>
+									
+
+									
+									<div class="tab-pane fade" id="FANC_4f" role="tabpanel">
+										<div id="fig_plot_4f">
+    
+        
+        
+            <a href="CRISPResso_on_params/4f.FANC.Global_mutations_in_HDR_reads_with_reference_to_FANC.pdf"><img src="CRISPResso_on_params/4f.FANC.Global_mutations_in_HDR_reads_with_reference_to_FANC.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4f: Positions of modifications in HDR reads with respect to the reference sequence (FANC). Insertions: red, deletions: purple, substitutions: green. All modifications (including those outside the quantification window) are shown.</label>
+        
+    
+</div>
+									</div>
+									
+  								</div>
+  							</div> 
+  						</div> 
+
+
+						
+
+						
+						<div class='card text-center mb-2'>
+							<div class='card-header'>
+								
+  								<h5>Frameshift mutagenesis profiles for FANC</h5>
+								
+							</div>
+  							<div class='card-body'>
+								<div id="fig_plot_6">
+    
+        
+        
+            <a href="CRISPResso_on_params/6.FANC.Frameshift_in-frame_mutation_profiles.pdf"><img src="CRISPResso_on_params/6.FANC.Frameshift_in-frame_mutation_profiles.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 6: Frameshift and in-frame mutagenesis profiles indicating position affected by modification. The y axis shows the number of reads and percentage of all reads in that category (frameshifted (top) or in-frame (bottom)). 0 reads with no length modifications are not shown.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Indel_histogram.txt">Indel histogram for FANC</a></small></p>
+        
+    
+</div>
+							</div>
+						</div>
+						
+
+						
+						<div class='card text-center mb-2'>
+							<div class='card-header'>
+								
+  								<h5>Coding mutations for FANC</h5>
+								
+							</div>
+  							<div class='card-body'>
+								<div id="fig_plot_7">
+    
+        
+        
+            <a href="CRISPResso_on_params/7.FANC.Insertion_deletion_substitution_locations_noncoding.pdf"><img src="CRISPResso_on_params/7.FANC.Insertion_deletion_substitution_locations_noncoding.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 7: Reads with insertions (red), deletions (purple), and substitutions (green) mapped to reference amplicon position exclusively in noncoding region/s (that is, without mutations affecting coding sequences). The predicted cleavage site is indicated by a vertical dashed line. Only sequence positions directly adjacent to insertions or directly affected by deletions or substitutions are plotted.</label>
+        
+    
+</div>
+							</div>
+						</div>
+						
+
+						
+						<div class='card text-center mb-2'>
+							<div class='card-header'>
+								
+  								<h5>Splicing for FANC</h5>
+								
+							</div>
+  							<div class='card-body'>
+								<div id="fig_plot_8">
+    
+        
+        
+            <a href="CRISPResso_on_params/8.FANC.Potential_splice_sites_pie_chart.pdf"><img src="CRISPResso_on_params/8.FANC.Potential_splice_sites_pie_chart.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 8: Predicted impact on splice sites. Potential splice sites modified refers to reads in which the either of the two intronic positions adjacent to exon junctions are disrupted.</label>
+        
+    
+</div>
+							</div>
+						</div>
+						
+
+						
+						<div class='card text-center mb-2'>
+							<div class='card-header'>
+								
+  								<h5>Allele plots for FANC</h5>
+								
+							</div>
+							<div class='card-body'>
+								
+                  				<div class='mb-4'>
+					  				<div id="fig_plot_9_0">
+    
+        
+        
+            <a href="CRISPResso_on_params/9.FANC.Alleles_frequency_table_around_hi.pdf"><img src="CRISPResso_on_params/9.FANC.Alleles_frequency_table_around_hi.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the hi (GGAATCCCTTCTGCAGCACC). Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Alleles_frequency_table_around_hi.txt">Allele frequency table</a></small></p>
+        
+    
+</div>
+                				</div>
+								
+                  				<div class='mb-4'>
+					  				<div id="fig_plot_9_1">
+    
+        
+        
+            <a href="CRISPResso_on_params/9.FANC.Alleles_frequency_table_around_dear.pdf"><img src="CRISPResso_on_params/9.FANC.Alleles_frequency_table_around_dear.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the dear (AGCCTTGCAGTGGGCGCGCTA). Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Alleles_frequency_table_around_dear.txt">Allele frequency table</a></small></p>
+        
+    
+</div>
+                				</div>
+								
+                  				<div class='mb-4'>
+					  				<div id="fig_plot_9_2">
+    
+        
+        
+            <a href="CRISPResso_on_params/9.FANC.Alleles_frequency_table_around_sgRNA_CCCACTGAAGGCCC.pdf"><img src="CRISPResso_on_params/9.FANC.Alleles_frequency_table_around_sgRNA_CCCACTGAAGGCCC.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the sgRNA CCCACTGAAGGCCC. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Alleles_frequency_table_around_sgRNA_CCCACTGAAGGCCC.txt">Allele frequency table</a></small></p>
+        
+    
+</div>
+                				</div>
+								
+							</div>
+						</div>
+						
+
+						
+  						<div class='card text-center mb-2'>
+  							<div class='card-header'>
+								
+  								<h5>Base editing for FANC</h5>
+								
+  								<ul class="nav nav-tabs justify-content-center card-header-tabs" id="aln-tab" role="tablist">
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#FANC_10a" role="tab" aria-controls="FANC_10a" aria-selected="true">Substitution Frequencies</button>
+  						  			</li>
+									
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#FANC_10d" role="tab" aria-controls="FANC_10d" aria-selected="false">Nucleotide Frequencies</button>
+  						  			</li>
+									
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#FANC_10e" role="tab" aria-controls="FANC_10e" aria-selected="false">Base Proportions</button>
+  						  			</li>
+            						
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#FANC_10f" role="tab" aria-controls="FANC_10f" aria-selected="false">Non-reference Bases</button>
+  						  			</li>
+            						
+  								</ul>
+							</div>
+							<div class='card-body'>
+								<div class="tab-content" id="pills-tabContent">
+									
+					  				<div class="tab-pane fade show active" id="FANC_10a" role="tabpanel">
+                						<div class='mb-3'>
+											<div id="fig_plot_10a">
+    
+        
+        
+            <a href="CRISPResso_on_params/10a.FANC.Substitution_frequencies_at_each_bp.pdf"><img src="CRISPResso_on_params/10a.FANC.Substitution_frequencies_at_each_bp.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10a: Substitution frequencies across the amplicon.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Nucleotide_frequency_table.txt">Nucleotide frequencies</a></small></p>
+        
+    
+</div>
+                						</div>
+										<div>
+											<label class="labelpadding">Figures 10b,c: Substitution frequencies across the entire amplicon (left) and in the quantification window (right).</label>
+											<div id="fig_plot_10b">
+    
+        
+        
+            <a href="CRISPResso_on_params/10b.FANC.Substitution_frequency_barplot.pdf"><img src="CRISPResso_on_params/10b.FANC.Substitution_frequency_barplot.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10b: Substitution frequencies across the amplicon.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Nucleotide_frequency_table.txt">Nucleotide frequencies</a></small></p>
+        
+    
+</div>
+											<div id="fig_plot_10c">
+    
+        
+        
+            <a href="CRISPResso_on_params/10c.FANC.Substitution_frequency_barplot_in_quantification_window.pdf"><img src="CRISPResso_on_params/10c.FANC.Substitution_frequency_barplot_in_quantification_window.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10c: Substitution frequencies in the quantification window</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Quantification_window_substitution_frequency_table.txt">Nucleotide frequencies in quantification window</a></small></p>
+        
+    
+</div>
+										</div>
+									</div>
+									
+									
+									<div class="tab-pane fade" id="FANC_10d" role="tabpanel">
+										
+										<div class='mb-4'>
+											<div id="fig_plot_10d_0">
+    
+        
+        
+            <a href="CRISPResso_on_params/10d.FANC.Log2_nucleotide_frequency_around_hi.pdf"><img src="CRISPResso_on_params/10d.FANC.Log2_nucleotide_frequency_around_hi.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10d: Log2 nucleotide frequencies for each position in the plotting window around the hi (GGAATCCCTTCTGCAGCACC). The quantification window is outlined by the dotted box.</label>
+        
+    
+</div>
+										</div>
+										
+										<div class='mb-4'>
+											<div id="fig_plot_10d_1">
+    
+        
+        
+            <a href="CRISPResso_on_params/10d.FANC.Log2_nucleotide_frequency_around_dear.pdf"><img src="CRISPResso_on_params/10d.FANC.Log2_nucleotide_frequency_around_dear.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10d: Log2 nucleotide frequencies for each position in the plotting window around the dear (AGCCTTGCAGTGGGCGCGCTA). The quantification window is outlined by the dotted box.</label>
+        
+    
+</div>
+										</div>
+										
+										<div class='mb-4'>
+											<div id="fig_plot_10d_2">
+    
+        
+        
+            <a href="CRISPResso_on_params/10d.FANC.Log2_nucleotide_frequency_around_sgRNA_CCCACTGAAGGCCC.pdf"><img src="CRISPResso_on_params/10d.FANC.Log2_nucleotide_frequency_around_sgRNA_CCCACTGAAGGCCC.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10d: Log2 nucleotide frequencies for each position in the plotting window around the sgRNA CCCACTGAAGGCCC. The quantification window is outlined by the dotted box.</label>
+        
+    
+</div>
+										</div>
+										
+									</div>
+									
+									
+					  				<div class="tab-pane fade" id="FANC_10e" role="tabpanel">
+						  				
+										<div class='mb-4'>
+			  								<div id="fig_plot_10e_0">
+    
+        
+        
+            <a href="CRISPResso_on_params/10e.FANC.Selected_conversion_at_Cs_around_hi.pdf"><img src="CRISPResso_on_params/10e.FANC.Selected_conversion_at_Cs_around_hi.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10e: Proportion of each base at each nucleotide targeted by base editors in the plotting window around the hi (GGAATCCCTTCTGCAGCACC). The number of each target base is annotated on the reference sequence at the bottom of the plot.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Selected_nucleotide_frequency_table_around_hi.txt">Nucleotide frequencies at Cs</a></small></p>
+        
+    
+</div>
+  										</div>
+										
+										<div class='mb-4'>
+			  								<div id="fig_plot_10e_1">
+    
+        
+        
+            <a href="CRISPResso_on_params/10e.FANC.Selected_conversion_at_Cs_around_dear.pdf"><img src="CRISPResso_on_params/10e.FANC.Selected_conversion_at_Cs_around_dear.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10e: Proportion of each base at each nucleotide targeted by base editors in the plotting window around the dear (AGCCTTGCAGTGGGCGCGCTA). The number of each target base is annotated on the reference sequence at the bottom of the plot.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Selected_nucleotide_frequency_table_around_dear.txt">Nucleotide frequencies at Cs</a></small></p>
+        
+    
+</div>
+  										</div>
+										
+										<div class='mb-4'>
+			  								<div id="fig_plot_10e_2">
+    
+        
+        
+            <a href="CRISPResso_on_params/10e.FANC.Selected_conversion_at_Cs_around_sgRNA_CCCACTGAAGGCCC.pdf"><img src="CRISPResso_on_params/10e.FANC.Selected_conversion_at_Cs_around_sgRNA_CCCACTGAAGGCCC.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10e: Proportion of each base at each nucleotide targeted by base editors in the plotting window around the sgRNA CCCACTGAAGGCCC. The number of each target base is annotated on the reference sequence at the bottom of the plot.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/FANC.Selected_nucleotide_frequency_table_around_sgRNA_CCCACTGAAGGCCC.txt">Nucleotide frequencies at Cs</a></small></p>
+        
+    
+</div>
+  										</div>
+										
+              						</div>
+									
+									
+									<div class="tab-pane fade" id="FANC_10f" role="tabpanel">
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10f">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                  						</div>
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10f">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                  						</div>
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10f">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                  						</div>
+										
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10g">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                    					</div>
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10g">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                    					</div>
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10g">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                    					</div>
+										
+									</div>
+								</div>
+							
+							</div>
+						</div> 
+					 
+					</div>  <!--end amp tab -->
+				
+					 
+					<div class="tab-pane fade" id="div_HDR" role="tabpanel" aria-labelledby="pills_HDR_tab">
+            			<div class="d-none d-print-block"><h3>Reads aligning to HDR</h3> </div>
+							
+
+		      				<div class='card text-center mb-2'>
+      							<div class='card-header'>
+								
+      								<h5>Nucleotide composition for HDR</h5>
+								
+      							</div>
+      							<div class='card-body'>
+								
+								<div class='div_zoom_outer d-none d-md-block' style="height:100px;border:1px solid #DDDDDD;position:relative">
+									<div id="zoomview_nucs_HDR" style="position:absolute;left:0;height:100%;width:100%;background-image: url(CRISPResso_on_params/2a.HDR.Nucleotide_percentage_quilt.png);background-size:auto 100%;background-repeat:no-repeat;"></div>
+  										<div class="d-lg-none" style="overflow-x:scroll;overflow-y:hidden;position:absolute;width:100%;height:100%">
+	  										<img src="CRISPResso_on_params/2a.HDR.Nucleotide_percentage_quilt.png" style='height:100%'>
+  										</div>
+								</div>
+									<div style='position:relative;display:inline-block;width:95%'>
+										<a href="CRISPResso_on_params/2a.HDR.Nucleotide_percentage_quilt.pdf">
+    									<div id='zoomlens_nucs_HDR' class="d-none d-lg-block" style='float: left;position: absolute;left: 0px;top: 0px;z-index: 1000;border: 1px solid #DDDDDD;height:100%;width:10%'></div>
+    										<img id='tozoom_nucs_HDR' src="CRISPResso_on_params/2a.HDR.Nucleotide_percentage_quilt.png" width='100%' style='position:relative'></a>
+										</div>
+										<label class="labelpadding">
+  										<span class='d-none d-md-block'>Hover your mouse over the bottom image to zoom in on a specific region.</span><br>
+  											Figure 2a: Nucleotide distribution across amplicon. At each base in the reference amplicon, the percentage of each base as observed in sequencing reads is shown (A = green; C = orange; G = yellow; T = purple). Black bars show the percentage of reads for which that base was deleted. Brown bars between bases show the percentage of reads having an insertion at that position.
+										</label>
+							  			
+							  			<p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Nucleotide_frequency_table.txt">Nucleotide frequency table</a></small></p>
+                						
+								
+
+								
+  									
+									<div id="fig_plot_2b_0">
+    
+        
+        
+            <a href="CRISPResso_on_params/2b.HDR.Nucleotide_percentage_quilt_around_hi.pdf"><img src="CRISPResso_on_params/2b.HDR.Nucleotide_percentage_quilt_around_hi.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 2b: Nucleotide distribution around the hi (GGAATCCCTTCTGCAGCACC).</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Quantification_window_nucleotide_frequency_table.txt">Nucleotide frequency in quantification window</a></small></p>
+        
+    
+</div>
+  									
+									<div id="fig_plot_2b_1">
+    
+        
+        
+            <a href="CRISPResso_on_params/2b.HDR.Nucleotide_percentage_quilt_around_dear.pdf"><img src="CRISPResso_on_params/2b.HDR.Nucleotide_percentage_quilt_around_dear.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 2b: Nucleotide distribution around the dear (AGCCTTGCAGTGGGCGCGCTA).</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Quantification_window_nucleotide_frequency_table.txt">Nucleotide frequency in quantification window</a></small></p>
+        
+    
+</div>
+  									
+									<div id="fig_plot_2b_2">
+    
+        
+        
+            <a href="CRISPResso_on_params/2b.HDR.Nucleotide_percentage_quilt_around_sgRNA_CCCACTGAAGGCCC.pdf"><img src="CRISPResso_on_params/2b.HDR.Nucleotide_percentage_quilt_around_sgRNA_CCCACTGAAGGCCC.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 2b: Nucleotide distribution around the sgRNA CCCACTGAAGGCCC.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Quantification_window_nucleotide_frequency_table.txt">Nucleotide frequency in quantification window</a></small></p>
+        
+    
+</div>
+  									
+								
+            		</div>
+					</div> 
+
+  						<div class='card text-center mb-2'>
+  							<div class='card-header'>
+								
+      							<h5>Modification lengths for HDR</h5>
+								
+  								<ul class="nav nav-tabs justify-content-center card-header-tabs" id="aln-tab" role="tablist">
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#HDR_3a" role="tab" aria-controls="HDR_3a" aria-selected="true">Summary</button>
+  						  			</li>
+            								
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#HDR_3b" role="tab" aria-controls="HDR_3b" aria-selected="false">Indels</button>
+  						  			</li>
+            						
+  								</ul>
+  							</div>
+  							<div class='card-body'>
+								<div class="tab-content" id="pills-tabContent">
+									
+  						  			<div class="tab-pane fade show active" id="HDR_3a" role="tabpanel">
+							  			<div id="fig_plot_3a">
+    
+        
+        
+            <a href="CRISPResso_on_params/3a.HDR.Indel_size_distribution.pdf"><img src="CRISPResso_on_params/3a.HDR.Indel_size_distribution.png" width='40%' height='40%' ></a>
+             
+        
+        <label class="labelpadding">Figure 3a: Frequency distribution of alleles with indels (blue) and without indels (red).</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Indel_histogram.txt">Indel histogram</a></small></p>
+        
+    
+</div>
+						  			</div>
+									
+
+									
+  						  			<div class="tab-pane fade" id="HDR_3b" role="tabpanel">
+							  			<div id="fig_plot_3b">
+    
+        
+        
+            <a href="CRISPResso_on_params/3b.HDR.Insertion_deletion_substitutions_size_hist.pdf"><img src="CRISPResso_on_params/3b.HDR.Insertion_deletion_substitutions_size_hist.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 3b: Left panel, frequency distribution of sequence modifications that increase read length with respect to the reference amplicon, classified as insertions (positive indel size). Middle panel, frequency distribution of sequence modifications that reduce read length with respect to the reference amplicon, classified as deletions (negative indel size). Right panel, frequency distribution of sequence modifications that do not alter read length with respect to the reference amplicon, which are classified as substitutions (number of substituted positions shown).</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Insertion_histogram.txt">Insertions frequency</a></small></p>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Deletion_histogram.txt">Deletions Frequency</a></small></p>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Substitution_histogram.txt">Substitutions Frequency</a></small></p>
+        
+    
+</div>
+						  			</div>
+									
+  								</div>
+  							</div> 
+  						</div> 
+
+						<div class='card text-center mb-2'>
+  							<div class='card-header'>
+								
+  								<h5>Indel characterization for HDR</h5>
+								
+  								<ul class="nav nav-tabs justify-content-center card-header-tabs" id="indel-characterization-tabs" role="tablist">
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#HDR_4a" role="tab" aria-controls="HDR_4a" aria-selected="true">All Modifications Combined</button>
+  						  			</li>
+            								
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#HDR_4b" role="tab" aria-controls="HDR_4b" aria-selected="false">All Modifications by Type</button>
+  						  			</li>
+            								
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#HDR_4c" role="tab" aria-controls="HDR_4c" aria-selected="false">Modifications in Quantification Window</button>
+  						  			</li>
+            								
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#HDR_4d" role="tab" aria-controls="HDR_4d" aria-selected="false">Indel Lengths</button>
+  						  			</li>
+            								
+									
+									
+  								</ul>
+  							</div> 
+  							<div class='card-body'>
+  								<div class="tab-content" id="pills-tabContent">
+									
+									<div class="tab-pane fade" id="HDR_4a" role="tabpanel">
+										<div id="fig_plot_4a">
+    
+        
+        
+            <a href="CRISPResso_on_params/4a.HDR.Combined_insertion_deletion_substitution_locations.pdf"><img src="CRISPResso_on_params/4a.HDR.Combined_insertion_deletion_substitution_locations.png" width='40%' height='40%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4a: Combined frequency of any modification across the amplicon. Modifications outside of the quantification window are also shown.</label>
+        
+    
+</div>
+									</div>
+									
+									
+									<div class="tab-pane fade show active" id="HDR_4b" role="tabpanel">
+										<div id="fig_plot_4b">
+    
+        
+        
+            <a href="CRISPResso_on_params/4b.HDR.Insertion_deletion_substitution_locations.pdf"><img src="CRISPResso_on_params/4b.HDR.Insertion_deletion_substitution_locations.png" width='40%' height='40%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4b: Frequency of insertions (red), deletions (purple), and substitutions (green) across the entire amplicon, including modifications outside of the quantification window.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Modification_count_vectors.txt">Modification frequency</a></small></p>
+        
+    
+</div>
+									</div>
+									
+									
+									<div class="tab-pane fade" id="HDR_4c" role="tabpanel">
+										<div id="fig_plot_4c">
+    
+        
+        
+            <a href="CRISPResso_on_params/4c.HDR.Quantification_window_insertion_deletion_substitution_locations.pdf"><img src="CRISPResso_on_params/4c.HDR.Quantification_window_insertion_deletion_substitution_locations.png" width='40%' height='40%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4c: Frequency of insertions (red), deletions (purple), and substitutions (green) across the entire amplicon, considering only modifications that overlap with the quantification window.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Quantification_window_modification_count_vectors.txt">Modification frequency in quantification window</a></small></p>
+        
+    
+</div>
+									</div>
+									
+
+									
+									<div class="tab-pane fade" id="HDR_4d" role="tabpanel">
+										<div id="fig_plot_4d">
+    
+        
+        
+            <a href="CRISPResso_on_params/4d.HDR.Position_dependent_average_indel_size.pdf"><img src="CRISPResso_on_params/4d.HDR.Position_dependent_average_indel_size.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 4d: Position dependent insertion size(left) and deletion size (right), including only modifications that overlap with the quantification window.</label>
+        
+    
+</div>
+									</div>
+									
+
+									
+
+									
+  								</div>
+  							</div> 
+  						</div> 
+
+
+						
+						<div class='card text-center mb-2'>
+							<div class='card-header'>
+								
+  								<h5>Frameshift analysis for HDR</h5>
+								
+							</div>
+  							<div class='card-body'>
+								<div id="fig_plot_5">
+    
+        
+        
+            <a href="CRISPResso_on_params/5.HDR.Frameshift_in-frame_mutations_pie_chart.pdf"><img src="CRISPResso_on_params/5.HDR.Frameshift_in-frame_mutations_pie_chart.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 5: Frameshift analysis of coding sequence reads affected by modifications (unmodified reads are excluded from this analysis).</label>
+        
+    
+</div>
+							</div>
+						</div>
+						
+
+						
+						<div class='card text-center mb-2'>
+							<div class='card-header'>
+								
+  								<h5>Frameshift mutagenesis profiles for HDR</h5>
+								
+							</div>
+  							<div class='card-body'>
+								<div id="fig_plot_6">
+    
+        
+        
+            <a href="CRISPResso_on_params/6.HDR.Frameshift_in-frame_mutation_profiles.pdf"><img src="CRISPResso_on_params/6.HDR.Frameshift_in-frame_mutation_profiles.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 6: Frameshift and in-frame mutagenesis profiles indicating position affected by modification. The y axis shows the number of reads and percentage of all reads in that category (frameshifted (top) or in-frame (bottom)). 0 reads with no length modifications are not shown.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Indel_histogram.txt">Indel histogram for HDR</a></small></p>
+        
+    
+</div>
+							</div>
+						</div>
+						
+
+						
+						<div class='card text-center mb-2'>
+							<div class='card-header'>
+								
+  								<h5>Coding mutations for HDR</h5>
+								
+							</div>
+  							<div class='card-body'>
+								<div id="fig_plot_7">
+    
+        
+        
+            <a href="CRISPResso_on_params/7.HDR.Insertion_deletion_substitution_locations_noncoding.pdf"><img src="CRISPResso_on_params/7.HDR.Insertion_deletion_substitution_locations_noncoding.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 7: Reads with insertions (red), deletions (purple), and substitutions (green) mapped to reference amplicon position exclusively in noncoding region/s (that is, without mutations affecting coding sequences). The predicted cleavage site is indicated by a vertical dashed line. Only sequence positions directly adjacent to insertions or directly affected by deletions or substitutions are plotted.</label>
+        
+    
+</div>
+							</div>
+						</div>
+						
+
+						
+						<div class='card text-center mb-2'>
+							<div class='card-header'>
+								
+  								<h5>Splicing for HDR</h5>
+								
+							</div>
+  							<div class='card-body'>
+								<div id="fig_plot_8">
+    
+        
+        
+            <a href="CRISPResso_on_params/8.HDR.Potential_splice_sites_pie_chart.pdf"><img src="CRISPResso_on_params/8.HDR.Potential_splice_sites_pie_chart.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 8: Predicted impact on splice sites. Potential splice sites modified refers to reads in which the either of the two intronic positions adjacent to exon junctions are disrupted.</label>
+        
+    
+</div>
+							</div>
+						</div>
+						
+
+						
+						<div class='card text-center mb-2'>
+							<div class='card-header'>
+								
+  								<h5>Allele plots for HDR</h5>
+								
+							</div>
+							<div class='card-body'>
+								
+                  				<div class='mb-4'>
+					  				<div id="fig_plot_9_0">
+    
+        
+        
+            <a href="CRISPResso_on_params/9.HDR.Alleles_frequency_table_around_hi.pdf"><img src="CRISPResso_on_params/9.HDR.Alleles_frequency_table_around_hi.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the hi (GGAATCCCTTCTGCAGCACC). Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Alleles_frequency_table_around_hi.txt">Allele frequency table</a></small></p>
+        
+    
+</div>
+                				</div>
+								
+                  				<div class='mb-4'>
+					  				<div id="fig_plot_9_1">
+    
+        
+        
+            <a href="CRISPResso_on_params/9.HDR.Alleles_frequency_table_around_dear.pdf"><img src="CRISPResso_on_params/9.HDR.Alleles_frequency_table_around_dear.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the dear (AGCCTTGCAGTGGGCGCGCTA). Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Alleles_frequency_table_around_dear.txt">Allele frequency table</a></small></p>
+        
+    
+</div>
+                				</div>
+								
+                  				<div class='mb-4'>
+					  				<div id="fig_plot_9_2">
+    
+        
+        
+            <a href="CRISPResso_on_params/9.HDR.Alleles_frequency_table_around_sgRNA_CCCACTGAAGGCCC.pdf"><img src="CRISPResso_on_params/9.HDR.Alleles_frequency_table_around_sgRNA_CCCACTGAAGGCCC.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the sgRNA CCCACTGAAGGCCC. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Alleles_frequency_table_around_sgRNA_CCCACTGAAGGCCC.txt">Allele frequency table</a></small></p>
+        
+    
+</div>
+                				</div>
+								
+							</div>
+						</div>
+						
+
+						
+  						<div class='card text-center mb-2'>
+  							<div class='card-header'>
+								
+  								<h5>Base editing for HDR</h5>
+								
+  								<ul class="nav nav-tabs justify-content-center card-header-tabs" id="aln-tab" role="tablist">
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#HDR_10a" role="tab" aria-controls="HDR_10a" aria-selected="true">Substitution Frequencies</button>
+  						  			</li>
+									
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#HDR_10d" role="tab" aria-controls="HDR_10d" aria-selected="false">Nucleotide Frequencies</button>
+  						  			</li>
+									
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#HDR_10e" role="tab" aria-controls="HDR_10e" aria-selected="false">Base Proportions</button>
+  						  			</li>
+            						
+									
+  						  			<li class="nav-item">
+						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#HDR_10f" role="tab" aria-controls="HDR_10f" aria-selected="false">Non-reference Bases</button>
+  						  			</li>
+            						
+  								</ul>
+							</div>
+							<div class='card-body'>
+								<div class="tab-content" id="pills-tabContent">
+									
+					  				<div class="tab-pane fade show active" id="HDR_10a" role="tabpanel">
+                						<div class='mb-3'>
+											<div id="fig_plot_10a">
+    
+        
+        
+            <a href="CRISPResso_on_params/10a.HDR.Substitution_frequencies_at_each_bp.pdf"><img src="CRISPResso_on_params/10a.HDR.Substitution_frequencies_at_each_bp.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10a: Substitution frequencies across the amplicon.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Nucleotide_frequency_table.txt">Nucleotide frequencies</a></small></p>
+        
+    
+</div>
+                						</div>
+										<div>
+											<label class="labelpadding">Figures 10b,c: Substitution frequencies across the entire amplicon (left) and in the quantification window (right).</label>
+											<div id="fig_plot_10b">
+    
+        
+        
+            <a href="CRISPResso_on_params/10b.HDR.Substitution_frequency_barplot.pdf"><img src="CRISPResso_on_params/10b.HDR.Substitution_frequency_barplot.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10b: Substitution frequencies across the amplicon.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Nucleotide_frequency_table.txt">Nucleotide frequencies</a></small></p>
+        
+    
+</div>
+											<div id="fig_plot_10c">
+    
+        
+        
+            <a href="CRISPResso_on_params/10c.HDR.Substitution_frequency_barplot_in_quantification_window.pdf"><img src="CRISPResso_on_params/10c.HDR.Substitution_frequency_barplot_in_quantification_window.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10c: Substitution frequencies in the quantification window</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Quantification_window_substitution_frequency_table.txt">Nucleotide frequencies in quantification window</a></small></p>
+        
+    
+</div>
+										</div>
+									</div>
+									
+									
+									<div class="tab-pane fade" id="HDR_10d" role="tabpanel">
+										
+										<div class='mb-4'>
+											<div id="fig_plot_10d_0">
+    
+        
+        
+            <a href="CRISPResso_on_params/10d.HDR.Log2_nucleotide_frequency_around_hi.pdf"><img src="CRISPResso_on_params/10d.HDR.Log2_nucleotide_frequency_around_hi.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10d: Log2 nucleotide frequencies for each position in the plotting window around the hi (GGAATCCCTTCTGCAGCACC). The quantification window is outlined by the dotted box.</label>
+        
+    
+</div>
+										</div>
+										
+										<div class='mb-4'>
+											<div id="fig_plot_10d_1">
+    
+        
+        
+            <a href="CRISPResso_on_params/10d.HDR.Log2_nucleotide_frequency_around_dear.pdf"><img src="CRISPResso_on_params/10d.HDR.Log2_nucleotide_frequency_around_dear.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10d: Log2 nucleotide frequencies for each position in the plotting window around the dear (AGCCTTGCAGTGGGCGCGCTA). The quantification window is outlined by the dotted box.</label>
+        
+    
+</div>
+										</div>
+										
+										<div class='mb-4'>
+											<div id="fig_plot_10d_2">
+    
+        
+        
+            <a href="CRISPResso_on_params/10d.HDR.Log2_nucleotide_frequency_around_sgRNA_CCCACTGAAGGCCC.pdf"><img src="CRISPResso_on_params/10d.HDR.Log2_nucleotide_frequency_around_sgRNA_CCCACTGAAGGCCC.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10d: Log2 nucleotide frequencies for each position in the plotting window around the sgRNA CCCACTGAAGGCCC. The quantification window is outlined by the dotted box.</label>
+        
+    
+</div>
+										</div>
+										
+									</div>
+									
+									
+					  				<div class="tab-pane fade" id="HDR_10e" role="tabpanel">
+						  				
+										<div class='mb-4'>
+			  								<div id="fig_plot_10e_0">
+    
+        
+        
+            <a href="CRISPResso_on_params/10e.HDR.Selected_conversion_at_Cs_around_hi.pdf"><img src="CRISPResso_on_params/10e.HDR.Selected_conversion_at_Cs_around_hi.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10e: Proportion of each base at each nucleotide targeted by base editors in the plotting window around the hi (GGAATCCCTTCTGCAGCACC). The number of each target base is annotated on the reference sequence at the bottom of the plot.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Selected_nucleotide_frequency_table_around_hi.txt">Nucleotide frequencies at Cs</a></small></p>
+        
+    
+</div>
+  										</div>
+										
+										<div class='mb-4'>
+			  								<div id="fig_plot_10e_1">
+    
+        
+        
+            <a href="CRISPResso_on_params/10e.HDR.Selected_conversion_at_Cs_around_dear.pdf"><img src="CRISPResso_on_params/10e.HDR.Selected_conversion_at_Cs_around_dear.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10e: Proportion of each base at each nucleotide targeted by base editors in the plotting window around the dear (AGCCTTGCAGTGGGCGCGCTA). The number of each target base is annotated on the reference sequence at the bottom of the plot.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Selected_nucleotide_frequency_table_around_dear.txt">Nucleotide frequencies at Cs</a></small></p>
+        
+    
+</div>
+  										</div>
+										
+										<div class='mb-4'>
+			  								<div id="fig_plot_10e_2">
+    
+        
+        
+            <a href="CRISPResso_on_params/10e.HDR.Selected_conversion_at_Cs_around_sgRNA_CCCACTGAAGGCCC.pdf"><img src="CRISPResso_on_params/10e.HDR.Selected_conversion_at_Cs_around_sgRNA_CCCACTGAAGGCCC.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding">Figure 10e: Proportion of each base at each nucleotide targeted by base editors in the plotting window around the sgRNA CCCACTGAAGGCCC. The number of each target base is annotated on the reference sequence at the bottom of the plot.</label>
+        
+            <p class="m-0"><small>Data: <a href="CRISPResso_on_params/HDR.Selected_nucleotide_frequency_table_around_sgRNA_CCCACTGAAGGCCC.txt">Nucleotide frequencies at Cs</a></small></p>
+        
+    
+</div>
+  										</div>
+										
+              						</div>
+									
+									
+									<div class="tab-pane fade" id="HDR_10f" role="tabpanel">
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10f">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                  						</div>
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10f">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                  						</div>
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10f">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                  						</div>
+										
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10g">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                    					</div>
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10g">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                    					</div>
+										
+                  						<div class='mb-4'>
+			  								<div id="fig_plot_10g">
+    
+        
+        
+            <a href="CRISPResso_on_params/.pdf"><img src="CRISPResso_on_params/.png" width='85%' height='85%' ></a>
+             
+        
+        <label class="labelpadding"></label>
+        
+    
+</div>
+                    					</div>
+										
+									</div>
+								</div>
+							
+							</div>
+						</div> 
+					 
+					</div>  <!--end amp tab -->
+				
+				</div>  <!-- end tab content -->
+			</div> <!-- end card -->
+		</div>  <!-- end jumbotron_content -->
+	</div>  <!-- end jumbotron -->
+</div>  <!-- end column -->
+</center>
+
+<div class="col-sm-1"></div>
+
+
+			
+			<div class="row">
+			<div class="col-sm-1"></div>
+			<footer class="col-sm-10 crispresso_body_div" style='padding-bottom:3em'>
+			  <p class="text-center"><small> &copy; Copyright <a href="http://edilytics.com">Edilytics</a></small></p>
+			</footer>
+			<div class="col-sm-1"></div>
+		</div>
+		
+    </div>
+
+
+			<!-- Optional JavaScript -->
+	    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.3.5/jquery.fancybox.min.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+			
+<script>
+function updateZoom(e) {
+  /*prevent any other actions that may occur when moving over the image:*/
+//  e.preventDefault();
+  var img = e.target.imgObj
+  var view = e.target.viewObj
+  var lens = e.target.lensObj
+
+  if (!lens.hasWidthSet)
+  {
+    view_height = $('#'+view.id).height()
+    view_width = $('#'+view.id).width()
+    img_height = $('#'+img.id).height()
+    img_width = $('#'+img.id).width()
+    lens_height = $('#'+lens.id).height()
+    lens_width = $('#'+lens.id).width()
+
+    new_width = img_height * view_width/view_height  //make up for loss of precision
+    $('#'+lens.id).outerWidth(new_width)
+    lens.hasWidthSet = true
+
+    cx = view_width / new_width
+
+    view.view_height = view_height
+    view.view_width = view_width
+    img.img_height = img_height
+    img.img_width = img_width
+    lens.lens_height = lens_height
+    lens.lens_width = new_width
+
+  }
+
+  var pos, x, y;
+  /*get the cursor's x and y positions:*/
+  pos = getCursorPos(e,img);
+  /*calculate the position of the lens:*/
+  x = pos.x - (lens.lens_width / 2);
+  /*prevent the lens from being positioned outside the image:*/
+  if (x > img.img_width - lens.lens_width) {x = img.img_width - lens.lens_width;;
+  }
+  if (x < 0) {x = 0;}
+  lens.style.left = x + "px";
+  view.style.backgroundPosition = "-" + (x * cx) + "px 0px";
+}
+
+function getCursorPos(e,img) {
+  var a, x = 0, y = 0;
+  e = e || window.event;
+  /*get the x and y positions of the image:*/
+  a = img.getBoundingClientRect();
+  /*calculate the cursor's x and y coordinates, relative to the image:*/
+  x = e.pageX - a.left;
+  y = e.pageY - a.top;
+  /*consider any page scrolling:*/
+  x = x - window.pageXOffset;
+  y = y - window.pageYOffset;
+  return {x : x, y : y};
+}
+
+var passiveSupported = false;
+try {
+  var options = {
+    get passive() { // This function will be called when the browser
+                    //   attempts to access the passive property.
+      passiveSupported = true;
+    }
+  };
+
+  window.addEventListener("test", options, options);
+  window.removeEventListener("test", options, options);
+} catch(err) {
+  passiveSupported = false;
+}
+
+	
+		
+		view = document.getElementById('zoomview_nucs_FANC');
+		img = document.getElementById('tozoom_nucs_FANC');
+		lens = document.getElementById('zoomlens_nucs_FANC')
+
+		img.viewObj = view
+		img.lensObj = lens
+		img.imgObj = img
+
+		lens.viewObj = view
+		lens.lensObj = lens
+		lens.imgObj = img
+
+		lens.addEventListener("mousemove", updateZoom, passiveSupported? { passive: true } : false);
+		img.addEventListener("mousemove", updateZoom, passiveSupported? { passive: true } : false);
+		/*and also for touch screens:*/
+		lens.addEventListener("touchmove", updateZoom, passiveSupported? { passive: true } : false);
+		img.addEventListener("touchmove", updateZoom, passiveSupported? { passive: true } : false);
+
+		
+	
+		
+		view = document.getElementById('zoomview_nucs_HDR');
+		img = document.getElementById('tozoom_nucs_HDR');
+		lens = document.getElementById('zoomlens_nucs_HDR')
+
+		img.viewObj = view
+		img.lensObj = lens
+		img.imgObj = img
+
+		lens.viewObj = view
+		lens.lensObj = lens
+		lens.imgObj = img
+
+		lens.addEventListener("mousemove", updateZoom, passiveSupported? { passive: true } : false);
+		img.addEventListener("mousemove", updateZoom, passiveSupported? { passive: true } : false);
+		/*and also for touch screens:*/
+		lens.addEventListener("touchmove", updateZoom, passiveSupported? { passive: true } : false);
+		img.addEventListener("touchmove", updateZoom, passiveSupported? { passive: true } : false);
+
+		
+	
+	</script>
+
+	</body>
+
+</html>

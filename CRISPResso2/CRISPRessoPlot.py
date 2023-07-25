@@ -1405,7 +1405,7 @@ def plot_frameshift_frequency(
     ax1.bar(x - 0.1, y)
     ax1.set_xlim(-30.5, 30.5)
     ax1.set_frame_on(False)
-    ax1.set_xticks([idx for idx in range(-30, 31) if idx % 3])
+    ax1.set_xticks([idx for idx in range(-30, 31) if idx % 3 == 0])
     ax1.tick_params(
         which='both',      # both major and minor ticks are affected
         bottom=False,      # ticks along the bottom edge are off
@@ -1416,7 +1416,7 @@ def plot_frameshift_frequency(
     xmin, xmax = ax1.get_xaxis().get_view_interval()
     ymin, ymax = ax1.get_yaxis().get_view_interval()
     ax1.set_xticklabels(
-        map(str, [idx for idx in range(-30, 31) if idx % 3]),
+        map(str, [idx for idx in range(-30, 31) if idx % 3 == 0]),
         rotation='vertical',
     )
     ax1.set_title(plot_titles['fs'])
@@ -1536,7 +1536,7 @@ def plot_global_frameshift_in_frame_mutations(
     ax1.bar(x - 0.1, y)
     ax1.set_xlim(-30.5, 30.5)
     ax1.set_frame_on(False)
-    ax1.set_xticks([idx for idx in range(-30, 31) if idx % 3])
+    ax1.set_xticks([idx for idx in range(-30, 31) if idx % 3 == 0])
     ax1.tick_params(
         which='both',      # both major and minor ticks are affected
         bottom=False,      # ticks along the bottom edge are off
@@ -1547,7 +1547,7 @@ def plot_global_frameshift_in_frame_mutations(
     xmin, xmax = ax1.get_xaxis().get_view_interval()
     ymin, ymax = ax1.get_yaxis().get_view_interval()
     ax1.set_xticklabels(
-        map(str, [idx for idx in range(-30, 31) if idx % 3]),
+        map(str, [idx for idx in range(-30, 31) if idx % 3 == 0]),
         rotation='vertical',
     )
     ax1.set_title('Global Frameshift profile')
