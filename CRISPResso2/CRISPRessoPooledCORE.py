@@ -688,7 +688,7 @@ def main():
                         info(f'Matching header {head} with {lowercase_default_amplicon_headers[match[0]]}.')
 
             if len(headers) > 5 and not has_header:
-                    raise CRISPRessoShared.BadParameterException('Incorrect number of columns provided without header.')
+                raise CRISPRessoShared.BadParameterException('Incorrect number of columns provided without header.')
             elif has_header and has_unmatched_header_el:
                 raise CRISPRessoShared.BadParameterException('Unable to match headers: ' + str(unmatched_headers))
             
