@@ -663,6 +663,7 @@ def main():
             lowercase_default_amplicon_headers = {h.lower(): h for h in default_input_amplicon_headers}
 
             headers = []
+            unmatched_headers = []
             has_header = False
             has_unmatched_header_el = False
             for head in header_els:
@@ -679,21 +680,23 @@ def main():
                 match = difflib.get_close_matches(long_head, lowercase_default_amplicon_headers, n=1)
                 if not match:
                     has_unmatched_header_el = True
-                    warn(f'Unable to find matches for header value "{head}". Using the default header values and order.')
-                    break
+                    unmatched_headers.append(head)
                 else:
                     has_header = True
                     headers.append(lowercase_default_amplicon_headers[match[0]])
                     if args.debug:
                         info(f'Matching header {head} with {lowercase_default_amplicon_headers[match[0]]}.')
 
-            if not has_header or has_unmatched_header_el:
+            if len(headers) > 5 and not has_header:
+                    raise CRISPRessoShared.BadParameterException('Incorrect number of columns provided without header.')
+            elif has_header and has_unmatched_header_el:
+                raise CRISPRessoShared.BadParameterException('Unable to match headers: ' + str(unmatched_headers))
+            
+            if not has_header:
                 # Default header
                 headers = []
                 for i in range(len(header_els)):
                     headers.append(default_input_amplicon_headers[i])
-                if len(headers) > 5:
-                    raise CRISPRessoShared.BadParameterException('Incorrect number of columns provided without header.')
 
             if args.debug:
                 info(f'Header variable names in order: {headers}')
