@@ -13,7 +13,7 @@ if sys.version_info > (3, 0):
     running_python3 = True
 
 import argparse
-from collections import defaultdict
+from collections import Counter
 from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor, wait
 from functools import partial
@@ -87,8 +87,6 @@ def check_program(binary_name,download_url=None):
         if download_url:
             error('You can download it here:%s' % download_url)
         sys.exit(1)
-
-
 
 def get_avg_read_length_fastq(fastq_filename):
      cmd=('z' if fastq_filename.endswith('.gz') else '' ) +('cat < \"%s\"' % fastq_filename)+\
@@ -1001,6 +999,21 @@ def main():
         header = CRISPRessoShared.get_crispresso_header(description=description, header_str=None)
         print(header)
 
+        # if no args are given, print a simplified help message
+        if len(sys.argv) == 1:
+            print(CRISPRessoShared.format_cl_text('usage: CRISPResso [-r1 FASTQ_R1] [-r2 FASTQ_R2] [-a AMPLICON_SEQ] [-g GUIDE_SEQ] [-n NAME]\n' + \
+                'commonly-used arguments:\n' + \
+                '-h, --help            show the full list of arguments\n' + \
+                '-v, --version         show program\'s version number and exit\n' + \
+                '-r1 FASTQ_R1          Input fastq file R1 (default: None)\n' + \
+                '-r2 FASTQ_R2          Input fastq file R2 (default: None)\n' + \
+                '-a AMPLICON_SEQ       Amplicon sequence (default: None)\n' + \
+                '-g GUIDE_SEQ          Guide sequence (default: None)\n' + \
+                '-n NAME, --name NAME  Name for the analysis (default: name based on input file name)'
+            ))
+            sys.exit()
+
+
         arg_parser = CRISPRessoShared.getCRISPRessoArgParser()
         args = arg_parser.parse_args()
 
@@ -1052,8 +1065,10 @@ def main():
         #check files and get output name
         if args.fastq_r1:
             CRISPRessoShared.check_file(args.fastq_r1)
+            CRISPRessoShared.assert_fastq_format(args.fastq_r1)
             if args.fastq_r2:
                 CRISPRessoShared.check_file(args.fastq_r2)
+                CRISPRessoShared.assert_fastq_format(args.fastq_r2)
         elif args.bam_input:
             CRISPRessoShared.check_file(args.bam_input)
         else:
@@ -1358,19 +1373,25 @@ def main():
             f1,f2,fw_score=CRISPResso2Align.global_align(pegRNA_spacer_seq,amplicon_seq_arr[0].upper(),matrix=aln_matrix,gap_incentive=amp_incentive,gap_open=args.needleman_wunsch_gap_open,gap_extend=args.needleman_wunsch_gap_extend,)
             r1,r2,rv_score=CRISPResso2Align.global_align(pegRNA_spacer_seq,CRISPRessoShared.reverse_complement(amplicon_seq_arr[0].upper()),matrix=aln_matrix,gap_incentive=amp_incentive,gap_open=args.needleman_wunsch_gap_open,gap_extend=args.needleman_wunsch_gap_extend,)
             if rv_score > fw_score:
+                if args.debug:
+                    info('pegRNA spacer alignment:\nForward (correct orientation):\n%s\n%s\nScore: %s\nReverse (incorrect orientation):\n%s\n%s\nScore: %s' % (f1,f2,fw_score,r1,r2,rv_score))
+                error_msg = 'The prime editing pegRNA spacer sequence appears to be given in the 3\'->5\' order. The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) must be given in the RNA 5\'->3\' order.'
                 if args.prime_editing_override_sequence_checks:
-                    warn('The prime editing pegRNA spacer sequence appears to be given in the 3\'->5\' order. The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) must be given in the RNA 5\'->3\' order.')
+                    warn(error_msg)
                 else:
-                    raise CRISPRessoShared.BadParameterException('The prime editing pegRNA spacer sequence appears to be given in the 3\'->5\' order. The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) must be given in the RNA 5\'->3\' order.')
+                    raise CRISPRessoShared.BadParameterException(error_msg)
 
             ref_incentive = np.zeros(len(prime_editing_extension_seq_dna)+1, dtype=int)
             f1, f2, fw_score=CRISPResso2Align.global_align(pegRNA_spacer_seq, prime_editing_extension_seq_dna, matrix=aln_matrix, gap_incentive=ref_incentive, gap_open=args.needleman_wunsch_gap_open, gap_extend=0,)
             r1, r2, rv_score=CRISPResso2Align.global_align(pegRNA_spacer_seq, extension_seq_dna_top_strand, matrix=aln_matrix, gap_incentive=ref_incentive, gap_open=args.needleman_wunsch_gap_open, gap_extend=0,)
             if rv_score > fw_score:
+                if args.debug:
+                    info('pegRNA spacer vs extension_seq alignment:\nForward (correct orientation):\n%s\n%s\nScore: %s\nReverse (incorrect orientation):\n%s\n%s\nScore: %s' % (f1,f2,fw_score,r1,r2,rv_score))
+                error_msg = "The pegRNA spacer aligns to the pegRNA extension sequence in 3'->5' direction. The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) must be given in the RNA 5'->3' order, and the pegRNA extension sequence (--prime_editing_pegRNA_extension_seq) must be given in the 5'->3' order. In other words, the pegRNA spacer sequence should be found in the given reference sequence, and the reverse complement of the pegRNA extension sequence should be found in the reference sequence."
                 if args.prime_editing_override_sequence_checks:
-                    warn("The pegRNA spacer aligns to the pegRNA extension sequence in 3'->5' direction. The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) must be given in the RNA 5'->3' order, and the pegRNA extension sequence (--prime_editing_pegRNA_extension_seq) must be given in the 5'->3' order. In other words, the pegRNA spacer sequence should be found in the given reference sequence, and the reverse complement of the pegRNA extension sequence should be found in the reference sequence.")
+                    warn(error_msg)
                 else:
-                    raise CRISPRessoShared.BadParameterException("The pegRNA spacer aligns to the pegRNA extension sequence in 3'->5' direction. The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) must be given in the RNA 5'->3' order, and the pegRNA extension sequence (--prime_editing_pegRNA_extension_seq) must be given in the 5'->3' order. In other words, the pegRNA spacer sequence should be found in the given reference sequence, and the reverse complement of the pegRNA extension sequence should be found in the reference sequence.")
+                    raise CRISPRessoShared.BadParameterException(error_msg)
 
             #setting refs['Prime-edited']['sequence']
             #first, align the extension seq to the reference amplicon
@@ -2433,14 +2454,14 @@ def main():
             deletion_length_vectors              [ref_name] = np.zeros(this_len_amplicon)
 
 
-            inserted_n_dicts                    [ref_name] = defaultdict(int)
-            deleted_n_dicts                     [ref_name] = defaultdict(int)
-            substituted_n_dicts                 [ref_name] = defaultdict(int)
-            effective_len_dicts                 [ref_name] = defaultdict(int)
+            inserted_n_dicts                    [ref_name] = Counter()
+            deleted_n_dicts                     [ref_name] = Counter()
+            substituted_n_dicts                 [ref_name] = Counter()
+            effective_len_dicts                 [ref_name] = Counter()
 
-            hists_inframe                       [ref_name] = defaultdict(int)
+            hists_inframe                       [ref_name] = Counter()
             hists_inframe                       [ref_name][0] = 0
-            hists_frameshift                    [ref_name] = defaultdict(int)
+            hists_frameshift                    [ref_name] = Counter()
             hists_frameshift                    [ref_name][0] = 0
         #end initialize data structures for each ref
         def get_allele_row(reference_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, write_detailed_allele_table):
@@ -2856,7 +2877,7 @@ def main():
         df_alleles['%Reads']=df_alleles['#Reads']/N_TOTAL*100
         df_alleles[['n_deleted', 'n_inserted', 'n_mutated']] = df_alleles[['n_deleted', 'n_inserted', 'n_mutated']].astype(int)
 
-        df_alleles.sort_values(by='#Reads', ascending=False, inplace=True)
+        df_alleles.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
 
         def calculate_99_max(d):
             """
@@ -3382,7 +3403,7 @@ def main():
 
         if n_processes > 1:
             process_pool = ProcessPoolExecutor(n_processes)
-            process_futures = []
+            process_futures = {}
         else:
             process_pool = None
             process_futures = None
@@ -4218,7 +4239,7 @@ def main():
                     df_to_plot = df_alleles_around_cut
                     if not args.expand_allele_plots_by_quantification:
                         df_to_plot = df_alleles_around_cut.groupby(['Aligned_Sequence', 'Reference_Sequence']).sum().reset_index().set_index('Aligned_Sequence')
-                        df_to_plot.sort_values(by='%Reads', inplace=True, ascending=False)
+                        df_to_plot.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
 
                     new_sgRNA_intervals = []
                     #adjust coordinates of sgRNAs
@@ -4385,9 +4406,9 @@ def main():
             global_NON_MODIFIED_NON_FRAMESHIFT = 0
             global_SPLICING_SITES_MODIFIED = 0
 
-            global_hists_frameshift = defaultdict(lambda :0)
+            global_hists_frameshift = Counter()
             global_hists_frameshift[0] = 0  # fill with at least the zero value (in case there are no others)
-            global_hists_inframe = defaultdict(lambda :0)
+            global_hists_inframe = Counter()
             global_hists_inframe[0] = 0
 
             global_count_total = 0
