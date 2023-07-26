@@ -665,7 +665,6 @@ def main():
             headers = []
             unmatched_headers = []
             has_header = False
-            has_unmatched_header_el = False
             for head in header_els:
                 # Header based on header provided
                 # Look up long name (e.g. qwc -> quantification_window_coordinates)
@@ -679,7 +678,6 @@ def main():
 
                 match = difflib.get_close_matches(long_head, lowercase_default_amplicon_headers, n=1)
                 if not match:
-                    has_unmatched_header_el = True
                     unmatched_headers.append(head)
                 else:
                     has_header = True
@@ -689,7 +687,7 @@ def main():
 
             if len(headers) > 5 and not has_header:
                 raise CRISPRessoShared.BadParameterException('Incorrect number of columns provided without header.')
-            elif has_header and has_unmatched_header_el:
+            elif has_header and len(unmatched_headers) > 0:
                 raise CRISPRessoShared.BadParameterException('Unable to match headers: ' + str(unmatched_headers))
             
             if not has_header:
