@@ -91,7 +91,7 @@ def main():
         crispresso_options_for_batch = list(crispresso_options-options_to_ignore)
 
         CRISPRessoShared.check_file(args.batch_settings)
-        custom_style = CRISPRessoShared.check_custom_style(args)
+        custom_style = CRISPRessoShared.check_custom_config(args)
 
         if args.zip_output and not args.place_report_in_output_folder:
             warn('Invalid arguement combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True.')
