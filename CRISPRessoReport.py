@@ -79,7 +79,7 @@ def add_fig_if_exists(fig_name, fig_root, fig_title, fig_caption, fig_data,
             if os.path.exists(os.path.join(crispresso_folder, data_file)):
                 amplicon_figures['datas'][fig_name].append((data_caption, data_file))
         if os.path.exists(htmlfullpath):
-            with open(htmlfullpath) as html:
+            with open(htmlfullpath, encoding="utf-8") as html:
                 html_string = "<div align='center'>"
                 html_string += html.read()
                 html_string += "</div>"
@@ -87,6 +87,9 @@ def add_fig_if_exists(fig_name, fig_root, fig_title, fig_caption, fig_data,
 
 
 def assemble_figs(run_data, crispresso_folder):
+    """
+        Helper function create the data structre for the figures
+    """
     figures = {'names': {}, 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}, 'sgRNA_based_names': {}}
 
     global_fig_names = []
@@ -138,7 +141,7 @@ def assemble_figs(run_data, crispresso_folder):
     return data
 
 
-def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT, web_version=False):
+def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
     # dicts for each amplicon fig_names[amp_name] = [list of fig names]
     #                        fig_locs[amp_name][fig_name] = figure location
     #    print('crispresso_report file: ' + crispresso_report_file + ' crispresso_folder : ' + crispresso_folder + ' root: ' + _ROOT)
@@ -169,7 +172,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT, web_
     #    shutil.copy2(os.path.join(_ROOT,'templates','CRISPResso_justcup.png'),dest_dir)
     #    shutil.copy2(os.path.join(_ROOT,'templates','favicon.ico'),dest_dir)
 
-    with open(crispresso_report_file, 'w') as outfile:
+    with open(crispresso_report_file, 'w', encoding="utf-8") as outfile:
         outfile.write(render_template(
             'report.html', j2_env, report_data=report_data,
         ))
@@ -244,12 +247,12 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
 
     allele_modification_heatmap_plot['htmls'] = {}
     for heatmap_plot_name, heatmap_plot_path in allele_modification_heatmap_plot['paths'].items():
-        with open(heatmap_plot_path) as fh:
+        with open(heatmap_plot_path, encoding="utf-8") as fh:
             allele_modification_heatmap_plot['htmls'][heatmap_plot_name] = fh.read()
 
     allele_modification_line_plot['htmls'] = {}
     for line_plot_name, line_plot_path in allele_modification_line_plot['paths'].items():
-        with open(line_plot_path) as fh:
+        with open(line_plot_path, encoding="utf-8") as fh:
             allele_modification_line_plot['htmls'][line_plot_name] = fh.read()
 
     #find path between the report and the data (if the report is in another directory vs in the same directory as the data)
@@ -257,7 +260,7 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
     if crispresso_data_path == ".":
         crispresso_data_path = ""
     else:
-        crispresso_data_path += "/";
+        crispresso_data_path += "/"
 
     sub_html_files = {}
     run_names = []
@@ -267,7 +270,7 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
         crispresso_folder = os.path.join(batch_folder, sub_folder)
         run_data = CRISPRessoShared.load_crispresso_info(crispresso_folder)
         if 'running_info' not in run_data:
-            raise Exception('CRISPResso run %s has no report. Cannot add to batch report.' % sub_folder)
+            raise Exception(f'CRISPResso run {sub_folder} has no report. Cannot add to batch report.')
 
         this_sub_html_file = sub_folder + ".html"
         if run_data['running_info']['args'].place_report_in_output_folder:
@@ -278,7 +281,7 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
 
     output_title = 'CRISPResso Batch Output'
     if crispresso2_info['running_info']['args'].name != '':
-        output_title += '<br/>{0}'.format(crispresso2_info['running_info']['args'].name)
+        output_title += f"<br/>{crispresso2_info['running_info']['args'].name}"
 
     make_multi_report(
         run_names,
@@ -307,7 +310,7 @@ def make_pooled_report_from_folder(crispresso_report_file, crispresso2_info, fol
     names_arr = crispresso2_info['results']['good_region_names']
     output_title = 'CRISPResso Pooled Output'
     if crispresso2_info['running_info']['args'].name != '':
-        output_title += '<br/>{0}'.format(crispresso2_info['running_info']['args'].name)
+        output_title += f"<br/>{crispresso2_info['running_info']['args'].name}"
     make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'pooled')
 
 
@@ -315,7 +318,7 @@ def make_compare_report_from_folder(crispresso_report_file, crispresso2_info, fo
     names_arr = []
     output_title = 'CRISPResso Compare Output'
     if crispresso2_info['running_info']['args'].name != '':
-        output_title += '<br/>{0}'.format(crispresso2_info['running_info']['args'].name)
+        output_title += "<br/>{crispresso2_info['running_info']['args'].name}"
     make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'compare')
 
 
@@ -324,7 +327,7 @@ def make_meta_report_from_folder(crispresso_report_file, crispresso2_info, folde
     input_names = crispresso2_info['meta_input_names']
     output_title = 'CRISPresso Meta Output'
     if crispresso2_info['running_info']['args'].name != '':
-        output_title += '<br/>{0}'.format(crispresso2_info['running_info']['args'].name)
+        output_title += "<br/>{crispresso2_info['running_info']['args'].name}"
     make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'meta',
                                   display_names=input_names)
 
@@ -333,7 +336,7 @@ def make_wgs_report_from_folder(crispresso_report_file, crispresso2_info, folder
     names_arr = crispresso2_info['results']['good_region_names']
     output_title = 'CRISPResso WGS Output'
     if crispresso2_info['running_info']['args'].name != '':
-        output_title += '<br/>{0}'.format(crispresso2_info['running_info']['args'].name)
+        output_title += "<br/>{crispresso2_info['running_info']['args'].name}"
     make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'wgs')
 
 
@@ -349,10 +352,11 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
     crispresso_report_file (string): path to write report to
     folder (string): folder containing crispresso runs
     _ROOT (string): location of crispresso assets (images, templates, etc)
-    display_names (dict): report_name->display_name; Titles to be shown for crispresso runs (if different from names_arr, e.g. if display_names have spaces or bad chars, they won't be the same as names_arr)
+    display_names (dict): report_name->display_name; Titles to be shown for crispresso runs 
+        (if different from names_arr, e.g. if display_names have spaces or bad chars, they won't be the same as names_arr)
 
     Returns:
-    Nothin
+    Nothing
     """
 
     summary_plot_names = []
@@ -378,11 +382,11 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
         if display_names is not None:
             display_name = display_names[name]
 
-        folder_name = 'CRISPResso_on_%s' % name
+        folder_name = f'CRISPResso_on_{name}'
         sub_folder = os.path.join(folder, folder_name)
         run_data = CRISPRessoShared.load_crispresso_info(sub_folder)
         if 'running_info' not in run_data:
-            raise Exception('CRISPResso run %s has no report. Cannot add to report.' % sub_folder)
+            raise Exception(f'CRISPResso run {sub_folder} has no report. Cannot add to report.')
 
         run_names.append(display_name)
 
@@ -428,19 +432,14 @@ def make_multi_report(
     _ROOT,
     report_name,
     crispresso_tool,
-    window_nuc_pct_quilts=[],
-    nuc_pct_quilts=[],
-    window_nuc_conv_plots=[],
-    nuc_conv_plots=[],
-    summary_plots={
-        'names': [],
-        'titles': [],
-        'labels': [],
-        'datas': [],
-    },
-    compact_plots_to_show={},
-    allele_modification_heatmap_plot={},
-    allele_modification_line_plot={},
+    window_nuc_pct_quilts=None,
+    nuc_pct_quilts=None,
+    window_nuc_conv_plots=None,
+    nuc_conv_plots=None,
+    summary_plots=None,
+    compact_plots_to_show=None,
+    allele_modification_heatmap_plot=None,
+    allele_modification_line_plot=None,
 ):
     """
     Makes an HTML report for a run containing multiple crispresso runs
@@ -494,6 +493,10 @@ def make_multi_report(
     else:
         crispresso_data_path += "/"
 
+    if allele_modification_heatmap_plot is None:
+        allele_modification_heatmap_plot = {}
+    if allele_modification_line_plot is None:
+        allele_modification_line_plot = {}
     dictionaries = [
         allele_modification_heatmap_plot, allele_modification_line_plot,
     ]
@@ -511,18 +514,24 @@ def make_multi_report(
                 key,
                 default_type,
             )
-    web = False
-    if not web:
-        for html in sub_html_files:
-            sub_html_files[html] = crispresso_data_path + sub_html_files[html]
-    with open(crispresso_multi_report_file, 'w') as outfile:
+    if summary_plots is None:
+        summary_plots={
+            'names': [],
+            'titles': [],
+            'labels': [],
+            'datas': [],
+        }
+
+    for html in sub_html_files:
+        sub_html_files[html] = crispresso_data_path + sub_html_files[html]
+    with open(crispresso_multi_report_file, 'w', encoding="utf-8") as outfile:
         outfile.write(render_template(
             template,
             j2_env,
-            window_nuc_pct_quilts=window_nuc_pct_quilts,
-            nuc_pct_quilts=nuc_pct_quilts,
-            window_nuc_conv_plots=window_nuc_conv_plots,
-            nuc_conv_plots=nuc_conv_plots,
+            window_nuc_pct_quilts=[] if window_nuc_pct_quilts is None else window_nuc_pct_quilts,
+            nuc_pct_quilts=[] if nuc_pct_quilts is None else nuc_pct_quilts,
+            window_nuc_conv_plots=[] if window_nuc_conv_plots is None else window_nuc_conv_plots,
+            nuc_conv_plots=[] if nuc_conv_plots is None else nuc_conv_plots,
             crispresso_data_path=crispresso_data_path,
             report_data={
                 'names': summary_plots['names'],
@@ -535,7 +544,7 @@ def make_multi_report(
             run_names=run_names,
             sub_html_files=sub_html_files,
             report_name=report_name,
-            compact_plots_to_show=compact_plots_to_show,
+            compact_plots_to_show=[] if compact_plots_to_show is None else compact_plots_to_show,
             allele_modification_heatmap_plot_names=allele_modification_heatmap_plot['names'],
             allele_modification_heatmap_plot_htmls=allele_modification_heatmap_plot['htmls'],
             allele_modification_heatmap_plot_titles=allele_modification_heatmap_plot['titles'],
@@ -557,7 +566,7 @@ def make_aggregate_report(
     _ROOT,
     folder_arr,
     crispresso_html_reports,
-    compact_plots_to_show={},
+    compact_plots_to_show=None,
     display_names=None,
 ):
     """
@@ -572,10 +581,11 @@ def make_aggregate_report(
     folder_arr (arr of strings): paths to the aggregated crispresso folders
     crispresso_html_reports (dict): folder->html_path; Paths to the aggregated crispresso run html reports
     compact_plots_to_show (dict): name=>{'href': path to target(report) when user clicks on image, 'img': path to png image to show}
-    display_names (dict): folder->display_name; Titles to be shown for crispresso runs (if different from names_arr, e.g. if display_names have spaces or bad chars, they won't be the same as names_arr)
+    display_names (dict): folder->display_name; Titles to be shown for crispresso runs 
+        (if different from names_arr, e.g. if display_names have spaces or bad chars, they won't be the same as names_arr)
 
     Returns:
-    Nothin
+    Nothing
     """
     summary_plots = {}
     if 'summary_plot_names' in crispresso2_info['results']['general_plots']:
@@ -649,7 +659,7 @@ def make_aggregate_report(
     run_names = []
     sub_html_files = {}
 
-    for idx, folder in enumerate(folder_arr):
+    for folder in folder_arr:
         display_name = folder
         if display_names is not None:
             display_name = display_names[folder]
@@ -657,7 +667,8 @@ def make_aggregate_report(
         run_names.append(display_name)
         sub_html_file = os.path.relpath(crispresso_html_reports[folder], crispresso_report_folder)
         sub_html_files[display_name] = sub_html_file
-
+    if compact_plots_to_show is None:
+        compact_plots_to_show = {}
     for compact_plot in compact_plots_to_show:
         old_href = compact_plots_to_show[compact_plot]['href']
         compact_plots_to_show[compact_plot]['href'] = os.path.relpath(old_href, crispresso_report_folder)
@@ -666,12 +677,12 @@ def make_aggregate_report(
 
     allele_modification_heatmap_plot['htmls'] = {}
     for heatmap_plot_name, heatmap_plot_path in allele_modification_heatmap_plot['paths'].items():
-        with open(heatmap_plot_path) as fh:
+        with open(heatmap_plot_path, encoding="utf-8") as fh:
             allele_modification_heatmap_plot['htmls'][heatmap_plot_name] = fh.read()
 
     allele_modification_line_plot['htmls'] = {}
     for line_plot_name, line_plot_path in allele_modification_line_plot['paths'].items():
-        with open(line_plot_path) as fh:
+        with open(line_plot_path, encoding="utf-8") as fh:
             allele_modification_line_plot['htmls'][line_plot_name] = fh.read()
 
     make_multi_report(
