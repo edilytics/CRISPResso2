@@ -1559,8 +1559,8 @@ def plot_global_frameshift_in_frame_mutations(
     ax1.set_xticks([idx for idx in range(-30, 31) if idx % 3 == 0])
     ax1.tick_params(
         which='both',      # both major and minor ticks are affected
-        left=False,
-        bottom=False,      # ticks along the bottom edge are off
+        left=True,
+        bottom=True,      # ticks along the bottom edge are off
         top=False,         # ticks along the top edge are off
         labelbottom=True,  # labels along the bottom edge are off
     )
@@ -1601,8 +1601,8 @@ def plot_global_frameshift_in_frame_mutations(
     ax2.set_xticks([idx for idx in range(-30, 31) if (idx % 3 == 0)])
     ax2.tick_params(
         which='both',      # both major and minor ticks are affected
-        left=False,
-        bottom=False,       # ticks along the bottom edge are off
+        left=True,
+        bottom=True,       # ticks along the bottom edge are off
         top=False,         # ticks along the top edge are off
         labelbottom=True,  # labels along the bottom edge are off)
     )
