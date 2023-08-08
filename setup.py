@@ -70,7 +70,7 @@ def main():
           url='http://github.com/pinellolab/CRISPResso2',
           package_dir={'CRISPResso2' : 'CRISPResso2'},
           include_package_data = True,
-          packages=['CRISPResso2'],
+          packages=['CRISPResso2', 'CRISPResso2.CRISPRessoReports'],
           entry_points=entry_points,
           description="Software pipeline for the analysis of genome editing outcomes from deep sequencing data",
           classifiers=[
