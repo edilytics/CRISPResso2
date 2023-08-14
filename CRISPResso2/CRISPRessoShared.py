@@ -22,6 +22,7 @@ import signal
 import subprocess as sb
 import unicodedata
 import logging
+from inspect import getmodule, stack
 
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
@@ -1828,6 +1829,17 @@ def zip_results(results_folder):
     return
 
 
+def is_C2Pro_installed():
+    try:
+        spec = importlib.util.find_spec("crispressoPro")
+        if spec is None:
+            return False
+        else:
+            return True
+    except:
+        return False
+
+
 def check_custom_config(args):
     """Check if the config_file argument was provided. If so load the configurations from the file, otherwise load default configurations.
     
@@ -1860,10 +1872,11 @@ def check_custom_config(args):
                 '-': '#C1C1C1'
                 }        
             }
+    
+    logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
+
     #Check if crispresso.pro is installed
-    try:
-        spec = importlib.util.find_spec("crispressoPro")
-    except:
+    if not is_C2Pro_installed():
         return config
     if args.config_file:
         try:
@@ -1871,16 +1884,16 @@ def check_custom_config(args):
                 custom_config = json.load(json_file)
 
             if 'colors' not in custom_config.keys():
-                warn("Json file does not contain the colors key. Defaulting all values.")
+                logger.warn("Json file does not contain the colors key. Defaulting all values.")
                 return config
     
             for key in config['colors']:
                 if key not in custom_config['colors']:
-                    warn(f"Value for {key} not provided, defaulting")
+                    logger.warn(f"Value for {key} not provided, defaulting")
                     custom_config['colors'][key] = config['colors'][key]
     
             return custom_config
         except Exception as e:
-            warn("Cannot read json file '%s', defaulting style parameters." % args.config_file)
+            logger.warn("Cannot read json file '%s', defaulting style parameters." % args.config_file)
             print(e)
     return config
