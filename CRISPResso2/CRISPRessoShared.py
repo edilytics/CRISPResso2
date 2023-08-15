@@ -318,6 +318,7 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
     parser.add_argument('--write_cleaned_report', action='store_true',
                         help=argparse.SUPPRESS)  # trims working directories from output in report (for web access)
     parser.add_argument('--config_file', help='File path to JSON file with config elements', type=str)
+    parser.add_argument('--disable_guardrails', help='Disable guardrail warnings', action='store_true')
 
     # base editor parameters
     parser.add_argument('--base_editor_output',
