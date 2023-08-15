@@ -1860,45 +1860,68 @@ def check_custom_config(args):
 
     """
     config =  {
-        "colors": {
-                'Substitution': '#0000FF',
-                'Insertion': '#008000',
-                'Deletion': '#FF0000',
-                'A': '#7FC97F',
-                'T': '#BEAED4',
-                'C': '#FDC086',
-                'G': '#FFFF99',
-                'N': '#C8C8C8',
-                '-': '#C1C1C1'
-                }        
-            }
+        "colors": 
+        {
+            'Substitution': '#0000FF',
+            'Insertion': '#008000',
+            'Deletion': '#FF0000',
+            'A': '#7FC97F',
+            'T': '#BEAED4',
+            'C': '#FDC086',
+            'G': '#FFFF99',
+            'N': '#C8C8C8',
+            '-': '#C1C1C1'
+        }, 
+        "guardrails": 
+        {
+            'min_total_reads': 10000,
+            'alignedCutoff': 0.9,
+            'alternateAlignment': 0.3,
+            'minRatioOfModsInToOut': 0.01,
+            'modificationsAtEnds': 0.01,
+            'outsideWindowMaxSubRate': 0.002,
+            'maxRateOfSubs': 0.3,
+            'guide_len': 19,
+            'amplicon_len': 50,
+            'ampliconToReadLen': 1.5
+        }       
+    }
     
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
 
     #Check if crispresso.pro is installed
-    if not is_C2Pro_installed():
-        return config
+    # if not is_C2Pro_installed():
+    #     return config
     if args.config_file:
         try:
             with open(args.config_file, "r") as json_file:
                 custom_config = json.load(json_file)
 
-            if 'colors' not in custom_config.keys():
+            if 'colors' in custom_config.keys():
+                for key in config['colors']:
+                    if key not in custom_config['colors']:
+                        logger.warn(f"Value for {key} not provided, defaulting")
+                        custom_config['colors'][key] = config['colors'][key]
+            else:
                 logger.warn("Json file does not contain the colors key. Defaulting all values.")
-                return config
-    
-            for key in config['colors']:
-                if key not in custom_config['colors']:
-                    logger.warn(f"Value for {key} not provided, defaulting")
-                    custom_config['colors'][key] = config['colors'][key]
-    
+                custom_config['colors'] = config['colors']
+
+            if 'guardrails' in custom_config.keys():
+                for key in config['guardrails']:
+                    if key not in custom_config['guardrails']:
+                        logger.warn(f"Value for {key} not provided, defaulting")
+                        custom_config['guardrails'][key] = config['guardrails'][key]
+            else:
+                logger.warn("Json file does not contain the guardrails key. Defaulting all values.")
+                custom_config['guardrails'] = config['guardrails']
+                
             return custom_config
         except Exception as e:
             logger.warn("Cannot read json file '%s', defaulting style parameters." % args.config_file)
             print(e)
     return config
 
-def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000, alignedCutoff=.9, alternateAlignment=.3, minRatioOfModsInToOut=.01, modificationsAtEnds=.01, outsideWindowMaxSubRate=.002, maxRateOfSubs=0.3, guide_len=19, amplicon_len=50, ampliconToReadLen = 1.5):
+def safety_check(crispresso2_info, aln_stats, guardrails):
     """Check the results of analysis for potential issues and warns the user.
 
     Parameters
@@ -1930,10 +1953,7 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
     ampliconToReadLen : float
         Comparison value between amplicons and reads
     """
-    if logger is None:
-        # this line noise will get the name of the module from which this
-        # function was called, and thereby the correct logger
-        logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
+    logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
     messageHandler = GuardRailMessageHandler(logger)
 
     # Get amplicon and guide sequences and lengths
@@ -1944,37 +1964,37 @@ def safety_check(crispresso2_info, aln_stats, logger=None, min_total_reads=10000
         guide_groups.update(crispresso2_info['results']['refs'][name]['sgRNA_sequences'])
     unique_guides = {guide: len(guide) for guide in guide_groups}
     
-    totalReadsGuardRail = TotalReadsGuardRail(messageHandler, min_total_reads)
+    totalReadsGuardRail = TotalReadsGuardRail(messageHandler, guardrails['min_total_reads'])
     totalReadsGuardRail.safety(aln_stats['N_TOT_READS'])
 
-    overallReadsAlignedGuard = OverallReadsAlignedGuardRail(messageHandler, alignedCutoff)
+    overallReadsAlignedGuard = OverallReadsAlignedGuardRail(messageHandler, guardrails['alignedCutoff'])
     overallReadsAlignedGuard.safety(aln_stats['N_TOT_READS'], (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']))
 
-    lowReadsAlignedToAmpliconGuardRail = LowReadsAlignedToAmpliconGuardRail(messageHandler, alignedCutoff)
+    lowReadsAlignedToAmpliconGuardRail = LowReadsAlignedToAmpliconGuardRail(messageHandler, guardrails['alignedCutoff'])
     lowReadsAlignedToAmpliconGuardRail.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['alignment_stats']['counts_total'])
     
-    highReadsAlignedToAlternateAmplicon = HighReadsAlignedToAlternateAmpliconGuardRail(messageHandler, alternateAlignment)
+    highReadsAlignedToAlternateAmplicon = HighReadsAlignedToAlternateAmpliconGuardRail(messageHandler, guardrails['alternateAlignment'])
     highReadsAlignedToAlternateAmplicon.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['alignment_stats']['counts_total'])
     
-    lowRatioOfModsInWindowToOut = LowRatioOfModsInWindowToOutGuardRail(messageHandler, minRatioOfModsInToOut)
+    lowRatioOfModsInWindowToOut = LowRatioOfModsInWindowToOutGuardRail(messageHandler, guardrails['minRatioOfModsInToOut'])
     lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
     
-    highRateOfModificationAtEndsGuardRail = HighRateOfModificationAtEndsGuardRail(messageHandler, modificationsAtEnds)
+    highRateOfModificationAtEndsGuardRail = HighRateOfModificationAtEndsGuardRail(messageHandler, guardrails['modificationsAtEnds'])
     highRateOfModificationAtEndsGuardRail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
     
-    highRateOfSubstitutionsOutsideWindowGuardRail = HighRateOfSubstitutionsOutsideWindowGuardRail(messageHandler, outsideWindowMaxSubRate)
+    highRateOfSubstitutionsOutsideWindowGuardRail = HighRateOfSubstitutionsOutsideWindowGuardRail(messageHandler, guardrails['outsideWindowMaxSubRate'])
     highRateOfSubstitutionsOutsideWindowGuardRail.safety(aln_stats['N_GLOBAL_SUBS'], aln_stats['N_SUBS_OUTSIDE_WINDOW'])
     
-    highRateOfSubstitutions = HighRateOfSubstitutionsGuardRail(messageHandler, maxRateOfSubs)
+    highRateOfSubstitutions = HighRateOfSubstitutionsGuardRail(messageHandler, guardrails['maxRateOfSubs'])
     highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
         
-    shortAmpliconSequence = ShortSequenceGuardRail(messageHandler, amplicon_len, 'amplicon')
+    shortAmpliconSequence = ShortSequenceGuardRail(messageHandler, guardrails['amplicon_len'], 'amplicon')
     shortAmpliconSequence.safety(amplicons)
 
-    shortGuideSequence = ShortSequenceGuardRail(messageHandler, guide_len, 'guide')
+    shortGuideSequence = ShortSequenceGuardRail(messageHandler, guardrails['guide_len'], 'guide')
     shortGuideSequence.safety(unique_guides)
 
-    longAmpliconShortReadsGuardRail = LongAmpliconShortReadsGuardRail(messageHandler, ampliconToReadLen)
+    longAmpliconShortReadsGuardRail = LongAmpliconShortReadsGuardRail(messageHandler, guardrails['ampliconToReadLen'])
     longAmpliconShortReadsGuardRail.safety(amplicons, aln_stats['READ_LENGTH'])
 
     crispresso2_info['results']['guardrails'] = messageHandler.get_messages()
