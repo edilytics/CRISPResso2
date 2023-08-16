@@ -86,12 +86,10 @@
 					{% if report_data['report_display_name'] != '' %}
 					<h5>{{report_data['report_display_name']}}</h5>
 					{% endif %}
-					{% if 'guardrails' in report_data %}
-						{% if report_data['guardrails']|length > 0 %}
-			  				{% for message in report_data['guardrails'] %}
-								{{message}}
-			  				{% endfor %}
-			  			{% endif %}
+					{% if 'guardrails' in report_data and report_data['guardrails']|length > 0 %}
+						{% for message in report_data['guardrails'] %}
+							{{message}}
+						{% endfor %}
 					{% endif %}
 					<h5>CRISPResso2 run information</h5>
 					<ul class="nav nav-tabs justify-content-center card-header-tabs" id="log-tab" role="tablist">
