@@ -1841,24 +1841,20 @@ def is_C2Pro_installed():
         return False
 
 
-def check_custom_config(args):
+def check_custom_config(args, c2Pro):
     """Check if the config_file argument was provided. If so load the configurations from the file, otherwise load default configurations.
     
     Parameters:
     -------------
     args : dict
         All arguments passed into the crispresso run.
+    c2Pro : bool
+        Boolean indicating if crispresso.pro is installed.
 
     Returns:
     -------------
-    style : dict
-        A dict with a 'colors' key that contains hex color values for different report items.
-    
-    -OR-
-    
-    custom_style : dict
-        A dict with a 'colors' key that contains hex color values for different report items loaded from a user provided json file.
-
+    config : dict
+        A dict with a 'colors' key that contains hex color values for different report items as well as a 'guardrails' key that contains the guardrail values.
     """
     config =  {
         "colors": 
@@ -1890,9 +1886,9 @@ def check_custom_config(args):
     
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
 
-    #Check if crispresso.pro is installed
-    # if not is_C2Pro_installed():
-    #     return config
+    # Check if crispresso.pro is installed
+    if not c2Pro:
+        return config
     if args.config_file:
         try:
             with open(args.config_file, "r") as json_file:
@@ -1922,6 +1918,7 @@ def check_custom_config(args):
             print(e)
     return config
 
+
 def safety_check(crispresso2_info, aln_stats, guardrails):
     """Check the results of analysis for potential issues and warns the user.
 
@@ -1931,28 +1928,28 @@ def safety_check(crispresso2_info, aln_stats, guardrails):
         Dictionary of values describing the analysis
     aln_stats : dict
         Dictionary of alignment statistics and modification frequency and location
-    logger : logger
-        Logger from the calling function for logging messages
-    min_total_reads : int
-        Cutoff value for total reads aligned
-    alignedCutoff : float
-        Check value for the percentage of reads aligned vs not aligned
-    alternateAlignment : float
-        Percentage of variance from expected reads to trigger guardrail
-    minRatioOfModsInToOut : float
-        Float representing the acceptable ratio of modifications in the window to out
-    modificationsAtEnds : float
-        The ratio of reads with modifications at the 0 or -1 spot
-    outsideWindowMaxSubRate : float
-        Ratio of subs allowed outside of the window
-    maxRateOfSubs : float
-        Allowed rate of subs accross the entire read
-    guide_len : int
-        Minimum guide length
-    amplicon_len : int 
-        Minimum amplicon length
-    ampliconToReadLen : float
-        Comparison value between amplicons and reads
+    guardrails : dict
+        Contains the following:
+            min_total_reads : int
+                Cutoff value for total reads aligned
+            alignedCutoff : float
+                Check value for the percentage of reads aligned vs not aligned
+            alternateAlignment : float
+                Percentage of variance from expected reads to trigger guardrail
+            minRatioOfModsInToOut : float
+                Float representing the acceptable ratio of modifications in the window to out
+            modificationsAtEnds : float
+                The ratio of reads with modifications at the 0 or -1 spot
+            outsideWindowMaxSubRate : float
+                Ratio of subs allowed outside of the window
+            maxRateOfSubs : float
+                Allowed rate of subs accross the entire read
+            guide_len : int
+                Minimum guide length
+            amplicon_len : int 
+                Minimum amplicon length
+            ampliconToReadLen : float
+                Comparison value between amplicons and reads
     """
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
     messageHandler = GuardRailMessageHandler(logger)
@@ -1998,7 +1995,7 @@ def safety_check(crispresso2_info, aln_stats, guardrails):
     longAmpliconShortReadsGuardRail = LongAmpliconShortReadsGuardRail(messageHandler, guardrails['ampliconToReadLen'])
     longAmpliconShortReadsGuardRail.safety(amplicons, aln_stats['READ_LENGTH'])
 
-    crispresso2_info['results']['guardrails'] = messageHandler.get_messages()
+    return messageHandler.get_messages()
 
 
 class GuardRailMessageHandler:

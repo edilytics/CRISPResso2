@@ -3495,7 +3495,7 @@ def main():
             info('Making Plots...')
         ###############################################################################################################################################
         save_png = True
-        config = CRISPRessoShared.check_custom_config(args)
+        config = CRISPRessoShared.check_custom_config(args, CRISPRessoShared.is_C2Pro_installed())
         if args.suppress_report:
             save_png = False
 
@@ -4867,7 +4867,7 @@ def main():
         if args.disable_guardrails:
             crispresso2_info['results']['guardrails'] = []
         else:
-            CRISPRessoShared.safety_check(crispresso2_info, aln_stats, config['guardrails'])
+            crispresso2_info['results']['guardrails'] = CRISPRessoShared.safety_check(crispresso2_info, aln_stats, config['guardrails'])
 
         if not args.suppress_report:
             if (args.place_report_in_output_folder):
