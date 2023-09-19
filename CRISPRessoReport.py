@@ -34,6 +34,7 @@ def render_template(template_name, jinja2_env, **data):
             render_partial=generate_render_partial(
                 custom_partial_render,
             ),
+            is_default_user=False
         )
         return template.render(**partial_data)
     return render_partial(
