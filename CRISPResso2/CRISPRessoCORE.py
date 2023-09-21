@@ -4264,13 +4264,13 @@ def main():
                         allele_graph  = CRISPRessoPlot.AlleleGraph(**plot_9b_input)
                         allele_graph.write_plot_data()
 
-                    if n_processes > 1:
-                        plot_results.append(plot_pool.submit(
-                            plot_9b,
-                            **plot_9b_input,
-                        ))
-                    else:
-                        plot_9b(plot_9b_input)
+                    # if n_processes > 1:
+                    #     plot_results.append(plot_pool.submit(
+                    #         plot_9b,
+                    #         **plot_9b_input,
+                    #     ))
+                    # else:
+                    plot_9b(plot_9b_input)
                     crispresso2_info['results']['refs'][ref_name]['plot_9b_roots'].append(os.path.basename(fig_filename))
                     crispresso2_info['results']['refs'][ref_name]['plot_9b_captions'].append('Figure 9b: Graph based visualization of the distribution of identified alleles around the cleavage site for the {0}. Each node in the graph represents a nucleotide, and a path (nodes connected by edges) represents a sequence present in one or more of the alleles. Hover over a node (or edge) to see the total frequency of that nucleotide or path. Hover over an allele (row) in the table to see which nodes correspond to it. Dashed lines represent deletions and one can click a node to potentially collapse it with its neighbors.'.format(sgRNA_legend))
                     crispresso2_info['results']['refs'][ref_name]['plot_9b_datas'].append([('Allele frequency table', os.path.basename(allele_filename))])

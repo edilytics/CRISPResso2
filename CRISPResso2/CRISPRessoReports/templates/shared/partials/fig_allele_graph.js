@@ -350,7 +350,7 @@ const buildGraphQuilt = (graph, slug) => {
       })
     }
   }
-
+  // TODO highlight allele rows when hovering over nodes
   alleleGroup
     .filter(d => d.name != "Reference")
     .on("click", function(d) { hideOrShowAlleleGroup(d, this, true) })

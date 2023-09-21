@@ -3477,6 +3477,7 @@ class AlleleGraph:
         self.collapse_components()
         self.update_node_attributes()
         self.remove_source_and_terminal_nodes()
+        self.remove_adjacent_mutation_edges()
         self.update_edge_attributes()
 
     def add_sgRNA_groups(self):
@@ -3717,6 +3718,15 @@ class AlleleGraph:
                     )
                 ] += [allele_id]
         return insertion_alleles_by_position_and_seq
+
+    def remove_adjacent_mutation_edges(self):
+        substitution_groups = self.get_groups_of_modifications(self.substitutions)
+        insertion_groups = self.get_groups_of_modifications(self.insertions)
+        for allele_id in insertion_groups.keys() & substitution_groups.keys():
+            for insertion_group in insertion_groups[allele_id]:
+                for substitution_group in substitution_groups[allele_id]:
+
+                    breakpoint()
 
     def get_reference_position(self, allele_id, reference_position):
         return reference_position - self.insertion_offset.loc[allele_id, reference_position]
