@@ -13,6 +13,83 @@ cdef extern from "Python.h":
     int _PyBytes_Resize(PyObject **, size_t)
     char * PyBytes_AS_STRING(PyObject *)
 
+class ResultsSlotsDict():
+    __slots__ = (
+        'all_insertion_positions',
+        'all_insertion_left_positions',
+        'insertion_positions',
+        'insertion_coordinates',
+        'insertion_sizes',
+        'insertion_n',
+        'all_deletion_positions',
+        'deletion_positions',
+        'deletion_coordinates',
+        'deletion_sizes',
+        'deletion_n',
+        'all_substitution_positions',
+        'substitution_positions',
+        'all_substitution_values',
+        'substitution_values',
+        'substitution_n',
+        'ref_positions',
+        'ref_name',
+        'aln_scores',
+        'classification',
+        'aln_seq',
+        'aln_ref',
+        'aln_strand'
+    )
+
+    def __init__(
+        self,
+        all_insertion_positions,
+        all_insertion_left_positions,
+        insertion_positions,
+        insertion_coordinates,
+        insertion_sizes,
+        insertion_n,
+        all_deletion_positions,
+        deletion_positions,
+        deletion_coordinates,
+        deletion_sizes, 
+        deletion_n,
+        all_substitution_positions,
+        substitution_positions, 
+        all_substitution_values,
+        substitution_values,
+        substitution_n,
+        ref_positions
+        ):
+        self.all_insertion_positions = all_insertion_positions
+        self.all_insertion_left_positions = all_insertion_left_positions
+        self.insertion_positions = insertion_positions
+        self.insertion_coordinates = insertion_coordinates
+        self.insertion_sizes = insertion_sizes
+        self.insertion_n = insertion_n
+        self.all_deletion_positions = all_deletion_positions
+        self.deletion_positions = deletion_positions
+        self.deletion_coordinates = deletion_coordinates
+        self.deletion_sizes = deletion_sizes
+        self.deletion_n = deletion_n
+        self.all_substitution_positions = all_substitution_positions
+        self.substitution_positions = substitution_positions
+        self.all_substitution_values = all_substitution_values
+        self.substitution_values = substitution_values
+        self.substitution_n = substitution_n
+        self.ref_positions = ref_positions
+        self.ref_name = None
+        self.aln_scores = None
+        self.classification = None
+        self.aln_seq = None
+        self.aln_ref = None
+        self.aln_strand = None
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
 
 re_find_indels = re.compile("(-*-)")
 
@@ -110,6 +187,29 @@ def find_indels_substitutions(read_seq_al, ref_seq_al, _include_indx):
     cdef size_t substitution_n = len(substitution_positions)
     cdef size_t deletion_n = sum(deletion_sizes)
     cdef size_t insertion_n = sum(insertion_sizes)
+
+    return ResultsSlotsDict(
+        all_insertion_positions,
+        all_insertion_left_positions,
+        insertion_positions,
+        insertion_coordinates,
+        insertion_sizes,
+        insertion_n,
+
+        all_deletion_positions,
+        deletion_positions,
+        deletion_coordinates,
+        deletion_sizes,
+        deletion_n,
+
+        all_substitution_positions,
+        substitution_positions,
+        all_substitution_values,
+        substitution_values,
+        substitution_n,
+
+        ref_positions
+    )
 
     return {
         'all_insertion_positions': all_insertion_positions,
