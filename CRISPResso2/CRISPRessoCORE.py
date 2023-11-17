@@ -1350,6 +1350,8 @@ def main():
 
 
         #Prime editing
+        if 'Prime-edited' in amplicon_name_arr:
+            raise CRISPRessoShared.BadParameterException("An amplicon named 'Prime-edited' must not be provided.")
         prime_editing_extension_seq_dna = "" #global var for the editing extension sequence for the scaffold quantification below
         prime_editing_edited_amp_seq = ""
         if args.prime_editing_pegRNA_extension_seq != "":
@@ -1411,8 +1413,6 @@ def main():
             if new_ref in amplicon_seq_arr:
                 raise CRISPRessoShared.BadParameterException('The calculated prime-edited amplicon is the same as the reference sequence.')
             amplicon_seq_arr.append(new_ref)
-            if 'Prime-edited' in amplicon_name_arr:
-                raise CRISPRessoShared.BadParameterException("An amplicon named 'Prime-edited' must not be provided.")
             amplicon_name_arr.append('Prime-edited')
             amplicon_quant_window_coordinates_arr.append('')
             prime_editing_edited_amp_seq = new_ref
