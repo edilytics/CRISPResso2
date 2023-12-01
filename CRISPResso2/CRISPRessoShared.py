@@ -618,7 +618,7 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
     params:
         file_path: path to fastq file
         max_lines_to_check: number of lines to check in the file
-    returns:   
+    returns:
         True if the file is in the correct format
     """
 
