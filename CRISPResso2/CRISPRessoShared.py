@@ -19,6 +19,7 @@ import signal
 import subprocess as sb
 import unicodedata
 import logging
+from inspect import getmodule, stack
 
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
@@ -301,6 +302,8 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
     parser.add_argument('--suppress_plots', help='Suppress output plots', action='store_true')
     parser.add_argument('--write_cleaned_report', action='store_true',
                         help=argparse.SUPPRESS)  # trims working directories from output in report (for web access)
+    parser.add_argument('--config_file', help='File path to JSON file with config elements', type=str)
+    parser.add_argument('--disable_guardrails', help='Disable guardrail warnings', action='store_true')
 
     # base editor parameters
     parser.add_argument('--base_editor_output',
@@ -1826,3 +1829,520 @@ def zip_results(results_folder):
         )
     sb.call(cmd_to_zip, shell=True)
     return
+
+
+def check_custom_config(args):
+    """Check if the config_file argument was provided. If so load the configurations from the file, otherwise load default configurations.
+    
+    Parameters:
+    -------------
+    args : dict
+        All arguments passed into the crispresso run.
+    c2Pro : bool
+        Boolean indicating if crispresso.pro is installed.
+
+    Returns:
+    -------------
+    config : dict
+        A dict with a 'colors' key that contains hex color values for different report items as well as a 'guardrails' key that contains the guardrail values.
+    """
+    config =  {
+        "colors": 
+        {
+            'Substitution': '#0000FF',
+            'Insertion': '#008000',
+            'Deletion': '#FF0000',
+            'A': '#7FC97F',
+            'T': '#BEAED4',
+            'C': '#FDC086',
+            'G': '#FFFF99',
+            'N': '#C8C8C8',
+            '-': '#C1C1C1'
+        }, 
+        "guardrails": 
+        {
+            'min_total_reads': 10000,
+            'alignedCutoff': 0.9,
+            'alternateAlignment': 0.3,
+            'minRatioOfModsInToOut': 0.01,
+            'modificationsAtEnds': 0.01,
+            'outsideWindowMaxSubRate': 0.002,
+            'maxRateOfSubs': 0.3,
+            'guide_len': 19,
+            'amplicon_len': 50,
+            'ampliconToReadLen': 1.5
+        }       
+    }
+    
+    logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
+
+    if args.config_file:
+        try:
+            with open(args.config_file, "r") as json_file:
+                custom_config = json.load(json_file)
+
+            if 'guardrails' in custom_config.keys():
+                for key in config['guardrails']:
+                    if key not in custom_config['guardrails']:
+                        logger.warn(f"Value for {key} not provided, defaulting")
+                        custom_config['guardrails'][key] = config['guardrails'][key]
+            else:
+                logger.warn("Json file does not contain the guardrails key. Defaulting all values.")
+                custom_config['guardrails'] = config['guardrails']
+                
+            return custom_config
+        except Exception as e:
+            logger.warn("Cannot read json file '%s', defaulting style parameters." % args.config_file)
+            print(e)
+    return config
+
+
+def safety_check(crispresso2_info, aln_stats, guardrails):
+    """Check the results of analysis for potential issues and warns the user.
+
+    Parameters
+    ----------
+    crispresso2_info : dict
+        Dictionary of values describing the analysis
+    aln_stats : dict
+        Dictionary of alignment statistics and modification frequency and location
+    guardrails : dict
+        Contains the following:
+            min_total_reads : int
+                Cutoff value for total reads aligned
+            alignedCutoff : float
+                Check value for the percentage of reads aligned vs not aligned
+            alternateAlignment : float
+                Percentage of variance from expected reads to trigger guardrail
+            minRatioOfModsInToOut : float
+                Float representing the acceptable ratio of modifications in the window to out
+            modificationsAtEnds : float
+                The ratio of reads with modifications at the 0 or -1 spot
+            outsideWindowMaxSubRate : float
+                Ratio of subs allowed outside of the window
+            maxRateOfSubs : float
+                Allowed rate of subs accross the entire read
+            guide_len : int
+                Minimum guide length
+            amplicon_len : int 
+                Minimum amplicon length
+            ampliconToReadLen : float
+                Comparison value between amplicons and reads
+    """
+    logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
+    messageHandler = GuardRailMessageHandler(logger)
+
+    # Get amplicon and guide sequences and lengths
+    amplicons = {}
+    guide_groups = set()
+    for name in crispresso2_info['results']['ref_names']:
+        amplicons[name] = crispresso2_info['results']['refs'][name]['sequence_length']
+        guide_groups.update(crispresso2_info['results']['refs'][name]['sgRNA_sequences'])
+    unique_guides = {guide: len(guide) for guide in guide_groups}
+    
+    totalReadsGuardRail = TotalReadsGuardRail(messageHandler, guardrails['min_total_reads'])
+    totalReadsGuardRail.safety(aln_stats['N_TOT_READS'])
+
+    overallReadsAlignedGuard = OverallReadsAlignedGuardRail(messageHandler, guardrails['alignedCutoff'])
+    overallReadsAlignedGuard.safety(aln_stats['N_TOT_READS'], (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']))
+
+    lowReadsAlignedToAmpliconGuardRail = LowReadsAlignedToAmpliconGuardRail(messageHandler, guardrails['alignedCutoff'])
+    lowReadsAlignedToAmpliconGuardRail.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['alignment_stats']['counts_total'])
+    
+    highReadsAlignedToAlternateAmplicon = HighReadsAlignedToAlternateAmpliconGuardRail(messageHandler, guardrails['alternateAlignment'])
+    highReadsAlignedToAlternateAmplicon.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['alignment_stats']['counts_total'])
+    
+    lowRatioOfModsInWindowToOut = LowRatioOfModsInWindowToOutGuardRail(messageHandler, guardrails['minRatioOfModsInToOut'])
+    lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
+    
+    highRateOfModificationAtEndsGuardRail = HighRateOfModificationAtEndsGuardRail(messageHandler, guardrails['modificationsAtEnds'])
+    highRateOfModificationAtEndsGuardRail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
+    
+    highRateOfSubstitutionsOutsideWindowGuardRail = HighRateOfSubstitutionsOutsideWindowGuardRail(messageHandler, guardrails['outsideWindowMaxSubRate'])
+    highRateOfSubstitutionsOutsideWindowGuardRail.safety(aln_stats['N_GLOBAL_SUBS'], aln_stats['N_SUBS_OUTSIDE_WINDOW'])
+    
+    highRateOfSubstitutions = HighRateOfSubstitutionsGuardRail(messageHandler, guardrails['maxRateOfSubs'])
+    highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
+        
+    shortAmpliconSequence = ShortSequenceGuardRail(messageHandler, guardrails['amplicon_len'], 'amplicon')
+    shortAmpliconSequence.safety(amplicons)
+
+    shortGuideSequence = ShortSequenceGuardRail(messageHandler, guardrails['guide_len'], 'guide')
+    shortGuideSequence.safety(unique_guides)
+
+    longAmpliconShortReadsGuardRail = LongAmpliconShortReadsGuardRail(messageHandler, guardrails['ampliconToReadLen'])
+    longAmpliconShortReadsGuardRail.safety(amplicons, aln_stats['READ_LENGTH'])
+
+    return messageHandler.get_messages()
+
+
+class GuardRailMessageHandler:
+    """Class to handle message storage and display for guardrails"""
+    def __init__(self, logger):
+        """Create the message handler with an empty message array to collect html divs for the report
+        
+        Parameters:
+        ------------
+        logger : logger
+            logger object used to display messages
+        """
+        self.logger = logger
+        self.messages = []
+
+    def display_warning(self, message):
+        """Send the message to the logger to be displayed
+        
+        Parameters:
+        -----------
+        message : string
+            Related guardrail message
+        """
+        self.logger.warning(message)
+
+    def report_warning(self, message):
+        """Create and store the html message to display on the report
+        
+        Parameters:
+        -----------
+        message : string
+            Related guardrail message
+        """
+        html_warning = '<div class="alert alert-danger"><strong>Guardrail Warning!</strong>{0}</div>'.format(message)
+        self.messages.append(html_warning)
+
+    def get_messages(self):
+        """Return the messages accumulated by the message handler"""
+        return self.messages
+
+
+class TotalReadsGuardRail:
+    """Guardrail class: check that the number of reads are above a minimum"""
+    def __init__(self, messageHandler, minimum):
+        """Assign variables and create guardrail message
+        
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        minimum : int
+            The comparison integer to determine if there are sufficent reads
+        """
+        self.messageHandler = messageHandler
+        self.minimum = minimum
+        self.message = " Low number of total reads: <{}".format(minimum)
+
+    def safety(self, total_reads):
+        """Safety check, if total is below minimum send warnings
+
+        Parameters:
+        -----------
+        total_reads : int
+            The total reads, unaligned and aligned
+        """
+        if total_reads < self.minimum:
+            self.messageHandler.display_warning(self.message)
+            self.messageHandler.report_warning(self.message)
+
+
+class OverallReadsAlignedGuardRail:
+    """Guardrail class: check if enough reads are aligned"""
+    def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of percentage of minimum reads to be aligned
+        """
+        self.messageHandler = messageHandler
+        self.message = " <={val}% of reads were aligned".format(val=(cutoff * 100))
+        self.cutoff = cutoff
+    
+    def safety(self, total_reads, n_read_aligned):
+        """Safety check, if total_reads divided by n_reads_aligned is lower than the cutoff
+
+        Parameters:
+        -----------
+        total_reads : int
+            Total reads, unaligned and aligned
+        n_read_aligned : int
+            Total aligned reads
+        """
+        if total_reads == 0:
+            return
+        if (n_read_aligned/total_reads) <= self.cutoff:
+            self.messageHandler.display_warning(self.message)
+            self.messageHandler.report_warning(self.message)
+
+
+class LowReadsAlignedToAmpliconGuardRail:
+    """Guardrail class: check if the distribution of reads is roughly even across amplicons"""
+    def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of the accepted percentage deviation down from the expected distribution
+        """
+        self.messageHandler = messageHandler
+        self.message = " <={val}% of expected reads were aligned to amplicon: ".format(val=(cutoff * 100))
+        self.cutoff = cutoff
+
+    def safety(self, total_reads, reads_aln_amplicon):
+        """Safety check, if total_reads divided by n_reads_aligned is lower than the total_reads divided by the number of amplicons
+        
+        Parameters:
+        -----------
+        total_reads : int
+            Total reads, unaligned and aligned
+        reads_aln_amplicon : dict
+            A dictionary with the names of amplicons as the key and the number of reads aligned as the value
+        """
+        expected_per_amplicon = total_reads / len(reads_aln_amplicon.keys())
+        for amplicon, aligned in reads_aln_amplicon.items():
+            if aligned <= (expected_per_amplicon * self.cutoff):
+                amplicon_message = self.message + amplicon
+                self.messageHandler.display_warning(amplicon_message)
+                self.messageHandler.report_warning(amplicon_message)
+
+
+class HighReadsAlignedToAlternateAmpliconGuardRail:
+    """Guardrail class: check if the distribution of reads is roughly even across amplicons"""
+    def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of the accepted percentage deviation up from the expected distribution
+        """
+        self.messageHandler = messageHandler
+        self.message = " >={val}% more reads than expected were aligned to amplicon: ".format(val=(cutoff * 100))
+        self.cutoff = cutoff
+
+    def safety(self, total_reads, reads_aln_amplicon):
+        """Safety check, if total_reads divided by n_reads_aligned is higher than the total_reads divided by the number of amplicons
+        
+        Parameters:
+        -----------
+        total_reads : int
+            Total reads, unaligned and aligned
+        reads_aln_amplicon : dict
+            A dictionary with the names of amplicons as the key and the number of reads aligned as the value
+        """
+        expected_per_amplicon = total_reads / len(reads_aln_amplicon.keys())
+        for amplicon, aligned in reads_aln_amplicon.items():
+            if aligned >= (expected_per_amplicon * self.cutoff):
+                amplicon_message = self.message + amplicon
+                self.messageHandler.display_warning(amplicon_message)
+                self.messageHandler.report_warning(amplicon_message)
+
+
+class LowRatioOfModsInWindowToOutGuardRail:
+    """Guardrail class: check the ratio of modifications in the quantification window to out of it"""
+    def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of the maximum percentage of modifications outside of the quantification window
+        """
+        self.messageHandler = messageHandler
+        self.message = " <={}% of modifications were inside of the quantification window ".format(cutoff * 100)
+        self.cutoff = cutoff
+
+    def safety(self, mods_in_window, mods_outside_window):
+        """Safety check, if the modifications in the window are below a ratio of the total
+        
+        Parameters:
+        -----------
+        mods_in_window : int
+            The number of mods in the quantification window
+        mods_outside_window : int
+            The number of mods outside of the quantification window
+        """
+        total_mods = mods_in_window + mods_outside_window
+        if total_mods == 0:
+            return
+        if ((mods_in_window / total_mods) <= self.cutoff):
+            self.messageHandler.display_warning(self.message)
+            self.messageHandler.report_warning(self.message)
+
+
+class HighRateOfModificationAtEndsGuardRail:
+    """Guardrail class: check the ratio of modifications in the quantification window to out of it"""
+    def __init__(self, messageHandler, percentage_start_end):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        percentage_start_end : float
+            The float representation of the maximum percentage reads that have modifications on either end
+        """
+        self.messageHandler = messageHandler
+        self.message = " >={}% of reads have modifications at the start or end. ".format(percentage_start_end * 100)
+        self.percent = percentage_start_end
+    
+    def safety(self, total_reads, irregular_reads):
+        """Safety check, comparison between the number of irregular reads to total reads
+        
+        Parameters:
+        -----------
+        total_reads : int
+            The number of mods in the quantification window
+        irregular_reads : int
+            The number of mods outside of the quantification window
+        """
+        if total_reads == 0:
+            return
+        if (irregular_reads / total_reads) >= self.percent:
+            self.messageHandler.display_warning(self.message)
+            self.messageHandler.report_warning(self.message)
+
+
+class HighRateOfSubstitutionsOutsideWindowGuardRail:
+    """Guardrail class: check the ratio of global substitutions to substitutions outside of the quantification window"""
+    def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of how many of the total substitutions can be outside of the quantification window
+        """
+        self.messageHandler = messageHandler
+        self.message = " >={}% of substitutions were outside of the quantification window. ".format(cutoff * 100)
+        self.cutoff = cutoff
+        
+    def safety(self, global_subs, subs_outside_window):
+        """Safety check, comparison between the number of global subs to subs outside of the quantification window
+        
+        Parameters:
+        -----------
+        global_subs : int
+            The number of mods in the quantification window
+        subs_outside_window : int
+            The number of mods outside of the quantification window
+        """
+        if global_subs == 0:
+            return
+        if ((subs_outside_window / global_subs) >= self.cutoff):
+            self.messageHandler.display_warning(self.message)
+            self.messageHandler.report_warning(self.message)
+
+
+class HighRateOfSubstitutionsGuardRail:
+    """Guardrail class: check the ratio of global substitutions to total modifications"""
+    def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The float representation of how many of the total modifications can be subsitutions
+        """
+        self.messageHandler = messageHandler
+        self.message = " >={}% of modifications were substitutions. This could potentially indicate poor sequencing quality. ".format(cutoff * 100)
+        self.cutoff = cutoff
+        
+    def safety(self, mods_in_window, mods_outside_window, global_subs):
+        """Safety check, comparison between subsitutions and total modifications
+        
+        Parameters:
+        -----------
+        mods_in_window : int
+            Modifications inside of the quantification window
+        mods_outside_window : int
+            Modifications outside of the quantification window
+        global_subs : int
+            Total subsitutions across all reads
+        """
+        total_mods = mods_in_window + mods_outside_window
+        if total_mods == 0:
+            return
+        if ((global_subs / total_mods) >= self.cutoff):
+            self.messageHandler.display_warning(self.message)
+            self.messageHandler.report_warning(self.message)
+
+
+class ShortSequenceGuardRail:
+    """Guardrail class: Check to make sure that sequences (amplicons and guides) are above a certain length"""
+    def __init__(self, messageHandler, cutoff, sequence_type):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : int
+            Integer value to measure the length of the sequence
+        sequence_type : string
+            Amplicon or guide
+        """
+        self.messageHandler = messageHandler
+        self.cutoff = cutoff
+        self.message = " {0} length <{1}: ".format(sequence_type, cutoff)
+
+    def safety(self, sequences):
+        """Safety check, comparison between sequence lengths and minimum lengths
+        
+        Parameters:
+        -----------
+        sequences : dict
+            Dictionary with the name of the sequence as the key and the length of the sequence as the value
+        """
+        for name, length in sequences.items():
+            if length < self.cutoff:
+                sequence_message = self.message + name
+                self.messageHandler.display_warning(sequence_message)
+                self.messageHandler.report_warning(sequence_message)
+
+
+class LongAmpliconShortReadsGuardRail:
+    """Guardrail class: Check to make sure that the reads are close in size to amplicons"""
+    def __init__(self, messageHandler, cutoff):
+        """Assign variables and create guardrail message
+
+        Parameters:
+        -----------
+        messageHandler : GuardRailMessagehandler
+            Guardrail message handler to create and display warnings
+        cutoff : float
+            The value multiplied by the read length to make sure the amplicon isn't too much longer than the reads.
+            
+        """
+        self.messageHandler = messageHandler
+        self.cutoff = cutoff
+        self.message = " Amplicon length is greater than {}x the length of the reads: ".format(cutoff)
+
+    def safety(self, amplicons, read_len):
+        """Safety check, comparison between amplicon length and read length
+        
+        Parameters:
+        -----------
+        amplicons : dict
+            Dictionary with the name of the amplicon as the key and the length of the sequence as the value
+        read_len : int
+            Average length of reads
+        """
+        for name, length in amplicons.items():
+            if length > (read_len * self.cutoff):
+                sequence_message = self.message + name
+                self.messageHandler.display_warning(sequence_message)
+                self.messageHandler.report_warning(sequence_message)
