@@ -28,7 +28,7 @@ import traceback
 
 
 from CRISPResso2 import CRISPRessoCOREResources
-from CRISPResso2 import CRISPRessoReport
+from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2 import CRISPRessoShared
 from CRISPResso2 import CRISPRessoPlot
 from CRISPResso2 import CRISPResso2Align
@@ -1436,7 +1436,7 @@ def main():
 
 
 
-        def get_prime_editing_guides(this_amp_seq, this_amp_name, ref0_seq, prime_edited_seq, prime_editing_extension_seq_dna, prime_editing_pegRNA_extension_quantification_window_size, 
+        def get_prime_editing_guides(this_amp_seq, this_amp_name, ref0_seq, prime_edited_seq, prime_editing_extension_seq_dna, prime_editing_pegRNA_extension_quantification_window_size,
                                      nicking_qw_center, nicking_qw_size,aln_matrix,needleman_wunsch_gap_open,needleman_wunsch_gap_extend, prime_editing_gap_open, prime_editing_gap_extend):
             """
             gets prime editing guide sequences for this amplicon
@@ -1451,7 +1451,7 @@ def main():
             aln_matrix: matrix specifying alignment substitution scores in the NCBI format
             needleman_wunsch_gap_open: alignment penalty assignment used to determine similarity of two sequences.
             needleman_wunsch_gap_extend: alignment penalty assignment used to determine similarity of two sequences.
-            prime_editing_gap_open: alignment penalty assignment used to determine similarity of two pegRNA components. For prime editing the gap open is usually larger while the extension penalty is lower/zero to accomodate insertions of large sequences. 
+            prime_editing_gap_open: alignment penalty assignment used to determine similarity of two pegRNA components. For prime editing the gap open is usually larger while the extension penalty is lower/zero to accomodate insertions of large sequences.
             prime_editing_gap_extend: alignment penalty assignment used to determine similarity of two pegRNA components
             """
             pe_guides = []
