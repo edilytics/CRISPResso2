@@ -188,28 +188,28 @@ def find_indels_substitutions(read_seq_al, ref_seq_al, _include_indx):
     cdef size_t deletion_n = sum(deletion_sizes)
     cdef size_t insertion_n = sum(insertion_sizes)
 
-    # return ResultsSlotsDict(
-    #     all_insertion_positions,
-    #     all_insertion_left_positions,
-    #     insertion_positions,
-    #     insertion_coordinates,
-    #     insertion_sizes,
-    #     insertion_n,
+    return ResultsSlotsDict(
+        all_insertion_positions,
+        all_insertion_left_positions,
+        insertion_positions,
+        insertion_coordinates,
+        insertion_sizes,
+        insertion_n,
 
-    #     all_deletion_positions,
-    #     deletion_positions,
-    #     deletion_coordinates,
-    #     deletion_sizes,
-    #     deletion_n,
+        all_deletion_positions,
+        deletion_positions,
+        deletion_coordinates,
+        deletion_sizes,
+        deletion_n,
 
-    #     all_substitution_positions,
-    #     substitution_positions,
-    #     all_substitution_values,
-    #     substitution_values,
-    #     substitution_n,
+        all_substitution_positions,
+        substitution_positions,
+        all_substitution_values,
+        substitution_values,
+        substitution_n,
 
-    #     ref_positions
-    # )
+        ref_positions
+    )
 
     return {
         'all_insertion_positions': all_insertion_positions,
