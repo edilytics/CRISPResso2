@@ -1,5 +1,7 @@
 {% extends "layout.html" %}
 {% block head %}
+
+<script src="https://cdn.plot.ly/plotly-2.11.1.min.js"></script>
 <style>
 .nav-tabs.amp-header {
   border-bottom:none !important;
@@ -315,10 +317,13 @@
             </div>
           {% endif %}
 
-
-          </div>
-
-        </div>
+            <div align="center" class='p-3'>
+              {% if report_zip_filename %}
+			    <a href="/reports_data/{{report_zip_filename}}" class="btn btn-primary" role="button"><i class="fas fa-download"></i> Download report</a>
+              {% endif %}
+			  <a href="{{report_path}}" class="btn btn-primary" role="button"><i class="fas fa-link"></i> Link to report</a>
+              <button class='btn btn-primary hidden-print' onclick='window.print();'><i class="fas fa-print"></i> Print</button>
+            </div>
 
 	</div> {# jumbotron_content #} <!-- end jumbotron_content -->
 </div> {# jumbrotron #} <!-- end jumbotron -->

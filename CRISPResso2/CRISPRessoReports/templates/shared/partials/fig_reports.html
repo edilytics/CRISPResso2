@@ -8,8 +8,8 @@
             {% elif fig_name in ['plot_10b', 'plot_10c'] %}
             <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.png" width='70%' height='70%' ></a>
             {% else %}
-            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.png" width='85%' height='85%' ></a>
-            {% endif %} 
+            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.png" width='100%' height='100%' ></a>
+            {% endif %}
         {% endif %}
         <label class="labelpadding">{{report_data['figures']['captions'][amplicon_name][fig_name]}}</label>
         {% for (data_label,data_path) in report_data['figures']['datas'][amplicon_name][fig_name] %}
@@ -24,8 +24,8 @@
             {% elif fig_name in ['plot_10b', 'plot_10c'] %}
             <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.png" width='70%' height='70%' ></a>
             {% else %}
-            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.png" width='85%' height='85%' ></a>
-            {% endif %}        
+            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.png" width='100%' height='100%' ></a>
+            {% endif %}
         {% endif %}
         <label class="labelpadding">{{report_data['figures']['captions'][fig_name]}}</label>
         {% for (data_label,data_path) in report_data['figures']['datas'][fig_name] %}

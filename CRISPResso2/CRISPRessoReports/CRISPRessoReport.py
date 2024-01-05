@@ -34,6 +34,8 @@ def render_template(template_name, jinja2_env, **data):
             render_partial=generate_render_partial(
                 custom_partial_render,
             ),
+            is_default_user=False,
+            is_web=False,
         )
         return template.render(**partial_data)
     return render_partial(
@@ -356,7 +358,7 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
     crispresso_report_file (string): path to write report to
     folder (string): folder containing crispresso runs
     _ROOT (string): location of crispresso assets (images, templates, etc)
-    display_names (dict): report_name->display_name; Titles to be shown for crispresso runs 
+    display_names (dict): report_name->display_name; Titles to be shown for crispresso runs
         (if different from names_arr, e.g. if display_names have spaces or bad chars, they won't be the same as names_arr)
 
     Returns:
@@ -593,7 +595,7 @@ def make_aggregate_report(
     folder_arr (arr of strings): paths to the aggregated crispresso folders
     crispresso_html_reports (dict): folder->html_path; Paths to the aggregated crispresso run html reports
     compact_plots_to_show (dict): name=>{'href': path to target(report) when user clicks on image, 'img': path to png image to show}
-    display_names (dict): folder->display_name; Titles to be shown for crispresso runs 
+    display_names (dict): folder->display_name; Titles to be shown for crispresso runs
         (if different from names_arr, e.g. if display_names have spaces or bad chars, they won't be the same as names_arr)
 
     Returns:
@@ -696,7 +698,7 @@ def make_aggregate_report(
     for line_plot_name, line_plot_path in allele_modification_line_plot['paths'].items():
         with open(line_plot_path, encoding="utf-8") as fh:
             allele_modification_line_plot['htmls'][line_plot_name] = fh.read()
-    
+
     # make_multi_report expects two arrays here for other calls of this function
     empty_failed_runs = []
     empty_failed_runs_desc = []
