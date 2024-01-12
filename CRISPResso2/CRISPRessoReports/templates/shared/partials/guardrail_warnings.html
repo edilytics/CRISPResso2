@@ -1,0 +1,5 @@
+{% if 'guardrails' in report_data and report_data['guardrails']|length > 0 %}
+	{% for message in report_data['guardrails'] %}
+		{{message}}
+	{% endfor %}
+{% endif %}
