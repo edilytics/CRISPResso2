@@ -1238,7 +1238,7 @@ def main():
                     auto_fastq_r2 = ""
                     files_to_remove.append(auto_fastq_r1)
                     sb.call('samtools view -h ' + args.bam_input + ' ' + args.bam_chr_loc + ' | head -n ' + str(number_of_reads_to_consider+100) + ' | samtools bam2fq -  2> /dev/null > ' + auto_fastq_r1, shell=True)
-
+            
             amplicon_seq_arr = CRISPRessoShared.guess_amplicons(
                         fastq_r1=auto_fastq_r1,
                         fastq_r2=auto_fastq_r2,
@@ -4563,13 +4563,13 @@ def main():
                     mod_pcts.append(np.concatenate(([ref_name, 'Deletions'], np.array(ref1_all_deletion_count_vectors[ref_name]).astype(float)/tot)))
                     mod_pcts.append(np.concatenate(([ref_name, 'Substitutions'], np.array(ref1_all_substitution_count_vectors[ref_name]).astype(float)/tot)))
                     mod_pcts.append(np.concatenate(([ref_name, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name]).astype(float)/tot)))
-                    mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]]*refs[ref_names_for_pe[0]]['sequence_length'])))
-                colnames = ['Batch', 'Modification']+list(refs[ref_names_for_pe[0]]['sequence'])
+                    mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]]*refs['Reference']['sequence_length'])))
+                colnames = ['Batch', 'Modification']+list(refs['Reference']['sequence'])
                 pe_modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames).apply(pd.to_numeric,errors='ignore')
-                sgRNA_intervals = refs[ref_names_for_pe[0]]['sgRNA_intervals']
-                sgRNA_names = refs[ref_names_for_pe[0]]['sgRNA_names']
-                sgRNA_mismatches = refs[ref_names_for_pe[0]]['sgRNA_mismatches']
-                include_idxs_list = refs[ref_names_for_pe[0]]['include_idxs']
+                sgRNA_intervals = refs['Reference']['sgRNA_intervals']
+                sgRNA_names = refs['Reference']['sgRNA_names']
+                sgRNA_mismatches = refs['Reference']['sgRNA_mismatches']
+                include_idxs_list = refs['Reference']['include_idxs']
 
                 plot_root = _jp('11a.Prime_editing_nucleotide_percentage_quilt')
                 plot_11a_input = {
