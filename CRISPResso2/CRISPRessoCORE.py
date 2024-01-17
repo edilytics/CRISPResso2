@@ -1238,6 +1238,7 @@ def main():
                     auto_fastq_r2 = ""
                     files_to_remove.append(auto_fastq_r1)
                     sb.call('samtools view -h ' + args.bam_input + ' ' + args.bam_chr_loc + ' | head -n ' + str(number_of_reads_to_consider+100) + ' | samtools bam2fq -  2> /dev/null > ' + auto_fastq_r1, shell=True)
+
             amplicon_seq_arr = CRISPRessoShared.guess_amplicons(
                         fastq_r1=auto_fastq_r1,
                         fastq_r2=auto_fastq_r2,
