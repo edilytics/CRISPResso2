@@ -1929,8 +1929,8 @@ def check_custom_config(args):
                 'C': '#FDC086',
                 'G': '#FFFF99',
                 'N': '#C8C8C8',
-                '-': '#C1C1C1'
-                }        
+                '-': '#1E1E1E',
+                }
             }
 
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
