@@ -603,15 +603,8 @@
 				{% endfor %}
 				</div> {# tab content #} <!-- end tab content -->
 			</div> <!-- end card -->
-           	<div align="center" class='p-3'>
-              {% if is_web %}
-                {% if report_zip_filename %}
-			      <a href="/reports_data/{{report_zip_filename}}" class="btn btn-primary" role="button"><i class="fas fa-download"></i> Download report</a>
-                {% endif %}
-			    <a href="{{report_path}}" class="btn btn-primary" role="button"><i class="fas fa-link"></i> Link to report</a>
-              {% endif %}
-              <button class='btn btn-primary hidden-print' onclick='window.print();'><i class="fas fa-print"></i> Print</button>
-            </div>
+
+            {{render_partial('shared/partials/report_footer_buttons.html', report_zip_filename=report_zip_filename, report_path=report_path)}}
 		</div> {# jumbotron_content #} <!-- end jumbotron_content -->
 	</div> {# jumbrotron #} <!-- end jumbotron -->
 </div> {# column #} <!-- end column -->

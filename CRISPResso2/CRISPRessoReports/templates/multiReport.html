@@ -310,20 +310,14 @@
               <div class='card-body p-0'>
                 <div class="list-group list-group-flush" style='max-height:80vh;overflow-y:auto'>
 							  {% for compact_plot in compact_plots_to_show %}
-	      <a href="{{report_data['crispresso_data_path']}}{{compact_plots_to_show[compact_plot]['href']}}" data-toggle="tooltip" title="{{compact_plot}}" class="list-group-item list-group-item-action p-0"><img src="{{report_data['crispresso_data_path']}}{{compact_plots_to_show[compact_plot]['img']}}" width='100%' ></a>
-                {% endfor %}
-              </div>
+	              <a href="{{report_data['crispresso_data_path']}}{{compact_plots_to_show[compact_plot]['href']}}" data-toggle="tooltip" title="{{compact_plot}}" class="list-group-item list-group-item-action p-0"><img src="{{report_data['crispresso_data_path']}}{{compact_plots_to_show[compact_plot]['img']}}" width='100%' ></a>
+                  {% endfor %}
+                </div>
               </div>
             </div>
-          {% endif %}
+            {% endif %}
 
-            <div align="center" class='p-3'>
-              {% if report_zip_filename %}
-			    <a href="/reports_data/{{report_zip_filename}}" class="btn btn-primary" role="button"><i class="fas fa-download"></i> Download report</a>
-              {% endif %}
-			  <a href="{{report_path}}" class="btn btn-primary" role="button"><i class="fas fa-link"></i> Link to report</a>
-              <button class='btn btn-primary hidden-print' onclick='window.print();'><i class="fas fa-print"></i> Print</button>
-            </div>
+            {{render_partial('shared/partials/report_footer_buttons.html', report_zip_filename=report_zip_filename, report_path=report_path)}}
 
 	</div> {# jumbotron_content #} <!-- end jumbotron_content -->
 </div> {# jumbrotron #} <!-- end jumbotron -->
