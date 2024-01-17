@@ -379,8 +379,14 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
         summary_plot_datas = crispresso2_info['results']['general_plots']['summary_plot_datas']
 
     run_names = []
-    failed_runs = crispresso2_info['results']['failed_batch_arr']
-    failed_runs_desc = crispresso2_info['results']['failed_batch_arr_desc']
+    if 'failed_batch_arr' in crispresso2_info['results']:
+        failed_runs = crispresso2_info['results']['failed_batch_arr']
+    else:
+        failed_runs = []
+    if 'failed_batch_arr' in crispresso2_info['results']:
+        failed_runs_desc = crispresso2_info['results']['failed_batch_arr_desc']
+    else:
+        failed_runs_desc = []
     sub_html_files = {}
     sub_2a_labels = {}
     sub_2a_pdfs = {}
