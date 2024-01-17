@@ -635,7 +635,7 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
     params:
         file_path: path to fastq file
         max_lines_to_check: number of lines to check in the file
-    returns:   
+    returns:
         True if the file is in the correct format
     """
 
@@ -1037,7 +1037,7 @@ def check_if_failed_run(folder_name, info):
     bool True if run completed successfully, False otherwise
     string describing why it failed
     """
-     
+
     run_data_file = os.path.join(folder_name, 'CRISPResso2_info.json')
     status_info = os.path.join(folder_name, 'CRISPResso_status.txt')
     if not os.path.isfile(run_data_file) or not os.path.isfile(status_info):
@@ -1048,7 +1048,7 @@ def check_if_failed_run(folder_name, info):
             unit = "region"
         else:
             unit = "sample"
-        
+
         return True, f"CRISPResso failed for this {unit}! Please check your input files and parameters."
     else:
         with open(status_info) as fh:
@@ -1902,7 +1902,7 @@ def is_C2Pro_installed():
 
 def check_custom_config(args):
     """Check if the config_file argument was provided. If so load the configurations from the file, otherwise load default configurations.
-    
+
     Parameters:
     -------------
     args : dict
@@ -1912,9 +1912,9 @@ def check_custom_config(args):
     -------------
     style : dict
         A dict with a 'colors' key that contains hex color values for different report items.
-    
+
     -OR-
-    
+
     custom_style : dict
         A dict with a 'colors' key that contains hex color values for different report items loaded from a user provided json file.
 
@@ -1932,7 +1932,7 @@ def check_custom_config(args):
                 '-': '#C1C1C1'
                 }        
             }
-    
+
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
 
     #Check if crispresso.pro is installed
@@ -1946,12 +1946,12 @@ def check_custom_config(args):
             if 'colors' not in custom_config.keys():
                 logger.warn("Json file does not contain the colors key. Defaulting all values.")
                 return config
-    
+
             for key in config['colors']:
                 if key not in custom_config['colors']:
                     logger.warn(f"Value for {key} not provided, defaulting")
                     custom_config['colors'][key] = config['colors'][key]
-    
+
             return custom_config
         except Exception as e:
             logger.warn("Cannot read json file '%s', defaulting style parameters." % args.config_file)
