@@ -3955,7 +3955,7 @@ def main():
                         plot_4e_input['plot_title'] = 'Mutation position distribution in %s reads with reference to %s'%(ref_name, ref_names[0])
                         plot_4e_input['plot_root'] = plot_root
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_root'] = os.path.basename(plot_root)
-                        crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_caption'] = "Figure 4f: Positions of modifications in HDR reads with respect to the reference sequence ("+ref_names[0]+"). Insertions: red, deletions: purple, substitutions: green. All modifications (including those outside the quantification window) are shown."
+                        crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_caption'] = f"Figure 4f: Positions of modifications in HDR reads with respect to the reference sequence ({ref_names[0]}). All modifications (including those outside the quantification window) are shown."
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_data'] = []
                     debug('Plotting global modifications with respect to reference')
                     plot(
