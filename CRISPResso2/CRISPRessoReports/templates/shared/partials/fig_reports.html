@@ -1,15 +1,21 @@
 <div id="fig_{{fig_name}}">
+    {# Set the height and width based on the plot #}
+    {% if fig_name in ['plot_1a', 'plot_1b', 'plot_1c', 'plot_3a', 'plot_4a', 'plot_4b', 'plot_4c', 'plot_4e', 'plot_4f'] %}
+        {% set width = '40%' %}
+        {% set height = '40%' %}
+    {% elif fig_name in ['plot_10b', 'plot_10c'] %}
+        {% set width = '70%' %}
+        {% set height = '70%' %}
+    {% else %}
+        {% set width = '100%' %}
+        {% set height = '100%' %}
+    {% endif %}
+
     {% if amplicon_name is defined %}
         {% if 'htmls' in report_data['figures'] and fig_name in report_data['figures']['htmls'][amplicon_name] %}
             {{report_data['figures']['htmls'][amplicon_name][fig_name]|safe}}
         {% else %}
-            {% if fig_name in ['plot_1a', 'plot_1b', 'plot_1c', 'plot_3a', 'plot_4a', 'plot_4b', 'plot_4c'] %}
-            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.png" width='40%' height='40%' ></a>
-            {% elif fig_name in ['plot_10b', 'plot_10c'] %}
-            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.png" width='70%' height='70%' ></a>
-            {% else %}
-            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.png" width='100%' height='100%' ></a>
-            {% endif %}
+            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][amplicon_name][fig_name]}}.png" width='{{width}}' height='{{height}}' ></a>
         {% endif %}
         <label class="labelpadding">{{report_data['figures']['captions'][amplicon_name][fig_name]}}</label>
         {% for (data_label,data_path) in report_data['figures']['datas'][amplicon_name][fig_name] %}
@@ -19,13 +25,7 @@
         {% if 'htmls' in report_data['figures'] and fig_name in report_data['figures']['htmls'] %}
             {{report_data['figures']['htmls'][fig_name]|safe}}
         {% else %}
-            {% if fig_name in ['plot_1a', 'plot_1b', 'plot_1c', 'plot_3a', 'plot_4a', 'plot_4b', 'plot_4c'] %}
-            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.png" width='40%' height='40%' ></a>
-            {% elif fig_name in ['plot_10b', 'plot_10c'] %}
-            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.png" width='70%' height='70%' ></a>
-            {% else %}
-            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.png" width='100%' height='100%' ></a>
-            {% endif %}
+            <a href="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.pdf"><img src="{{report_data['crispresso_data_path']}}{{report_data['figures']['locs'][fig_name]}}.png" width='{{width}}' height='{{height}}' ></a>
         {% endif %}
         <label class="labelpadding">{{report_data['figures']['captions'][fig_name]}}</label>
         {% for (data_label,data_path) in report_data['figures']['datas'][fig_name] %}
