@@ -107,36 +107,7 @@
             </div>
           {% endif %}
 
-
-
-          {% if failed_runs|length > 0 %}
-          <div class='card text-center mb-2'>
-              <div class="card-header bg-danger d-flex justify-content-center align-items-center" onclick="toggleAllDescriptions()">
-                <!-- Center the title and button -->
-                <h5 id="CRISPResso2_Batch_Output" class="mb-0 text-white">Failed Runs</h5>
-                <button class="btn btn-danger ml-2" id="toggleAll" >
-                  <i class="fas fa-chevron-down" id="chevronIcon"></i>
-                </button>
-            </div>
-
-            <div class='card-body p-0'>
-              <div class="list-group list-group-flush">
-                {% for failed_run in failed_runs %}
-                <!-- Toggle the description visibility on click -->
-                <a href="javascript:void(0)" class="list-group-item list-group-item-action failed-run-name bg-light text-dark"
-                  id="failed_run_{{loop.index0}}" onclick="toggleDescription({{loop.index0}})">
-                 {{failed_run}}
-                </a>
-                <!-- Initially hide the description and add a light background with dark text for readability -->
-                <div class="list-group-item text-dark  failed-run-desc" id="failed_run_desc_{{loop.index0}}" style="display: none;">
-                  {{failed_runs_desc[loop.index0]}}</div>
-                {% endfor %}
-              </div>
-            </div>
-          </div>
-          {% endif %}
-
-
+          {{render_partial('shared/partials/failed_runs.html', failed_runs=failed_runs, failed_runs_desc=failed_runs_desc)}}
 
           {% if window_nuc_pct_quilts|length > 0 %}
             <div class='card text-center mb-2'>
