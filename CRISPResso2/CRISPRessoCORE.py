@@ -4678,7 +4678,7 @@ def main():
                         plot_11c_input,
                     )
                     crispresso2_info['results']['general_plots']['plot_11c_root'] = os.path.basename(plot_root)
-                    crispresso2_info['results']['general_plots']['plot_11c_caption'] = "Figure 11a: Scaffold insertion lengths and deletion lengths in reads that contain a scaffold insertion. 'Length matching scaffold' shows the number of basepairs immediately after the pegRNA extension sequence that exactly match the scaffold RNA sequence. 'Insertion length' shows the length of the insertion immediately after the pegRNA extension sequence (including bases that do not match the scaffold sequence)."
+                    crispresso2_info['results']['general_plots']['plot_11c_caption'] = "Figure 11c: Scaffold insertion lengths and deletion lengths in reads that contain a scaffold insertion. 'Length matching scaffold' shows the number of basepairs immediately after the pegRNA extension sequence that exactly match the scaffold RNA sequence. 'Insertion length' shows the length of the insertion immediately after the pegRNA extension sequence (including bases that do not match the scaffold sequence)."
                     crispresso2_info['results']['general_plots']['plot_11c_data'] = [('Scaffold insertion alleles with insertion sizes', os.path.basename(scaffold_insertion_sizes_filename))]
 
         # join plotting pool
