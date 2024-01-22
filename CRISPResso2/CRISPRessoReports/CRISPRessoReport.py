@@ -5,8 +5,8 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 '''
 
 import os
-from jinja2 import Environment, FileSystemLoader, ChoiceLoader, make_logging_undefined
-from CRISPResso2.CRISPRessoReports.jinja_partials import generate_render_partial, render_partial
+from jinja2 import Environment, FileSystemLoader
+from jinja_partials import generate_render_partial, render_partial
 from CRISPResso2 import CRISPRessoShared
 
 if CRISPRessoShared.is_C2Pro_installed():
@@ -67,6 +67,39 @@ def render_template(template_name, jinja2_env, **data):
     )
 
 
+def render_template(template_name, jinja2_env, **data):
+    """Render a template with partials.
+
+    Parameters
+    ----------
+    template_name: str
+        The name of the template to render. For example, if you have a template
+        file called `templates/my_template.html` you would pass in
+        `my_template.html`.
+    jinja2_env: jinja2.Environment
+        The Jinja2 environment being used.
+    **data: keyword arguments of any type
+        Additional keyword arguments that are passed to the template.
+
+    Returns
+    -------
+    The rendered template.
+    """
+    def custom_partial_render(partial_template_name, **partial_data):
+        template = jinja2_env.get_template(partial_template_name)
+        partial_data.update(
+            render_partial=generate_render_partial(
+                custom_partial_render,
+            ),
+            is_default_user=False,
+            is_web=False,
+        )
+        return template.render(**partial_data)
+    return render_partial(
+        template_name, custom_partial_render, **data,
+    )
+
+
 def make_report_from_folder(crispresso_report_file, crispresso_folder, _ROOT):
     """
     Makes an html report for a crispresso run
@@ -83,8 +116,8 @@ def make_report_from_folder(crispresso_report_file, crispresso_folder, _ROOT):
     make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT)
 
 
-def add_fig_if_exists(fig, fig_name, fig_root, fig_title, fig_caption, fig_data,
-                      amplicon_fig_names, amplicon_figures, crispresso_folder, d3_nuc_quilt_names):
+def add_fig_if_exists(fig_name, fig_root, fig_title, fig_caption, fig_data,
+                      amplicon_fig_names, amplicon_figures, crispresso_folder):
     """
         Helper function to add figure if the file exists
         if fig at filename exists,
@@ -93,9 +126,8 @@ def add_fig_if_exists(fig, fig_name, fig_root, fig_title, fig_caption, fig_data,
     # fullpath=os.path.join(crispresso_folder,fig_root+'.png')
     pngfullpath = os.path.join(crispresso_folder, fig_root + '.png')
     htmlfullpath = os.path.join(crispresso_folder, fig_root + '.html')
-    jsonfullpath = os.path.join(crispresso_folder, f'plot_{fig_root}.json')
     #            print('adding file ' + fig_root + ' at ' + fullpath)
-    if os.path.exists(pngfullpath) or os.path.exists(htmlfullpath) or os.path.exists(jsonfullpath):
+    if os.path.exists(pngfullpath) or os.path.exists(htmlfullpath):
         amplicon_fig_names.append(fig_name)
         # amplicon_fig_locs[fig_name]=os.path.basename(fig_root+'.png')
         amplicon_figures['locs'][fig_name] = os.path.basename(fig_root)
@@ -111,14 +143,6 @@ def add_fig_if_exists(fig, fig_name, fig_root, fig_title, fig_caption, fig_data,
                 html_string += html.read()
                 html_string += "</div>"
             amplicon_figures['htmls'][fig_name] = html_string
-        elif os.path.exists(jsonfullpath) and C2PRO_INSTALLED:
-            root_name = fig_root.replace('.', '_').replace('-', '_')
-            d3_nuc_quilt_names.append(f"nuc_quilt_{root_name}")
-            with open(jsonfullpath) as fig_json_fh:
-                amplicon_figures['htmls'][fig_name] = f"""
-                <div class="d-flex justify-content-between" style="max-height: 80vh; overflow-y: auto;" id="{f"nuc_quilt_{root_name}"}"></div>
-                <script type="text/javascript">const {f"nuc_quilt_{root_name}"} = {fig_json_fh.read().strip()}</script>
-                    """
 
 
 def assemble_figs(run_data, crispresso_folder):
@@ -126,16 +150,15 @@ def assemble_figs(run_data, crispresso_folder):
         Helper function create the data structre for the figures
     """
     figures = {'names': {}, 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}, 'sgRNA_based_names': {}}
-    d3_nuc_quilt_names = []
 
     global_fig_names = []
     for fig in ['1a', '1b', '1c', '1d', '5a', '6a', '8a', '11c']:
         fig_name = 'plot_' + fig
         if fig_name + '_root' in run_data['results']['general_plots']:
-            add_fig_if_exists(fig, fig_name, run_data['results']['general_plots'][fig_name + '_root'], 'Figure ' + fig,
+            add_fig_if_exists(fig_name, run_data['results']['general_plots'][fig_name + '_root'], 'Figure ' + fig,
                               run_data['results']['general_plots'][fig_name + '_caption'],
                               run_data['results']['general_plots'][fig_name + '_data'],
-                              global_fig_names, figures, crispresso_folder, d3_nuc_quilt_names)
+                              global_fig_names, figures, crispresso_folder)
 
     amplicons = []
     for amplicon_name in run_data['results']['ref_names']:
@@ -146,11 +169,11 @@ def assemble_figs(run_data, crispresso_folder):
                     '11a']:
             fig_name = 'plot_' + fig
             if fig_name + '_root' in run_data['results']['refs'][amplicon_name]:
-                add_fig_if_exists(fig, fig_name, run_data['results']['refs'][amplicon_name][fig_name + '_root'],
+                add_fig_if_exists(fig_name, run_data['results']['refs'][amplicon_name][fig_name + '_root'],
                                   'Figure ' + fig_name,
                                   run_data['results']['refs'][amplicon_name][fig_name + '_caption'],
                                   run_data['results']['refs'][amplicon_name][fig_name + '_data'],
-                                  global_fig_names, amplicon_figures, crispresso_folder, d3_nuc_quilt_names)
+                                  global_fig_names, amplicon_figures, crispresso_folder)
 
         this_sgRNA_based_fig_names = {}
         for fig in ['2b', '9', '10d', '10e', '10f', '10g', '11b']:
@@ -159,10 +182,10 @@ def assemble_figs(run_data, crispresso_folder):
             if 'plot_' + fig + '_roots' in run_data['results']['refs'][amplicon_name]:
                 for idx, plot_root in enumerate(run_data['results']['refs'][amplicon_name]['plot_' + fig + '_roots']):
                     fig_name = "plot_" + fig + "_" + str(idx)
-                    add_fig_if_exists(fig, fig_name, plot_root, 'Figure ' + fig_name + ' sgRNA ' + str(idx + 1),
+                    add_fig_if_exists(fig_name, plot_root, 'Figure ' + fig_name + ' sgRNA ' + str(idx + 1),
                                       run_data['results']['refs'][amplicon_name]['plot_' + fig + '_captions'][idx],
                                       run_data['results']['refs'][amplicon_name]['plot_' + fig + '_datas'][idx],
-                                      this_fig_names, amplicon_figures, crispresso_folder, d3_nuc_quilt_names)
+                                      this_fig_names, amplicon_figures, crispresso_folder)
             this_sgRNA_based_fig_names[fig] = this_fig_names
 
         figures['names'][amplicon_name] = amplicon_figures['names']
@@ -173,11 +196,11 @@ def assemble_figs(run_data, crispresso_folder):
         figures['captions'][amplicon_name] = amplicon_figures['captions']
         figures['datas'][amplicon_name] = amplicon_figures['datas']
         figures['htmls'][amplicon_name] = amplicon_figures['htmls']
-    data = {'amplicons': amplicons, 'figures': figures, 'nuc_quilt_names': d3_nuc_quilt_names}
+    data = {'amplicons': amplicons, 'figures': figures}
     return data
 
 
-def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT, logger):
+def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
     # dicts for each amplicon fig_names[amp_name] = [list of fig names]
     #                        fig_locs[amp_name][fig_name] = figure location
     #    print('crispresso_report file: ' + crispresso_report_file + ' crispresso_folder : ' + crispresso_folder + ' root: ' + _ROOT)
@@ -203,7 +226,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT, logg
         'nuc_quilt_names': data['nuc_quilt_names'],
     }
 
-    j2_env = get_jinja_loader(_ROOT, logger)
+    j2_env = Environment(loader=FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')))
 
     #    dest_dir = os.path.dirname(crispresso_report_file)
     #    shutil.copy2(os.path.join(_ROOT,'templates','CRISPResso_justcup.png'),dest_dir)
@@ -211,8 +234,9 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT, logg
 
     with open(crispresso_report_file, 'w', encoding="utf-8") as outfile:
         outfile.write(render_template(
-            'report.html', j2_env, report_data=report_data, C2PRO_INSTALLED=C2PRO_INSTALLED,
+            'report.html', j2_env, report_data=report_data,
         ))
+
 
 
 def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info, batch_folder, _ROOT, logger):
@@ -349,7 +373,6 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
         _ROOT,
         output_title,
         'batch',
-        logger,
         summary_plots={
             'names': summary_plot_names,
             'titles': summary_plot_titles,
@@ -371,7 +394,8 @@ def make_pooled_report_from_folder(crispresso_report_file, crispresso2_info, fol
     output_title = 'CRISPResso Pooled Output'
     if crispresso2_info['running_info']['args'].name != '':
         output_title += f"<br/>{crispresso2_info['running_info']['args'].name}"
-    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'pooled', logger)
+    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'pooled')
+
 
 
 def make_compare_report_from_folder(crispresso_report_file, crispresso2_info, folder, _ROOT, logger):
@@ -379,7 +403,8 @@ def make_compare_report_from_folder(crispresso_report_file, crispresso2_info, fo
     output_title = 'CRISPResso Compare Output'
     if crispresso2_info['running_info']['args'].name != '':
         output_title += "<br/>{crispresso2_info['running_info']['args'].name}"
-    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'compare', logger)
+    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'compare')
+
 
 
 def make_meta_report_from_folder(crispresso_report_file, crispresso2_info, folder, _ROOT, logger):
@@ -388,8 +413,9 @@ def make_meta_report_from_folder(crispresso_report_file, crispresso2_info, folde
     output_title = 'CRISPresso Meta Output'
     if crispresso2_info['running_info']['args'].name != '':
         output_title += "<br/>{crispresso2_info['running_info']['args'].name}"
-    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'meta', logger,
+    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'meta',
                                   display_names=input_names)
+
 
 
 def make_wgs_report_from_folder(crispresso_report_file, crispresso2_info, folder, _ROOT, logger):
@@ -397,10 +423,10 @@ def make_wgs_report_from_folder(crispresso_report_file, crispresso2_info, folder
     output_title = 'CRISPResso WGS Output'
     if crispresso2_info['running_info']['args'].name != '':
         output_title += "<br/>{crispresso2_info['running_info']['args'].name}"
-    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'wgs', logger)
+    make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _ROOT, 'wgs')
 
 
-def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, crispresso_report_file, folder, _ROOT, crispresso_tool, logger,
+def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, crispresso_report_file, folder, _ROOT, crispresso_tool,
                                   display_names=None):
     """
     Prepares information to make a report of multiple CRISPResso runs - like CRISPRessoWGS or CRISPRessoPooled
@@ -412,7 +438,6 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
     crispresso_report_file (string): path to write report to
     folder (string): folder containing crispresso runs
     _ROOT (string): location of crispresso assets (images, templates, etc)
-    logger (logging.Logger): logger to log messages to, mainly for undefined variables in Jinja2 templates
     display_names (dict): report_name->display_name; Titles to be shown for crispresso runs
         (if different from names_arr, e.g. if display_names have spaces or bad chars, they won't be the same as names_arr)
 
@@ -486,7 +511,6 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
         _ROOT,
         report_name,
         crispresso_tool,
-        logger,
         summary_plots={
             'names': summary_plot_names,
             'titles': summary_plot_titles,
@@ -506,7 +530,6 @@ def make_multi_report(
     _ROOT,
     report_name,
     crispresso_tool,
-    logger,
     window_nuc_pct_quilts=None,
     nuc_pct_quilts=None,
     window_nuc_conv_plots=None,
@@ -547,8 +570,9 @@ def make_multi_report(
         if key not in dictionary:
             dictionary[key] = default_type()
 
-    j2_env = get_jinja_loader(_ROOT, logger)
-
+    j2_env = Environment(
+        loader=FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')),
+    )
     j2_env.filters['dirname'] = dirname
     if crispresso_tool == 'batch':
         template = 'batchReport.html'
@@ -595,8 +619,8 @@ def make_multi_report(
             'titles': [],
             'labels': [],
             'datas': [],
-            'htmls': [],
         }
+
     for html in sub_html_files:
         sub_html_files[html] = crispresso_data_path + sub_html_files[html]
     with open(crispresso_multi_report_file, 'w', encoding="utf-8") as outfile:
@@ -613,7 +637,7 @@ def make_multi_report(
                 'titles': summary_plots['titles'],
                 'labels': summary_plots['labels'],
                 'datas': summary_plots['datas'],
-                'htmls': summary_plots['htmls'] if 'htmls' in summary_plots else [],
+                'htmls': [],
                 'crispresso_data_path': crispresso_data_path,
             },
             run_names=run_names,

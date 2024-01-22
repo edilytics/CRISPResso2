@@ -11,7 +11,6 @@ import gzip
 import json
 import sys
 import importlib.util
-from pathlib import Path
 
 import numpy as np
 import os
@@ -33,6 +32,10 @@ __version__ = "2.3.1"
 
 ###EXCEPTIONS############################
 class FastpException(Exception):
+    pass
+
+
+class TrimmomaticException(Exception):
     pass
 
 
@@ -153,15 +156,167 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
         "float": float,
     }
 
-    for key, value in args_dict.items():
-        # print(key, value)
-        tools = value.get('tools', [])  # Default to empty list if 'tools' is not found
-        if tool in tools:
-            action = value.get('action')  # Use None as default if 'action' is not found
-            required = value.get('required', False)  # Use False as default if 'required' is not found
-            default = value.get('default')  # Use None as default if 'default' is not found
-            type_value = value.get('type', 'str')  # Assume 'str' as default type if 'type' is not specified
-            arg_help = value.get('help', '') if value.get('help') != "SUPPRESS" else argparse.SUPPRESS
+    # quantification window params
+    parser.add_argument('-w', '--quantification_window_size', '--window_around_sgrna', type=str,
+                        help='Defines the size (in bp) of the quantification window extending from the position specified by the "--cleavage_offset" or "--quantification_window_center" parameter in relation to the provided guide RNA sequence(s) (--sgRNA). Mutations within this number of bp from the quantification window center are used in classifying reads as modified or unmodified. A value of 0 disables this window and indels in the entire amplicon are considered. Default is 1, 1bp on each side of the cleavage position for a total length of 2bp. Multiple quantification window sizes (corresponding to each guide specified by --guide_seq) can be specified with a comma-separated list.',
+                        default='1')
+    parser.add_argument('-wc', '--quantification_window_center', '--cleavage_offset', type=str,
+                        help="Center of quantification window to use within respect to the 3' end of the provided sgRNA sequence. Remember that the sgRNA sequence must be entered without the PAM. For cleaving nucleases, this is the predicted cleavage position. The default is -3 and is suitable for the Cas9 system. For alternate nucleases, other cleavage offsets may be appropriate, for example, if using Cpf1 this parameter would be set to 1. For base editors, this could be set to -17 to only include mutations near the 5' end of the sgRNA. Multiple quantification window centers (corresponding to each guide specified by --guide_seq) can be specified with a comma-separated list.",
+                        default='-3')
+    #    parser.add_argument('--cleavage_offset', type=str, help="Predicted cleavage position for cleaving nucleases with respect to the 3' end of the provided sgRNA sequence. Remember that the sgRNA sequence must be entered without the PAM. The default value of -3 is suitable for the Cas9 system. For alternate nucleases, other cleavage offsets may be appropriate, for example, if using Cpf1 this parameter would be set to 1. To suppress the cleavage offset, enter 'N'.", default=-3)
+    parser.add_argument('--exclude_bp_from_left', type=int,
+                        help='Exclude bp from the left side of the amplicon sequence for the quantification of the indels',
+                        default=15)
+    parser.add_argument('--exclude_bp_from_right', type=int,
+                        help='Exclude bp from the right side of the amplicon sequence for the quantification of the indels',
+                        default=15)
+    parser.add_argument('--use_legacy_insertion_quantification',
+                        help='If set, the legacy insertion quantification method will be used (i.e. with a 1bp quantification window, indels at the cut site and 1bp away from the cut site would be quantified). By default (if this parameter is not set) with a 1bp quantification window, only insertions at the cut site will be quantified.',
+                        action='store_true')
+
+    parser.add_argument('--ignore_substitutions',
+                        help='Ignore substitutions events for the quantification and visualization',
+                        action='store_true')
+    parser.add_argument('--ignore_insertions', help='Ignore insertions events for the quantification and visualization',
+                        action='store_true')
+    parser.add_argument('--ignore_deletions', help='Ignore deletions events for the quantification and visualization',
+                        action='store_true')
+    parser.add_argument('--discard_indel_reads',
+                        help='Discard reads with indels in the quantification window from analysis',
+                        action='store_true')
+
+    # alignment parameters
+    parser.add_argument('--needleman_wunsch_gap_open', type=int, help='Gap open option for Needleman-Wunsch alignment',
+                        default=-20)
+    parser.add_argument('--needleman_wunsch_gap_extend', type=int,
+                        help='Gap extend option for Needleman-Wunsch alignment', default=-2)
+    parser.add_argument('--needleman_wunsch_gap_incentive', type=int,
+                        help='Gap incentive value for inserting indels at cut sites', default=1)
+    parser.add_argument('--needleman_wunsch_aln_matrix_loc', type=str,
+                        help='Location of the matrix specifying substitution scores in the NCBI format (see ftp://ftp.ncbi.nih.gov/blast/matrices/)',
+                        default='EDNAFULL')
+    parser.add_argument('--aln_seed_count', type=int, default=5,
+                        help=argparse.SUPPRESS)  # help='Number of seeds to test whether read is forward or reverse',default=5)
+    parser.add_argument('--aln_seed_len', type=int, default=10,
+                        help=argparse.SUPPRESS)  # help='Length of seeds to test whether read is forward or reverse',default=10)
+    parser.add_argument('--aln_seed_min', type=int, default=2,
+                        help=argparse.SUPPRESS)  # help='number of seeds that must match to call the read forward/reverse',default=2)
+
+    # plotting parameters
+    parser.add_argument('--plot_histogram_outliers',
+                        help="If set, all values will be shown on histograms. By default (if unset), histogram ranges are limited to plotting data within the 99 percentile.",
+                        action='store_true')
+
+    # allele plot parameters
+    parser.add_argument('--plot_window_size', '--offset_around_cut_to_plot', type=int,
+                        help='Defines the size of the window extending from the quantification window center to plot. Nucleotides within plot_window_size of the quantification_window_center for each guide are plotted.',
+                        default=20)
+    parser.add_argument('--min_frequency_alleles_around_cut_to_plot', type=float,
+                        help='Minimum %% reads required to report an allele in the alleles table plot.', default=0.2)
+    parser.add_argument('--expand_allele_plots_by_quantification',
+                        help='If set, alleles with different modifications in the quantification window (but not necessarily in the plotting window (e.g. for another sgRNA)) are plotted on separate lines, even though they may have the same apparent sequence. To force the allele plot and the allele table to be the same, set this parameter. If unset, all alleles with the same sequence will be collapsed into one row.',
+                        action='store_true')
+    parser.add_argument('--allele_plot_pcts_only_for_assigned_reference',
+                        help='If set, in the allele plots, the percentages will show the percentage as a percent of reads aligned to the assigned reference. Default behavior is to show percentage as a percent of all reads.',
+                        action='store_true')
+    parser.add_argument('-qwc', '--quantification_window_coordinates', type=str,
+                        help='Bp positions in the amplicon sequence specifying the quantification window. This parameter overrides values of the "--quantification_window_center", "--cleavage_offset", "--window_around_sgrna" or "--window_around_sgrna" values. Any indels/substitutions outside this window are excluded. Indexes are 0-based, meaning that the first nucleotide is position 0. Ranges are separted by the dash sign (e.g. "start-stop"), and multiple ranges can be separated by the underscore (_). ' +
+                             'A value of 0 disables this filter. (can be comma-separated list of values, corresponding to amplicon sequences given in --amplicon_seq e.g. 5-10,5-10_20-30 would specify the 5th-10th bp in the first reference and the 5th-10th and 20th-30th bp in the second reference)',
+                        default=None)
+    parser.add_argument('--annotate_wildtype_allele', type=str,
+                        help='Wildtype alleles in the allele table plots will be marked with this string (e.g. **).',
+                        default='')
+
+    # output parameters
+    parser.add_argument('--keep_intermediate', help='Keep all the  intermediate files', action='store_true')
+    parser.add_argument('--dump', help='Dump numpy arrays and pandas dataframes to file for debugging purposes',
+                        action='store_true')
+    parser.add_argument('--write_detailed_allele_table',
+                        help='If set, a detailed allele table will be written including alignment scores for each read sequence.',
+                        action='store_true')
+    parser.add_argument('--fastq_output', help='If set, a fastq file with annotations for each read will be produced.',
+                        action='store_true')
+    parser.add_argument('--bam_output', help='If set, a bam file with alignments for each read will be produced.',
+                        action='store_true')
+    parser.add_argument('-x', '--bowtie2_index', type=str, help='Basename of Bowtie2 index for the reference genome',
+                        default='')
+    parser.add_argument('--zip_output', help="If set, the output will be placed in a zip folder.", action='store_true')
+
+    # report style parameters
+    parser.add_argument('--max_rows_alleles_around_cut_to_plot', type=int,
+                        help='Maximum number of rows to report in the alleles table plot.', default=50)
+    parser.add_argument('--suppress_report', help='Suppress output report', action='store_true')
+    parser.add_argument('--place_report_in_output_folder',
+                        help='If true, report will be written inside the CRISPResso output folder. By default, the report will be written one directory up from the report output.',
+                        action='store_true')
+    parser.add_argument('--suppress_plots', help='Suppress output plots', action='store_true')
+    parser.add_argument('--write_cleaned_report', action='store_true',
+                        help=argparse.SUPPRESS)  # trims working directories from output in report (for web access)
+    parser.add_argument('--config_file', help='File path to JSON file with config elements', type=str)
+
+    # base editor parameters
+    parser.add_argument('--base_editor_output',
+                        help='Outputs plots and tables to aid in analysis of base editor studies.', action='store_true')
+    parser.add_argument('--conversion_nuc_from',
+                        help='For base editor plots, this is the nucleotide targeted by the base editor', default='C')
+    parser.add_argument('--conversion_nuc_to',
+                        help='For base editor plots, this is the nucleotide produced by the base editor', default='T')
+
+    # prime editing parameters
+    parser.add_argument('--prime_editing_pegRNA_spacer_seq', type=str,
+                        help="pegRNA spacer sgRNA sequence used in prime editing. The spacer should not include the PAM sequence. The sequence should be given in the RNA 5'->3' order, so for Cas9, the PAM would be on the right side of the given sequence.",
+                        default='')
+    parser.add_argument('--prime_editing_pegRNA_extension_seq', type=str,
+                        help="Extension sequence used in prime editing. The sequence should be given in the RNA 5'->3' order, such that the sequence starts with the RT template including the edit, followed by the Primer-binding site (PBS).",
+                        default='')
+    parser.add_argument('--prime_editing_pegRNA_extension_quantification_window_size', type=int,
+                        help="Quantification window size (in bp) at flap site for measuring modifications anchored at the right side of the extension sequence. Similar to the --quantification_window parameter, the total length of the quantification window will be 2x this parameter. Default: 5bp (10bp total window size)",
+                        default=5)
+    parser.add_argument('--prime_editing_pegRNA_scaffold_seq', type=str,
+                        help="If given, reads containing any of this scaffold sequence before extension sequence (provided by --prime_editing_extension_seq) will be classified as 'Scaffold-incorporated'. The sequence should be given in the 5'->3' order such that the RT template directly follows this sequence. A common value is 'GGCACCGAGUCGGUGC'.",
+                        default='')
+    parser.add_argument('--prime_editing_pegRNA_scaffold_min_match_length', type=int,
+                        help="Minimum number of bases matching scaffold sequence for the read to be counted as 'Scaffold-incorporated'. If the scaffold sequence matches the reference sequence at the incorporation site, the minimum number of bases to match will be minimally increased (beyond this parameter) to disambiguate between prime-edited and scaffold-incorporated sequences.",
+                        default=1)
+    parser.add_argument('--prime_editing_nicking_guide_seq', type=str,
+                        help="Nicking sgRNA sequence used in prime editing. The sgRNA should not include the PAM sequence. The sequence should be given in the RNA 5'->3' order, so for Cas9, the PAM would be on the right side of the sequence",
+                        default='')
+    parser.add_argument('--prime_editing_override_prime_edited_ref_seq', type=str,
+                        help="If given, this sequence will be used as the prime-edited reference sequence. This may be useful if the prime-edited reference sequence has large indels or the algorithm cannot otherwise infer the correct reference sequence.",
+                        default='')
+    parser.add_argument('--prime_editing_override_sequence_checks',
+                        help="If set, checks to assert that the prime editing guides and extension sequence are in the proper orientation are not performed. This may be useful if the checks are failing inappropriately, but the user is confident that the sequences are correct.",
+                        action='store_true')
+    parser.add_argument('--prime_editing_gap_open_penalty',
+                        help=argparse.SUPPRESS, type=int, default=-50)
+                        # help="If set, adjusts the alignment gap open penalty for calculating alignment between pegRNA components (e.g. spacer and extension)."
+    parser.add_argument('--prime_editing_gap_extend_penalty',
+                        help=argparse.SUPPRESS, type=int, default=0)
+                        # help="If set, adjusts the alignment gap extension penalty for calculating alignment between pegRNA components (e.g. spacer and extension). Because prime editing may introduce large insertions/deletions, this is set to 0 to preference these large insertions."
+
+    # special running modes
+    parser.add_argument('--crispresso1_mode', help='Parameter usage as in CRISPResso 1', action='store_true')
+    parser.add_argument('--dsODN', help='Label reads with the dsODN sequence provided', default='')
+    parser.add_argument('--auto', help='Infer amplicon sequence from most common reads', action='store_true')
+    parser.add_argument('--debug', help='Show debug messages', action='store_true')
+    parser.add_argument('--no_rerun',
+                        help="Don't rerun CRISPResso2 if a run using the same parameters has already been finished.",
+                        action='store_true')
+    parser.add_argument('-p', '--n_processes', type=str, help='Specify the number of processes to use for analysis.\
+    Please use with caution since increasing this parameter will significantly increase the memory required to run CRISPResso. Can be set to \'max\'.',
+                        default='1')
+
+    # processing of aligned bam files
+    if 'bam_input' not in suppress_params:
+        parser.add_argument('--bam_input', type=str, help='Aligned reads for processing in bam format', default='')
+    if 'bam_chr_loc' not in suppress_params:
+        parser.add_argument('--bam_chr_loc', type=str,
+                        help='Chromosome location in bam for reads to process. For example: "chr1:50-100" or "chrX".',
+                        default='')
+
+    # deprecated params
+    parser.add_argument('--save_also_png', default=False,
+                        help=argparse.SUPPRESS)  # help='Save also .png images in addition to .pdf files') #depreciated -- now pngs are automatically created. Pngs can be suppressed by '--suppress_report'
 
             # Determine the correct function based on conditions
             if action:
@@ -825,6 +980,47 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
 def check_if_failed_run(folder_name, info):
     """
     Check the output folder for a info.json file and a status.txt file to see if the run completed successfully or not
+
+    input:
+    folder_name: path to output folder
+    info: logger
+
+
+    returns:
+    bool True if run completed successfully, False otherwise
+    string describing why it failed
+    """
+
+    run_data_file = os.path.join(folder_name, 'CRISPResso2_info.json')
+    status_info = os.path.join(folder_name, 'CRISPResso_status.txt')
+    if not os.path.isfile(run_data_file) or not os.path.isfile(status_info):
+        info("Skipping folder '%s'. Cannot find run data status file at '%s'."%(folder_name, run_data_file))
+        if "CRISPRessoPooled" in folder_name:
+            unit = "amplicon"
+        elif "CRISPRessoWGS" in folder_name:
+            unit = "region"
+        else:
+            unit = "sample"
+
+        return True, f"CRISPResso failed for this {unit}! Please check your input files and parameters."
+    else:
+        with open(status_info) as fh:
+            try:
+                file_contents = fh.read()
+                search_result = re.search(r'(\d+\.\d+)% (.+)', file_contents)
+                if search_result:
+                    percent_complete, status = search_result.groups()
+                    if percent_complete != '100.00':
+                        info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status))
+                        return True, status
+                else:
+                    return True, file_contents
+            except Exception as e:
+                print(e)
+                info("Skipping folder '%s'. Cannot parse status file '%s'." % (folder_name, status_info))
+                return True, "Cannot parse status file '%s'." % (status_info)
+    return False, ""
+
 
     input:
     folder_name: path to output folder
@@ -1777,7 +1973,7 @@ def zip_results(results_folder):
 
 def is_C2Pro_installed():
     try:
-        spec = importlib.util.find_spec("CRISPRessoPro")
+        spec = importlib.util.find_spec("crispressoPro")
         if spec is None:
             return False
         else:
@@ -1796,499 +1992,50 @@ def check_custom_config(args):
 
     Returns:
     -------------
-    config : dict
-        A dict with a 'colors' key that contains hex color values for different report items as well as a 'guardrails' key that contains the guardrail values.
+    style : dict
+        A dict with a 'colors' key that contains hex color values for different report items.
+
+    -OR-
+
+    custom_style : dict
+        A dict with a 'colors' key that contains hex color values for different report items loaded from a user provided json file.
+
     """
     config =  {
         "colors": {
-            'Substitution': '#0000FF',
-            'Insertion': '#008000',
-            'Deletion': '#FF0000',
-            'A': '#7FC97F',
-            'T': '#BEAED4',
-            'C': '#FDC086',
-            'G': '#FFFF99',
-            'N': '#C8C8C8',
-            '-': '#1E1E1E',
-        },
-        "guardrails": {
-            'min_total_reads': 10000,
-            'aligned_cutoff': 0.9,
-            'alternate_alignment': 0.3,
-            'min_ratio_of_mods_in_to_out': 0.01,
-            'modifications_at_ends': 0.01,
-            'outside_window_max_sub_rate': 0.002,
-            'max_rate_of_subs': 0.3,
-            'guide_len': 19,
-            'amplicon_len': 50,
-            'amplicon_to_read_length': 1.5
-        }
-    }
+                'Substitution': '#0000FF',
+                'Insertion': '#008000',
+                'Deletion': '#FF0000',
+                'A': '#7FC97F',
+                'T': '#BEAED4',
+                'C': '#FDC086',
+                'G': '#FFFF99',
+                'N': '#C8C8C8',
+                '-': '#1E1E1E',
+                }
+            }
 
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
+
+    #Check if crispresso.pro is installed
     if not is_C2Pro_installed():
         return config
-
     if args.config_file:
         try:
             with open(args.config_file, "r") as json_file:
                 custom_config = json.load(json_file)
 
-            if 'guardrails' in custom_config.keys():
-                for key in config['guardrails']:
-                    if key not in custom_config['guardrails']:
-                        logger.warn(f"Value for {key} not provided, defaulting.")
-                        custom_config['guardrails'][key] = config['guardrails'][key]
-                for key in custom_config['guardrails']:
-                    if key not in config['guardrails']:
-                        logger.warn(f"Key {key} is not a recognized guardrail parameter, skipping.")
-            else:
-                logger.warn("Json file does not contain the guardrails key. Defaulting all values.")
-                custom_config['guardrails'] = config['guardrails']
-
-            if 'colors' in custom_config.keys():
-                for key in config['colors']:
-                    if key not in custom_config['colors']:
-                        logger.warn(f"Value for {key} not provided, defaulting")
-                        custom_config['colors'][key] = config['colors'][key]
-            else:
+            if 'colors' not in custom_config.keys():
                 logger.warn("Json file does not contain the colors key. Defaulting all values.")
-                custom_config['colors'] = config['colors']
+                return config
+
+            for key in config['colors']:
+                if key not in custom_config['colors']:
+                    logger.warn(f"Value for {key} not provided, defaulting")
+                    custom_config['colors'][key] = config['colors'][key]
 
             return custom_config
-        except Exception:
-            if args.config_file:
-                logger.warn("Cannot read config file '%s', defaulting config parameters." % args.config_file)
-            else:
-                logger.warn("No config file provided, defaulting config parameters.")
+        except Exception as e:
+            logger.warn("Cannot read json file '%s', defaulting style parameters." % args.config_file)
+            print(e)
     return config
-
-
-def safety_check(crispresso2_info, aln_stats, guardrails):
-    """Check the results of analysis for potential issues and warns the user.
-
-    Parameters
-    ----------
-    crispresso2_info : dict
-        Dictionary of values describing the analysis
-    aln_stats : dict
-        Dictionary of alignment statistics and modification frequency and location
-    guardrails : dict
-        Contains the following:
-            min_total_reads : int
-                Cutoff value for total reads aligned
-            alignedCutoff : float
-                Check value for the percentage of reads aligned vs not aligned
-            alternateAlignment : float
-                Percentage of variance from expected reads to trigger guardrail
-            minRatioOfModsInToOut : float
-                Float representing the acceptable ratio of modifications in the window to out
-            modificationsAtEnds : float
-                The ratio of reads with modifications at the 0 or -1 spot
-            outsideWindowMaxSubRate : float
-                Ratio of subs allowed outside of the window
-            maxRateOfSubs : float
-                Allowed rate of subs accross the entire read
-            guide_len : int
-                Minimum guide length
-            amplicon_len : int
-                Minimum amplicon length
-            ampliconToReadLen : float
-                Comparison value between amplicons and reads
-    """
-    logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
-    messageHandler = GuardrailMessageHandler(logger)
-
-    # Get amplicon and guide sequences and lengths
-    amplicons = {}
-    guide_groups = set()
-    for name in crispresso2_info['results']['ref_names']:
-        amplicons[name] = crispresso2_info['results']['refs'][name]['sequence_length']
-        guide_groups.update(crispresso2_info['results']['refs'][name]['sgRNA_sequences'])
-    unique_guides = {guide: len(guide) for guide in guide_groups}
-
-    totalReadsGuardrail = TotalReadsGuardrail(messageHandler, guardrails['min_total_reads'])
-    totalReadsGuardrail.safety(aln_stats['N_TOT_READS'])
-
-    overallReadsAlignedGuard = OverallReadsAlignedGuardrail(messageHandler, guardrails['aligned_cutoff'])
-    overallReadsAlignedGuard.safety(aln_stats['N_TOT_READS'], (aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']))
-
-    disproportionateReadsAlignedGuardrail = DisproportionateReadsAlignedGuardrail(messageHandler, guardrails['aligned_cutoff'])
-    disproportionateReadsAlignedGuardrail.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['alignment_stats']['counts_total'])
-
-    lowRatioOfModsInWindowToOut = LowRatioOfModsInWindowToOutGuardrail(messageHandler, guardrails['min_ratio_of_mods_in_to_out'])
-    lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
-
-    highRateOfModificationAtEndsGuardrail = HighRateOfModificationAtEndsGuardrail(messageHandler, guardrails['modifications_at_ends'])
-    highRateOfModificationAtEndsGuardrail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
-
-    highRateOfSubstitutionsOutsideWindowGuardrail = HighRateOfSubstitutionsOutsideWindowGuardrail(messageHandler, guardrails['outside_window_max_sub_rate'])
-    highRateOfSubstitutionsOutsideWindowGuardrail.safety(aln_stats['N_GLOBAL_SUBS'], aln_stats['N_SUBS_OUTSIDE_WINDOW'])
-
-    highRateOfSubstitutions = HighRateOfSubstitutionsGuardrail(messageHandler, guardrails['max_rate_of_subs'])
-    highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
-
-    shortAmpliconSequence = ShortSequenceGuardrail(messageHandler, guardrails['amplicon_len'], 'amplicon')
-    shortAmpliconSequence.safety(amplicons)
-
-    shortGuideSequence = ShortSequenceGuardrail(messageHandler, guardrails['guide_len'], 'guide')
-    shortGuideSequence.safety(unique_guides)
-
-    longAmpliconShortReadsGuardrail = LongAmpliconShortReadsGuardrail(messageHandler, guardrails['amplicon_to_read_length'])
-    longAmpliconShortReadsGuardrail.safety(amplicons, aln_stats['READ_LENGTH'])
-
-    crispresso2_info['results']['guardrails'] = messageHandler.get_messages()
-
-    return messageHandler.get_html_messages()
-
-
-class GuardrailMessageHandler:
-    """Class to handle message storage and display for guardrails"""
-    def __init__(self, logger):
-        """Create the message handler with an empty message array to collect html divs for the report
-
-        Parameters:
-        ------------
-        logger : logger
-            logger object used to display messages
-        """
-        self.logger = logger
-        self.html_messages = []
-        self.messages = {}
-
-    def display_warning(self, guardrail, message):
-        """Send the message to the logger to be displayed
-
-        Parameters:
-        -----------
-        message : string
-            Related guardrail message
-        """
-        self.logger.warning(message)
-        self.messages[guardrail] = message
-
-    def report_warning(self, message):
-        """Create and store the html message to display on the report
-
-        Parameters:
-        -----------
-        message : string
-            Related guardrail message
-        """
-        html_warning = '<div class="alert alert-danger"><strong>Guardrail Warning!</strong>{0}</div>'.format(message)
-        self.html_messages.append(html_warning)
-
-    def get_messages(self):
-        """Return the messages accumulated by the message handler"""
-        return self.messages
-
-    def get_html_messages(self):
-        """Return the html messages accumulated by the message handler"""
-        return self.html_messages
-
-
-class TotalReadsGuardrail:
-    """Guardrail class: check that the number of reads are above a minimum"""
-    def __init__(self, messageHandler, minimum):
-        """Assign variables and create guardrail message
-
-        Parameters:
-        -----------
-        messageHandler : GuardrailMessagehandler
-            Guardrail message handler to create and display warnings
-        minimum : int
-            The comparison integer to determine if there are sufficent reads
-        """
-        self.messageHandler = messageHandler
-        self.minimum = minimum
-        self.message = " Low number of total reads: <{}.".format(minimum)
-
-    def safety(self, total_reads):
-        """Safety check, if total is below minimum send warnings
-
-        Parameters:
-        -----------
-        total_reads : int
-            The total reads, unaligned and aligned
-        """
-        if total_reads < self.minimum:
-            self.message = self.message + " Total reads: {}.".format(total_reads)
-            self.messageHandler.display_warning('TotalReadsGuardrail', self.message)
-            self.messageHandler.report_warning(self.message)
-
-
-class OverallReadsAlignedGuardrail:
-    """Guardrail class: check if enough reads are aligned"""
-    def __init__(self, messageHandler, cutoff):
-        """Assign variables and create guardrail message
-
-        Parameters:
-        -----------
-        messageHandler : GuardrailMessagehandler
-            Guardrail message handler to create and display warnings
-        cutoff : float
-            The float representation of percentage of minimum reads to be aligned
-        """
-        self.messageHandler = messageHandler
-        self.message = " <={val}% of reads were aligned.".format(val=(cutoff * 100))
-        self.cutoff = cutoff
-
-    def safety(self, total_reads, n_read_aligned):
-        """Safety check, if total_reads divided by n_reads_aligned is lower than the cutoff
-
-        Parameters:
-        -----------
-        total_reads : int
-            Total reads, unaligned and aligned
-        n_read_aligned : int
-            Total aligned reads
-        """
-        if total_reads == 0:
-            return
-        if (n_read_aligned/total_reads) <= self.cutoff:
-            self.message = self.message + " Total reads: {}, Aligned reads: {}.".format(total_reads, n_read_aligned)
-            self.messageHandler.display_warning('OverallReadsAlignedGuardrail', self.message)
-            self.messageHandler.report_warning(self.message)
-
-
-class DisproportionateReadsAlignedGuardrail:
-    """Guardrail class: check if the distribution of reads is roughly even across amplicons"""
-    def __init__(self, messageHandler, cutoff):
-        """Assign variables and create guardrail message
-
-        Parameters:
-        -----------
-        messageHandler : GuardrailMessagehandler
-            Guardrail message handler to create and display warnings
-        cutoff : float
-            The float representation of the accepted percentage deviation from the expected distribution
-        """
-        self.messageHandler = messageHandler
-        self.message = " Disproportionate percentages of reads were aligned to amplicon: "
-        self.cutoff = cutoff
-
-    def safety(self, n_read_aligned, reads_aln_amplicon):
-        """Safety check, if total_reads divided by n_reads_aligned is higher or lower than the total_reads divided by the number of amplicons
-
-        Parameters:
-        -----------
-        total_reads : int
-            Total reads, unaligned and aligned
-        reads_aln_amplicon : dict
-            A dictionary with the names of amplicons as the key and the number of reads aligned as the value
-        """
-        if len(reads_aln_amplicon.keys()) <= 1:
-            return
-        expected_per_amplicon = n_read_aligned / len(reads_aln_amplicon.keys())
-        for amplicon, aligned in reads_aln_amplicon.items():
-            if aligned <= (expected_per_amplicon * self.cutoff) or aligned >= (expected_per_amplicon * (1 - self.cutoff)):
-                amplicon_message = self.message + amplicon + ", Percent of aligned reads aligned to this amplicon: {}%.".format(round((aligned/n_read_aligned) * 100, 2))
-                self.messageHandler.display_warning('DisproportionateReadsAlignedGuardrail', amplicon_message)
-                self.messageHandler.report_warning(amplicon_message)
-
-
-class LowRatioOfModsInWindowToOutGuardrail:
-    """Guardrail class: check the ratio of modifications in the quantification window to out of it"""
-    def __init__(self, messageHandler, cutoff):
-        """Assign variables and create guardrail message
-
-        Parameters:
-        -----------
-        messageHandler : GuardrailMessagehandler
-            Guardrail message handler to create and display warnings
-        cutoff : float
-            The float representation of the maximum percentage of modifications outside of the quantification window
-        """
-        self.messageHandler = messageHandler
-        self.message = " <={}% of modifications were inside of the quantification window.".format(cutoff * 100)
-        self.cutoff = cutoff
-
-    def safety(self, mods_in_window, mods_outside_window):
-        """Safety check, if the modifications in the window are below a ratio of the total
-
-        Parameters:
-        -----------
-        mods_in_window : int
-            The number of mods in the quantification window
-        mods_outside_window : int
-            The number of mods outside of the quantification window
-        """
-        total_mods = mods_in_window + mods_outside_window
-        if total_mods == 0:
-            return
-        if ((mods_in_window / total_mods) <= self.cutoff):
-            self.message = self.message + " Total modifications: {}, Modifications in window: {}, Modifications outside window: {}.".format(total_mods, mods_in_window, mods_outside_window)
-            self.messageHandler.display_warning('LowRatioOfModsInWindowToOutGuardrail', self.message)
-            self.messageHandler.report_warning(self.message)
-
-
-class HighRateOfModificationAtEndsGuardrail:
-    """Guardrail class: check the ratio of modifications in the quantification window to out of it"""
-    def __init__(self, messageHandler, percentage_start_end):
-        """Assign variables and create guardrail message
-
-        Parameters:
-        -----------
-        messageHandler : GuardrailMessagehandler
-            Guardrail message handler to create and display warnings
-        percentage_start_end : float
-            The float representation of the maximum percentage reads that have modifications on either end
-        """
-        self.messageHandler = messageHandler
-        self.message = " >={}% of reads have modifications at the start or end.".format(round(percentage_start_end * 100, 2))
-        self.percent = percentage_start_end
-
-    def safety(self, total_reads, irregular_reads):
-        """Safety check, comparison between the number of irregular reads to total reads
-
-        Parameters:
-        -----------
-        total_reads : int
-            The number of mods in the quantification window
-        irregular_reads : int
-            The number of mods outside of the quantification window
-        """
-        if total_reads == 0:
-            return
-        if (irregular_reads / total_reads) >= self.percent:
-            self.message = self.message + " Total reads: {}, Irregular reads: {}.".format(total_reads, irregular_reads)
-            self.messageHandler.display_warning('HighRateOfModificationAtEndsGuardrail', self.message)
-            self.messageHandler.report_warning(self.message)
-
-
-class HighRateOfSubstitutionsOutsideWindowGuardrail:
-    """Guardrail class: check the ratio of global substitutions to substitutions outside of the quantification window"""
-    def __init__(self, messageHandler, cutoff):
-        """Assign variables and create guardrail message
-
-        Parameters:
-        -----------
-        messageHandler : GuardrailMessagehandler
-            Guardrail message handler to create and display warnings
-        cutoff : float
-            The float representation of how many of the total substitutions can be outside of the quantification window
-        """
-        self.messageHandler = messageHandler
-        self.message = " >={}% of substitutions were outside of the quantification window.".format(cutoff * 100)
-        self.cutoff = cutoff
-
-    def safety(self, global_subs, subs_outside_window):
-        """Safety check, comparison between the number of global subs to subs outside of the quantification window
-
-        Parameters:
-        -----------
-        global_subs : int
-            The number of mods in the quantification window
-        subs_outside_window : int
-            The number of mods outside of the quantification window
-        """
-        if global_subs == 0:
-            return
-        if ((subs_outside_window / global_subs) >= self.cutoff):
-            self.message = self.message + " Total substitutions: {}, Substitutions outside window: {}.".format(global_subs, subs_outside_window)
-            self.messageHandler.display_warning('HighRateOfSubstitutionsOutsideWindowGuardrail', self.message)
-            self.messageHandler.report_warning(self.message)
-
-
-class HighRateOfSubstitutionsGuardrail:
-    """Guardrail class: check the ratio of global substitutions to total modifications"""
-    def __init__(self, messageHandler, cutoff):
-        """Assign variables and create guardrail message
-
-        Parameters:
-        -----------
-        messageHandler : GuardrailMessagehandler
-            Guardrail message handler to create and display warnings
-        cutoff : float
-            The float representation of how many of the total modifications can be subsitutions
-        """
-        self.messageHandler = messageHandler
-        self.message = " >={}% of modifications were substitutions. This could potentially indicate poor sequencing quality.".format(cutoff * 100)
-        self.cutoff = cutoff
-
-    def safety(self, mods_in_window, mods_outside_window, global_subs):
-        """Safety check, comparison between subsitutions and total modifications
-
-        Parameters:
-        -----------
-        mods_in_window : int
-            Modifications inside of the quantification window
-        mods_outside_window : int
-            Modifications outside of the quantification window
-        global_subs : int
-            Total subsitutions across all reads
-        """
-        total_mods = mods_in_window + mods_outside_window
-        if total_mods == 0:
-            return
-        if ((global_subs / total_mods) >= self.cutoff):
-            self.message = self.message + " Total modifications: {}, Substitutions: {}.".format(total_mods, global_subs)
-            self.messageHandler.display_warning('HighRateOfSubstitutionsGuardrail', self.message)
-            self.messageHandler.report_warning(self.message)
-
-
-class ShortSequenceGuardrail:
-    """Guardrail class: Check to make sure that sequences (amplicons and guides) are above a certain length"""
-    def __init__(self, messageHandler, cutoff, sequence_type):
-        """Assign variables and create guardrail message
-
-        Parameters:
-        -----------
-        messageHandler : GuardrailMessagehandler
-            Guardrail message handler to create and display warnings
-        cutoff : int
-            Integer value to measure the length of the sequence
-        sequence_type : string
-            Amplicon or guide
-        """
-        self.messageHandler = messageHandler
-        self.cutoff = cutoff
-        self.message = f" {string.capwords(sequence_type)} length <{cutoff}: "
-
-    def safety(self, sequences):
-        """Safety check, comparison between sequence lengths and minimum lengths
-
-        Parameters:
-        -----------
-        sequences : dict
-            Dictionary with the name of the sequence as the key and the length of the sequence as the value
-        """
-        for name, length in sequences.items():
-            if length < self.cutoff:
-                sequence_message = self.message + name + ", Length: {}.".format(length)
-                self.messageHandler.display_warning('ShortSequenceGuardrail', sequence_message)
-                self.messageHandler.report_warning(sequence_message)
-
-
-class LongAmpliconShortReadsGuardrail:
-    """Guardrail class: Check to make sure that the reads are close in size to amplicons"""
-    def __init__(self, messageHandler, cutoff):
-        """Assign variables and create guardrail message
-
-        Parameters:
-        -----------
-        messageHandler : GuardrailMessagehandler
-            Guardrail message handler to create and display warnings
-        cutoff : float
-            The value multiplied by the read length to make sure the amplicon isn't too much longer than the reads.
-
-        """
-        self.messageHandler = messageHandler
-        self.cutoff = cutoff
-        self.message = " Amplicon length is greater than {}x the length of the reads: ".format(cutoff)
-
-    def safety(self, amplicons, read_len):
-        """Safety check, comparison between amplicon length and read length
-
-        Parameters:
-        -----------
-        amplicons : dict
-            Dictionary with the name of the amplicon as the key and the length of the sequence as the value
-        read_len : int
-            Average length of reads
-        """
-        for name, length in amplicons.items():
-            if length > (read_len * self.cutoff):
-                sequence_message = self.message + name + ", Amplicon length: {}, Read length: {}.".format(length, read_len)
-                self.messageHandler.display_warning('LongAmpliconShortReadsGuardrail', sequence_message)
-                self.messageHandler.report_warning(sequence_message)

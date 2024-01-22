@@ -9,6 +9,7 @@ from copy import deepcopy
 import sys
 import traceback
 from CRISPResso2 import CRISPRessoShared
+from CRISPResso2 import CRISPRessoPlot
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
 import logging
