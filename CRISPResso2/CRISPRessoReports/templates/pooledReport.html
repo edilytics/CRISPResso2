@@ -45,44 +45,6 @@
 
 {% block content %}
 
-<script>
-  // Function to toggle individual descriptions
-  function toggleDescription(index) {
-    var desc = document.getElementById("failed_run_desc_" + index);
-    desc.style.display = desc.style.display === "none" ? "block" : "none";
-    updateChevron();
-  }
-
-  // Function to toggle all descriptions
-  function toggleAllDescriptions() {
-    var descs = document.querySelectorAll('.failed-run-desc');
-    var allHidden = Array.from(descs).every(desc => desc.style.display === "none");
-
-    descs.forEach(desc => {
-      desc.style.display = allHidden ? "block" : "none";
-    });
-
-    updateChevron();
-  }
-
-  // Function to update the chevron direction based on the visibility of the descriptions
-  function updateChevron() {
-    var descs = document.querySelectorAll('.failed-run-desc');
-    var allHidden = Array.from(descs).every(desc => desc.style.display === "none");
-    var chevronIcon = document.getElementById("chevronIcon");
-    if (allHidden) {
-      chevronIcon.classList.remove("fa-chevron-up");
-      chevronIcon.classList.add("fa-chevron-down");
-    } else {
-      chevronIcon.classList.remove("fa-chevron-down");
-      chevronIcon.classList.add("fa-chevron-up");
-    }
-  }
-
-  // Call updateChevron on page load to set the initial chevron direction
-  document.addEventListener('DOMContentLoaded', updateChevron);
-</script>
-
 <div class="row">
 <div class="col-sm-1"></div>
 <div class="col-sm-10">
@@ -98,39 +60,14 @@
                 <div class='card-body p-0'>
                     <div class="list-group list-group-flush">
                         {% for region_name in run_names %}
-	                    <a href="{{sub_html_files[region_name]}}" class="list-group-item list-group-item-action">{{region_name}}</a>
-                        {% endfor %}
+	                  <a href="{{sub_html_files[region_name]}}" class="list-group-item list-group-item-action">{{region_name}}</a>
+                      {% endfor %}
                     </div>
                 </div>
             </div>
             {% endif %}
-            {% if failed_runs|length > 0 %}
-            <div class='card text-center mb-2'>
-              <div class="card-header bg-danger d-flex justify-content-center align-items-center" onclick="toggleAllDescriptions()">
-                <!-- Center the title and button -->
-                <h5 id="CRISPResso2_Batch_Output" class="mb-0 text-white">Failed Runs</h5>
-                <button class="btn btn-danger ml-2" id="toggleAll">
-                  <i class="fas fa-chevron-down" id="chevronIcon"></i>
-                </button>
-              </div>
 
-              <div class='card-body p-0'>
-                <div class="list-group list-group-flush">
-                  {% for failed_run in failed_runs %}
-                  <!-- Toggle the description visibility on click -->
-                  <a href="javascript:void(0)" class="list-group-item list-group-item-action failed-run-name bg-light text-dark"
-                    id="failed_run_{{loop.index0}}" onclick="toggleDescription({{loop.index0}})">
-                    {{failed_run}}
-                  </a>
-                  <!-- Initially hide the description and add a light background with dark text for readability -->
-                  <div class="list-group-item text-dark  failed-run-desc" id="failed_run_desc_{{loop.index0}}"
-                    style="display: none;">
-                    {{failed_runs_desc[loop.index0]}}</div>
-                  {% endfor %}
-                </div>
-              </div>
-            </div>
-            {% endif %}
+            {{render_partial('shared/partials/failed_runs.html', failed_runs=failed_runs, failed_runs_desc=failed_runs_desc)}}
 
           {% if report_data['names']|length > 0 %}
             {% for plot_name in report_data['names'] %}
@@ -139,17 +76,14 @@
                 <h5 id="modification_summary_title">{{report_data['titles'][plot_name]}}</h5>
               </div>
               <div class='card-body' style='max-height:80vh;overflow-y:auto'>
-                  {{ render_partial('shared/partials/fig_summaries.html', report_data=report_data, plot_name=plot_name) }}
+                {{ render_partial('shared/partials/fig_summaries.html', report_data=report_data, plot_name=plot_name) }}
               </div>
             </div>
             {% endfor %}
-          {% endif %}
+            {% endif %}
 
-           	<div align="center" class='p-3'>
-			     <a href="/reports_data/{{report_zip_filename}}" class="btn btn-primary" role="button"><i class="fas fa-download"></i> Download report</a>
-			     <a href="{{report_path}}" class="btn btn-primary" role="button"><i class="fas fa-link"></i> Link to report</a>
-                 <button class='btn btn-primary hidden-print' onclick='window.print();'><i class="fas fa-print"></i> Print</button>
-            </div>
+            {{render_partial('shared/partials/report_footer_buttons.html', report_zip_filename=report_zip_filename, report_path=report_path)}}
+
     {# data bit for web version: #}
     {#
         			  <p class="m-0"><small>Data: <a href="{{report_data['crispresso_data_path']}}{{data_path}}">{{data_label}}</a> <a href="{{report_data['crispresso_data_path']}}{{data_path}}" title="{{data_label}}" download> <span class="fas fa-download" data-toggle='tooltip' title='Download {{data_label}}'><span></a></small></p>

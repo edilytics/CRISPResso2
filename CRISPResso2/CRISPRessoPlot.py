@@ -2750,16 +2750,17 @@ def plot_alleles_heatmap(reference_seq,fig_filename_root,X,annot,y_labels,insert
     INDEL_color = get_nuc_color('N', alpha)
 
     if custom_colors is not None:
+        hex_alpha = '66'  # this is equivalent to 40% in hexadecimal
         if 'A' in custom_colors:
-            A_color = custom_colors['A']
+            A_color = custom_colors['A'] + hex_alpha
         if 'T' in custom_colors:
-            T_color = custom_colors['T']
+            T_color = custom_colors['T'] + hex_alpha
         if 'C' in custom_colors:
-            C_color = custom_colors['C']
+            C_color = custom_colors['C'] + hex_alpha
         if 'G' in custom_colors:
-            G_color = custom_colors['G']
+            G_color = custom_colors['G'] + hex_alpha
         if 'N' in custom_colors:
-            INDEL_color = custom_colors['N']
+            INDEL_color = custom_colors['N'] + hex_alpha
 
     dna_to_numbers={'-':0,'A':1,'T':2,'C':3,'G':4,'N':5}
     seq_to_numbers= lambda seq: [dna_to_numbers[x] for x in seq]

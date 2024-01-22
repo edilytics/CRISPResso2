@@ -1436,7 +1436,7 @@ def main():
 
 
 
-        def get_prime_editing_guides(this_amp_seq, this_amp_name, ref0_seq, prime_edited_seq, prime_editing_extension_seq_dna, prime_editing_pegRNA_extension_quantification_window_size, 
+        def get_prime_editing_guides(this_amp_seq, this_amp_name, ref0_seq, prime_edited_seq, prime_editing_extension_seq_dna, prime_editing_pegRNA_extension_quantification_window_size,
                                      nicking_qw_center, nicking_qw_size,aln_matrix,needleman_wunsch_gap_open,needleman_wunsch_gap_extend, prime_editing_gap_open, prime_editing_gap_extend):
             """
             gets prime editing guide sequences for this amplicon
@@ -1451,7 +1451,7 @@ def main():
             aln_matrix: matrix specifying alignment substitution scores in the NCBI format
             needleman_wunsch_gap_open: alignment penalty assignment used to determine similarity of two sequences.
             needleman_wunsch_gap_extend: alignment penalty assignment used to determine similarity of two sequences.
-            prime_editing_gap_open: alignment penalty assignment used to determine similarity of two pegRNA components. For prime editing the gap open is usually larger while the extension penalty is lower/zero to accomodate insertions of large sequences. 
+            prime_editing_gap_open: alignment penalty assignment used to determine similarity of two pegRNA components. For prime editing the gap open is usually larger while the extension penalty is lower/zero to accomodate insertions of large sequences.
             prime_editing_gap_extend: alignment penalty assignment used to determine similarity of two pegRNA components
             """
             pe_guides = []
@@ -3955,7 +3955,7 @@ def main():
                         plot_4e_input['plot_title'] = 'Mutation position distribution in %s reads with reference to %s'%(ref_name, ref_names[0])
                         plot_4e_input['plot_root'] = plot_root
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_root'] = os.path.basename(plot_root)
-                        crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_caption'] = "Figure 4f: Positions of modifications in HDR reads with respect to the reference sequence ("+ref_names[0]+"). Insertions: red, deletions: purple, substitutions: green. All modifications (including those outside the quantification window) are shown."
+                        crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_caption'] = f"Figure 4f: Positions of modifications in HDR reads with respect to the reference sequence ({ref_names[0]}). All modifications (including those outside the quantification window) are shown."
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_data'] = []
                     debug('Plotting global modifications with respect to reference')
                     plot(
@@ -4678,7 +4678,7 @@ def main():
                         plot_11c_input,
                     )
                     crispresso2_info['results']['general_plots']['plot_11c_root'] = os.path.basename(plot_root)
-                    crispresso2_info['results']['general_plots']['plot_11c_caption'] = "Figure 11a: Scaffold insertion lengths and deletion lengths in reads that contain a scaffold insertion. 'Length matching scaffold' shows the number of basepairs immediately after the pegRNA extension sequence that exactly match the scaffold RNA sequence. 'Insertion length' shows the length of the insertion immediately after the pegRNA extension sequence (including bases that do not match the scaffold sequence)."
+                    crispresso2_info['results']['general_plots']['plot_11c_caption'] = "Figure 11c: Scaffold insertion lengths and deletion lengths in reads that contain a scaffold insertion. 'Length matching scaffold' shows the number of basepairs immediately after the pegRNA extension sequence that exactly match the scaffold RNA sequence. 'Insertion length' shows the length of the insertion immediately after the pegRNA extension sequence (including bases that do not match the scaffold sequence)."
                     crispresso2_info['results']['general_plots']['plot_11c_data'] = [('Scaffold insertion alleles with insertion sizes', os.path.basename(scaffold_insertion_sizes_filename))]
 
         # join plotting pool
