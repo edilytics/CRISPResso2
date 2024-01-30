@@ -19,7 +19,10 @@ import zipfile
 from CRISPResso2 import CRISPRessoShared
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
-from CRISPResso2 import CRISPRessoPlot
+try:
+    from CRISPRessoPro import plot as CRISPRessoPlot
+except:
+    from CRISPResso2 import CRISPRessoPlot
 import traceback
 
 import logging

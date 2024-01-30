@@ -13,7 +13,10 @@ import re
 import traceback
 import json
 from CRISPResso2 import CRISPRessoShared
-from CRISPResso2 import CRISPRessoPlot
+try:
+    from CRISPRessoPro import plot as CRISPRessoPlot
+except:
+    from CRISPResso2 import CRISPRessoPlot
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 

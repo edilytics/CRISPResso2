@@ -9,7 +9,10 @@ import os
 import numpy as np
 import pandas as pd
 import zipfile
-from CRISPResso2 import CRISPRessoPlot
+try:
+    from CRISPRessoPro import plot as CRISPRessoPlot
+except:
+    from CRISPResso2 import CRISPRessoPlot
 from CRISPResso2 import CRISPRessoShared
 
 def main():

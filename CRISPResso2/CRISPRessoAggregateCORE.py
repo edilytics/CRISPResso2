@@ -17,7 +17,11 @@ import pandas as pd
 import traceback
 from datetime import datetime
 from CRISPResso2 import CRISPRessoShared
-from CRISPResso2 import CRISPRessoPlot
+try:
+    from CRISPRessoPro import plot as CRISPRessoPlot
+except:
+    from CRISPResso2 import CRISPRessoPlot
+
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2.CRISPRessoMultiProcessing import get_max_processes, run_plot
 

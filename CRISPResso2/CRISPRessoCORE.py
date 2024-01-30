@@ -30,7 +30,13 @@ import traceback
 from CRISPResso2 import CRISPRessoCOREResources
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2 import CRISPRessoShared
-from CRISPResso2 import CRISPRessoPlot
+try:
+    from CRISPRessoPro import plot as CRISPRessoPlot, __version__ as CRISPRessoProVersion
+    pro_installed = True
+except Exception as e:
+    from CRISPResso2 import CRISPRessoPlot
+    pro_install_error = e
+    pro_installed = False
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoMultiProcessing
 
@@ -1587,6 +1593,10 @@ def main():
 
         #now that we're done with adding possible guides and amplicons, go through each amplicon and compute quantification windows
         info('Computing quantification windows', {'percent_complete': 2})
+        if pro_installed:
+            info(f'CRISPRessoPro v{CRISPRessoProVersion} installed', {'percent_complete': 3})
+        else:
+            info(f'CRISPRessoPro Not Installed: {pro_install_error}', {'percent_complete': 3})
 
         found_guide_seq = [False]*len(guides)
         found_coding_seq = [False]*len(coding_seqs)
