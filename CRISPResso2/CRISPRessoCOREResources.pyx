@@ -40,49 +40,9 @@ class ResultsSlotsDict():
         'aln_strand'
     )
 
-    def __init__(
-        self,
-        all_insertion_positions,
-        all_insertion_left_positions,
-        insertion_positions,
-        insertion_coordinates,
-        insertion_sizes,
-        insertion_n,
-        all_deletion_positions,
-        deletion_positions,
-        deletion_coordinates,
-        deletion_sizes, 
-        deletion_n,
-        all_substitution_positions,
-        substitution_positions, 
-        all_substitution_values,
-        substitution_values,
-        substitution_n,
-        ref_positions
-        ):
-        self.all_insertion_positions = all_insertion_positions
-        self.all_insertion_left_positions = all_insertion_left_positions
-        self.insertion_positions = insertion_positions
-        self.insertion_coordinates = insertion_coordinates
-        self.insertion_sizes = insertion_sizes
-        self.insertion_n = insertion_n
-        self.all_deletion_positions = all_deletion_positions
-        self.deletion_positions = deletion_positions
-        self.deletion_coordinates = deletion_coordinates
-        self.deletion_sizes = deletion_sizes
-        self.deletion_n = deletion_n
-        self.all_substitution_positions = all_substitution_positions
-        self.substitution_positions = substitution_positions
-        self.all_substitution_values = all_substitution_values
-        self.substitution_values = substitution_values
-        self.substitution_n = substitution_n
-        self.ref_positions = ref_positions
-        self.ref_name = None
-        self.aln_scores = None
-        self.classification = None
-        self.aln_seq = None
-        self.aln_ref = None
-        self.aln_strand = None
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def __getitem__(self, key):
         return getattr(self, key)
@@ -189,26 +149,26 @@ def find_indels_substitutions(read_seq_al, ref_seq_al, _include_indx):
     cdef size_t insertion_n = sum(insertion_sizes)
 
     return ResultsSlotsDict(
-        all_insertion_positions,
-        all_insertion_left_positions,
-        insertion_positions,
-        insertion_coordinates,
-        insertion_sizes,
-        insertion_n,
+        all_insertion_positions=all_insertion_positions,
+        all_insertion_left_positions=all_insertion_left_positions,
+        insertion_positions=insertion_positions,
+        insertion_coordinates=insertion_coordinates,
+        insertion_sizes=insertion_sizes,
+        insertion_n=insertion_n,
 
-        all_deletion_positions,
-        deletion_positions,
-        deletion_coordinates,
-        deletion_sizes,
-        deletion_n,
+        all_deletion_positions=all_deletion_positions,
+        deletion_positions=deletion_positions,
+        deletion_coordinates=deletion_coordinates,
+        deletion_sizes=deletion_sizes,
+        deletion_n=deletion_n,
 
-        all_substitution_positions,
-        substitution_positions,
-        all_substitution_values,
-        substitution_values,
-        substitution_n,
+        all_substitution_positions=all_substitution_positions,
+        substitution_positions=substitution_positions,
+        all_substitution_values=np.array(all_substitution_values),
+        substitution_values=np.array(substitution_values),
+        substitution_n=substitution_n,
 
-        ref_positions
+        ref_positions=ref_positions,
     )
 
     return {
