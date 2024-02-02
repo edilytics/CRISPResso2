@@ -30,13 +30,13 @@ import traceback
 from CRISPResso2 import CRISPRessoCOREResources
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2 import CRISPRessoShared
+
 try:
-    from CRISPRessoPro import plot as CRISPRessoPlot, __version__ as CRISPRessoProVersion
+    from CRISPRessoPro import __version__ as CRISPRessoProVersion
     pro_installed = True
-except Exception as e:
-    from CRISPResso2 import CRISPRessoPlot
-    pro_install_error = e
+except:
     pro_installed = False
+
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoMultiProcessing
 
@@ -119,7 +119,7 @@ matplotlib=check_library('matplotlib')
 #end = time.time()
 #start = time.time()
 from matplotlib import font_manager as fm
-CRISPRessoPlot.setMatplotlibDefaults()
+# CRISPRessoPlot.setMatplotlibDefaults()
 #end = time.time()
 
 #start = time.time()
@@ -1095,6 +1095,13 @@ def main():
             raise CRISPRessoShared.BadParameterException("Needleman Wunsch gap extend penalty must be <= 0")
 
 
+        if args.use_matplotlib or not pro_installed:
+            from CRISPResso2 import CRISPRessoPlot
+        else:
+            from CRISPRessoPro import plot as CRISPRessoPlot
+        CRISPRessoPlot.setMatplotlibDefaults()
+
+
         #create output directory
         crispresso2_info_file = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso2_info.json')
         crispresso2_info = {'running_info': {}, 'results': {'alignment_stats': {}, 'general_plots': {}}} #keep track of all information for this run to be pickled and saved at the end of the run
@@ -1596,7 +1603,7 @@ def main():
         if pro_installed:
             info(f'CRISPRessoPro v{CRISPRessoProVersion} installed', {'percent_complete': 3})
         else:
-            info(f'CRISPRessoPro Not Installed: {pro_install_error}', {'percent_complete': 3})
+            info(f'CRISPRessoPro not installed', {'percent_complete': 3})
 
         found_guide_seq = [False]*len(guides)
         found_coding_seq = [False]*len(coding_seqs)
@@ -3457,6 +3464,7 @@ def main():
                 'N_TOTAL': N_TOTAL,
                 'piechart_plot_root': plot_1b_root,
                 'barplot_plot_root': plot_1c_root,
+                'custom_colors': config['colors'],
                 'save_png': save_png
             }
             crispresso2_info['results']['general_plots']['plot_1b_root'] = os.path.basename(plot_1b_root)
@@ -3789,6 +3797,7 @@ def main():
                     'xmax_ins': xmax_ins,
                     'xmax_mut': xmax_mut,
                     'save_also_png': save_png,
+                    'custom_colors': config["colors"],
                 }
                 debug('Plotting frequency deletions/insertions for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_frequency_deletions_insertions, plot_3b_input)

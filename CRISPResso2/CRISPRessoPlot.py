@@ -382,6 +382,7 @@ def plot_frequency_deletions_insertions(
     xmax_ins,
     xmax_mut,
     save_also_png=False,
+    custom_colors=None
 ):
     y_values_mut = ref['y_values_mut']
     x_bins_mut = ref['x_bins_mut']
@@ -3399,7 +3400,7 @@ def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
 
 def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
                                     expected_hdr_amplicon_seq, N_TOTAL,
-                                    piechart_plot_root, barplot_plot_root, save_png):
+                                    piechart_plot_root, barplot_plot_root, custom_colors, save_png):
     """Plot a pie chart and barplot of class assignments for reads.
 
        Class assignments include: 'MODIFIED','UNMODIFIED','HDR',etc.
