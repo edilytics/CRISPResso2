@@ -378,11 +378,16 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
         parser.add_argument('--bam_chr_loc', type=str,
                         help='Chromosome location in bam for reads to process. For example: "chr1:50-100" or "chrX".',
                         default='')
-
+        
+    # CRISPRessoPro params
+    parser.add_argument('--use_matplotlib', default=False, action='store_true',
+                        help='Use matplotlib for plotting instead of plotly when CRISPRessoPro is installed')
+    
     # deprecated params
     parser.add_argument('--save_also_png', default=False,
                         help=argparse.SUPPRESS)  # help='Save also .png images in addition to .pdf files') #depreciated -- now pngs are automatically created. Pngs can be suppressed by '--suppress_report'
 
+    
     return parser
 
 
