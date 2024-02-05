@@ -2205,15 +2205,21 @@ def main():
                     refs[ref_name]['contains_guide'] = refs[clone_ref_name]['contains_guide']
 
                 #quantification window coordinates override other options
-                if amplicon_quant_window_coordinates_arr[clone_ref_idx] != "" and amplicon_quant_window_coordinates_arr[this_ref_idx] != '0':
+                if amplicon_quant_window_coordinates_arr[clone_ref_idx] != "":
                     if amplicon_quant_window_coordinates_arr[this_ref_idx] != "":
-                        this_include_idxs = get_include_idxs_from_quant_window_coordinates(amplicon_quant_window_coordinates_arr[this_ref_idx])
+                        this_quant_window_coordinates = amplicon_quant_window_coordinates_arr[this_ref_idx]
                     else:
-                        this_include_idxs = get_cloned_include_idxs_from_quant_window_coordinates(
-                            amplicon_quant_window_coordinates_arr[clone_ref_idx],
-                            s1inds.copy(),
-                        )
-
+                        this_quant_window_coordinates = amplicon_quant_window_coordinates_arr[clone_ref_idx]
+                    this_include_idxs = []
+                    these_coords = this_quant_window_coordinates.split("_")
+                    for coord in these_coords:
+                        coordRE = re.match(r'^(\d+)-(\d+)$', coord)
+                        if coordRE:
+                            start = s1inds[int(coordRE.group(1))]
+                            end = s1inds[int(coordRE.group(2)) + 1]
+                            this_include_idxs.extend(range(start, end))
+                        else:
+                            raise NTException("Cannot parse analysis window coordinate '" + str(coord))
                     #subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
                     this_exclude_idxs = sorted(list(set(refs[ref_name]['exclude_idxs'])))
                     this_include_idxs = sorted(list(set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
