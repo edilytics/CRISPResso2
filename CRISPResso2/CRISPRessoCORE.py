@@ -28,7 +28,7 @@ import traceback
 
 
 from CRISPResso2 import CRISPRessoCOREResources
-from CRISPResso2 import CRISPRessoReport
+from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2 import CRISPRessoShared
 from CRISPResso2 import CRISPRessoPlot
 from CRISPResso2 import CRISPResso2Align
@@ -3372,6 +3372,7 @@ def main():
             info('Making Plots...')
         ###############################################################################################################################################
         save_png = True
+        config = CRISPRessoShared.check_custom_config(args)
         if args.suppress_report:
             save_png = False
 
@@ -3416,6 +3417,7 @@ def main():
         else:
             process_pool = None
             process_futures = None
+
         plot = partial(
             CRISPRessoMultiProcessing.run_plot,
             num_processes=n_processes,
@@ -3601,6 +3603,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'quantification_window_idxs': include_idxs_list,
+                        'custom_colors': config["colors"],
                     }
                     debug('Plotting nucleotide quilt across amplicon')
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2a_input)
@@ -3647,6 +3650,7 @@ def main():
                             'sgRNA_names': sgRNA_names,
                             'sgRNA_mismatches': sgRNA_mismatches,
                             'quantification_window_idxs': new_include_idx,
+                            'custom_colors': config["colors"],
                         }
                         debug('Plotting nucleotide distribuition around {0} for {1}'.format(sgRNA_legend, ref_name))
                         plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2b_input)
@@ -3824,6 +3828,7 @@ def main():
                         ),
                     },
                     'plot_root': plot_root,
+                    'custom_colors': config["colors"],
                     'save_also_png': save_png,
                 }
                 debug('Plotting amplication modifications for {0}'.format(ref_name))
@@ -3853,12 +3858,13 @@ def main():
                         'Mutation position distribution', ref_name,
                     ),
                     'plot_root': plot_root,
+                    'custom_colors': config["colors"],
                     'save_also_png': save_png,
                 }
                 debug('Plotting modification frequency for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_modification_frequency, plot_4b_input)
                 crispresso2_info['results']['refs'][ref_name]['plot_4b_root'] = os.path.basename(plot_root)
-                crispresso2_info['results']['refs'][ref_name]['plot_4b_caption'] = "Figure 4b: Frequency of insertions (red), deletions (purple), and substitutions (green) across the entire amplicon, including modifications outside of the quantification window."
+                crispresso2_info['results']['refs'][ref_name]['plot_4b_caption'] = "Figure 4b: Frequency of insertions, deletions, and substitutions across the entire amplicon, including modifications outside of the quantification window."
                 crispresso2_info['results']['refs'][ref_name]['plot_4b_data'] = [('Modification frequency', os.path.basename(mod_count_filename))]
 
                 plot_root = _jp(
@@ -3881,6 +3887,7 @@ def main():
                     ),
                     'ref_name': ref_name,
                     'plot_root': plot_root,
+                    'custom_colors': config["colors"],
                     'save_also_png': save_png,
                 }
                 debug('Plotting quantification window locations for {0}'.format(ref_name))
@@ -3889,7 +3896,7 @@ def main():
                     plot_4c_input,
                 )
                 crispresso2_info['results']['refs'][ref_name]['plot_4c_root'] = os.path.basename(plot_root)
-                crispresso2_info['results']['refs'][ref_name]['plot_4c_caption'] = "Figure 4c: Frequency of insertions (red), deletions (purple), and substitutions (green) across the entire amplicon, considering only modifications that overlap with the quantification window."
+                crispresso2_info['results']['refs'][ref_name]['plot_4c_caption'] = "Figure 4c: Frequency of insertions, deletions, and substitutions across the entire amplicon, considering only modifications that overlap with the quantification window."
                 crispresso2_info['results']['refs'][ref_name]['plot_4c_data'] = [('Modification frequency in quantification window', os.path.basename(quant_window_mod_count_filename))]
 
                 #Position dependent indels plot
@@ -3937,6 +3944,7 @@ def main():
                         'n_total': N_TOTAL,
                         'ref_len': ref_len,
                         'ref_name': ref_names[0],
+                        'custom_colors': config["colors"],
                         'save_also_png': save_png,
                     }
                     if ref_name == ref_names[0]:
@@ -3951,7 +3959,7 @@ def main():
                         plot_4e_input['plot_title'] = 'Mutation position distribution in %s reads with reference to %s'%(ref_name, ref_names[0])
                         plot_4e_input['plot_root'] = plot_root
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_root'] = os.path.basename(plot_root)
-                        crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_caption'] = "Figure 4f: Positions of modifications in HDR reads with respect to the reference sequence ("+ref_names[0]+"). Insertions: red, deletions: purple, substitutions: green. All modifications (including those outside the quantification window) are shown."
+                        crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_caption'] = f"Figure 4f: Positions of modifications in HDR reads with respect to the reference sequence ({ref_names[0]}). All modifications (including those outside the quantification window) are shown."
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_data'] = []
                     debug('Plotting global modifications with respect to reference')
                     plot(
@@ -4006,6 +4014,7 @@ def main():
                         'quantification_window_idxs': include_idxs_list,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
+                        'custom_colors': config["colors"],
                     }
                     debug('Plotting HDR nucleotide quilt')
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_4g_input)
@@ -4106,12 +4115,13 @@ def main():
                             ref_name,
                         ),
                         'plot_root': plot_root,
+                        'custom_colors': config["colors"],
                         'save_also_png': save_png,
                     }
                     debug('Plotting non-coding mutation positions for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_non_coding_mutations, plot_7_input)
                     crispresso2_info['results']['refs'][ref_name]['plot_7_root'] = os.path.basename(plot_root)
-                    crispresso2_info['results']['refs'][ref_name]['plot_7_caption'] = "Figure 7: Reads with insertions (red), deletions (purple), and substitutions (green) mapped to reference amplicon position exclusively in noncoding region/s (that is, without mutations affecting coding sequences). The predicted cleavage site is indicated by a vertical dashed line. Only sequence positions directly adjacent to insertions or directly affected by deletions or substitutions are plotted."
+                    crispresso2_info['results']['refs'][ref_name]['plot_7_caption'] = "Figure 7: Reads with insertions, deletions, and substitutions mapped to reference amplicon position exclusively in noncoding region/s (that is, without mutations affecting coding sequences). The predicted cleavage site is indicated by a vertical dashed line. Only sequence positions directly adjacent to insertions or directly affected by deletions or substitutions are plotted."
                     crispresso2_info['results']['refs'][ref_name]['plot_7_data'] = []
 
                     plot_root = _jp('8.'+ref_plot_name+'Potential_splice_sites_pie_chart')
@@ -4145,6 +4155,7 @@ def main():
                         'fig_filename_root': fig_filename_root,
                         'save_also_png': save_png,
                         'quantification_window_idxs': include_idxs_list,
+                        'custom_colors': config['colors']
                     }
                     debug('Plotting substitutions across reference for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_subs_across_ref, plot_10a_input)
@@ -4162,7 +4173,8 @@ def main():
                             'Substitution frequency\nin entire amplicon', ref_name,
                         ),
                         'fig_filename_root': fig_filename_root,
-                        'save_also_png': save_png
+                        'save_also_png': save_png,
+                        'custom_colors': config['colors']
                     }
                     debug('Plotting substitution frequency barplot for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_sub_freqs, plot_10b_input)
@@ -4176,7 +4188,8 @@ def main():
                         'alt_nuc_counts': alt_nuc_counts,
                         'plot_title': get_plot_title_with_ref_name('Substitution frequency\nin quantification window', ref_name),
                         'fig_filename_root': fig_filename_root,
-                        'save_also_png': save_png
+                        'save_also_png': save_png,
+                        'custom_colors': config['colors']
                     }
                     debug('Plotting substitution frequency barplot in quantification window for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_sub_freqs, plot_10c_input)
@@ -4267,6 +4280,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
+                        'custom_colors': config["colors"],
                     }
                     debug('Plotting allele distribution around cut for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_alleles_table, plot_9_input)
@@ -4353,6 +4367,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
+                            'custom_colors': config['colors'],
                         }
                         debug('Plotting conversion at {0}s around the {1} for {2}'.format(args.conversion_nuc_from, sgRNA_legend, ref_name))
                         plot(
@@ -4372,6 +4387,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
+                            'custom_colors': config['colors']
                         }
                         debug('Plotting non-reference conversion at {0}s around the {1} for {2}'.format(args.conversion_nuc_from, sgRNA_legend, ref_name))
                         plot(
@@ -4393,7 +4409,8 @@ def main():
                             ),
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
-                            'save_also_png': save_png
+                            'save_also_png': save_png,
+                            'custom_colors': config['colors']
                         }
                         debug('Plotting scaled non-reference conversion at {0}s around the {1} for {2}'.format(args.conversion_nuc_from, sgRNA_legend, ref_name))
                         plot(
@@ -4585,6 +4602,7 @@ def main():
                     'sgRNA_names': sgRNA_names,
                     'sgRNA_mismatches': sgRNA_mismatches,
                     'quantification_window_idxs': include_idxs_list,
+                    'custom_colors': config['colors']
                 }
                 info('Plotting prime editing nucleotide percentage quilt', {'percent_complete': 96})
                 plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11a_input)
@@ -4643,6 +4661,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'quantification_window_idxs': new_include_idx,
+                        'custom_colors': config['colors']
                     }
                     info('Plotting nucleotide quilt', {'percent_complete': 97})
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11b_input)
@@ -4663,7 +4682,7 @@ def main():
                         plot_11c_input,
                     )
                     crispresso2_info['results']['general_plots']['plot_11c_root'] = os.path.basename(plot_root)
-                    crispresso2_info['results']['general_plots']['plot_11c_caption'] = "Figure 11a: Scaffold insertion lengths and deletion lengths in reads that contain a scaffold insertion. 'Length matching scaffold' shows the number of basepairs immediately after the pegRNA extension sequence that exactly match the scaffold RNA sequence. 'Insertion length' shows the length of the insertion immediately after the pegRNA extension sequence (including bases that do not match the scaffold sequence)."
+                    crispresso2_info['results']['general_plots']['plot_11c_caption'] = "Figure 11c: Scaffold insertion lengths and deletion lengths in reads that contain a scaffold insertion. 'Length matching scaffold' shows the number of basepairs immediately after the pegRNA extension sequence that exactly match the scaffold RNA sequence. 'Insertion length' shows the length of the insertion immediately after the pegRNA extension sequence (including bases that do not match the scaffold sequence)."
                     crispresso2_info['results']['general_plots']['plot_11c_data'] = [('Scaffold insertion alleles with insertion sizes', os.path.basename(scaffold_insertion_sizes_filename))]
 
         # join plotting pool
