@@ -3716,6 +3716,7 @@ def main():
                     ),
                     'plot_root': plot_root,
                     'save_also_png': save_png,
+                    'ref_name': ref_name,
                 }
                 debug('Plotting indel size distribution for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_indel_size_distribution, plot_3a_input)
@@ -3798,6 +3799,7 @@ def main():
                     'xmax_mut': xmax_mut,
                     'save_also_png': save_png,
                     'custom_colors': config["colors"],
+                    'ref_name' : ref_name,
                 }
                 debug('Plotting frequency deletions/insertions for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_frequency_deletions_insertions, plot_3b_input)
@@ -3934,6 +3936,7 @@ def main():
                     },
                     'plot_root': plot_root,
                     'save_also_png': save_png,
+                    'ref_name': ref_name,
                 }
                 debug('Plotting position dependent indel for {0}'.format(ref_name))
                 plot(
@@ -4078,6 +4081,7 @@ def main():
                             'ref_name': ref_name,
                             'plot_root': plot_root,
                             'save_also_png': save_png,
+                            'custom_colors': config['colors'],
                         }
                         debug('Plotting frameshift analysis for {0}'.format(ref_name))
                         plot(CRISPRessoPlot.plot_frameshift_analysis, plot_5_input)
@@ -4103,6 +4107,7 @@ def main():
 
                         'plot_root': plot_root,
                         'save_also_png': save_png,
+                        'ref_name': ref_name,
                     }
                     debug('Plotting frameshift frequency for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_frameshift_frequency, plot_6_input)
@@ -4132,6 +4137,7 @@ def main():
                         'plot_root': plot_root,
                         'custom_colors': config["colors"],
                         'save_also_png': save_png,
+                        'ref_name': ref_name,
                     }
                     debug('Plotting non-coding mutation positions for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_non_coding_mutations, plot_7_input)
@@ -4145,6 +4151,8 @@ def main():
                         'count_total': count_total,
                         'plot_root': plot_root,
                         'save_also_png': save_png,
+                        'ref_name': ref_name,
+                        'custom_colors': config['colors'],
                     }
                     debug('Plotting potential splice sites')
                     plot(CRISPRessoPlot.plot_potential_splice_sites, plot_8_input)
@@ -4170,7 +4178,8 @@ def main():
                         'fig_filename_root': fig_filename_root,
                         'save_also_png': save_png,
                         'quantification_window_idxs': include_idxs_list,
-                        'custom_colors': config['colors']
+                        'custom_colors': config['colors'],
+                        'ref_name': ref_name,
                     }
                     debug('Plotting substitutions across reference for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_subs_across_ref, plot_10a_input)
@@ -4492,6 +4501,7 @@ def main():
                         'global_non_modified_non_frameshift': global_NON_MODIFIED_NON_FRAMESHIFT,
                         'plot_root': plot_root,
                         'save_also_png': save_png,
+                        'custom_colors': config['colors'],
                     }
                     debug('Plotting global frameshift in-frame mutations pie chart', {'percent_complete': 90})
                     plot(
@@ -4531,6 +4541,7 @@ def main():
                     'global_count_total': global_count_total,
                     'plot_root': plot_root,
                     'save_also_png': save_png,
+                    'custom_colors': config['colors'],
                 }
                 debug('Plotting global potential splice sites pie chart', {'percent_complete': 94})
                 plot(CRISPRessoPlot.plot_impact_on_splice_sites, plot_8a_input)
