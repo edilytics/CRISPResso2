@@ -3385,7 +3385,7 @@ def main():
             info('Making Plots...')
         ###############################################################################################################################################
         save_png = True
-        config = CRISPRessoShared.check_custom_config(args)
+        custom_config = CRISPRessoShared.check_custom_config(args)
         if args.suppress_report:
             save_png = False
 
@@ -3464,7 +3464,7 @@ def main():
                 'N_TOTAL': N_TOTAL,
                 'piechart_plot_root': plot_1b_root,
                 'barplot_plot_root': plot_1c_root,
-                'custom_colors': config['colors'],
+                'custom_colors': custom_config['colors'],
                 'save_png': save_png
             }
             crispresso2_info['results']['general_plots']['plot_1b_root'] = os.path.basename(plot_1b_root)
@@ -3617,7 +3617,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'quantification_window_idxs': include_idxs_list,
-                        'custom_colors': config["colors"],
+                        'custom_colors': custom_config["colors"],
                     }
                     debug('Plotting nucleotide quilt across amplicon')
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2a_input)
@@ -3664,7 +3664,7 @@ def main():
                             'sgRNA_names': sgRNA_names,
                             'sgRNA_mismatches': sgRNA_mismatches,
                             'quantification_window_idxs': new_include_idx,
-                            'custom_colors': config["colors"],
+                            'custom_colors': custom_config["colors"],
                         }
                         debug('Plotting nucleotide distribuition around {0} for {1}'.format(sgRNA_legend, ref_name))
                         plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2b_input)
@@ -3798,7 +3798,7 @@ def main():
                     'xmax_ins': xmax_ins,
                     'xmax_mut': xmax_mut,
                     'save_also_png': save_png,
-                    'custom_colors': config["colors"],
+                    'custom_colors': custom_config["colors"],
                     'ref_name' : ref_name,
                 }
                 debug('Plotting frequency deletions/insertions for {0}'.format(ref_name))
@@ -3845,7 +3845,7 @@ def main():
                         ),
                     },
                     'plot_root': plot_root,
-                    'custom_colors': config["colors"],
+                    'custom_colors': custom_config["colors"],
                     'save_also_png': save_png,
                 }
                 debug('Plotting amplication modifications for {0}'.format(ref_name))
@@ -3875,7 +3875,7 @@ def main():
                         'Mutation position distribution', ref_name,
                     ),
                     'plot_root': plot_root,
-                    'custom_colors': config["colors"],
+                    'custom_colors': custom_config["colors"],
                     'save_also_png': save_png,
                 }
                 debug('Plotting modification frequency for {0}'.format(ref_name))
@@ -3904,7 +3904,7 @@ def main():
                     ),
                     'ref_name': ref_name,
                     'plot_root': plot_root,
-                    'custom_colors': config["colors"],
+                    'custom_colors': custom_config["colors"],
                     'save_also_png': save_png,
                 }
                 debug('Plotting quantification window locations for {0}'.format(ref_name))
@@ -3962,7 +3962,7 @@ def main():
                         'n_total': N_TOTAL,
                         'ref_len': ref_len,
                         'ref_name': ref_names[0],
-                        'custom_colors': config["colors"],
+                        'custom_colors': custom_config["colors"],
                         'save_also_png': save_png,
                     }
                     if ref_name == ref_names[0]:
@@ -4032,7 +4032,7 @@ def main():
                         'quantification_window_idxs': include_idxs_list,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
-                        'custom_colors': config["colors"],
+                        'custom_colors': custom_config["colors"],
                     }
                     debug('Plotting HDR nucleotide quilt')
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_4g_input)
@@ -4081,7 +4081,7 @@ def main():
                             'ref_name': ref_name,
                             'plot_root': plot_root,
                             'save_also_png': save_png,
-                            'custom_colors': config['colors'],
+                            'custom_colors': custom_config['colors'],
                         }
                         debug('Plotting frameshift analysis for {0}'.format(ref_name))
                         plot(CRISPRessoPlot.plot_frameshift_analysis, plot_5_input)
@@ -4135,7 +4135,7 @@ def main():
                             ref_name,
                         ),
                         'plot_root': plot_root,
-                        'custom_colors': config["colors"],
+                        'custom_colors': custom_config["colors"],
                         'save_also_png': save_png,
                         'ref_name': ref_name,
                     }
@@ -4152,7 +4152,7 @@ def main():
                         'plot_root': plot_root,
                         'save_also_png': save_png,
                         'ref_name': ref_name,
-                        'custom_colors': config['colors'],
+                        'custom_colors': custom_config['colors'],
                     }
                     debug('Plotting potential splice sites')
                     plot(CRISPRessoPlot.plot_potential_splice_sites, plot_8_input)
@@ -4178,7 +4178,7 @@ def main():
                         'fig_filename_root': fig_filename_root,
                         'save_also_png': save_png,
                         'quantification_window_idxs': include_idxs_list,
-                        'custom_colors': config['colors'],
+                        'custom_colors': custom_config['colors'],
                         'ref_name': ref_name,
                     }
                     debug('Plotting substitutions across reference for {0}'.format(ref_name))
@@ -4198,7 +4198,7 @@ def main():
                         ),
                         'fig_filename_root': fig_filename_root,
                         'save_also_png': save_png,
-                        'custom_colors': config['colors']
+                        'custom_colors': custom_config['colors']
                     }
                     debug('Plotting substitution frequency barplot for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_sub_freqs, plot_10b_input)
@@ -4213,7 +4213,7 @@ def main():
                         'plot_title': get_plot_title_with_ref_name('Substitution frequency\nin quantification window', ref_name),
                         'fig_filename_root': fig_filename_root,
                         'save_also_png': save_png,
-                        'custom_colors': config['colors']
+                        'custom_colors': custom_config['colors']
                     }
                     debug('Plotting substitution frequency barplot in quantification window for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_sub_freqs, plot_10c_input)
@@ -4304,7 +4304,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
-                        'custom_colors': config["colors"],
+                        'custom_colors': custom_config["colors"],
                     }
                     debug('Plotting allele distribution around cut for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_alleles_table, plot_9_input)
@@ -4391,7 +4391,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
-                            'custom_colors': config['colors'],
+                            'custom_colors': custom_config['colors'],
                         }
                         debug('Plotting conversion at {0}s around the {1} for {2}'.format(args.conversion_nuc_from, sgRNA_legend, ref_name))
                         plot(
@@ -4411,7 +4411,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
-                            'custom_colors': config['colors']
+                            'custom_colors': custom_config['colors']
                         }
                         debug('Plotting non-reference conversion at {0}s around the {1} for {2}'.format(args.conversion_nuc_from, sgRNA_legend, ref_name))
                         plot(
@@ -4434,7 +4434,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
-                            'custom_colors': config['colors']
+                            'custom_colors': custom_config['colors']
                         }
                         debug('Plotting scaled non-reference conversion at {0}s around the {1} for {2}'.format(args.conversion_nuc_from, sgRNA_legend, ref_name))
                         plot(
@@ -4501,7 +4501,7 @@ def main():
                         'global_non_modified_non_frameshift': global_NON_MODIFIED_NON_FRAMESHIFT,
                         'plot_root': plot_root,
                         'save_also_png': save_png,
-                        'custom_colors': config['colors'],
+                        'custom_colors': custom_config['colors'],
                     }
                     debug('Plotting global frameshift in-frame mutations pie chart', {'percent_complete': 90})
                     plot(
@@ -4541,7 +4541,7 @@ def main():
                     'global_count_total': global_count_total,
                     'plot_root': plot_root,
                     'save_also_png': save_png,
-                    'custom_colors': config['colors'],
+                    'custom_colors': custom_config['colors'],
                 }
                 debug('Plotting global potential splice sites pie chart', {'percent_complete': 94})
                 plot(CRISPRessoPlot.plot_impact_on_splice_sites, plot_8a_input)
@@ -4628,7 +4628,7 @@ def main():
                     'sgRNA_names': sgRNA_names,
                     'sgRNA_mismatches': sgRNA_mismatches,
                     'quantification_window_idxs': include_idxs_list,
-                    'custom_colors': config['colors']
+                    'custom_colors': custom_config['colors']
                 }
                 info('Plotting prime editing nucleotide percentage quilt', {'percent_complete': 96})
                 plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11a_input)
@@ -4687,7 +4687,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'quantification_window_idxs': new_include_idx,
-                        'custom_colors': config['colors']
+                        'custom_colors': custom_config['colors']
                     }
                     info('Plotting nucleotide quilt', {'percent_complete': 97})
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11b_input)
