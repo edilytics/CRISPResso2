@@ -9,6 +9,12 @@ from jinja2 import Environment, FileSystemLoader
 from jinja_partials import generate_render_partial, render_partial
 from CRISPResso2 import CRISPRessoShared
 
+try:
+    from CRISPRessoPro import __version__
+    pro_installed = True
+except:
+    pro_installed = False
+
 
 def render_template(template_name, jinja2_env, **data):
     """Render a template with partials.
@@ -36,6 +42,7 @@ def render_template(template_name, jinja2_env, **data):
             ),
             is_default_user=False,
             is_web=False,
+            pro_installed=pro_installed,
         )
         return template.render(**partial_data)
     return render_partial(
