@@ -34,11 +34,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
-    
-    - name: Install dependencies
-      run: |
-        conda create -n test_env -c defaults -c conda-forge -c bioconda -y --debug -c bioconda pip trimmomatic flash numpy cython jinja2 tbb=2020.2 pyparsing=2.3.1 scipy matplotlib pandas plotly
-        conda init
         
     - name: Install Pytest
       run: |
