@@ -15,7 +15,7 @@ jobs:
       run:
         shell: bash -l {0}
     env:
-      CRISPRESSO2_DIR: ${GITHUB_WORKSPACE}
+      CRISPRESSO2_DIR: ${GITHUB_WORKSPACE}/CRISPResso2_copy
 
     strategy:
       fail-fast: false
@@ -38,10 +38,17 @@ jobs:
         sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
         pip install ydiff
 
+    - name: Create directory for copied files
+      run: |
+        mkdir CRISPResso2_copy
+
+    - name: Copy files to new directory
+      run: |
+        cp -r * CRISPResso2_copy
+
     - name: Copy C2_tests repo
       uses: actions/checkout@master
       with:
-        submodules: true
         repository: edilytics/CRISPResso2_tests
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
 
