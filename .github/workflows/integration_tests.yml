@@ -15,7 +15,7 @@ jobs:
       run:
         shell: bash -l {0}
     env:
-      CRISPRESSO2_DIR: ${GITHUB_WORKSPACE}/..
+      CRISPRESSO2_DIR: ${GITHUB_WORKSPACE}
 
     strategy:
       fail-fast: false
@@ -38,11 +38,12 @@ jobs:
         sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
         pip install ydiff
 
-    - name: Clone C2_tests
-      uses: GuillaumeFalourd/clone-github-repo-action@v2.3
+    - name: Copy C2_tests repo
+      uses: actions/checkout@master
       with:
+        submodules: true
         repository: edilytics/CRISPResso2_tests
-        access-token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
+        token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
 
     - name: Run Integration Tests
       run: |
