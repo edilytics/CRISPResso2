@@ -37,6 +37,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
 
+    - name: Install CRISPResso2
+      run: |
+        pip install ydiff
+        pip install -e .
+
     - name: Copy C2_tests repo
       uses: actions/checkout@master
       with:
@@ -45,9 +50,4 @@ jobs:
 
     - name: Run Integration Tests
       run: |
-        pwd
-        ls
-        cd $GITHUB_WORKSPACE
-        pwd
-        ls
         make test
