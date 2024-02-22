@@ -50,4 +50,4 @@ jobs:
 
     - name: Run Pytest
       run: | 
-        pytest --cov CRISPResso2
+        pytest --cov CRISPResso2/CRISPResso2
