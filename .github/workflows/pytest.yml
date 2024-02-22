@@ -45,4 +45,4 @@ jobs:
 
     - name: Run Pytest
       run: | 
-        pytest --cov=./ --cov-report=xml
+        pytest tests --cov CRISPResso2
