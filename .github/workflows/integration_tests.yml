@@ -47,5 +47,5 @@ jobs:
 
     - name: Run Integration Tests
       run: |
-        cd CRISPResso2_tests
+        ls
         make test
