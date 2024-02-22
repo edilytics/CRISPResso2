@@ -45,4 +45,9 @@ jobs:
 
     - name: Run Integration Tests
       run: |
+        pwd
+        ls
+        cd $GITHUB_WORKSPACE
+        pwd
+        ls
         make test
