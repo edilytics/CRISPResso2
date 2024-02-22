@@ -41,7 +41,7 @@ jobs:
     
     - name: Install CRISPResso
       run: |
-        pip install .
+        pip install -e .
 
     - name: Run Pytest
       run: | 
