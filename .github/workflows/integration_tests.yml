@@ -40,11 +40,13 @@ jobs:
 
     - name: Create directory for copied files
       run: |
-        mkdir CRISPResso2_copy
+        ls
+        mkdir ../CRISPResso2_copy
+        ls
 
     - name: Copy files to new directory
       run: |
-        cp -r * CRISPResso2_copy
+        cp -r * ../CRISPResso2_copy
 
     - name: Copy C2_tests repo
       uses: actions/checkout@master
