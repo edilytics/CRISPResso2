@@ -38,16 +38,11 @@ jobs:
         sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
         pip install ydiff
 
-    - name: Create directory for copied files
+    - name: Create directory for files
       run: |
-        ls
         mkdir ../CRISPResso2_copy
-        ls
-
-    - name: Copy files to new directory
-      run: |
         cp -r * ../CRISPResso2_copy
-
+        
     - name: Copy C2_tests repo
       uses: actions/checkout@master
       with:
@@ -56,5 +51,4 @@ jobs:
 
     - name: Run Integration Tests
       run: |
-        ls
         make test
