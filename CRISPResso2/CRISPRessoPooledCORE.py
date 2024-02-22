@@ -1171,13 +1171,13 @@ def main():
                                 n_reads_at_end = get_n_aligned_bam_region(bam_filename_genome, chr_str, curr_end-5, curr_end+5)
                                 while n_reads_at_end > 0:
                                     curr_end += 500  # look for another place with no reads
-                                    if curr_end >= curr_pos:
+                                    if curr_end >= chr_len:
                                         curr_end = chr_len
                                         break
                                     n_reads_at_end = get_n_aligned_bam_region(bam_filename_genome, chr_str, curr_end-5, curr_end+5)
 
                                 sub_chr_command = chr_cmd.replace("__REGION__", ":%d-%d "%(curr_pos, curr_end))
-                                chr_output_filename = _jp('MAPPED_REGIONS/%s_%s_%s.info' % (chr_str, curr_pos, chr_end))
+                                chr_output_filename = _jp('MAPPED_REGIONS/%s_%s_%s.info' % (chr_str, curr_pos, curr_end))
                                 chr_commands.append(sub_chr_command)
                                 chr_output_filenames.append(chr_output_filename)
                                 curr_pos = curr_end
