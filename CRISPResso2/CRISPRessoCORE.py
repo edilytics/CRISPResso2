@@ -119,7 +119,6 @@ matplotlib=check_library('matplotlib')
 #end = time.time()
 #start = time.time()
 from matplotlib import font_manager as fm
-# CRISPRessoPlot.setMatplotlibDefaults()
 #end = time.time()
 
 #start = time.time()
