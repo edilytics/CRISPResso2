@@ -199,9 +199,10 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
     parser.add_argument('-v', '--verbosity', type=int, help='Verbosity level of output to the console (1-4), 4 is the most verbose', default=3)
 
     ## read preprocessing params
-    parser.add_argument('--split_interleaved_input', '--split_paired_end',
-                        help='Splits a single fastq file containing paired end reads into two files before running CRISPResso',
-                        action='store_true')
+    if 'split_interleaved_input' not in suppress_params:
+        parser.add_argument('--split_interleaved_input', '--split_paired_end',
+                            help='Splits a single fastq file containing paired end reads into two files before running CRISPResso',
+                            action='store_true')
     parser.add_argument('--trim_sequences', help='Enable the trimming of Illumina adapters with Trimmomatic',
                         action='store_true')
     parser.add_argument('--trimmomatic_command', type=str, help='Command to run trimmomatic', default='trimmomatic')
