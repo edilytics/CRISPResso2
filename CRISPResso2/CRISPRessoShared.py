@@ -1326,6 +1326,61 @@ def force_merge_pairs(r1_filename, r2_filename, output_filename):
     return (lineCount)
 
 
+def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_r2):
+    """Split an interleaved fastq file into two files, one for each read pair.
+
+    This assumes that the input fastq file is interleaved, i.e. that the reads are ordered as follows:
+        R1
+        R2
+        R1
+        R2
+        ...
+
+    And results in two files, one for each read pair:
+        output_filename_r1
+            R1
+            R1
+            ...
+        output_filename_r2
+            R2
+            R2
+            ...
+
+    Parameters
+    ----------
+    fastq_filename : str
+        Path to the input fastq file.
+    output_filename_r1 : str
+        Path to the output fastq file for r1.
+    output_filename_r2 : str
+        Path to the output fastq file for r2.
+
+    Returns
+    -------
+    output_filename_r1 : str
+        Path to the output fastq file for r1.
+    output_filename_r2 : str
+        Path to the output fastq file for r2.
+    """
+    if fastq_filename.endswith('.gz'):
+        fastq_handle = gzip.open(fastq_filename, 'rt')
+    else:
+        fastq_handle = open(fastq_filename)
+
+    try:
+        fastq_splitted_outfile_r1 = gzip.open(output_filename_r1, 'wt')
+        fastq_splitted_outfile_r2 = gzip.open(output_filename_r2, 'wt')
+        [fastq_splitted_outfile_r1.write(line) if (i % 8 < 4) else fastq_splitted_outfile_r2.write(line) for i, line in enumerate(fastq_handle)]
+    except:
+        raise BadParameterException('Error in splitting read pairs from a single file')
+    finally:
+        fastq_handle.close()
+        fastq_splitted_outfile_r1.close()
+        fastq_splitted_outfile_r2.close()
+
+    return output_filename_r1, output_filename_r2
+
+
 ######
 # allele modification functions
 ######
