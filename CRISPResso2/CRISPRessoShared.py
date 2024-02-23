@@ -140,15 +140,19 @@ def set_console_log_level(logger, level, debug=False):
 def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params=[], suppress_params=[]):
     parser = argparse.ArgumentParser(description=parser_title, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
-    parser.add_argument('-r1', '--fastq_r1', type=str, help='First fastq file', default='',
-                        required='fastq_r1' in required_params)
-    parser.add_argument('-r2', '--fastq_r2', type=str, help='Second fastq file for paired end reads', default='')
-    parser.add_argument('-a', '--amplicon_seq', type=str,
-                        help='Amplicon Sequence (can be comma-separated list of multiple sequences)',
-                        required='amplicon_seq' in required_params)
-    parser.add_argument('-an', '--amplicon_name', type=str,
-                        help='Amplicon Name (can be comma-separated list of multiple names, corresponding to amplicon sequences given in --amplicon_seq',
-                        default='Reference')
+    if 'fastq_r1' not in suppress_params:
+        parser.add_argument('-r1', '--fastq_r1', type=str, help='First fastq file', default='',
+                            required='fastq_r1' in required_params)
+    if 'fastq_r2' not in suppress_params:
+        parser.add_argument('-r2', '--fastq_r2', type=str, help='Second fastq file for paired end reads', default='')
+    if 'amplicon_seq' not in suppress_params:
+        parser.add_argument('-a', '--amplicon_seq', type=str,
+                            help='Amplicon Sequence (can be comma-separated list of multiple sequences)',
+                            required='amplicon_seq' in required_params)
+    if 'amplicon_name' not in suppress_params:
+        parser.add_argument('-an', '--amplicon_name', type=str,
+                            help='Amplicon Name (can be comma-separated list of multiple names, corresponding to amplicon sequences given in --amplicon_seq',
+                            default='Reference')
     parser.add_argument('-amas', '--amplicon_min_alignment_score', type=str,
                         help='Amplicon Minimum Alignment Score; score between 0 and 100; sequences must have at least this homology score with the amplicon to be aligned (can be comma-separated list of multiple scores, corresponding to amplicon sequences given in --amplicon_seq)',
                         default="")
