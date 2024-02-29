@@ -44,8 +44,9 @@ jobs:
         cp -r * ../CRISPResso2_copy
         
     - name: Copy C2_tests repo
-      uses: actions/checkout@githubactions
+      uses: actions/checkout@master
       with:
+        ref: githubactions
         repository: edilytics/CRISPResso2_tests
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
 
