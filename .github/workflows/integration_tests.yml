@@ -46,9 +46,13 @@ jobs:
     - name: Copy C2_tests repo
       uses: actions/checkout@master
       with:
-        ref: githubactions
         repository: edilytics/CRISPResso2_tests
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
+
+    - name: Checkout Githubactions
+      uses: actions/checkout@master
+      with:
+        ref: githubactions
 
     - name: Run Integration Tests
       run: |
