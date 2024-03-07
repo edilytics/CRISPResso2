@@ -511,21 +511,21 @@ def main():
 
         info('Processing input', {'percent_complete': 5})
 
+        if args.split_interleaved_input:
+            info('Splitting paired end single fastq file into two files...')
+            args.fastq_r1, args.fastq_r2 = CRISPRessoShared.split_interleaved_fastq(
+                args.fastq_r1,
+                output_filename_r1=_jp('{0}_splitted_r1.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
+                output_filename_r2=_jp('{0}_splitted_r2.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
+            )
+            files_to_remove += [args.fastq_r1, args.fastq_r2]
+
         # perform read trimming if necessary
         if args.aligned_pooled_bam is not None:
             # don't trim reads in aligned bams
             pass
         # read filtering (for quality) is done at the individual crispresso run
         elif args.fastq_r2 == '':  # single end reads
-            if args.split_interleaved_input:
-                info('Splitting paired end single fastq file into two files...')
-                args.fastq_r1, args.fastq_r2 = CRISPRessoShared.split_interleaved_fastq(
-                    args.fastq_r1,
-                    output_filename_r1=_jp('{0}_splitted_r1.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
-                    output_filename_r2=_jp('{0}_splitted_r2.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
-                )
-                files_to_remove += [args.fastq_r1, args.fastq_r2]
-
             # check if we need to trim
             if not args.trim_sequences:
                 # create a symbolic link
@@ -550,8 +550,6 @@ def main():
             processed_output_filename = output_forward_filename
 
         else:  # paired end reads case
-            if args.split_interleaved_input:
-                raise CRISPRessoShared.BadParameterException('The option --split_interleaved_input is available only when a single fastq file is specified!')
             if not args.trim_sequences:
                 output_forward_paired_filename = args.fastq_r1
                 output_reverse_paired_filename = args.fastq_r2
