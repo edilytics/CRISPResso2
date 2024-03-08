@@ -3586,8 +3586,12 @@ def main():
                     mod_pcts.append(np.concatenate((['All_modifications'], np.array(all_indelsub_count_vectors[ref_name]).astype(float)/tot)))
                     mod_pcts.append(np.concatenate((['Total'], [counts_total[ref_name]]*refs[ref_name]['sequence_length'])))
                     colnames = ['Modification']+list(ref_seq)
-                    modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames).apply(pd.to_numeric, errors='ignore')
-
+                    modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames) 
+                    for col in colnames:
+                        try:
+                            modification_percentage_summary_df[col] = modification_percentage_summary_df[col].apply(pd.to_numeric, errors='raise')
+                        except:
+                            pass
                     nuc_df_for_plot = df_nuc_pct_all.reset_index().rename(columns={'index':'Nucleotide'})
                     nuc_df_for_plot.insert(0, 'Batch', ref_name) #this function was designed for plottin batch... so just add a column in there to make it happy
                     mod_df_for_plot = modification_percentage_summary_df.copy()
@@ -3979,7 +3983,12 @@ def main():
                         for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
                             nuc_pcts.append(np.concatenate(([ref_name_for_hdr, nuc], np.array(ref1_all_base_count_vectors[ref_name_for_hdr+"_"+nuc]).astype(float)/tot)))
                     colnames = ['Batch', 'Nucleotide']+list(refs[ref_names_for_hdr[0]]['sequence'])
-                    hdr_nucleotide_percentage_summary_df = pd.DataFrame(nuc_pcts, columns=colnames).apply(pd.to_numeric, errors='ignore')
+                    hdr_nucleotide_percentage_summary_df = pd.DataFrame(nuc_pcts, columns=colnames)
+                    for col in colnames:
+                        try:
+                            hdr_nucleotide_percentage_summary_df[col] = hdr_nucleotide_percentage_summary_df[col].apply(pd.to_numeric, errors='raise')
+                        except:
+                            pass
 
                     mod_pcts = []
                     for ref_name_for_hdr in ref_names_for_hdr:
@@ -3991,7 +4000,13 @@ def main():
                         mod_pcts.append(np.concatenate(([ref_name_for_hdr, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name_for_hdr]).astype(float)/tot)))
                         mod_pcts.append(np.concatenate(([ref_name_for_hdr, 'Total'], [counts_total[ref_name_for_hdr]]*refs[ref_names_for_hdr[0]]['sequence_length'])))
                     colnames = ['Batch', 'Modification']+list(refs[ref_names_for_hdr[0]]['sequence'])
-                    hdr_modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames).apply(pd.to_numeric, errors='ignore')
+                    hdr_modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames)
+                    for col in colnames:
+                        try:
+                            hdr_modification_percentage_summary_df[col] = hdr_modification_percentage_summary_df[col].apply(pd.to_numeric, errors='raise')
+                        except:
+                            pass
+
                     sgRNA_intervals = refs[ref_names_for_hdr[0]]['sgRNA_intervals']
                     sgRNA_names = refs[ref_names_for_hdr[0]]['sgRNA_names']
                     sgRNA_mismatches = refs[ref_names_for_hdr[0]]['sgRNA_mismatches']
@@ -4574,7 +4589,13 @@ def main():
                     for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
                         nuc_pcts.append(np.concatenate(([ref_name, nuc], np.array(ref1_all_base_count_vectors[ref_name+"_"+nuc]).astype(float)/tot)))
                 colnames = ['Batch', 'Nucleotide']+list(refs[ref_names[0]]['sequence'])
-                pe_nucleotide_percentage_summary_df = pd.DataFrame(nuc_pcts, columns=colnames).apply(pd.to_numeric,errors='ignore')
+                pe_nucleotide_percentage_summary_df = pd.DataFrame(nuc_pcts, columns=colnames)
+                for col in colnames:
+                    try:
+                        pe_nucleotide_percentage_summary_df[col] = pe_nucleotide_percentage_summary_df[col].apply(pd.to_numeric, errors='raise')
+                    except:
+                        pass
+
 
                 mod_pcts = []
                 for ref_name in ref_names_for_pe:
@@ -4586,7 +4607,13 @@ def main():
                     mod_pcts.append(np.concatenate(([ref_name, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name]).astype(float)/tot)))
                     mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]]*refs[ref_names_for_pe[0]]['sequence_length'])))
                 colnames = ['Batch', 'Modification']+list(refs[ref_names_for_pe[0]]['sequence'])
-                pe_modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames).apply(pd.to_numeric,errors='ignore')
+                pe_modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames)
+                for col in colnames:
+                    try:
+                        pe_modification_percentage_summary_df[col] = pe_modification_percentage_summary_df[col].apply(pd.to_numeric, errors='raise')
+                    except:
+                        pass
+
                 sgRNA_intervals = refs[ref_names_for_pe[0]]['sgRNA_intervals']
                 sgRNA_names = refs[ref_names_for_pe[0]]['sgRNA_names']
                 sgRNA_mismatches = refs[ref_names_for_pe[0]]['sgRNA_mismatches']
