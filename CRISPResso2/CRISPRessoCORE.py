@@ -81,12 +81,46 @@ def which(program):
 
     return None
 
-def check_program(binary_name,download_url=None):
+
+def check_program(binary_name, download_url=None, version_flag=None, version_regex=None, version=None):
+    """Check if a program is installed and accessible.
+
+    Parameters
+    ----------
+    binary_name : str
+        Name of the binary to check.
+    download_url : str, optional
+        URL to download the program from that is displayed if not installed.
+    version_flag : str, optional
+        Flag to pass to the program to get the version.
+    version_regex : str, optional
+        Regex to extract the version from the output of the program.
+    version : str, optional
+        Version to check against.
+
+    Returns
+    -------
+    None, will exit if program is not installed.
+    """
     if not which(binary_name):
-        error('You need to install and have the command #####%s##### in your PATH variable to use CRISPResso!\n Please read the documentation!' % binary_name)
+        error('You need to install and have the command #####{0}##### in your PATH variable to use CRISPResso!\n Please read the documentation!'.format(binary_name))
         if download_url:
-            error('You can download it here:%s' % download_url)
+            error('You can download it here: {0}'.format(download_url))
         sys.exit(1)
+
+    if version_flag:
+        p = sb.Popen('{0} {1}'.format(binary_name, version_flag), shell=True, stdout=sb.PIPE, stderr=sb.STDOUT)
+        p_output = p.communicate()[1].decode('utf-8')
+        major_version, minor_version, patch_version = map(int, re.search(version_regex, p_output).groups())
+        if major_version <= version[0] and minor_version <= version[1] and patch_version < version[2]:
+            error('You need to install version {0} of {1} to use CRISPResso!'.format(version, binary_name))
+            error('You have version {0}.{1}.{2} installed'.format(major_version, minor_version, patch_version))
+            if download_url:
+                error('You can download it here: {0}'.format(download_url))
+            sys.exit(1)
+
+
+check_fastp = lambda: check_program('fastp', download_url='http://opengene.org/fastp/fastp', version_flag='--version', version_regex=r'fastp (\d+)\.(\d+)\.(\d+)', version=(0, 19, 8))
 
 def get_avg_read_length_fastq(fastq_filename):
      cmd=('z' if fastq_filename.endswith('.gz') else '' ) +('cat < \"%s\"' % fastq_filename)+\
@@ -125,7 +159,6 @@ import matplotlib.gridspec as gridspec
 
 pd=check_library('pandas')
 np=check_library('numpy')
-check_program('flash')
 
 #start = time.time()
 sns=check_library('seaborn')
