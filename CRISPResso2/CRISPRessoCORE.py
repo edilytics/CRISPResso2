@@ -1254,6 +1254,7 @@ def main():
 
             info('Inferring reference amplicon sequence..', {'percent_complete': 1})
 
+            check_fastp()
             auto_fastq_r1 = args.fastq_r1 #paths to fastq files for performing auto functions
             auto_fastq_r2 = args.fastq_r2
             if args.bam_input != "": #if input is a bam, create temp files with reads for processing here
@@ -1276,7 +1277,7 @@ def main():
                         fastq_r1=auto_fastq_r1,
                         fastq_r2=auto_fastq_r2,
                         number_of_reads_to_consider=number_of_reads_to_consider,
-                        flash_command=args.flash_command,
+                        fastp_command=args.fastp_command,
                         max_paired_end_reads_overlap=args.max_paired_end_reads_overlap,
                         min_paired_end_reads_overlap=args.min_paired_end_reads_overlap,
                         aln_matrix=aln_matrix,
@@ -1305,7 +1306,7 @@ def main():
                                     fastq_r1=auto_fastq_r1,
                                     fastq_r2=auto_fastq_r2,
                                     number_of_reads_to_consider=number_of_reads_to_consider,
-                                    flash_command=args.flash_command,
+                                    fastp_command=args.fastp_command,
                                     max_paired_end_reads_overlap=args.max_paired_end_reads_overlap,
                                     min_paired_end_reads_overlap=args.min_paired_end_reads_overlap,
                                     exclude_bp_from_left=args.exclude_bp_from_left,
