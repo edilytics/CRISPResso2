@@ -202,21 +202,23 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
     parser.add_argument('--split_interleaved_input', '--split_paired_end',
                         help='Splits a single fastq file containing paired end reads into two files before running CRISPResso',
                         action='store_true')
-    parser.add_argument('--trim_sequences', help='Enable the trimming of Illumina adapters with Trimmomatic',
+    parser.add_argument('--trim_sequences', help='Enable the trimming of sequences with fastp',
                         action='store_true')
-    parser.add_argument('--trimmomatic_command', type=str, help='Command to run trimmomatic', default='trimmomatic')
+    parser.add_argument('--trimmomatic_command', type=str, help='DEPRECATED in v2.3.0, use `--fastp_command`')
     parser.add_argument('--trimmomatic_options_string', type=str,
-                        help='Override options for Trimmomatic, e.g. "ILLUMINACLIP:/data/NexteraPE-PE.fa:0:90:10:0:true"',
+                        help='DEPRECATED in v2.3.0, use `--fastp_options_string`',
                         default='')
     parser.add_argument('--fastp_command', type=str, help='Command to run fastp', default='fastp')
+    parser.add_argument('--fastp_options_string', type=str, help='Override options for fastp, e.g. `--length_required 70 --umi`', default='')
+    parser.add_argument('--flash_command', type=str, help='DEPRECATED in v2.3.0, use `--fastp_command`')
     parser.add_argument('--min_paired_end_reads_overlap', type=int,
-                        help='Parameter for the FLASH read merging step. Minimum required overlap length between two reads to provide a confident overlap. ',
+                        help='Parameter for the fastp read merging step. Minimum required overlap length between two reads to provide a confident overlap',
                         default=10)
     parser.add_argument('--max_paired_end_reads_overlap', type=int,
-                        help='Parameter for the FLASH merging step.  Maximum overlap length expected in approximately 90%% of read pairs. Please see the FLASH manual for more information.',
+                        help='DEPRECATED in v2.3.0',
                         default=100)
     parser.add_argument('--stringent_flash_merging',
-                        help='Use stringent parameters for flash merging. In the case where flash could merge R1 and R2 reads ambiguously, the expected overlap is calculated as 2*average_read_length - amplicon_length. The flash parameters for --min-overlap and --max-overlap will be set to prefer merged reads with length within 10bp of the expected overlap. These values override the --min_paired_end_reads_overlap or --max_paired_end_reads_overlap CRISPResso parameters.',
+                        help='DEPRECATED in v2.3.0',
                         action='store_true')
     parser.add_argument('--force_merge_pairs', help=argparse.SUPPRESS,
                         action='store_true')  # help=Force-merges R1 and R2 if they cannot be merged using flash (use with caution -- may create non-biological apparent indels at the joining site)
