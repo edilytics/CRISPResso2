@@ -4758,13 +4758,9 @@ def main():
         print_stacktrace_if_debug()
         error('sgRNA error, please check your input.\n\nERROR: %s' % e)
         sys.exit(2)
-    except CRISPRessoShared.TrimmomaticException as e:
+    except CRISPRessoShared.FastpException as e:
         print_stacktrace_if_debug()
-        error('Trimming error, please check your input.\n\nERROR: %s' % e)
-        sys.exit(4)
-    except CRISPRessoShared.FlashException as e:
-        print_stacktrace_if_debug()
-        error('Merging error, please check your input.\n\nERROR: %s' % e)
+        error('Merging or trimming error, please check your input.\n\nERROR: %s' % e)
         sys.exit(5)
     except CRISPRessoShared.BadParameterException as e:
         print_stacktrace_if_debug()
