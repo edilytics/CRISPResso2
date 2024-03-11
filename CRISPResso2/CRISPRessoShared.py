@@ -1079,7 +1079,7 @@ def check_if_failed_run(folder_name, info):
     return False, ""
 
 
-def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap, aln_matrix, needleman_wunsch_gap_open, needleman_wunsch_gap_extend, split_interleaved_input=False, min_freq_to_consider=0.2, amplicon_similarity_cutoff=0.95):
+def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, aln_matrix, needleman_wunsch_gap_open, needleman_wunsch_gap_extend, split_interleaved_input=False, min_freq_to_consider=0.2, amplicon_similarity_cutoff=0.95):
     """
     guesses the amplicons used in an experiment by examining the most frequent read (giant caveat -- most frequent read should be unmodified)
     input:
@@ -1088,7 +1088,6 @@ def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_comma
     number_of_reads_to_consider: number of reads from the top of the file to examine
     fastp_command: command to call fastp
     min_paired_end_reads_overlap: min overlap in bp for merging r1 and r2
-    max_paired_end_reads_overlap: max overlap in bp for merging r1 and r2
     aln_matrix: matrix specifying alignment substitution scores in the NCBI format
     needleman_wunsch_gap_open: alignment penalty assignment used to determine similarity of two sequences
     needleman_wunsch_gap_extend: alignment penalty assignment used to determine similarity of two sequences
@@ -1144,7 +1143,7 @@ def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_comma
     return amplicon_seq_arr
 
 
-def guess_guides(amplicon_sequence, fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, max_paired_end_reads_overlap,
+def guess_guides(amplicon_sequence, fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command,
             min_paired_end_reads_overlap, exclude_bp_from_left, exclude_bp_from_right,
             aln_matrix, needleman_wunsch_gap_open, needleman_wunsch_gap_extend,
             min_edit_freq_to_consider=0.1, min_edit_fold_change_to_consider=3,
@@ -1156,9 +1155,8 @@ def guess_guides(amplicon_sequence, fastq_r1, fastq_r2, number_of_reads_to_consi
     fastq_r1: path to fastq r1 (can be gzipped)
     fastq_r2: path to fastq r2 (can be gzipped)
     number_of_reads_to_consider: number of reads from the top of the file to examine
-    flash_command: command to call flash
+    fastp_command: command to call fastp
     min_paired_end_reads_overlap: min overlap in bp for flashing (merging) r1 and r2
-    max_paired_end_reads_overlap: max overlap in bp for flashing (merging) r1 and r2
     exclude_bp_from_left: number of bp to exclude from the left side of the amplicon sequence for the quantification of the indels
     exclude_bp_from_right: number of bp to exclude from the right side of the amplicon sequence for the quantification of the indels
     aln_matrix: matrix specifying alignment substitution scores in the NCBI format
