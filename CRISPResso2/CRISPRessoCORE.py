@@ -4791,15 +4791,14 @@ def main():
                     mod_pcts.append(np.concatenate(([ref_name, 'Deletions'], np.array(ref1_all_deletion_count_vectors[ref_name]).astype(float)/tot)))
                     mod_pcts.append(np.concatenate(([ref_name, 'Substitutions'], np.array(ref1_all_substitution_count_vectors[ref_name]).astype(float)/tot)))
                     mod_pcts.append(np.concatenate(([ref_name, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name]).astype(float)/tot)))
-                    mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]]*refs[ref_names[0]]['sequence_length'])))
-                colnames = ['Batch', 'Modification']+list(refs[ref_names[0]]['sequence'])
+                    mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]]*refs[ref_names_for_pe[0]]['sequence_length'])))
+                colnames = ['Batch', 'Modification']+list(refs[ref_names_for_pe[0]]['sequence'])
                 pe_modification_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(mod_pcts, columns=colnames), {'Batch', 'Modification'})
 
-                sgRNA_intervals = refs[ref_names[0]]['sgRNA_intervals']
-                sgRNA_names = refs[ref_names[0]]['sgRNA_names']
-                sgRNA_mismatches = refs[ref_names[0]]['sgRNA_mismatches']
-                sgRNA_sequences = refs[ref_names[0]]['sgRNA_sequences']
-                include_idxs_list = refs[ref_names[0]]['include_idxs']
+                sgRNA_intervals = refs[ref_names_for_pe[0]]['sgRNA_intervals']
+                sgRNA_names = refs[ref_names_for_pe[0]]['sgRNA_names']
+                sgRNA_mismatches = refs[ref_names_for_pe[0]]['sgRNA_mismatches']
+                include_idxs_list = refs[ref_names_for_pe[0]]['include_idxs']
 
                 plot_root = _jp('11a.Prime_editing_nucleotide_percentage_quilt')
                 pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
