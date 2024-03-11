@@ -979,6 +979,20 @@ def normalize_name(name, fastq_r1, fastq_r2, bam_input):
 
 
 def to_numeric_ignore_columns(df, ignore_columns):
+    """Convert the columns of a dataframe to numeric, ignoring some columns.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The dataframe to convert.
+    ignore_columns : list or set
+        The columns to ignore, i.e. not convert to numeric.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The dataframe with the columns (except for ignore_columns) converted to numeric.
+    """
     for col in df.columns:
         if col not in ignore_columns:
             df[col] = df[col].apply(pd.to_numeric, errors='raise')
