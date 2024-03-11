@@ -27,7 +27,7 @@ from inspect import getmodule, stack
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
 
-__version__ = "2.2.15"
+__version__ = "2.3.0"
 
 
 ###EXCEPTIONS############################
