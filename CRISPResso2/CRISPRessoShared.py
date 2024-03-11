@@ -1059,20 +1059,31 @@ def check_if_failed_run(folder_name, info):
     else:
         with open(status_info) as fh:
             try:
-                file_contents = fh.read()
-                search_result = re.search(r'(\d+\.\d+)% (.+)', file_contents)
-                if search_result:
-                    percent_complete, status = search_result.groups()
-                    if percent_complete != '100.00':
-                        info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status))
-                        return True, status
+                status_dict = json.load(fh)
+                if status_dict['percent_complete'] != 100.0:
+                    info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status_dict['status']))
+                    return True, status_dict['status']
                 else:
-                    return True, file_contents
-            except Exception as e:
-                print(e)
-                info("Skipping folder '%s'. Cannot parse status file '%s'." % (folder_name, status_info))
-                return True, "Cannot parse status file '%s'." % (status_info)
-    return False, ""
+                    return False, ""      
+            except:
+                pass
+
+        with open(status_info) as fh:
+                try:
+                    file_contents = fh.read()
+                    search_result = re.search(r'(\d+\.\d+)% (.+)', file_contents)
+                    if search_result:
+                        percent_complete, status = search_result.groups()
+                        if percent_complete != '100.00':
+                            info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status))
+                            return True, status
+                    else:
+                        return True, file_contents
+                except Exception as e:
+                    print(e)
+                    info("Skipping folder '%s'. Cannot parse status file '%s'." % (folder_name, status_info))
+                    return True, "Cannot parse status file '%s'." % (status_info)
+        return False, ""
 
 
 def guess_amplicons(fastq_r1,fastq_r2,number_of_reads_to_consider,flash_command,max_paired_end_reads_overlap,min_paired_end_reads_overlap,aln_matrix,needleman_wunsch_gap_open,needleman_wunsch_gap_extend,split_interleaved_input=False,min_freq_to_consider=0.2,amplicon_similarity_cutoff=0.95):
