@@ -31,11 +31,7 @@ __version__ = "2.3.0"
 
 
 ###EXCEPTIONS############################
-class FlashException(Exception):
-    pass
-
-
-class TrimmomaticException(Exception):
+class FastpException(Exception):
     pass
 
 

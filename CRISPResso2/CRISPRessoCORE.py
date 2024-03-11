@@ -2187,25 +2187,29 @@ def main():
             raise CRISPRessoShared.BadParameterException('Read trimming options are not available with bam input')
         elif args.fastq_r1 != '' and args.fastq_r2 == '': #single end reads
             if not args.trim_sequences: #no trimming or merging required
-                output_forward_filename=args.fastq_r1
+                output_forward_filename = args.fastq_r1
             else:
+                check_fastp()
+                info('Trimming sequences with fastp...')
                 output_forward_filename=_jp('reads.trimmed.fq.gz')
-                #Trimming with trimmomatic
-                cmd='%s SE -phred33 %s  %s %s >>%s 2>&1'\
-                % (args.trimmomatic_command, args.fastq_r1,
-                   output_forward_filename,
-                   args.trimmomatic_options_string.replace('NexteraPE-PE.fa', 'TruSeq3-SE.fa'),
-                   log_filename)
-                #print cmd
-                TRIMMOMATIC_STATUS=sb.call(cmd, shell=True)
+                cmd = '{command} -i {r1} -o {out} {options} --json {json_report} --html {html_report} >> {log} 2>&1'.format(
+                    command=args.fastp_command,
+                    r1=args.fastq_r1,
+                    out=output_forward_filename,
+                    options=args.fastp_options_string,
+                    json_report=_jp('fastp_report.json'),
+                    html_report=_jp('fastp_report.html'),
+                    log=log_filename,
+                )
+                fastp_status = sb.call(cmd, shell=True)
 
-                if TRIMMOMATIC_STATUS:
-                        raise CRISPRessoShared.TrimmomaticException('TRIMMOMATIC failed to run, please check the log file.')
-                crispresso2_info['trimmomatic_command'] = cmd
+                if fastp_status:
+                    raise CRISPRessoShared.FastpException('FASTP failed to run, please check the log file.')
+                crispresso2_info['fastp_command'] = cmd
 
                 files_to_remove += [output_forward_filename]
 
-            processed_output_filename=output_forward_filename
+            processed_output_filename = output_forward_filename
 
         elif args.fastq_r1 != '' and args.fastq_r2 != '':#paired end reads
             if not args.trim_sequences:
