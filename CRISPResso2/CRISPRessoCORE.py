@@ -1623,16 +1623,9 @@ def main():
         found_guide_seq = [False]*len(guides)
         found_coding_seq = [False]*len(coding_seqs)
 
-        max_amplicon_len = 0 #for flash
-        min_amplicon_len = 99**99 #for flash
-
         for idx, seq in enumerate(amplicon_seq_arr):
             this_seq = seq.strip().upper()
             this_seq_length = len(this_seq)
-            if this_seq_length > max_amplicon_len:
-                max_amplicon_len = this_seq_length
-            if this_seq_length < min_amplicon_len:
-                min_amplicon_len = this_seq_length
 
             this_name = 'Amplicon'+str(idx)
             if idx < len(amplicon_name_arr):
