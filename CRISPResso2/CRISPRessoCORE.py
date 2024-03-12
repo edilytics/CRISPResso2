@@ -202,7 +202,7 @@ def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinat
     return [
         i
         for coord in split_quant_window_coordinates(quant_window_coordinates)
-        for i in range(s1inds[coord[0]], s1inds[coord[1] + 1])
+        for i in range(s1inds[coord[0]], s1inds[coord[1]] + 1)
     ]
 
 
@@ -2056,10 +2056,13 @@ def main():
                     if amplicon_quant_window_coordinates_arr[this_ref_idx] != "":
                         this_include_idxs = get_include_idxs_from_quant_window_coordinates(amplicon_quant_window_coordinates_arr[this_ref_idx])
                     else:
+                        payload = CRISPRessoCOREResources.find_indels_substitutions(fws1, fws2, [])
+                        ref_positions = payload['ref_positions']
                         this_include_idxs = get_cloned_include_idxs_from_quant_window_coordinates(
                             amplicon_quant_window_coordinates_arr[clone_ref_idx],
-                            s1inds,
+                            ref_positions,
                         )
+
                     #subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
                     this_exclude_idxs = sorted(list(set(refs[ref_name]['exclude_idxs'])))
                     this_include_idxs = sorted(list(set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
