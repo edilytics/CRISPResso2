@@ -101,7 +101,7 @@ class StatusFormatter(logging.Formatter):
 class StatusHandler(logging.FileHandler):
     def __init__(self, filename):
         super().__init__(filename, 'w')
-        self.setFormatter(StatusFormatter('%(percent_complete)s%(message)s'))
+        self.setFormatter(StatusFormatter('{ "message": "%(message)s", "percent_complete": "%(percent_complete)s" }'))
 
     def emit(self, record):
         """Overwrite the existing file and write the new log."""
@@ -1062,7 +1062,7 @@ def check_if_failed_run(folder_name, info):
                 status_dict = json.load(fh)
                 if status_dict['percent_complete'] != 100.0:
                     info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status_dict['status']))
-                    return True, status_dict['status']
+                    return True, str(status_dict['status'])
                 else:
                     return False, ""      
             except:
