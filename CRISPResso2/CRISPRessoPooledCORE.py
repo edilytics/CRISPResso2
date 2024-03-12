@@ -524,19 +524,22 @@ def main():
                 CRISPRessoShared.force_symlink(os.path.abspath(args.fastq_r1), symlink_filename)
                 output_forward_filename = symlink_filename
             else:
+                info('Trimming sequences with fastp...')
                 output_forward_filename = _jp('reads.trimmed.fq.gz')
-                # Trimming with trimmomatic
-                info('Trimming sequences with Trimmomatic...', {'percent_complete': 7})
-                cmd = '%s SE -phred33 %s %s %s >>%s 2>&1'\
-                    % (args.trimmomatic_command, args.fastq_r1,
-                        output_forward_filename,
-                        args.trimmomatic_options_string,
-                        log_filename)
-                # print cmd
-                TRIMMOMATIC_STATUS = sb.call(cmd, shell=True)
+                cmd = '{command} -i {r1} -o {out} {options} --json {json_report} --html {html_report} >> {log} 2>&1'.format(
+                    command=args.fastp_command,
+                    r1=args.fastq_r1,
+                    out=output_forward_filename,
+                    options=args.fastp_options_string,
+                    json_report=_jp('fastp_report.json'),
+                    html_report=_jp('fastp_report.html'),
+                    log=log_filename,
+                )
+                fastp_status = sb.call(cmd, shell=True)
 
-                if TRIMMOMATIC_STATUS:
-                    raise TrimmomaticException('TRIMMOMATIC failed to run, please check the log file.')
+                if fastp_status:
+                    raise CRISPRessoShared.FastpException('FASTP failed to run, please check the log file.')
+                info('Done!', {'percent_complete': 7})
 
             processed_output_filename = output_forward_filename
 
@@ -689,7 +692,7 @@ def main():
                 raise CRISPRessoShared.BadParameterException('Incorrect number of columns provided without header.')
             elif has_header and len(unmatched_headers) > 0:
                 raise CRISPRessoShared.BadParameterException('Unable to match headers: ' + str(unmatched_headers))
-            
+
             if not has_header:
                 # Default header
                 headers = []
@@ -886,7 +889,7 @@ def main():
             failed_batch_arr = []
             failed_batch_arr_desc = []
             for cmd in crispresso_cmds:
-                
+
                 # Extract the folder name from the CRISPResso command
                 folder_name_regex = re.search(r'-o\s+\S+\s+--name\s+(\S+)', cmd)
                 if folder_name_regex:
