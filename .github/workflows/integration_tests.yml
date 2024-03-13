@@ -49,11 +49,30 @@ jobs:
         repository: edilytics/CRISPResso2_tests
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
 
-    - name: Checkout Githubactions
-      uses: actions/checkout@master
-      with:
-        ref: githubactions
-
-    - name: Run Integration Tests
+    - name: Run Basic
       run: |
-        make test
+        make basic-test
+
+    - name: Run Params
+      run: |
+        make params-test
+
+    - name: Run Prime Editor
+      run: |
+        make prime-editor-test
+
+    - name: Run Batch
+      run: |
+        make batch-test
+
+    - name: Run Pooled
+      run: |
+        make pooled-test
+
+    - name: Run WGS
+      run: |
+        make wgs-test
+
+    - name: Run Compare
+      run: |
+        make compare-test
