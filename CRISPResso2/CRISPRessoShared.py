@@ -91,7 +91,7 @@ class StatusFormatter(logging.Formatter):
     def format(self, record):
         record.percent_complete = ''
         if record.args and 'percent_complete' in record.args:
-            record.percent_complete = '{0:.2f}% '.format(record.args['percent_complete'])
+            record.percent_complete = float(record.args['percent_complete'])
             self.last_percent_complete = record.percent_complete
         elif hasattr(self, 'last_percent_complete'): # if we don't have a percent complete, use the last one
             record.percent_complete = self.last_percent_complete
@@ -101,7 +101,7 @@ class StatusFormatter(logging.Formatter):
 class StatusHandler(logging.FileHandler):
     def __init__(self, filename):
         super().__init__(filename, 'w')
-        self.setFormatter(StatusFormatter('{ "message": "%(message)s", "percent_complete": "%(percent_complete)s" }'))
+        self.setFormatter(StatusFormatter('{ "message": "%(message)s", "percent_complete": %(percent_complete)s }'))
 
     def emit(self, record):
         """Overwrite the existing file and write the new log."""
