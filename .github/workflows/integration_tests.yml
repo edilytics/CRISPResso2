@@ -54,25 +54,31 @@ jobs:
         make basic-test
 
     - name: Run Params
+      if: success() || failure()
       run: |
         make params-test
 
     - name: Run Prime Editor
+      if: success() || failure()
       run: |
         make prime-editor-test
 
     - name: Run Batch
+      if: success() || failure()
       run: |
         make batch-test
 
     - name: Run Pooled
+      if: success() || failure()
       run: |
         make pooled-test
 
     - name: Run WGS
+      if: success() || failure()
       run: |
         make wgs-test
 
     - name: Run Compare
+      if: success() || failure()
       run: |
         make compare-test
