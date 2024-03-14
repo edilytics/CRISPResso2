@@ -305,7 +305,7 @@ def main():
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
-        crispresso_options = CRISPRessoShared.get_core_crispresso_options()
+        crispresso_options = CRISPRessoShared.get_crispresso_options()
         options_to_ignore = {'fastq_r1', 'fastq_r2', 'amplicon_seq', 'amplicon_name', 'output_folder', 'name', 'zip_output', 'split_interleaved_input'}
         crispresso_options_for_pooled = list(crispresso_options-options_to_ignore)
 
@@ -663,7 +663,7 @@ def main():
                 raise CRISPRessoShared.BadParameterException('Incorrect number of columns provided without header.')
             elif has_header and len(unmatched_headers) > 0:
                 raise CRISPRessoShared.BadParameterException('Unable to match headers: ' + str(unmatched_headers))
-            
+
             if not has_header:
                 # Default header
                 headers = []
@@ -859,7 +859,7 @@ def main():
             failed_batch_arr = []
             failed_batch_arr_desc = []
             for cmd in crispresso_cmds:
-                
+
                 # Extract the folder name from the CRISPResso command
                 folder_name_regex = re.search(r'-o\s+\S+\s+--name\s+(\S+)', cmd)
                 if folder_name_regex:

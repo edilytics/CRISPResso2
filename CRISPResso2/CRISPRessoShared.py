@@ -140,6 +140,48 @@ def set_console_log_level(logger, level, debug=False):
 def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
     parser = argparse.ArgumentParser(description=parser_title, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
+    if 'fastq_r1' not in suppress_params:
+        parser.add_argument('-r1', '--fastq_r1', type=str, help='First fastq file', default='',
+                            required='fastq_r1' in required_params)
+    if 'fastq_r2' not in suppress_params:
+        parser.add_argument('-r2', '--fastq_r2', type=str, help='Second fastq file for paired end reads', default='')
+    if 'amplicon_seq' not in suppress_params:
+        parser.add_argument('-a', '--amplicon_seq', type=str,
+                            help='Amplicon Sequence (can be comma-separated list of multiple sequences)',
+                            required='amplicon_seq' in required_params)
+    if 'amplicon_name' not in suppress_params:
+        parser.add_argument('-an', '--amplicon_name', type=str,
+                            help='Amplicon Name (can be comma-separated list of multiple names, corresponding to amplicon sequences given in --amplicon_seq',
+                            default='Reference')
+    parser.add_argument('-amas', '--amplicon_min_alignment_score', type=str,
+                        help='Amplicon Minimum Alignment Score; score between 0 and 100; sequences must have at least this homology score with the amplicon to be aligned (can be comma-separated list of multiple scores, corresponding to amplicon sequences given in --amplicon_seq)',
+                        default="")
+    parser.add_argument('--default_min_aln_score', '--min_identity_score', type=int,
+                        help='Default minimum homology score for a read to align to a reference amplicon', default=60)
+    parser.add_argument('--expand_ambiguous_alignments',
+                        help='If more than one reference amplicon is given, reads that align to multiple reference amplicons will count equally toward each amplicon. Default behavior is to exclude ambiguous alignments.',
+                        action='store_true')
+    parser.add_argument('--assign_ambiguous_alignments_to_first_reference',
+                        help='If more than one reference amplicon is given, ambiguous reads that align with the same score to multiple amplicons will be assigned to the first amplicon. Default behavior is to exclude ambiguous alignments.',
+                        action='store_true')
+    parser.add_argument('-g', '--guide_seq', '--sgRNA',
+                        help="sgRNA sequence, if more than one, please separate by commas. Note that the sgRNA needs to be input as the guide RNA sequence (usually 20 nt) immediately adjacent to but not including the PAM sequence (5' of NGG for SpCas9). If the PAM is found on the opposite strand with respect to the Amplicon Sequence, ensure the sgRNA sequence is also found on the opposite strand. The CRISPResso convention is to depict the expected cleavage position using the value of the parameter '--quantification_window_center' nucleotides from the 3' end of the guide. In addition, the use of alternate nucleases besides SpCas9 is supported. For example, if using the Cpf1 system, enter the sequence (usually 20 nt) immediately 3' of the PAM sequence and explicitly set the '--cleavage_offset' parameter to 1, since the default setting of -3 is suitable only for SpCas9.",
+                        default='')
+    parser.add_argument('-gn', '--guide_name', help="sgRNA names, if more than one, please separate by commas.",
+                        default='')
+    parser.add_argument('-fg', '--flexiguide_seq',
+                        help="sgRNA sequence (flexible) (can be comma-separated list of multiple flexiguides). The flexiguide sequence will be aligned to the amplicon sequence(s), as long as the guide sequence has homology as set by --flexiguide_homology.")
+    parser.add_argument('-fh', '--flexiguide_homology', type=int,
+                        help="flexiguides will yield guides in amplicons with at least this homology to the flexiguide sequence.",
+                        default=80)
+    parser.add_argument('-fgn', '--flexiguide_name', help="flexiguide name", default='')
+    parser.add_argument('--discard_guide_positions_overhanging_amplicon_edge',
+                        help="If set, for guides that align to multiple positions, guide positions will be discarded if plotting around those regions would included bp that extend beyond the end of the amplicon. ",
+                        action='store_true')
+    parser.add_argument('-e', '--expected_hdr_amplicon_seq', help='Amplicon sequence expected after HDR', default='')
+    parser.add_argument('-c', '--coding_seq',
+                        help='Subsequence/s of the amplicon sequence covering one or more coding sequences for frameshift analysis. If more than one (for example, split by intron/s), please separate by commas.',
+                        default='')
 
     # Getting the directory of the current script
     current_dir = Path(__file__).parent
@@ -147,14 +189,29 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
     # Adjusting the path to point directly to the args.json file
     json_path = current_dir / 'args.json'
 
-    with open(json_path, 'r') as json_file:
-        args_dict = json.load(json_file)
-        args_dict = args_dict["CRISPResso_args"]
-    type_mapper = {
-        "str": str,
-        "int": int,
-        "float": float,
-    }
+    ## read preprocessing params
+    if 'split_interleaved_input' not in suppress_params:
+        parser.add_argument('--split_interleaved_input', '--split_paired_end',
+                            help='Splits a single fastq file containing paired end reads into two files before running CRISPResso',
+                            action='store_true')
+    parser.add_argument('--trim_sequences', help='Enable the trimming of Illumina adapters with Trimmomatic',
+                        action='store_true')
+    parser.add_argument('--trimmomatic_command', type=str, help='Command to run trimmomatic', default='trimmomatic')
+    parser.add_argument('--trimmomatic_options_string', type=str,
+                        help='Override options for Trimmomatic, e.g. "ILLUMINACLIP:/data/NexteraPE-PE.fa:0:90:10:0:true"',
+                        default='')
+    parser.add_argument('--flash_command', type=str, help='Command to run flash', default='flash')
+    parser.add_argument('--min_paired_end_reads_overlap', type=int,
+                        help='Parameter for the FLASH read merging step. Minimum required overlap length between two reads to provide a confident overlap. ',
+                        default=10)
+    parser.add_argument('--max_paired_end_reads_overlap', type=int,
+                        help='Parameter for the FLASH merging step.  Maximum overlap length expected in approximately 90%% of read pairs. Please see the FLASH manual for more information.',
+                        default=100)
+    parser.add_argument('--stringent_flash_merging',
+                        help='Use stringent parameters for flash merging. In the case where flash could merge R1 and R2 reads ambiguously, the expected overlap is calculated as 2*average_read_length - amplicon_length. The flash parameters for --min-overlap and --max-overlap will be set to prefer merged reads with length within 10bp of the expected overlap. These values override the --min_paired_end_reads_overlap or --max_paired_end_reads_overlap CRISPResso parameters.',
+                        action='store_true')
+    parser.add_argument('--force_merge_pairs', help=argparse.SUPPRESS,
+                        action='store_true')  # help=Force-merges R1 and R2 if they cannot be merged using flash (use with caution -- may create non-biological apparent indels at the joining site)
 
     # quantification window params
     parser.add_argument('-w', '--quantification_window_size', '--window_around_sgrna', type=str,
