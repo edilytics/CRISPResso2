@@ -1045,7 +1045,7 @@ def check_if_failed_run(folder_name, info):
     """
 
     run_data_file = os.path.join(folder_name, 'CRISPResso2_info.json')
-    status_info = os.path.join(folder_name, 'CRISPResso_status.txt')
+    status_info = os.path.join(folder_name, 'CRISPResso_status.json')
     if not os.path.isfile(run_data_file) or not os.path.isfile(status_info):
         info("Skipping folder '%s'. Cannot find run data status file at '%s'."%(folder_name, run_data_file))
         if "CRISPRessoPooled" in folder_name:
