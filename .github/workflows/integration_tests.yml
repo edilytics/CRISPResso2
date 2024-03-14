@@ -47,13 +47,8 @@ jobs:
       uses: actions/checkout@master
       with:
         repository: edilytics/CRISPResso2_tests
-        token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
-
-    - name: Switch branches
-      uses: actions/checkout@v2
-      with:
-        repository: edilytics/CRISPResso2_tests 
         ref: 'integration-refining'
+        token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }
 
     - name: Run Basic
       run: |
