@@ -2,11 +2,6 @@ name: Run Pytest
 
 on:
   push:
-    paths:
-      - '.github/workflows/pytest.yml'
-      - '.github/envs/test_env.yml'
-    branches:
-      - '*'
 
 jobs:
   build:

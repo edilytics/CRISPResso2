@@ -2,11 +2,6 @@ name: Run Integration Tests
 
 on:
   push:
-    paths:
-      - '.github/workflows/integration_tests.yml'
-      - '.github/envs/test_env.yml'
-    branches:
-      - '*'
 
 jobs:
   build:
@@ -47,8 +42,8 @@ jobs:
       uses: actions/checkout@master
       with:
         repository: edilytics/CRISPResso2_tests
-        ref: 'integration-refining'
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
+        # ref: '<BRANCH_NAME>' // Use this to specify a branch other than master
 
     - name: Run Basic
       run: |
