@@ -2,9 +2,6 @@ name: QATests
 
 on:
   push:
-    paths:
-      - '.github/workflows/QATests.yml'
-      - '.github/envs/test_env.yml'
 
 jobs:
   Pylint:
