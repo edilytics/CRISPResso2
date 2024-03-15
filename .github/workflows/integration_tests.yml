@@ -5,8 +5,6 @@ on:
     paths:
       - '.github/workflows/integration_tests.yml'
       - '.github/envs/test_env.yml'
-    branches:
-      - '*'
 
 jobs:
   build:
