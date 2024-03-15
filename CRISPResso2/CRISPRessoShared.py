@@ -101,7 +101,7 @@ class StatusFormatter(logging.Formatter):
 class StatusHandler(logging.FileHandler):
     def __init__(self, filename):
         super().__init__(filename, 'w')
-        self.setFormatter(StatusFormatter('{ "message": "%(message)s", "percent_complete": %(percent_complete)s }'))
+        self.setFormatter(StatusFormatter('{\n  "message": "%(message)s",\n  "percent_complete": %(percent_complete)s\n}'))
 
     def emit(self, record):
         """Overwrite the existing file and write the new log."""
@@ -896,7 +896,7 @@ def write_crispresso_info(crispresso_output_file, crispresso2_info):
 
     """
     with open(crispresso_output_file, 'w') as fh:
-        json.dump(crispresso2_info, fh, cls=CRISPRessoJSONEncoder)
+        json.dump(crispresso2_info, fh, cls=CRISPRessoJSONEncoder, indent=2)
 
 
 def get_command_output(command):
@@ -1064,7 +1064,7 @@ def check_if_failed_run(folder_name, info):
                     info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status_dict['status']))
                     return True, str(status_dict['message'])
                 else:
-                    return False, ""      
+                    return False, ""
             except:
                 pass
 
