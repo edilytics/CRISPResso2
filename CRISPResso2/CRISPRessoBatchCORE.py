@@ -91,6 +91,7 @@ def main():
         crispresso_options_for_batch = list(crispresso_options-options_to_ignore)
 
         CRISPRessoShared.check_file(args.batch_settings)
+        config = CRISPRessoShared.check_custom_config(args)
 
         if args.zip_output and not args.place_report_in_output_folder:
             warn('Invalid arguement combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True.')
@@ -142,8 +143,6 @@ def main():
         else:
             n_processes_for_batch = int(args.n_processes)
 
-        # this value will be propagated to sub-commands, so set it as 1 here
-        args.n_processes = 1
 
         crispresso_cmd_to_write = ' '.join(sys.argv)
         if args.write_cleaned_report:
@@ -162,6 +161,13 @@ def main():
 #        batch_params=pd.read_csv(args.batch_settings,sep=None,engine='python',error_bad_lines=False)
         batch_params.columns = batch_params.columns.str.strip(' -\xd0')
 
+        # if there are more processes than batches, use more processes on each sub-crispresso run
+        # if there are more batches than processes, just use 1 process on each sub-crispresso run
+        args.n_processes = 1
+        num_batches = batch_params.shape[0]
+        if int(n_processes_for_batch/num_batches) > 1:
+            args.n_processes = int(n_processes_for_batch/num_batches)
+        
         int_columns = ['default_min_aln_score', 'min_average_read_quality', 'min_single_bp_quality',
                        'min_bp_quality_or_N',
                        'quantification_window_size', 'quantification_window_center', 'exclude_bp_from_left',
@@ -301,12 +307,16 @@ def main():
         amplicon_names = {}
         amplicon_counts = {}
         completed_batch_arr = []
+        failed_batch_arr = []
+        failed_batch_arr_desc = []
         for idx, row in batch_params.iterrows():
             batch_name = CRISPRessoShared.slugify(row["name"])
             folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % batch_name)
-            run_data_file = os.path.join(folder_name, 'CRISPResso2_info.json')
-            if not os.path.isfile(run_data_file):
-                info("Skipping folder '%s'. Cannot find run data at '%s'."%(folder_name, run_data_file))
+            # check if run failed
+            failed_run_bool, failed_status_string = CRISPRessoShared.check_if_failed_run(folder_name, info)
+            if failed_run_bool:
+                failed_batch_arr.append(batch_name)
+                failed_batch_arr_desc.append(failed_status_string)
                 run_datas.append(None)
                 continue
 
@@ -326,6 +336,8 @@ def main():
 
             completed_batch_arr.append(batch_name)
 
+        crispresso2_info['results']['failed_batch_arr'] = failed_batch_arr
+        crispresso2_info['results']['failed_batch_arr_desc'] = failed_batch_arr_desc
         crispresso2_info['results']['completed_batch_arr'] = completed_batch_arr
 
         # make sure amplicon names aren't super long
@@ -596,6 +608,7 @@ def main():
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': sub_sgRNA_intervals,
                                 'quantification_window_idxs': include_idxs,
+                                'custom_colors': config['colors'],
                             }
                             debug('Plotting nucleotide percentage quilt for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
                             plot(
@@ -620,6 +633,7 @@ def main():
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': sub_sgRNA_intervals,
                                     'quantification_window_idxs': include_idxs,
+                                    'custom_colors': config['colors']
                                 }
                                 debug('Plotting nucleotide conversion map for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
                                 plot(
@@ -646,6 +660,7 @@ def main():
                             'save_also_png': save_png,
                             'sgRNA_intervals': consensus_sgRNA_intervals,
                             'quantification_window_idxs': include_idxs,
+                            'custom_colors': config['colors'],
                         }
                         debug('Plotting nucleotide quilt for {0}'.format(amplicon_name))
                         plot(
@@ -669,6 +684,7 @@ def main():
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': consensus_sgRNA_intervals,
                                 'quantification_window_idxs': include_idxs,
+                                'custom_colors': config['colors']
                             }
                             debug('Plotting nucleotide conversion map for {0}'.format(amplicon_name))
                             plot(
@@ -692,6 +708,7 @@ def main():
                             'mod_pct_df': modification_percentage_summary_df,
                             'fig_filename_root': this_nuc_pct_quilt_plot_name,
                             'save_also_png': save_png,
+                            'custom_colors': config['colors'],
                         }
                         debug('Plotting nucleotide quilt for {0}'.format(amplicon_name))
                         plot(
@@ -710,6 +727,7 @@ def main():
                                 'conversion_nuc_from': args.conversion_nuc_from,
                                 'conversion_nuc_to': args.conversion_nuc_to,
                                 'save_also_png': save_png,
+                                'custom_colors': config['colors']
                             }
                             debug('Plotting BE nucleotide conversion map for {0}'.format(amplicon_name))
                             plot(

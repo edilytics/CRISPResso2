@@ -338,7 +338,7 @@ def main():
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
         crispresso_options = CRISPRessoShared.get_crispresso_options()
-        options_to_ignore = {'fastq_r1', 'fastq_r2', 'amplicon_seq', 'amplicon_name', 'output_folder', 'name', 'zip_output'}
+        options_to_ignore = {'fastq_r1', 'fastq_r2', 'amplicon_seq', 'amplicon_name', 'output_folder', 'name', 'zip_output', 'split_interleaved_input'}
         crispresso_options_for_pooled = list(crispresso_options-options_to_ignore)
 
         files_to_remove = []
@@ -511,6 +511,15 @@ def main():
 
         info('Processing input', {'percent_complete': 5})
 
+        if args.split_interleaved_input:
+            info('Splitting paired end single fastq file into two files...')
+            args.fastq_r1, args.fastq_r2 = CRISPRessoShared.split_interleaved_fastq(
+                args.fastq_r1,
+                output_filename_r1=_jp('{0}_splitted_r1.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
+                output_filename_r2=_jp('{0}_splitted_r2.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
+            )
+            files_to_remove += [args.fastq_r1, args.fastq_r2]
+
         # perform read trimming if necessary
         if args.aligned_pooled_bam is not None:
             # don't trim reads in aligned bams
@@ -615,6 +624,8 @@ def main():
                 N_READS_AFTER_PREPROCESSING = N_READS_INPUT
             else:
                 N_READS_INPUT = get_n_reads_fastq(args.fastq_r1)
+                if args.split_interleaved_input:
+                    N_READS_INPUT /= 2
                 N_READS_AFTER_PREPROCESSING = get_n_reads_fastq(processed_output_filename)
 
             crispresso2_info['running_info']['finished_steps']['count_input_reads'] = (N_READS_INPUT, N_READS_AFTER_PREPROCESSING)
@@ -663,8 +674,8 @@ def main():
             lowercase_default_amplicon_headers = {h.lower(): h for h in default_input_amplicon_headers}
 
             headers = []
+            unmatched_headers = []
             has_header = False
-            has_unmatched_header_el = False
             for head in header_els:
                 # Header based on header provided
                 # Look up long name (e.g. qwc -> quantification_window_coordinates)
@@ -678,21 +689,23 @@ def main():
 
                 match = difflib.get_close_matches(long_head, lowercase_default_amplicon_headers, n=1)
                 if not match:
-                    has_unmatched_header_el = True
-                    warn(f'Unable to find matches for header value "{head}". Using the default header values and order.')
+                    unmatched_headers.append(head)
                 else:
                     has_header = True
                     headers.append(lowercase_default_amplicon_headers[match[0]])
                     if args.debug:
                         info(f'Matching header {head} with {lowercase_default_amplicon_headers[match[0]]}.')
 
-            if not has_header or has_unmatched_header_el:
+            if len(headers) > 5 and not has_header:
+                raise CRISPRessoShared.BadParameterException('Incorrect number of columns provided without header.')
+            elif has_header and len(unmatched_headers) > 0:
+                raise CRISPRessoShared.BadParameterException('Unable to match headers: ' + str(unmatched_headers))
+
+            if not has_header:
                 # Default header
                 headers = []
                 for i in range(len(header_els)):
                     headers.append(default_input_amplicon_headers[i])
-                if len(headers) > 5:
-                    raise CRISPRessoShared.BadParameterException('Incorrect number of columns provided without header.')
 
             if args.debug:
                 info(f'Header variable names in order: {headers}')
@@ -880,6 +893,23 @@ def main():
                     warn('Skipping amplicon [%s] because no reads align to it\n'% idx)
 
             CRISPRessoMultiProcessing.run_crispresso_cmds(crispresso_cmds, n_processes_for_pooled, 'amplicon', args.skip_failed, start_end_percent=(16, 80))
+            # Initialize array to track failed runs
+            failed_batch_arr = []
+            failed_batch_arr_desc = []
+            for cmd in crispresso_cmds:
+
+                # Extract the folder name from the CRISPResso command
+                folder_name_regex = re.search(r'-o\s+\S+\s+--name\s+(\S+)', cmd)
+                if folder_name_regex:
+                    folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % folder_name_regex.group(1))
+                    failed_run_bool, failed_status_string = CRISPRessoShared.check_if_failed_run(folder_name, info)
+                    if failed_run_bool:
+                        failed_batch_arr.append(folder_name_regex.group(1))
+                        failed_batch_arr_desc.append(failed_status_string)
+
+            # Store the failed runs in crispresso2_info for later use
+            crispresso2_info['results']['failed_batch_arr'] = failed_batch_arr
+            crispresso2_info['results']['failed_batch_arr_desc'] = failed_batch_arr_desc
 
             df_template['n_reads']=n_reads_aligned_amplicons
             df_template['n_reads_aligned_%']=df_template['n_reads']/float(N_READS_ALIGNED)*100
@@ -1149,13 +1179,13 @@ def main():
                                 n_reads_at_end = get_n_aligned_bam_region(bam_filename_genome, chr_str, curr_end-5, curr_end+5)
                                 while n_reads_at_end > 0:
                                     curr_end += 500  # look for another place with no reads
-                                    if curr_end >= curr_pos:
+                                    if curr_end >= chr_len:
                                         curr_end = chr_len
                                         break
                                     n_reads_at_end = get_n_aligned_bam_region(bam_filename_genome, chr_str, curr_end-5, curr_end+5)
 
-                                sub_chr_command = chr_cmd.replace("__REGION__", ":%d-%d "%(curr_pos, curr_end))
-                                chr_output_filename = _jp('MAPPED_REGIONS/%s_%s_%s.info' % (chr_str, curr_pos, chr_end))
+                                chr_output_filename = _jp('MAPPED_REGIONS/%s_%s_%s.info' % (chr_str, curr_pos, curr_end))
+                                sub_chr_command = chr_cmd.replace("__REGION__", ":%d-%d "%(curr_pos, curr_end)).replace("__DEMUX_CHR_LOGFILENAME__",chr_output_filename)
                                 chr_commands.append(sub_chr_command)
                                 chr_output_filenames.append(chr_output_filename)
                                 curr_pos = curr_end

@@ -45,6 +45,7 @@
 {% endblock %}
 
 {% block content %}
+
 <div class="row">
 <div class="col-sm-1"></div>
 <div class="col-sm-10">
@@ -54,18 +55,20 @@
 
             <div class="card text-center mb-2">
                 <div class="card-header">
-                    <h5 id="{{report_name}}">{{report_name}}</h5>
+                    <h5>{{report_name}}</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
                         {% for region_name in run_names %}
-                        <a href="{{sub_html_files[region_name]}}" class="list-group-item list-group-item-action" id="{{region_name}}">{{region_name}}</a>
-                        {% endfor %}
+                      <a href="{{sub_html_files[region_name]}}" class="list-group-item list-group-item-action" id="{{region_name}}">{{region_name}}</a>
+                      {% endfor %}
                     </div>
                 </div>
             </div>
 
-          {% if report_data['names']|length > 0 %}
+            {{render_partial('shared/partials/failed_runs.html', failed_runs=failed_runs, failed_runs_desc=failed_runs_desc)}}
+
+            {% if report_data['names']|length > 0 %}
             {% for plot_name in report_data['names'] %}
             <div class='card text-center mb-2'>
               <div class='card-header'>
@@ -78,11 +81,7 @@
             {% endfor %}
           {% endif %}
 
-           	<div align="center" class='p-3'>
-			     <a href="/reports_data/{{report_zip_filename}}" class="btn btn-primary" role="button"><i class="fas fa-download"></i> Download report</a>
-			     <a href="{{report_path}}" class="btn btn-primary" role="button"><i class="fas fa-link"></i> Link to report</a>
-                 <button class='btn btn-primary hidden-print' onclick='window.print();'><i class="fas fa-print"></i> Print</button>
-            </div>
+          {{render_partial('shared/partials/report_footer_buttons.html', report_zip_filename=report_zip_filename, report_path=report_path)}}
     {# data bit for web version: #}
     {#
         			  <p class="m-0"><small>Data: <a href="{{report_data['crispresso_data_path']}}{{data_path}}">{{data_label}}</a> <a href="{{report_data['crispresso_data_path']}}{{data_path}}" title="{{data_label}}" download> <span class="fas fa-download" data-toggle='tooltip' title='Download {{data_label}}'><span></a></small></p>

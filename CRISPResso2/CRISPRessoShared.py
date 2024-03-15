@@ -9,6 +9,9 @@ import datetime
 import errno
 import gzip
 import json
+import sys
+import importlib.util
+
 import numpy as np
 import os
 import pandas as pd
@@ -31,38 +34,50 @@ __version__ = "2.2.15"
 class FlashException(Exception):
     pass
 
+
 class TrimmomaticException(Exception):
     pass
+
 
 class NoReadsAlignedException(Exception):
     pass
 
+
 class AlignmentException(Exception):
     pass
+
 
 class SgRNASequenceException(Exception):
     pass
 
+
 class NTException(Exception):
     pass
+
 
 class ExonSequenceException(Exception):
     pass
 
+
 class DuplicateSequenceIdException(Exception):
     pass
+
 
 class NoReadsAfterQualityFilteringException(Exception):
     pass
 
+
 class BadParameterException(Exception):
     pass
+
 
 class AutoException(Exception):
     pass
 
+
 class OutputFolderIncompleteException(Exception):
     pass
+
 
 class InstallationException(Exception):
     pass
@@ -125,15 +140,19 @@ def set_console_log_level(logger, level, debug=False):
 def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params=[], suppress_params=[]):
     parser = argparse.ArgumentParser(description=parser_title, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
-    parser.add_argument('-r1', '--fastq_r1', type=str, help='First fastq file', default='',
-                        required='fastq_r1' in required_params)
-    parser.add_argument('-r2', '--fastq_r2', type=str, help='Second fastq file for paired end reads', default='')
-    parser.add_argument('-a', '--amplicon_seq', type=str,
-                        help='Amplicon Sequence (can be comma-separated list of multiple sequences)',
-                        required='amplicon_seq' in required_params)
-    parser.add_argument('-an', '--amplicon_name', type=str,
-                        help='Amplicon Name (can be comma-separated list of multiple names, corresponding to amplicon sequences given in --amplicon_seq',
-                        default='Reference')
+    if 'fastq_r1' not in suppress_params:
+        parser.add_argument('-r1', '--fastq_r1', type=str, help='First fastq file', default='',
+                            required='fastq_r1' in required_params)
+    if 'fastq_r2' not in suppress_params:
+        parser.add_argument('-r2', '--fastq_r2', type=str, help='Second fastq file for paired end reads', default='')
+    if 'amplicon_seq' not in suppress_params:
+        parser.add_argument('-a', '--amplicon_seq', type=str,
+                            help='Amplicon Sequence (can be comma-separated list of multiple sequences)',
+                            required='amplicon_seq' in required_params)
+    if 'amplicon_name' not in suppress_params:
+        parser.add_argument('-an', '--amplicon_name', type=str,
+                            help='Amplicon Name (can be comma-separated list of multiple names, corresponding to amplicon sequences given in --amplicon_seq',
+                            default='Reference')
     parser.add_argument('-amas', '--amplicon_min_alignment_score', type=str,
                         help='Amplicon Minimum Alignment Score; score between 0 and 100; sequences must have at least this homology score with the amplicon to be aligned (can be comma-separated list of multiple scores, corresponding to amplicon sequences given in --amplicon_seq)',
                         default="")
@@ -184,9 +203,10 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
     parser.add_argument('-v', '--verbosity', type=int, help='Verbosity level of output to the console (1-4), 4 is the most verbose', default=3)
 
     ## read preprocessing params
-    parser.add_argument('--split_interleaved_input', '--split_paired_end',
-                        help='Splits a single fastq file containing paired end reads into two files before running CRISPResso',
-                        action='store_true')
+    if 'split_interleaved_input' not in suppress_params:
+        parser.add_argument('--split_interleaved_input', '--split_paired_end',
+                            help='Splits a single fastq file containing paired end reads into two files before running CRISPResso',
+                            action='store_true')
     parser.add_argument('--trim_sequences', help='Enable the trimming of Illumina adapters with Trimmomatic',
                         action='store_true')
     parser.add_argument('--trimmomatic_command', type=str, help='Command to run trimmomatic', default='trimmomatic')
@@ -270,8 +290,9 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
                         help='If set, in the allele plots, the percentages will show the percentage as a percent of reads aligned to the assigned reference. Default behavior is to show percentage as a percent of all reads.',
                         action='store_true')
     parser.add_argument('-qwc', '--quantification_window_coordinates', type=str,
-                        help='Bp positions in the amplicon sequence specifying the quantification window. This parameter overrides values of the "--quantification_window_center", "--cleavage_offset", "--window_around_sgrna" or "--window_around_sgrna" values. Any indels/substitutions outside this window are excluded. Indexes are 0-based, meaning that the first nucleotide is position 0. Ranges are separted by the dash sign (e.g. "start-stop"), and multiple ranges can be separated by the underscore (_). ' +
-                             'A value of 0 disables this filter. (can be comma-separated list of values, corresponding to amplicon sequences given in --amplicon_seq e.g. 5-10,5-10_20-30 would specify the 5th-10th bp in the first reference and the 5th-10th and 20th-30th bp in the second reference)',
+                        help='Bp positions in the amplicon sequence specifying the quantification window. This parameter overrides values of the "--quantification_window_center", "--cleavage_offset", "--window_around_sgrna" or "--window_around_sgrna" values. Any indels/substitutions outside this window are excluded. Indexes are 0-based, meaning that the first nucleotide is position 0. Ranges are separted by the dash sign (e.g. "start-stop"), and multiple ranges can be separated by the underscore (_) (can be comma-separated list of values, corresponding to amplicon sequences given in --amplicon_seq e.g. 5-10,5-10_20-30 would specify the 6th-11th bp in the first reference and the 6th-11th and 21st-31st bp in the second reference). ' +
+                             'A value of 0 disables this filter for a particular amplicon (e.g. 0,90-110 This would disable the quantification window for the first amplicon and specify the quantification window of 90-110 for the second).' +
+                             'Note that if there are multiple amplicons provided, and only one quantification window coordinate is provided, the same quantification window will be used for all amplicons and be adjusted to account for insertions/deletions.',
                         default=None)
     parser.add_argument('--annotate_wildtype_allele', type=str,
                         help='Wildtype alleles in the allele table plots will be marked with this string (e.g. **).',
@@ -532,7 +553,7 @@ def clean_filename(filename):
     validFilenameChars = "+-_.()%s%s" % (string.ascii_letters, string.digits)
     filename = slugify(str(filename).replace(' ', '_'))
     cleanedFilename = unicodedata.normalize('NFKD', filename)
-    return(''.join(c for c in cleanedFilename if c in validFilenameChars))
+    return (''.join(c for c in cleanedFilename if c in validFilenameChars))
 
 def check_file(filename):
     try:
@@ -621,7 +642,7 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
     params:
         file_path: path to fastq file
         max_lines_to_check: number of lines to check in the file
-    returns:   
+    returns:
         True if the file is in the correct format
     """
 
@@ -1010,6 +1031,50 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fla
 
     return seq_lines
 
+def check_if_failed_run(folder_name, info):
+    """
+    Check the output folder for a info.json file and a status.txt file to see if the run completed successfully or not
+
+    input:
+    folder_name: path to output folder
+    info: logger
+
+
+    returns:
+    bool True if run completed successfully, False otherwise
+    string describing why it failed
+    """
+
+    run_data_file = os.path.join(folder_name, 'CRISPResso2_info.json')
+    status_info = os.path.join(folder_name, 'CRISPResso_status.txt')
+    if not os.path.isfile(run_data_file) or not os.path.isfile(status_info):
+        info("Skipping folder '%s'. Cannot find run data status file at '%s'."%(folder_name, run_data_file))
+        if "CRISPRessoPooled" in folder_name:
+            unit = "amplicon"
+        elif "CRISPRessoWGS" in folder_name:
+            unit = "region"
+        else:
+            unit = "sample"
+
+        return True, f"CRISPResso failed for this {unit}! Please check your input files and parameters."
+    else:
+        with open(status_info) as fh:
+            try:
+                file_contents = fh.read()
+                search_result = re.search(r'(\d+\.\d+)% (.+)', file_contents)
+                if search_result:
+                    percent_complete, status = search_result.groups()
+                    if percent_complete != '100.00':
+                        info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status))
+                        return True, status
+                else:
+                    return True, file_contents
+            except Exception as e:
+                print(e)
+                info("Skipping folder '%s'. Cannot parse status file '%s'." % (folder_name, status_info))
+                return True, "Cannot parse status file '%s'." % (status_info)
+    return False, ""
+
 
 def guess_amplicons(fastq_r1,fastq_r2,number_of_reads_to_consider,flash_command,max_paired_end_reads_overlap,min_paired_end_reads_overlap,aln_matrix,needleman_wunsch_gap_open,needleman_wunsch_gap_extend,split_interleaved_input=False,min_freq_to_consider=0.2,amplicon_similarity_cutoff=0.95):
     """
@@ -1267,6 +1332,61 @@ def force_merge_pairs(r1_filename, r2_filename, output_filename):
     return (lineCount)
 
 
+def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_r2):
+    """Split an interleaved fastq file into two files, one for each read pair.
+
+    This assumes that the input fastq file is interleaved, i.e. that the reads are ordered as follows:
+        R1
+        R2
+        R1
+        R2
+        ...
+
+    And results in two files, one for each read pair:
+        output_filename_r1
+            R1
+            R1
+            ...
+        output_filename_r2
+            R2
+            R2
+            ...
+
+    Parameters
+    ----------
+    fastq_filename : str
+        Path to the input fastq file.
+    output_filename_r1 : str
+        Path to the output fastq file for r1.
+    output_filename_r2 : str
+        Path to the output fastq file for r2.
+
+    Returns
+    -------
+    output_filename_r1 : str
+        Path to the output fastq file for r1.
+    output_filename_r2 : str
+        Path to the output fastq file for r2.
+    """
+    if fastq_filename.endswith('.gz'):
+        fastq_handle = gzip.open(fastq_filename, 'rt')
+    else:
+        fastq_handle = open(fastq_filename)
+
+    try:
+        fastq_splitted_outfile_r1 = gzip.open(output_filename_r1, 'wt')
+        fastq_splitted_outfile_r2 = gzip.open(output_filename_r2, 'wt')
+        [fastq_splitted_outfile_r1.write(line) if (i % 8 < 4) else fastq_splitted_outfile_r2.write(line) for i, line in enumerate(fastq_handle)]
+    except:
+        raise BadParameterException('Error in splitting read pairs from a single file')
+    finally:
+        fastq_handle.close()
+        fastq_splitted_outfile_r1.close()
+        fastq_splitted_outfile_r2.close()
+
+    return output_filename_r1, output_filename_r2
+
+
 ######
 # allele modification functions
 ######
@@ -1469,7 +1589,7 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
     # create mask of positions in which to include/exclude indels for the quantification window
     # first, if exact coordinates have been given, set those
     given_include_idxs = []
-    if quantification_window_coordinates is not None:
+    if quantification_window_coordinates is not None and quantification_window_coordinates != "0":
         coordinate_include_idxs = []
         theseCoords = str(quantification_window_coordinates).split("_")
         for coord in theseCoords:
@@ -1831,9 +1951,20 @@ def zip_results(results_folder):
     return
 
 
+def is_C2Pro_installed():
+    try:
+        spec = importlib.util.find_spec("crispressoPro")
+        if spec is None:
+            return False
+        else:
+            return True
+    except:
+        return False
+
+
 def check_custom_config(args):
     """Check if the config_file argument was provided. If so load the configurations from the file, otherwise load default configurations.
-    
+
     Parameters:
     -------------
     args : dict
@@ -1847,8 +1978,7 @@ def check_custom_config(args):
         A dict with a 'colors' key that contains hex color values for different report items as well as a 'guardrails' key that contains the guardrail values.
     """
     config =  {
-        "colors": 
-        {
+        "colors": {
             'Substitution': '#0000FF',
             'Insertion': '#008000',
             'Deletion': '#FF0000',
@@ -1857,10 +1987,9 @@ def check_custom_config(args):
             'C': '#FDC086',
             'G': '#FFFF99',
             'N': '#C8C8C8',
-            '-': '#C1C1C1'
-        }, 
-        "guardrails": 
-        {
+            '-': '#1E1E1E',
+        },
+        "guardrails": {
             'min_total_reads': 10000,
             'alignedCutoff': 0.9,
             'alternateAlignment': 0.3,
@@ -1871,9 +2000,9 @@ def check_custom_config(args):
             'guide_len': 19,
             'amplicon_len': 50,
             'ampliconToReadLen': 1.5
-        }       
+        }
     }
-    
+
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
 
     if args.config_file:
@@ -1889,10 +2018,19 @@ def check_custom_config(args):
             else:
                 logger.warn("Json file does not contain the guardrails key. Defaulting all values.")
                 custom_config['guardrails'] = config['guardrails']
-                
+
+            if 'colors' in custom_config.keys():
+                for key in config['colors']:
+                    if key not in custom_config['colors']:
+                        logger.warn(f"Value for {key} not provided, defaulting")
+                        custom_config['colors'][key] = config['colors'][key]
+            else:
+                logger.warn("Json file does not contain the colors key. Defaulting all values.")
+                custom_config['colors'] = config['colors']
+
             return custom_config
         except Exception as e:
-            logger.warn("Cannot read json file '%s', defaulting style parameters." % args.config_file)
+            logger.warn("Cannot read json file '%s', defaulting config parameters." % args.config_file)
             print(e)
     return config
 
@@ -1924,7 +2062,7 @@ def safety_check(crispresso2_info, aln_stats, guardrails):
                 Allowed rate of subs accross the entire read
             guide_len : int
                 Minimum guide length
-            amplicon_len : int 
+            amplicon_len : int
                 Minimum amplicon length
             ampliconToReadLen : float
                 Comparison value between amplicons and reads
@@ -1939,7 +2077,7 @@ def safety_check(crispresso2_info, aln_stats, guardrails):
         amplicons[name] = crispresso2_info['results']['refs'][name]['sequence_length']
         guide_groups.update(crispresso2_info['results']['refs'][name]['sgRNA_sequences'])
     unique_guides = {guide: len(guide) for guide in guide_groups}
-    
+
     totalReadsGuardRail = TotalReadsGuardRail(messageHandler, guardrails['min_total_reads'])
     totalReadsGuardRail.safety(aln_stats['N_TOT_READS'])
 
@@ -1948,22 +2086,22 @@ def safety_check(crispresso2_info, aln_stats, guardrails):
 
     lowReadsAlignedToAmpliconGuardRail = LowReadsAlignedToAmpliconGuardRail(messageHandler, guardrails['alignedCutoff'])
     lowReadsAlignedToAmpliconGuardRail.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['alignment_stats']['counts_total'])
-    
+
     highReadsAlignedToAlternateAmplicon = HighReadsAlignedToAlternateAmpliconGuardRail(messageHandler, guardrails['alternateAlignment'])
     highReadsAlignedToAlternateAmplicon.safety(aln_stats['N_TOT_READS'], crispresso2_info['results']['alignment_stats']['counts_total'])
-    
+
     lowRatioOfModsInWindowToOut = LowRatioOfModsInWindowToOutGuardRail(messageHandler, guardrails['minRatioOfModsInToOut'])
     lowRatioOfModsInWindowToOut.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'])
-    
+
     highRateOfModificationAtEndsGuardRail = HighRateOfModificationAtEndsGuardRail(messageHandler, guardrails['modificationsAtEnds'])
     highRateOfModificationAtEndsGuardRail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
-    
+
     highRateOfSubstitutionsOutsideWindowGuardRail = HighRateOfSubstitutionsOutsideWindowGuardRail(messageHandler, guardrails['outsideWindowMaxSubRate'])
     highRateOfSubstitutionsOutsideWindowGuardRail.safety(aln_stats['N_GLOBAL_SUBS'], aln_stats['N_SUBS_OUTSIDE_WINDOW'])
-    
+
     highRateOfSubstitutions = HighRateOfSubstitutionsGuardRail(messageHandler, guardrails['maxRateOfSubs'])
     highRateOfSubstitutions.safety(aln_stats['N_MODS_IN_WINDOW'], aln_stats['N_MODS_OUTSIDE_WINDOW'], aln_stats['N_GLOBAL_SUBS'])
-        
+
     shortAmpliconSequence = ShortSequenceGuardRail(messageHandler, guardrails['amplicon_len'], 'amplicon')
     shortAmpliconSequence.safety(amplicons)
 
@@ -1980,7 +2118,7 @@ class GuardRailMessageHandler:
     """Class to handle message storage and display for guardrails"""
     def __init__(self, logger):
         """Create the message handler with an empty message array to collect html divs for the report
-        
+
         Parameters:
         ------------
         logger : logger
@@ -1991,7 +2129,7 @@ class GuardRailMessageHandler:
 
     def display_warning(self, message):
         """Send the message to the logger to be displayed
-        
+
         Parameters:
         -----------
         message : string
@@ -2001,7 +2139,7 @@ class GuardRailMessageHandler:
 
     def report_warning(self, message):
         """Create and store the html message to display on the report
-        
+
         Parameters:
         -----------
         message : string
@@ -2019,7 +2157,7 @@ class TotalReadsGuardRail:
     """Guardrail class: check that the number of reads are above a minimum"""
     def __init__(self, messageHandler, minimum):
         """Assign variables and create guardrail message
-        
+
         Parameters:
         -----------
         messageHandler : GuardRailMessagehandler
@@ -2059,7 +2197,7 @@ class OverallReadsAlignedGuardRail:
         self.messageHandler = messageHandler
         self.message = " <={val}% of reads were aligned".format(val=(cutoff * 100))
         self.cutoff = cutoff
-    
+
     def safety(self, total_reads, n_read_aligned):
         """Safety check, if total_reads divided by n_reads_aligned is lower than the cutoff
 
@@ -2095,7 +2233,7 @@ class LowReadsAlignedToAmpliconGuardRail:
 
     def safety(self, total_reads, reads_aln_amplicon):
         """Safety check, if total_reads divided by n_reads_aligned is lower than the total_reads divided by the number of amplicons
-        
+
         Parameters:
         -----------
         total_reads : int
@@ -2129,7 +2267,7 @@ class HighReadsAlignedToAlternateAmpliconGuardRail:
 
     def safety(self, total_reads, reads_aln_amplicon):
         """Safety check, if total_reads divided by n_reads_aligned is higher than the total_reads divided by the number of amplicons
-        
+
         Parameters:
         -----------
         total_reads : int
@@ -2163,7 +2301,7 @@ class LowRatioOfModsInWindowToOutGuardRail:
 
     def safety(self, mods_in_window, mods_outside_window):
         """Safety check, if the modifications in the window are below a ratio of the total
-        
+
         Parameters:
         -----------
         mods_in_window : int
@@ -2194,10 +2332,10 @@ class HighRateOfModificationAtEndsGuardRail:
         self.messageHandler = messageHandler
         self.message = " >={}% of reads have modifications at the start or end. ".format(percentage_start_end * 100)
         self.percent = percentage_start_end
-    
+
     def safety(self, total_reads, irregular_reads):
         """Safety check, comparison between the number of irregular reads to total reads
-        
+
         Parameters:
         -----------
         total_reads : int
@@ -2227,10 +2365,10 @@ class HighRateOfSubstitutionsOutsideWindowGuardRail:
         self.messageHandler = messageHandler
         self.message = " >={}% of substitutions were outside of the quantification window. ".format(cutoff * 100)
         self.cutoff = cutoff
-        
+
     def safety(self, global_subs, subs_outside_window):
         """Safety check, comparison between the number of global subs to subs outside of the quantification window
-        
+
         Parameters:
         -----------
         global_subs : int
@@ -2260,10 +2398,10 @@ class HighRateOfSubstitutionsGuardRail:
         self.messageHandler = messageHandler
         self.message = " >={}% of modifications were substitutions. This could potentially indicate poor sequencing quality. ".format(cutoff * 100)
         self.cutoff = cutoff
-        
+
     def safety(self, mods_in_window, mods_outside_window, global_subs):
         """Safety check, comparison between subsitutions and total modifications
-        
+
         Parameters:
         -----------
         mods_in_window : int
@@ -2301,7 +2439,7 @@ class ShortSequenceGuardRail:
 
     def safety(self, sequences):
         """Safety check, comparison between sequence lengths and minimum lengths
-        
+
         Parameters:
         -----------
         sequences : dict
@@ -2325,7 +2463,7 @@ class LongAmpliconShortReadsGuardRail:
             Guardrail message handler to create and display warnings
         cutoff : float
             The value multiplied by the read length to make sure the amplicon isn't too much longer than the reads.
-            
+
         """
         self.messageHandler = messageHandler
         self.cutoff = cutoff
@@ -2333,7 +2471,7 @@ class LongAmpliconShortReadsGuardRail:
 
     def safety(self, amplicons, read_len):
         """Safety check, comparison between amplicon length and read length
-        
+
         Parameters:
         -----------
         amplicons : dict

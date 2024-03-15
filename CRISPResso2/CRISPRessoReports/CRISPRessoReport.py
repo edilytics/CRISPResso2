@@ -182,6 +182,8 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
 
 def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info, batch_folder, _ROOT):
     batch_names = crispresso2_info['results']['completed_batch_arr']
+    failed_runs = crispresso2_info['results']['failed_batch_arr']
+    failed_runs_desc = crispresso2_info['results']['failed_batch_arr_desc']
     display_names = crispresso2_info['results']['batch_input_names']
 
     window_nuc_pct_quilts = crispresso2_info['results']['general_plots']['window_nuc_pct_quilt_plot_names']
@@ -287,6 +289,8 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
 
     make_multi_report(
         run_names,
+        failed_runs,
+        failed_runs_desc,
         sub_html_files,
         crispressoBatch_report_file,
         batch_folder,
@@ -375,6 +379,14 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
         summary_plot_datas = crispresso2_info['results']['general_plots']['summary_plot_datas']
 
     run_names = []
+    if 'failed_batch_arr' in crispresso2_info['results']:
+        failed_runs = crispresso2_info['results']['failed_batch_arr']
+    else:
+        failed_runs = []
+    if 'failed_batch_arr' in crispresso2_info['results']:
+        failed_runs_desc = crispresso2_info['results']['failed_batch_arr_desc']
+    else:
+        failed_runs_desc = []
     sub_html_files = {}
     sub_2a_labels = {}
     sub_2a_pdfs = {}
@@ -411,6 +423,8 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
 
     make_multi_report(
         run_names,
+        failed_runs,
+        failed_runs_desc,
         sub_html_files,
         crispresso_report_file,
         folder,
@@ -428,6 +442,8 @@ def make_multi_report_from_folder(crispresso2_info, names_arr, report_name, cris
 
 def make_multi_report(
     run_names,
+    failed_runs,
+    failed_runs_desc,
     sub_html_files,
     crispresso_multi_report_file,
     crispresso_folder,
@@ -544,6 +560,8 @@ def make_multi_report(
                 'crispresso_data_path': crispresso_data_path,
             },
             run_names=run_names,
+            failed_runs=failed_runs,
+            failed_runs_desc=failed_runs_desc,
             sub_html_files=sub_html_files,
             report_name=report_name,
             compact_plots_to_show=[] if compact_plots_to_show is None else compact_plots_to_show,
@@ -687,8 +705,14 @@ def make_aggregate_report(
         with open(line_plot_path, encoding="utf-8") as fh:
             allele_modification_line_plot['htmls'][line_plot_name] = fh.read()
 
+    # make_multi_report expects two arrays here for other calls of this function
+    empty_failed_runs = []
+    empty_failed_runs_desc = []
+
     make_multi_report(
         run_names,
+        empty_failed_runs,
+        empty_failed_runs_desc,
         sub_html_files,
         crispresso_report_file,
         crispresso_report_folder,
