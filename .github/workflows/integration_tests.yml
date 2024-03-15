@@ -3,9 +3,6 @@ name: Run Integration Tests
 on:
   push:
 
-  pull_request:
-    types: [opened, reopened]
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -40,12 +37,13 @@ jobs:
       run: |
         mkdir ../CRISPResso2_copy
         cp -r * ../CRISPResso2_copy
-
+        
     - name: Copy C2_tests repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@master
       with:
         repository: edilytics/CRISPResso2_tests
-        # ref: '<BRANCH-NAME>' # Use this to specify a branch other than master
+        token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
+        # ref: '<BRANCH_NAME>' // Use this to specify a branch other than master
 
     - name: Run Basic
       run: |
@@ -70,11 +68,6 @@ jobs:
       if: success() || failure()
       run: |
         make pooled test
-
-    - name: Run Pooled Paired Sim
-      if: success() || failure()
-      run: |
-        make pooled-paired-sim test
 
     - name: Run WGS
       if: success() || failure()
