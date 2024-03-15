@@ -1,0 +1,127 @@
+name: QATests
+  on:
+    push:
+      paths:
+        - '.github/workflows/QATests.yml'
+        - '.github/envs/test_env.yml'
+
+jobs:
+  build:
+  runs-on: ubuntu-latest
+  matrix:
+    python-version: ["3.10"]
+  defaults:
+    run:
+      shell: bash -l {0}
+  env:
+    CRISPRESSO2_DIR: ${GITHUB_WORKSPACE}/../CRISPResso2_copy
+  job1:
+    if: always()
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint
+    - name: Analysing the code with pylint
+      run: |
+        pylint --fail-under=6.2 $(git ls-files '*.py') --rcfile=/home/runner/work/CRISPResso2/CRISPResso2/.github/workflows/.pylintrc
+  job2:
+    if: always()
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Conda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+          mamba-version: "*"
+          channels: conda-forge,bioconda,defaults
+          auto-activate-base: false
+          activate-environment: test_env
+          environment-file: .github/envs/test_env.yml
+
+    - name: Install apt dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
+        
+    - name: Install Pytest
+      run: |
+        pip install pytest pytest-cov
+    
+    - name: Install CRISPResso
+      run: |
+        pip install -e .
+
+    - name: Run Pytest
+      run: | 
+        pytest tests --cov CRISPResso2
+  job3:
+    if: always()
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Conda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+          mamba-version: "*"
+          channels: conda-forge,bioconda,defaults
+          auto-activate-base: false
+          activate-environment: test_env
+          environment-file: .github/envs/test_env.yml
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
+        pip install ydiff
+
+    - name: Create directory for files
+      run: |
+        mkdir ../CRISPResso2_copy
+        cp -r * ../CRISPResso2_copy
+        
+    - name: Copy C2_tests repo
+      uses: actions/checkout@master
+      with:
+        repository: edilytics/CRISPResso2_tests
+        token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
+        # ref: '<BRANCH_NAME>' // Use this to specify a branch other than master
+
+    - name: Run Basic
+      run: |
+        make basic test
+
+    - name: Run Params
+      if: success() || failure()
+      run: |
+        make params test
+
+    - name: Run Prime Editor
+      if: success() || failure()
+      run: |
+        make prime-editor test
+
+    - name: Run Batch
+      if: success() || failure()
+      run: |
+        make batch test
+
+    - name: Run Pooled
+      if: success() || failure()
+      run: |
+        make pooled test
+
+    - name: Run WGS
+      if: success() || failure()
+      run: |
+        make wgs test
+
+    - name: Run Compare
+      if: success() || failure()
+      run: |
+        make compare test
