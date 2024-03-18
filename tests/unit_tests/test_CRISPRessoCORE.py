@@ -133,12 +133,64 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates():
     assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(1, 11)), *list(range(12, 21))]
 
 
-def test_get_cloned_include_idxs_from_quant_window_coordinates():
+def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_beginning():
     quant_window_coordinates = '1-10_12-20'
-    # represents a 5bp insertion at the begging (left)
+    # represents a 5bp insertion at the beginning (left)
     s1inds = list(range(5, 27))
     assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(6, 16)), *list(range(17, 26))]
 
+def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_beginning():
+    quant_window_coordinates = '1-10_12-20'
+    # represents a 5bp deletion at the beginning (left)
+    s1inds = [-1, -1, -1, -1, -1 ] + list(range(26))
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(1, 6)), *list(range(7, 16))]
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion():
+    quant_window_coordinates = '10-20_35-40'
+    # represents a 7bp deletion in the middle
+    s1inds = list(range(23)) + [22, 22, 22, 22, 22, 22, 22] + list(range(23, 34))
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(10, 21)), *list(range(35-7, 41-7))]
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_modified():
+    quant_window_coordinates = '10-25_35-40'
+    # represents a 7bp deletion in the middle, where part of the QW is deleted
+    # [0, 1, 3, 4, ... , 21, 22, 22, 22, 22, 22, 22, 22, 22, 23, 24, ... , 33]
+    s1inds = list(range(23)) + [22, 22, 22, 22, 22, 22, 22] + list(range(23, 34))
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(10, 23)), *list(range(35-7, 41-7))]
+
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_end_modified(): 
+    # 5 bp deletion at end of 20 bp sequence
+    quant_window_coordinates = '1-5_10-20'
+    s1inds = [*list(range(16)), *[15, 15, 15, 15, 15]]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(1, 6)), *list(range(10, 16))]
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_and_deletion():
+    # 5 bp deletion and 5 bp insertion
+    quant_window_coordinates = '1-5_10-20'
+    s1inds = [0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 5, 6, 7, 8, 9, 15]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(1, 6)), *[6, 7, 8, 9, 15]]
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_and_deletion_modified():
+    # 5 bp deletion and 5 bp insertion with modified QW
+    pytest.xfail('Not implemented yet')
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_across_qw():
+    # 6 bp insertion in middle of 4 bp sequence
+    quant_window_coordinates = '1-4'
+    s1inds = [0,1,2,9,10]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [1,2,9,10]
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_entire_qw():
+    # 5 bp deletion of entire qw
+    quant_window_coordinates = '1-4_7-10'
+    s1inds = [0, 1, 2, 3, 4, 5, 6, 6, 6, 6, 6]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [1, 2, 3, 4]
+
+# NOTE: include_idxs should be exactly the numbers as specificed in the string, inclusively
+# For example: 20-30_175-185 --> [20, 21, ..., 30, 175, 176, ..., 185]
+    
+# BUG: you can't include the last base in the QW or you get an out of range error -- this is extant beyond the function tested here.
 
 if __name__ == "__main__":
 # execute only if run as a script
