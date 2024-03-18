@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install gcc g++ bowtie2 samtools libsys-hostname-l
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /usr/share/man/* \
   && rm -rf /usr/share/doc/* \
-  && conda install -c defaults -c conda-forge -c bioconda -y -n base --debug trimmomatic flash numpy cython jinja2 tbb=2020.2 pyparsing=2.3.1 scipy matplotlib-base pandas plotly\
+  && conda install -c defaults -c conda-forge -c bioconda -y -n base --debug fastp numpy cython jinja2 tbb=2020.2 pyparsing=2.3.1 scipy matplotlib-base pandas plotly\
   && conda clean --all --yes
 
 #install ms fonts
@@ -21,8 +21,8 @@ RUN echo "deb http://httpredir.debian.org/debian buster main contrib" > /etc/apt
   && echo "deb http://security.debian.org/ buster/updates main contrib" >> /etc/apt/sources.list \
   && echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections \
   && apt-get update \
-  && apt-get clean \
   && apt-get install -y ttf-mscorefonts-installer \
+  && apt-get clean \
   && apt-get autoremove -y \
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /usr/share/man/* \
@@ -32,7 +32,7 @@ RUN echo "deb http://httpredir.debian.org/debian buster main contrib" > /etc/apt
 # install crispresso
 COPY . /CRISPResso2
 WORKDIR /CRISPResso2
-RUN python setup.py install \
+RUN python setup.py install
   && CRISPResso -h \
   && CRISPRessoBatch -h \
   && CRISPRessoPooled -h \
