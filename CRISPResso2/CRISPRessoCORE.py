@@ -181,7 +181,7 @@ def get_include_idxs_from_quant_window_coordinates(quant_window_coordinates):
     ]
 
 
-def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds):
+def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, idxs):
     """Get the include_idxs from the quantification window coordinates, but adjusted according to s1ind.
 
     Parameters
@@ -199,11 +199,15 @@ def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinat
         window coordinates expanded to include all individual indexes contained therein,
         but adjusted according to s1inds.
     """
-    return [
-        i
-        for coord in split_quant_window_coordinates(quant_window_coordinates)
-        for i in range(s1inds[coord[0]], s1inds[coord[1]] + 1)
-    ]
+    include_idxs = []
+    for i, x in enumerate(idxs):
+        if i > 0:
+            if abs(idxs[i-1]) == x:
+                idxs[i] = -1 * abs(x)
+    for coord in split_quant_window_coordinates(quant_window_coordinates):
+        include_idxs.extend(idxs[coord[0]:coord[1] + 1])
+        
+    return list(filter(lambda x: x > 0, include_idxs))
 
 
 def get_pe_scaffold_search(prime_edited_ref_sequence, prime_editing_pegRNA_extension_seq, prime_editing_pegRNA_scaffold_seq, prime_editing_pegRNA_scaffold_min_match_length):
@@ -2056,11 +2060,9 @@ def main():
                     if amplicon_quant_window_coordinates_arr[this_ref_idx] != "":
                         this_include_idxs = get_include_idxs_from_quant_window_coordinates(amplicon_quant_window_coordinates_arr[this_ref_idx])
                     else:
-                        payload = CRISPRessoCOREResources.find_indels_substitutions(fws1, fws2, [])
-                        ref_positions = payload['ref_positions']
                         this_include_idxs = get_cloned_include_idxs_from_quant_window_coordinates(
                             amplicon_quant_window_coordinates_arr[clone_ref_idx],
-                            ref_positions,
+                            s1inds.copy(),
                         )
 
                     #subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
