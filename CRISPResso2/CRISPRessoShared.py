@@ -916,7 +916,7 @@ def get_command_output(command):
             break
 
 
-def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap, split_interleaved_input=False, debug=False):
+def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, split_interleaved_input=False, debug=False):
     """
     Get the most frequent amplicon from a fastq file (or after merging a r1 and r2 fastq file).
 
@@ -1094,7 +1094,7 @@ def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_comma
     returns:
     list of putative amplicons
     """
-    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap, split_interleaved_input=split_interleaved_input)
+    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, split_interleaved_input=split_interleaved_input)
 
     curr_amplicon_id = 1
 
@@ -1168,7 +1168,7 @@ def guess_guides(amplicon_sequence, fastq_r1, fastq_r2, number_of_reads_to_consi
     tuple of (putative guide, boolean is_base_editor)
     or (None, None)
     """
-    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, max_paired_end_reads_overlap, min_paired_end_reads_overlap,split_interleaved_input=split_interleaved_input)
+    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap,split_interleaved_input=split_interleaved_input)
 
     amp_len = len(amplicon_sequence)
     gap_incentive = np.zeros(amp_len + 1, dtype=int)

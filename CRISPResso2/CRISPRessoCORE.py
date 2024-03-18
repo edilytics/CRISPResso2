@@ -110,7 +110,10 @@ def check_program(binary_name, download_url=None, version_flag=None, version_reg
 
     if version_flag:
         p = sb.Popen('{0} {1}'.format(binary_name, version_flag), shell=True, stdout=sb.PIPE, stderr=sb.STDOUT)
-        p_output = p.communicate()[1].decode('utf-8')
+        if binary_name == 'fastp':
+            p_output = p.communicate()[0].decode('utf-8')
+        else:
+            p_output = p.communicate()[1].decode('utf-8')
         major_version, minor_version, patch_version = map(int, re.search(version_regex, p_output).groups())
         if major_version <= version[0] and minor_version <= version[1] and patch_version < version[2]:
             error('You need to install version {0} of {1} to use CRISPResso!'.format(version, binary_name))
