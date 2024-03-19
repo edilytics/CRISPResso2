@@ -185,19 +185,19 @@ def find_indels_substitutions_legacy(read_seq_al, ref_seq_al, _include_indx):
                 ref_positions.append(-idx)
 
     substitution_n = len(substitution_positions)
-    
+
     #the remainder of positions are with reference to the original reference sequence indexes we calculated above
     all_deletion_positions=[]
     deletion_positions=[]
     deletion_coordinates=[]
     deletion_sizes=[]
-    
+
     all_insertion_positions=[]
     all_insertion_left_positions=[]
     insertion_positions=[]
     insertion_coordinates = []
     insertion_sizes=[]
-    
+
     include_indx_set = set(_include_indx)
     for p in re_find_indels.finditer(read_seq_al):
         st,en=p.span()
@@ -213,9 +213,9 @@ def find_indels_substitutions_legacy(read_seq_al, ref_seq_al, _include_indx):
           deletion_positions.extend(range(ref_st,ref_en))
           deletion_coordinates.append((ref_st,ref_en))
           deletion_sizes.append(en-st)
-    
+
     deletion_n = np.sum(deletion_sizes)
-    
+
     for p in re_find_indels.finditer(ref_seq_al):
         st,en=p.span()
         #sometimes insertions run off the end of the reference
@@ -225,7 +225,7 @@ def find_indels_substitutions_legacy(read_seq_al, ref_seq_al, _include_indx):
           continue
         ref_st = ref_positions[st-1]
         ref_en = ref_positions[en]
-        
+
         all_insertion_left_positions.append(ref_st)
         all_insertion_positions.append(ref_st)
         all_insertion_positions.append(ref_en)
@@ -234,9 +234,9 @@ def find_indels_substitutions_legacy(read_seq_al, ref_seq_al, _include_indx):
           insertion_positions.append(ref_st)
           insertion_positions.append(ref_en)
           insertion_sizes.append(en-st)
-    
+
     insertion_n = np.sum(insertion_sizes)
-    
+
     retDict = {
         'all_insertion_positions':all_insertion_positions,
         'all_insertion_left_positions':all_insertion_left_positions,
@@ -245,18 +245,18 @@ def find_indels_substitutions_legacy(read_seq_al, ref_seq_al, _include_indx):
         'insertion_sizes':insertion_sizes,
         'insertion_n':insertion_n,
         'all_deletion_positions':all_deletion_positions,
-        
+
         'deletion_positions':deletion_positions,
         'deletion_coordinates':deletion_coordinates,
         'deletion_sizes':deletion_sizes,
         'deletion_n':deletion_n,
-        
+
         'all_substitution_positions':all_substitution_positions,
         'substitution_positions':substitution_positions,
         'all_substitution_values':np.array(all_substitution_values),
         'substitution_values':np.array(substitution_values),
         'substitution_n':substitution_n,
-        
+
         'ref_positions':ref_positions,
     }
     return retDict
@@ -267,7 +267,7 @@ def calculate_homology(a, b):
     cdef char *bl = b
     cdef size_t l = strlen(al)
     cdef float score = 0.0
-    
+
     for i in range(l):
         if al[i] == bl[i]:
             score+=1
