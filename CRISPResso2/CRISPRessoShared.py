@@ -2167,7 +2167,7 @@ class TotalReadsGuardRail:
         """
         self.messageHandler = messageHandler
         self.minimum = minimum
-        self.message = " Low number of total reads: <{}".format(minimum)
+        self.message = " Low number of total reads: <{}.".format(minimum)
 
     def safety(self, total_reads):
         """Safety check, if total is below minimum send warnings
@@ -2178,6 +2178,7 @@ class TotalReadsGuardRail:
             The total reads, unaligned and aligned
         """
         if total_reads < self.minimum:
+            self.message = self.message + " Total reads: {}".format(total_reads)
             self.messageHandler.display_warning(self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2195,7 +2196,7 @@ class OverallReadsAlignedGuardRail:
             The float representation of percentage of minimum reads to be aligned
         """
         self.messageHandler = messageHandler
-        self.message = " <={val}% of reads were aligned".format(val=(cutoff * 100))
+        self.message = " <={val}% of reads were aligned.".format(val=(cutoff * 100))
         self.cutoff = cutoff
 
     def safety(self, total_reads, n_read_aligned):
@@ -2211,6 +2212,7 @@ class OverallReadsAlignedGuardRail:
         if total_reads == 0:
             return
         if (n_read_aligned/total_reads) <= self.cutoff:
+            self.message = self.message + " Total reads: {}, Aligned reads: {}".format(total_reads, n_read_aligned)
             self.messageHandler.display_warning(self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2244,7 +2246,7 @@ class LowReadsAlignedToAmpliconGuardRail:
         expected_per_amplicon = total_reads / len(reads_aln_amplicon.keys())
         for amplicon, aligned in reads_aln_amplicon.items():
             if aligned <= (expected_per_amplicon * self.cutoff):
-                amplicon_message = self.message + amplicon
+                amplicon_message = self.message + amplicon + ", Percent aligned: {}".format((aligned/total_reads) * 100)
                 self.messageHandler.display_warning(amplicon_message)
                 self.messageHandler.report_warning(amplicon_message)
 
@@ -2278,7 +2280,7 @@ class HighReadsAlignedToAlternateAmpliconGuardRail:
         expected_per_amplicon = total_reads / len(reads_aln_amplicon.keys())
         for amplicon, aligned in reads_aln_amplicon.items():
             if aligned >= (expected_per_amplicon * self.cutoff):
-                amplicon_message = self.message + amplicon
+                amplicon_message = self.message + amplicon + ", Percent aligned: {}".format((aligned/total_reads) * 100)
                 self.messageHandler.display_warning(amplicon_message)
                 self.messageHandler.report_warning(amplicon_message)
 
@@ -2296,7 +2298,7 @@ class LowRatioOfModsInWindowToOutGuardRail:
             The float representation of the maximum percentage of modifications outside of the quantification window
         """
         self.messageHandler = messageHandler
-        self.message = " <={}% of modifications were inside of the quantification window ".format(cutoff * 100)
+        self.message = " <={}% of modifications were inside of the quantification window.".format(cutoff * 100)
         self.cutoff = cutoff
 
     def safety(self, mods_in_window, mods_outside_window):
@@ -2313,6 +2315,7 @@ class LowRatioOfModsInWindowToOutGuardRail:
         if total_mods == 0:
             return
         if ((mods_in_window / total_mods) <= self.cutoff):
+            self.message = self.message + " Total modifications: {}, Modifications in window: {}, Modifications outside window: {}".format(total_mods, mods_in_window, mods_outside_window)
             self.messageHandler.display_warning(self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2330,7 +2333,7 @@ class HighRateOfModificationAtEndsGuardRail:
             The float representation of the maximum percentage reads that have modifications on either end
         """
         self.messageHandler = messageHandler
-        self.message = " >={}% of reads have modifications at the start or end. ".format(percentage_start_end * 100)
+        self.message = " >={}% of reads have modifications at the start or end.".format(percentage_start_end * 100)
         self.percent = percentage_start_end
 
     def safety(self, total_reads, irregular_reads):
@@ -2346,6 +2349,7 @@ class HighRateOfModificationAtEndsGuardRail:
         if total_reads == 0:
             return
         if (irregular_reads / total_reads) >= self.percent:
+            self.message = self.message + " Total reads: {}, Irregular reads: {}".format(total_reads, irregular_reads)
             self.messageHandler.display_warning(self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2363,7 +2367,7 @@ class HighRateOfSubstitutionsOutsideWindowGuardRail:
             The float representation of how many of the total substitutions can be outside of the quantification window
         """
         self.messageHandler = messageHandler
-        self.message = " >={}% of substitutions were outside of the quantification window. ".format(cutoff * 100)
+        self.message = " >={}% of substitutions were outside of the quantification window.".format(cutoff * 100)
         self.cutoff = cutoff
 
     def safety(self, global_subs, subs_outside_window):
@@ -2379,6 +2383,7 @@ class HighRateOfSubstitutionsOutsideWindowGuardRail:
         if global_subs == 0:
             return
         if ((subs_outside_window / global_subs) >= self.cutoff):
+            self.message = self.message + " Total substitutions: {}, Substitutions outside window: {}".format(global_subs, subs_outside_window)
             self.messageHandler.display_warning(self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2396,7 +2401,7 @@ class HighRateOfSubstitutionsGuardRail:
             The float representation of how many of the total modifications can be subsitutions
         """
         self.messageHandler = messageHandler
-        self.message = " >={}% of modifications were substitutions. This could potentially indicate poor sequencing quality. ".format(cutoff * 100)
+        self.message = " >={}% of modifications were substitutions. This could potentially indicate poor sequencing quality.".format(cutoff * 100)
         self.cutoff = cutoff
 
     def safety(self, mods_in_window, mods_outside_window, global_subs):
@@ -2415,6 +2420,7 @@ class HighRateOfSubstitutionsGuardRail:
         if total_mods == 0:
             return
         if ((global_subs / total_mods) >= self.cutoff):
+            self.message = self.message + " Total modifications: {}, Substitutions: {}".format(total_mods, global_subs)
             self.messageHandler.display_warning(self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2447,7 +2453,7 @@ class ShortSequenceGuardRail:
         """
         for name, length in sequences.items():
             if length < self.cutoff:
-                sequence_message = self.message + name
+                sequence_message = self.message + name + ", Length: {}".format(length)
                 self.messageHandler.display_warning(sequence_message)
                 self.messageHandler.report_warning(sequence_message)
 
@@ -2481,6 +2487,6 @@ class LongAmpliconShortReadsGuardRail:
         """
         for name, length in amplicons.items():
             if length > (read_len * self.cutoff):
-                sequence_message = self.message + name
+                sequence_message = self.message + name + ", Amplicon length: {}, Read length: {}".format(length, read_len)
                 self.messageHandler.display_warning(sequence_message)
                 self.messageHandler.report_warning(sequence_message)
