@@ -259,6 +259,14 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
         with open(line_plot_path, encoding="utf-8") as fh:
             allele_modification_line_plot['htmls'][line_plot_name] = fh.read()
 
+    summary_plot_htmls = {}
+    for plot_name in window_nuc_pct_quilts + nuc_pct_quilts:
+        with open(os.path.join(batch_folder, f'{plot_name}.json')) as window_nuc_pct_json_fh:
+            summary_plot_htmls[plot_name] = f"""
+        <div class="d-flex justify-content-between" style="max-height: 80vh; overflow-y: auto;" id="{plot_name}"></div>
+        <script type="text/javascript">const {plot_name} = {window_nuc_pct_json_fh.read().strip()}</script>
+        """
+
     #find path between the report and the data (if the report is in another directory vs in the same directory as the data)
     crispresso_data_path = os.path.relpath(batch_folder, os.path.dirname(crispressoBatch_report_file))
     if crispresso_data_path == ".":
@@ -302,6 +310,7 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
             'titles': summary_plot_titles,
             'labels': summary_plot_labels,
             'datas': summary_plot_datas,
+            'htmls': summary_plot_htmls,
         },
         window_nuc_pct_quilts=window_nuc_pct_quilts,
         nuc_pct_quilts=nuc_pct_quilts,
@@ -538,6 +547,7 @@ def make_multi_report(
             'titles': [],
             'labels': [],
             'datas': [],
+            'htmls': [],
         }
 
     for html in sub_html_files:
@@ -556,7 +566,7 @@ def make_multi_report(
                 'titles': summary_plots['titles'],
                 'labels': summary_plots['labels'],
                 'datas': summary_plots['datas'],
-                'htmls': [],
+                'htmls': summary_plots['htmls'],
                 'crispresso_data_path': crispresso_data_path,
             },
             run_names=run_names,
