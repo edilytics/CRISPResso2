@@ -338,7 +338,7 @@ def main():
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
         crispresso_options = CRISPRessoShared.get_crispresso_options()
-        options_to_ignore = {'fastq_r1', 'fastq_r2', 'amplicon_seq', 'amplicon_name', 'output_folder', 'name', 'zip_output'}
+        options_to_ignore = {'fastq_r1', 'fastq_r2', 'amplicon_seq', 'amplicon_name', 'output_folder', 'name', 'zip_output', 'split_interleaved_input'}
         crispresso_options_for_pooled = list(crispresso_options-options_to_ignore)
 
         files_to_remove = []
@@ -511,6 +511,15 @@ def main():
 
         info('Processing input', {'percent_complete': 5})
 
+        if args.split_interleaved_input:
+            info('Splitting paired end single fastq file into two files...')
+            args.fastq_r1, args.fastq_r2 = CRISPRessoShared.split_interleaved_fastq(
+                args.fastq_r1,
+                output_filename_r1=_jp('{0}_splitted_r1.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
+                output_filename_r2=_jp('{0}_splitted_r2.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
+            )
+            files_to_remove += [args.fastq_r1, args.fastq_r2]
+
         # perform read trimming if necessary
         if args.aligned_pooled_bam is not None:
             # don't trim reads in aligned bams
@@ -600,6 +609,8 @@ def main():
                 N_READS_AFTER_PREPROCESSING = N_READS_INPUT
             else:
                 N_READS_INPUT = get_n_reads_fastq(args.fastq_r1)
+                if args.split_interleaved_input:
+                    N_READS_INPUT /= 2
                 N_READS_AFTER_PREPROCESSING = get_n_reads_fastq(processed_output_filename)
 
             crispresso2_info['running_info']['finished_steps']['count_input_reads'] = (N_READS_INPUT, N_READS_AFTER_PREPROCESSING)

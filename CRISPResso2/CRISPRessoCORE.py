@@ -962,22 +962,6 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
     return(aln_stats)
 
 
-def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_r2):
-    if fastq_filename.endswith('.gz'):
-        fastq_handle = gzip.open(fastq_filename, 'rt')
-    else:
-        fastq_handle=open(fastq_filename)
-
-    try:
-        fastq_splitted_outfile_r1 = gzip.open(output_filename_r1, 'wt')
-        fastq_splitted_outfile_r2 = gzip.open(output_filename_r2, 'wt')
-        [fastq_splitted_outfile_r1.write(line) if (i % 8 < 4) else fastq_splitted_outfile_r2.write(line) for i, line in enumerate(fastq_handle)]
-    except:
-        raise CRISPRessoShared.BadParameterException('Error in splitting read pairs from a single file')
-
-    return output_filename_r1, output_filename_r2
-
-
 def normalize_name(name, fastq_r1, fastq_r2, bam_input):
     """Normalize the name according to the inputs and clean it.
 
@@ -1012,6 +996,27 @@ def normalize_name(name, fastq_r1, fastq_r2, bam_input):
         if name!= clean_name:
             warn('The specified name %s contained invalid characters and was changed to: %s' % (name, clean_name))
         return clean_name
+
+
+def to_numeric_ignore_columns(df, ignore_columns):
+    """Convert the columns of a dataframe to numeric, ignoring some columns.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The dataframe to convert.
+    ignore_columns : list or set
+        The columns to ignore, i.e. not convert to numeric.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The dataframe with the columns (except for ignore_columns) converted to numeric.
+    """
+    for col in df.columns:
+        if col not in ignore_columns:
+            df[col] = df[col].apply(pd.to_numeric, errors='raise')
+    return df
 
 
 def main():
@@ -2132,11 +2137,11 @@ def main():
                 raise CRISPRessoShared.BadParameterException('The option --split_interleaved_input is available only when a single fastq file is specified!')
             else:
                 info('Splitting paired end single fastq file into two files...')
-                args.fastq_r1, args.fastq_r2=split_interleaved_fastq(args.fastq_r1,
+                args.fastq_r1, args.fastq_r2 = CRISPRessoShared.split_interleaved_fastq(args.fastq_r1,
                     output_filename_r1=_jp(os.path.basename(args.fastq_r1.replace('.fastq', '')).replace('.gz', '')+'_splitted_r1.fastq.gz'),
                     output_filename_r2=_jp(os.path.basename(args.fastq_r1.replace('.fastq', '')).replace('.gz', '')+'_splitted_r2.fastq.gz'),)
-                files_to_remove+=[args.fastq_r1, args.fastq_r2]
-                N_READS_INPUT = N_READS_INPUT/2
+                files_to_remove += [args.fastq_r1, args.fastq_r2]
+                N_READS_INPUT /= 2
 
                 info('Done!', {'percent_complete': 4})
 
@@ -3569,7 +3574,7 @@ def main():
                     mod_pcts.append(np.concatenate((['All_modifications'], np.array(all_indelsub_count_vectors[ref_name]).astype(float)/tot)))
                     mod_pcts.append(np.concatenate((['Total'], [counts_total[ref_name]]*refs[ref_name]['sequence_length'])))
                     colnames = ['Modification']+list(ref_seq)
-                    modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames).apply(pd.to_numeric, errors='ignore')
+                    modification_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(mod_pcts, columns=colnames), {'Modification'})
 
                     nuc_df_for_plot = df_nuc_pct_all.reset_index().rename(columns={'index':'Nucleotide'})
                     nuc_df_for_plot.insert(0, 'Batch', ref_name) #this function was designed for plottin batch... so just add a column in there to make it happy
@@ -3962,7 +3967,7 @@ def main():
                         for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
                             nuc_pcts.append(np.concatenate(([ref_name_for_hdr, nuc], np.array(ref1_all_base_count_vectors[ref_name_for_hdr+"_"+nuc]).astype(float)/tot)))
                     colnames = ['Batch', 'Nucleotide']+list(refs[ref_names_for_hdr[0]]['sequence'])
-                    hdr_nucleotide_percentage_summary_df = pd.DataFrame(nuc_pcts, columns=colnames).apply(pd.to_numeric, errors='ignore')
+                    hdr_nucleotide_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(nuc_pcts, columns=colnames), {'Batch', 'Nucleotide'})
 
                     mod_pcts = []
                     for ref_name_for_hdr in ref_names_for_hdr:
@@ -3974,7 +3979,8 @@ def main():
                         mod_pcts.append(np.concatenate(([ref_name_for_hdr, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name_for_hdr]).astype(float)/tot)))
                         mod_pcts.append(np.concatenate(([ref_name_for_hdr, 'Total'], [counts_total[ref_name_for_hdr]]*refs[ref_names_for_hdr[0]]['sequence_length'])))
                     colnames = ['Batch', 'Modification']+list(refs[ref_names_for_hdr[0]]['sequence'])
-                    hdr_modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames).apply(pd.to_numeric, errors='ignore')
+                    hdr_modification_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(mod_pcts, columns=colnames), {'Batch', 'Modification'})
+
                     sgRNA_intervals = refs[ref_names_for_hdr[0]]['sgRNA_intervals']
                     sgRNA_names = refs[ref_names_for_hdr[0]]['sgRNA_names']
                     sgRNA_mismatches = refs[ref_names_for_hdr[0]]['sgRNA_mismatches']
@@ -4557,7 +4563,7 @@ def main():
                     for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
                         nuc_pcts.append(np.concatenate(([ref_name, nuc], np.array(ref1_all_base_count_vectors[ref_name+"_"+nuc]).astype(float)/tot)))
                 colnames = ['Batch', 'Nucleotide']+list(refs[ref_names[0]]['sequence'])
-                pe_nucleotide_percentage_summary_df = pd.DataFrame(nuc_pcts, columns=colnames).apply(pd.to_numeric,errors='ignore')
+                pe_nucleotide_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(nuc_pcts, columns=colnames), {'Batch', 'Nucleotide'})
 
                 mod_pcts = []
                 for ref_name in ref_names_for_pe:
@@ -4567,13 +4573,14 @@ def main():
                     mod_pcts.append(np.concatenate(([ref_name, 'Deletions'], np.array(ref1_all_deletion_count_vectors[ref_name]).astype(float)/tot)))
                     mod_pcts.append(np.concatenate(([ref_name, 'Substitutions'], np.array(ref1_all_substitution_count_vectors[ref_name]).astype(float)/tot)))
                     mod_pcts.append(np.concatenate(([ref_name, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name]).astype(float)/tot)))
-                    mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]]*refs[ref_names_for_pe[0]]['sequence_length'])))
-                colnames = ['Batch', 'Modification']+list(refs[ref_names_for_pe[0]]['sequence'])
-                pe_modification_percentage_summary_df = pd.DataFrame(mod_pcts, columns=colnames).apply(pd.to_numeric,errors='ignore')
-                sgRNA_intervals = refs[ref_names_for_pe[0]]['sgRNA_intervals']
-                sgRNA_names = refs[ref_names_for_pe[0]]['sgRNA_names']
-                sgRNA_mismatches = refs[ref_names_for_pe[0]]['sgRNA_mismatches']
-                include_idxs_list = refs[ref_names_for_pe[0]]['include_idxs']
+                    mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]]*refs[ref_names[0]]['sequence_length'])))
+                colnames = ['Batch', 'Modification']+list(refs[ref_names[0]]['sequence'])
+                pe_modification_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(mod_pcts, columns=colnames), {'Batch', 'Modification'})
+
+                sgRNA_intervals = refs[ref_names[0]]['sgRNA_intervals']
+                sgRNA_names = refs[ref_names[0]]['sgRNA_names']
+                sgRNA_mismatches = refs[ref_names[0]]['sgRNA_mismatches']
+                include_idxs_list = refs[ref_names[0]]['include_idxs']
 
                 plot_root = _jp('11a.Prime_editing_nucleotide_percentage_quilt')
                 plot_11a_input = {
@@ -4589,24 +4596,24 @@ def main():
                 }
                 info('Plotting prime editing nucleotide percentage quilt', {'percent_complete': 96})
                 plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11a_input)
-                crispresso2_info['results']['refs'][ref_names_for_pe[0]]['plot_11a_root'] = os.path.basename(plot_root)
-                crispresso2_info['results']['refs'][ref_names_for_pe[0]]['plot_11a_caption'] = "Figure 11a: Nucleotide distribution across all amplicons. At each base in the reference amplicon, the percentage of each base as observed in sequencing reads is shown (A = green; C = orange; G = yellow; T = purple). Black bars show the percentage of reads for which that base was deleted. Brown bars between bases show the percentage of reads having an insertion at that position."
-                crispresso2_info['results']['refs'][ref_names_for_pe[0]]['plot_11a_data'] = [('Nucleotide frequency table for ' + ref_name, os.path.basename(crispresso2_info['results']['refs'][ref_name]['nuc_freq_filename'])) for ref_name in ref_names_for_pe]
+                crispresso2_info['results']['refs'][ref_names[0]]['plot_11a_root'] = os.path.basename(plot_root)
+                crispresso2_info['results']['refs'][ref_names[0]]['plot_11a_caption'] = "Figure 11a: Nucleotide distribution across all amplicons. At each base in the reference amplicon, the percentage of each base as observed in sequencing reads is shown (A = green; C = orange; G = yellow; T = purple). Black bars show the percentage of reads for which that base was deleted. Brown bars between bases show the percentage of reads having an insertion at that position."
+                crispresso2_info['results']['refs'][ref_names[0]]['plot_11a_data'] = [('Nucleotide frequency table for ' + ref_name, os.path.basename(crispresso2_info['results']['refs'][ref_name]['nuc_freq_filename'])) for ref_name in ref_names_for_pe]
 
-                crispresso2_info['results']['refs'][ref_names_for_pe[0]]['plot_11b_roots'] = []
-                crispresso2_info['results']['refs'][ref_names_for_pe[0]]['plot_11b_captions'] = []
-                crispresso2_info['results']['refs'][ref_names_for_pe[0]]['plot_11b_datas'] = []
+                crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_roots'] = []
+                crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_captions'] = []
+                crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_datas'] = []
 
-                pe_sgRNA_sequences = refs[ref_names_for_pe[0]]['sgRNA_sequences']
-                pe_sgRNA_orig_sequences = refs[ref_names_for_pe[0]]['sgRNA_orig_sequences']
-                pe_sgRNA_cut_points = refs[ref_names_for_pe[0]]['sgRNA_cut_points']
-                pe_sgRNA_plot_cut_points = refs[ref_names_for_pe[0]]['sgRNA_plot_cut_points']
-                pe_sgRNA_intervals = refs[ref_names_for_pe[0]]['sgRNA_intervals']
-                pe_sgRNA_names = refs[ref_names_for_pe[0]]['sgRNA_names']
-                pe_sgRNA_plot_idxs = refs[ref_names_for_pe[0]]['sgRNA_plot_idxs']
-                pe_sgRNA_mismatches = refs[ref_names_for_pe[0]]['sgRNA_mismatches']
-                pe_ref_len = refs[ref_names_for_pe[0]]['sequence_length']
-                pe_include_idxs_list = refs[ref_names_for_pe[0]]['include_idxs']
+                pe_sgRNA_sequences = refs[ref_names[0]]['sgRNA_sequences']
+                pe_sgRNA_orig_sequences = refs[ref_names[0]]['sgRNA_orig_sequences']
+                pe_sgRNA_cut_points = refs[ref_names[0]]['sgRNA_cut_points']
+                pe_sgRNA_plot_cut_points = refs[ref_names[0]]['sgRNA_plot_cut_points']
+                pe_sgRNA_intervals = refs[ref_names[0]]['sgRNA_intervals']
+                pe_sgRNA_names = refs[ref_names[0]]['sgRNA_names']
+                pe_sgRNA_plot_idxs = refs[ref_names[0]]['sgRNA_plot_idxs']
+                pe_sgRNA_mismatches = refs[ref_names[0]]['sgRNA_mismatches']
+                pe_ref_len = refs[ref_names[0]]['sequence_length']
+                pe_include_idxs_list = refs[ref_names[0]]['include_idxs']
 
                 for i in range(len(pe_sgRNA_cut_points)):
                     cut_point = pe_sgRNA_cut_points[i]
@@ -4629,7 +4636,7 @@ def main():
                     #get new intervals
                     new_sgRNA_intervals = []
                     #add annotations for each sgRNA (to be plotted on this sgRNA's plot)
-                    for (int_start, int_end) in refs[ref_names_for_pe[0]]['sgRNA_intervals']:
+                    for (int_start, int_end) in refs[ref_names[0]]['sgRNA_intervals']:
                         new_sgRNA_intervals += [(int_start - new_sel_cols_start, int_end - new_sel_cols_start)]
                     new_include_idx = []
                     for x in pe_include_idxs_list:
@@ -4648,9 +4655,9 @@ def main():
                     }
                     info('Plotting nucleotide quilt', {'percent_complete': 97})
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11b_input)
-                    crispresso2_info['results']['refs'][ref_names_for_pe[0]]['plot_11b_roots'].append(os.path.basename(plot_root))
-                    crispresso2_info['results']['refs'][ref_names_for_pe[0]]['plot_11b_captions'].append('Figure 11b: Nucleotide distribution around the ' + sgRNA_legend + '.')
-                    crispresso2_info['results']['refs'][ref_names_for_pe[0]]['plot_11b_datas'].append([('Nucleotide frequency in quantification window for ' + ref_name, os.path.basename(crispresso2_info['results']['refs'][ref_name]['quant_window_nuc_freq_filename'])) for ref_name in ref_names_for_pe])
+                    crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_roots'].append(os.path.basename(plot_root))
+                    crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_captions'].append('Figure 11b: Nucleotide distribution around the ' + sgRNA_legend + '.')
+                    crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_datas'].append([('Nucleotide frequency in quantification window for ' + ref_name, os.path.basename(crispresso2_info['results']['refs'][ref_name]['quant_window_nuc_freq_filename'])) for ref_name in ref_names_for_pe])
 
                 if args.prime_editing_pegRNA_scaffold_seq != "" and df_scaffold_insertion_sizes.shape[0] > 0 and df_scaffold_insertion_sizes['Num_match_scaffold'].max() > 0 and df_scaffold_insertion_sizes['Num_gaps'].max() > 0:
                     plot_root = _jp('11c.Prime_editing_scaffold_insertion_sizes')
