@@ -15,7 +15,10 @@ import matplotlib.cm as cm
 import matplotlib.gridspec as gridspec
 import plotly.express as px
 import plotly.io as pio
-pio.kaleido.scope.chromium_args += ('--single-process',)
+try:
+    pio.kaleido.scope.chromium_args += ('--single-process',)
+except:
+    pass
 from collections import defaultdict
 from copy import deepcopy
 import re
