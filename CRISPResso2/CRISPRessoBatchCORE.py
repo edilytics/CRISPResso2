@@ -393,6 +393,8 @@ def main():
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_labels'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_datas'] = {}
 
+        large_plot_cutoff = 300
+
         percent_complete_start, percent_complete_end = 90, 99
         percent_complete_step = (percent_complete_end - percent_complete_start) / len(all_amplicons)
         # report for amplicons
@@ -573,7 +575,7 @@ def main():
                         sub_modification_percentage_summary_filename = _jp(amplicon_plot_name + 'Modification_percentage_summary_around_sgRNA_'+sgRNA+'.txt')
                         sub_modification_percentage_summary_df.to_csv(sub_modification_percentage_summary_filename, sep='\t', index=None)
 
-                        if not args.suppress_plots and not args.suppress_batch_summary_plots:
+                        if not args.suppress_plots and not args.suppress_batch_summary_plots and (nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
                             # plot for each guide
                             # show all sgRNA's on the plot
                             sub_sgRNA_intervals = []
@@ -604,7 +606,7 @@ def main():
                             nucleotide_quilt_input = {
                                 'nuc_pct_df': sub_nucleotide_percentage_summary_df,
                                 'mod_pct_df': sub_modification_percentage_summary_df,
-                                'fig_filename_root': this_window_nuc_pct_quilt_plot_name,
+                                'fig_filename_root': f'{this_window_nuc_pct_quilt_plot_name}.json',
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': sub_sgRNA_intervals,
                                 'quantification_window_idxs': include_idxs,
@@ -612,9 +614,13 @@ def main():
                             }
                             debug('Plotting nucleotide percentage quilt for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
                             plot(
-                                CRISPRessoPlot.plot_nucleotide_quilt,
+                                CRISPRessoPlot.plot_nucleotide_quilt_d3,
                                 nucleotide_quilt_input,
                             )
+                            # plot(
+                            #     CRISPRessoPlot.plot_nucleotide_quilt,
+                            #     nucleotide_quilt_input,
+                            # )
                             plot_name = os.path.basename(this_window_nuc_pct_quilt_plot_name)
                             window_nuc_pct_quilt_plot_names.append(plot_name)
                             crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'sgRNA: ' + sgRNA + ' Amplicon: ' + amplicon_name
@@ -623,7 +629,7 @@ def main():
                             crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base around the guide ' + sgRNA + ' for the amplicon ' + amplicon_name
                             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
 
-                            if args.base_editor_output:
+                            if args.base_editor_output and (sub_nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
                                 this_window_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_conversion_map_around_sgRNA_'+sgRNA)
                                 conversion_map_input = {
                                     'nuc_pct_df': sub_nucleotide_percentage_summary_df,
@@ -656,7 +662,7 @@ def main():
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
                             'mod_pct_df': modification_percentage_summary_df,
-                            'fig_filename_root': this_nuc_pct_quilt_plot_name,
+                            'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json',
                             'save_also_png': save_png,
                             'sgRNA_intervals': consensus_sgRNA_intervals,
                             'quantification_window_idxs': include_idxs,
@@ -664,9 +670,13 @@ def main():
                         }
                         debug('Plotting nucleotide quilt for {0}'.format(amplicon_name))
                         plot(
-                            CRISPRessoPlot.plot_nucleotide_quilt,
-                            nucleotide_quilt_input,
-                        )
+                                CRISPRessoPlot.plot_nucleotide_quilt_d3,
+                                nucleotide_quilt_input,
+                            )
+                        # plot(
+                        #     CRISPRessoPlot.plot_nucleotide_quilt,
+                        #     nucleotide_quilt_input,
+                        # )
                         plot_name = os.path.basename(this_nuc_pct_quilt_plot_name)
                         nuc_pct_quilt_plot_names.append(plot_name)
                         crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'Amplicon: ' + amplicon_name
@@ -674,7 +684,7 @@ def main():
                             crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = ''
                         crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base for the amplicon ' + amplicon_name
                         crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
-                        if args.base_editor_output:
+                        if args.base_editor_output and (sub_nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
                             this_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_conversion_map')
                             conversion_map_input = {
                                 'nuc_pct_df': nucleotide_percentage_summary_df,
@@ -706,20 +716,24 @@ def main():
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
                             'mod_pct_df': modification_percentage_summary_df,
-                            'fig_filename_root': this_nuc_pct_quilt_plot_name,
+                            'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json',
                             'save_also_png': save_png,
                             'custom_colors': config['colors'],
                         }
                         debug('Plotting nucleotide quilt for {0}'.format(amplicon_name))
                         plot(
-                            CRISPRessoPlot.plot_nucleotide_quilt,
-                            nucleotide_quilt_input,
-                        )
+                                CRISPRessoPlot.plot_nucleotide_quilt_d3,
+                                nucleotide_quilt_input,
+                            )
+                        # plot(
+                        #     CRISPRessoPlot.plot_nucleotide_quilt,
+                        #     nucleotide_quilt_input,
+                        # )
                         plot_name = os.path.basename(this_nuc_pct_quilt_plot_name)
                         nuc_pct_quilt_plot_names.append(plot_name)
                         crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base for the amplicon ' + amplicon_name
                         crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
-                        if args.base_editor_output:
+                        if args.base_editor_output and (sub_nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
                             this_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_percentage_quilt')
                             conversion_map_input = {
                                 'nuc_pct_df': nucleotide_percentage_summary_df,
@@ -740,7 +754,7 @@ def main():
                             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
 
                 # allele modification frequency heatmap and line plots
-                if not args.suppress_plots and not args.suppress_batch_summary_plots:
+                if not args.suppress_plots and not args.suppress_batch_summary_plots and (nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
                     if guides_all_same:
                         sgRNA_intervals = [consensus_sgRNA_intervals] * modification_frequency_summary_df.shape[0]
                     else:

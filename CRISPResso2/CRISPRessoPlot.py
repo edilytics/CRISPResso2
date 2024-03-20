@@ -8,6 +8,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib
+import json
 matplotlib.use('AGG')
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -320,6 +321,72 @@ def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root, custom_colors
     if save_also_png:
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
+
+
+def plot_nucleotide_quilt_d3(
+    nuc_pct_df,
+    mod_pct_df,
+    fig_filename_root,
+    custom_colors,
+    save_also_png=False,
+    sgRNA_intervals=None,
+    min_plot_pct=0.01,
+    min_text_pct=0.5,
+    max_text_pct=0.95,
+    quantification_window_idxs=None,
+    sgRNA_names=None,
+    sgRNA_mismatches=None,
+    shade_unchanged=True,
+    group_column='Batch',
+):
+    """
+    Plots a nucleotide quilt with each square showing the percentage of each base at that position in the reference
+    nuc_pct_df: dataframe with percents of each base (ACTGN-) at each position
+    mod_pct_df: dataframe with percents of modifications at each position (this function uses 'Insertions_Left' to plot insertions)
+    fig_filename_root: filename root (will add .pdf or .png)
+    save_also_png: whether png should also be saved
+    sgRNA_intervals: ranges for sgRNA annotation on plot
+    sgRNA_names: names to annotate sgRNAs with (if None, will just label left sgRNA with 'sgRNA')
+    sgRNA_mismatches: locations in the sgRNA where there are mismatches from an original guide (flexiguides)
+    quantification_window_idxs: indices for quantification window annotation on plot
+    min_plot_pct: minimum percentage to plot a modification, less than this and it isn't plotted
+    min_text_pct: add text annotation if the percent is greater than this number
+    max_text_pct: add text annotation if the percent is less than this number
+    shade_unchanged: if true, unchanged/reference nucleotides will be shaded (only changes with regard to reference will be dark)
+    group_column: If multiple samples are given, they are grouped by this column
+    """
+    def filter_low_pcts(d):
+        return {k: v for k, v in d.items() if v > min_plot_pct}
+
+    min_plot_pct = 0.01
+    plot_data = {}
+    plot_data['reference'] = ''.join(nuc_pct_df.columns.drop(['Batch', 'Nucleotide']))
+    plot_data['batches'] = []
+    for batch_name in nuc_pct_df['Batch'].unique():
+        batch_nuc_pct_df = nuc_pct_df.loc[nuc_pct_df['Batch'] == batch_name].drop(['Batch'], axis=1)
+        batch_nuc_pct_df.set_index('Nucleotide', inplace=True)
+        batch_nuc_pct_df = pd.concat([batch_nuc_pct_df, batch_nuc_pct_df.columns.to_frame().T])
+        batch_nuc_pct_df.columns = range(len(batch_nuc_pct_df.columns))
+        batch_nuc_pct_df.rename(index={0: 'Reference'}, inplace=True)
+        batch_mod_pct_df = mod_pct_df.loc[(mod_pct_df['Batch'] == batch_name) & (mod_pct_df['Modification'] == 'Insertions_Left')].reset_index(drop=True).drop(['Batch', 'Modification'], axis=1).reset_index(drop=True)
+        batch_mod_pct_df.columns = range(len(batch_mod_pct_df.columns))
+        batch_nuc_pct_df = pd.concat([batch_nuc_pct_df, batch_mod_pct_df])
+        batch_nuc_pct_df.rename(index={0: 'Insertions'}, inplace=True)
+        batch_nuc_pct_df.drop('Reference', inplace=True)
+        plot_data['batches'] += [{
+            'name': batch_name,
+            'nuc_pct': list(map(filter_low_pcts, batch_nuc_pct_df.to_dict().values())),
+        }]
+
+    if sgRNA_intervals is not None:
+        sgRNA_rows = get_rows_for_sgRNA_annotation(sgRNA_intervals, len(plot_data['reference']))
+        plot_data['sgRNAs'] = [
+            {'interval': interval, 'row': row}
+            for interval, row in zip(sgRNA_intervals, sgRNA_rows)
+        ]
+    plot_data['quantification_windows'] = quantification_window_idxs
+    with open(fig_filename_root, 'w') as fig_fh:
+        json.dump(plot_data, fig_fh, cls=CRISPRessoShared.CRISPRessoJSONEncoder)
 
 
 def plot_indel_size_distribution(
