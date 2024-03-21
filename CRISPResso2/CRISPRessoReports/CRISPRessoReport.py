@@ -268,11 +268,12 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
 
     summary_plot_htmls = {}
     for plot_name in window_nuc_pct_quilts + nuc_pct_quilts:
-        with open(os.path.join(batch_folder, f'{plot_name}.json')) as window_nuc_pct_json_fh:
-            summary_plot_htmls[plot_name] = f"""
-        <div class="d-flex justify-content-between" style="max-height: 80vh; overflow-y: auto;" id="{plot_name}"></div>
-        <script type="text/javascript">const {plot_name} = {window_nuc_pct_json_fh.read().strip()}</script>
-        """
+        if os.path.exists(os.path.join(batch_folder, f'{plot_name}.json')):
+            with open(os.path.join(batch_folder, f'{plot_name}.json')) as window_nuc_pct_json_fh:
+                summary_plot_htmls[plot_name] = f"""
+            <div class="d-flex justify-content-between" style="max-height: 80vh; overflow-y: auto;" id="{plot_name}"></div>
+            <script type="text/javascript">const {plot_name} = {window_nuc_pct_json_fh.read().strip()}</script>
+            """
 
     #find path between the report and the data (if the report is in another directory vs in the same directory as the data)
     crispresso_data_path = os.path.relpath(batch_folder, os.path.dirname(crispressoBatch_report_file))
@@ -325,6 +326,7 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
         nuc_conv_plots=nuc_conv_plots,
         allele_modification_heatmap_plot=allele_modification_heatmap_plot,
         allele_modification_line_plot=allele_modification_line_plot,
+        pro_installed=pro_installed,
     )
 
 
@@ -507,7 +509,7 @@ def make_multi_report(
             dictionary[key] = default_type()
 
     j2_env = Environment(
-        loader=FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')),
+        loader=FileSystemLoader([os.path.join(_ROOT, 'CRISPRessoReports', 'templates'), os.path.join(_ROOT, "CRISPRessoPro", "templates")]),
     )
     j2_env.filters['dirname'] = dirname
     if crispresso_tool == 'batch':
