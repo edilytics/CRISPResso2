@@ -566,7 +566,7 @@ def make_multi_report(
                 'titles': summary_plots['titles'],
                 'labels': summary_plots['labels'],
                 'datas': summary_plots['datas'],
-                'htmls': summary_plots['htmls'],
+                'htmls': summary_plots['htmls'] if 'htmls' in summary_plots else [],
                 'crispresso_data_path': crispresso_data_path,
             },
             run_names=run_names,
