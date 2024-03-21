@@ -14,7 +14,10 @@ import re
 import traceback
 from datetime import datetime
 from CRISPResso2 import CRISPRessoShared
-from CRISPResso2 import CRISPRessoPlot
+try:
+    from CRISPRessoPro import plot as CRISPRessoPlot
+except:
+    from CRISPResso2 import CRISPRessoPlot
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
@@ -91,7 +94,7 @@ def main():
         crispresso_options_for_batch = list(crispresso_options-options_to_ignore)
 
         CRISPRessoShared.check_file(args.batch_settings)
-        config = CRISPRessoShared.check_custom_config(args)
+        custom_config = CRISPRessoShared.check_custom_config(args)
 
         if args.zip_output and not args.place_report_in_output_folder:
             warn('Invalid arguement combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True.')
@@ -610,7 +613,7 @@ def main():
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': sub_sgRNA_intervals,
                                 'quantification_window_idxs': include_idxs,
-                                'custom_colors': config['colors'],
+                                'custom_colors': custom_config['colors'],
                             }
                             debug('Plotting nucleotide percentage quilt for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
                             plot(
@@ -635,7 +638,7 @@ def main():
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': sub_sgRNA_intervals,
                                     'quantification_window_idxs': include_idxs,
-                                    'custom_colors': config['colors']
+                                    'custom_colors': custom_config['colors']
                                 }
                                 debug('Plotting nucleotide conversion map for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
                                 plot(
@@ -662,7 +665,7 @@ def main():
                             'save_also_png': save_png,
                             'sgRNA_intervals': consensus_sgRNA_intervals,
                             'quantification_window_idxs': include_idxs,
-                            'custom_colors': config['colors'],
+                            'custom_colors': custom_config['colors'],
                         }
                         debug('Plotting nucleotide quilt for {0}'.format(amplicon_name))
                         plot(
@@ -686,7 +689,7 @@ def main():
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': consensus_sgRNA_intervals,
                                 'quantification_window_idxs': include_idxs,
-                                'custom_colors': config['colors']
+                                'custom_colors': custom_config['colors']
                             }
                             debug('Plotting nucleotide conversion map for {0}'.format(amplicon_name))
                             plot(
@@ -710,7 +713,7 @@ def main():
                             'mod_pct_df': modification_percentage_summary_df,
                             'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json',
                             'save_also_png': save_png,
-                            'custom_colors': config['colors'],
+                            'custom_colors': custom_config['colors'],
                         }
                         debug('Plotting nucleotide quilt for {0}'.format(amplicon_name))
                         plot(
@@ -733,7 +736,7 @@ def main():
                                 'conversion_nuc_from': args.conversion_nuc_from,
                                 'conversion_nuc_to': args.conversion_nuc_to,
                                 'save_also_png': save_png,
-                                'custom_colors': config['colors']
+                                'custom_colors': custom_config['colors']
                             }
                             debug('Plotting BE nucleotide conversion map for {0}'.format(amplicon_name))
                             plot(

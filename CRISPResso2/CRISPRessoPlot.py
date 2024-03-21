@@ -15,6 +15,11 @@ import matplotlib.patches as patches
 import matplotlib.cm as cm
 import matplotlib.gridspec as gridspec
 import plotly.express as px
+import plotly.io as pio
+try:
+    pio.kaleido.scope.chromium_args += ('--single-process',)
+except:
+    pass
 from collections import defaultdict
 from copy import deepcopy
 import re
@@ -96,7 +101,7 @@ def hex_to_rgb(value):
     lv = len(value)
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
 
-def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root, custom_colors, save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True,group_column='Batch'):
+def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root, custom_colors, save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True,group_column='Batch', **kwargs):
     """
     Plots a nucleotide quilt with each square showing the percentage of each base at that position in the reference
     nuc_pct_df: dataframe with percents of each base (ACTGN-) at each position
@@ -397,6 +402,7 @@ def plot_indel_size_distribution(
     title,
     plot_root,
     save_also_png=False,
+    **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
     densityPct_0 = 0.0
@@ -447,6 +453,8 @@ def plot_frequency_deletions_insertions(
     xmax_ins,
     xmax_mut,
     save_also_png=False,
+    custom_colors=None,
+    **kwargs,
 ):
     y_values_mut = ref['y_values_mut']
     x_bins_mut = ref['x_bins_mut']
@@ -582,6 +590,7 @@ def plot_amplicon_modifications(
     plot_root,
     custom_colors,
     save_also_png=False,
+    **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -734,6 +743,7 @@ def plot_modification_frequency(
     plot_root,
     custom_colors,
     save_also_png=False,
+    **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -903,6 +913,7 @@ def plot_quantification_window_locations(
     plot_root,
     custom_colors,
     save_also_png,
+    **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
 
@@ -1070,6 +1081,7 @@ def plot_position_dependent_indels(
     plot_titles,
     plot_root,
     save_also_png,
+    **kwargs,
 ):
     fig, ax = plt.subplots(1, 2, figsize=(24, 10))
     ax1 = ax[0]
@@ -1175,6 +1187,7 @@ def plot_global_modifications_reference(
     plot_root,
     custom_colors,
     save_also_png=False,
+    **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
     ref1_all_insertion_positions = ref1_all_insertion_count_vectors
@@ -1333,6 +1346,7 @@ def plot_frameshift_analysis(
     ref_name,
     plot_root,
     save_also_png=False,
+    **kwargs,
 ):
     """Plot 5: Plot a pie chart to plot_root showing classification of reads with regard to coding region for a specific reference sequence, also including a diagram of where the coding region is within the amplicon.
 
@@ -1481,6 +1495,7 @@ def plot_frameshift_frequency(
     plot_titles,
     plot_root,
     save_also_png=False,
+    **kwargs,
 ):
     fig, ax = plt.subplots(1, 2, figsize=(22, 10))
     ax1 = ax[0]
@@ -1576,6 +1591,7 @@ def plot_global_frameshift_analysis(
     global_non_modified_non_frameshift,
     plot_root,
     save_also_png=False,
+    **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(12, 12))
 
@@ -1612,6 +1628,7 @@ def plot_global_frameshift_in_frame_mutations(
     global_hists_inframe,
     plot_root,
     save_also_png=False,
+    **kwargs,
 ):
     fig, axs = plt.subplots(2, 1, figsize=(22, 10))
     ax1 = axs[0]
@@ -1708,6 +1725,7 @@ def plot_impact_on_splice_sites(
     global_count_total,
     plot_root,
     save_also_png=False,
+    **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(12, 12))
     patches, texts, autotexts = ax.pie(
@@ -1747,6 +1765,7 @@ def plot_non_coding_mutations(
     plot_root,
     custom_colors,
     save_also_png=False,
+    **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(10, 10))
     ax.plot(
@@ -1887,6 +1906,7 @@ def plot_potential_splice_sites(
     count_total,
     plot_root,
     save_also_png=False,
+    **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(12, 12))
     patches, texts, autotexts = ax.pie(
@@ -1917,6 +1937,7 @@ def plot_scaffold_indel_lengths(
     df_scaffold_insertion_sizes,
     plot_root,
     save_also_png=False,
+    **kwargs,
 ):
     colors = ['b', 'g']
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -2061,7 +2082,7 @@ def add_sgRNA_to_ax(ax,sgRNA_intervals,sgRNA_y_start,sgRNA_y_height,amp_len,x_of
         else:
             ax.text(x_offset+min_sgRNA_x, this_sgRNA_y_start + this_sgRNA_y_height/2, 'sgRNA ', horizontalalignment='right', verticalalignment='center', fontsize=font_size)
 
-def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,conversion_nuc_to,save_also_png,custom_colors,plotPct = 0.9,min_text_pct=0.3,max_text_pct=0.9,conversion_scale_max=None,sgRNA_intervals=None,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None):
+def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,conversion_nuc_to,save_also_png,custom_colors,plotPct = 0.9,min_text_pct=0.3,max_text_pct=0.9,conversion_scale_max=None,sgRNA_intervals=None,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,**kwargs):
     """
     Plots a heatmap of conversion across several sequences
     :param nuc_pct_df combined df of multiple batches
@@ -2233,7 +2254,7 @@ def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,convers
     plt.close(fig)
 
 
-def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution_base_vectors, plot_title, fig_filename_root, save_also_png, custom_colors, quantification_window_idxs=None):
+def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution_base_vectors, plot_title, fig_filename_root, save_also_png, custom_colors, quantification_window_idxs=None,**kwargs):
     """
     Plots substitutions across the reference sequece - each position on the x axis reprsents a nucleotide in the reference
     bars at each x posion show the number of times the reference nucleotide was substituted for another reference
@@ -2298,7 +2319,7 @@ def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution
         fig.savefig(fig_filename_root + '.png', bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.close(fig)
 
-def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png, custom_colors):
+def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png, custom_colors,**kwargs):
     """
     Plots histogram of substitution frequencies for each nucleotide (from nuc X to nuc Y)
     input:
@@ -2328,7 +2349,7 @@ def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png,
         fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
-def plot_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root, save_also_png):
+def plot_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root, save_also_png,**kwargs):
     """
     Plots a heatmap of the percentage of reads that had each nucletide at each base in the reference
     Positions in the reference that have more than one allele can be spotted using this plot
@@ -2344,7 +2365,7 @@ def plot_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root, sa
         plt.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close()
 
-def plot_log_nuc_freqs(df_nuc_freq,tot_aln_reads,plot_title,fig_filename_root,save_also_png,quantification_window_idxs=None):
+def plot_log_nuc_freqs(df_nuc_freq,tot_aln_reads,plot_title,fig_filename_root,save_also_png,quantification_window_idxs=None,**kwargs):
     """
     Plots a heatmap of the percentage of reads that had each nucletide at each base in the reference
     Positions in the reference that have more than one allele can be spotted using this plot
@@ -2382,7 +2403,7 @@ def plot_log_nuc_freqs(df_nuc_freq,tot_aln_reads,plot_title,fig_filename_root,sa
     plt.close(fig)
 
 
-def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors):
+def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors,**kwargs):
     '''
     Plots the conversion at selected nucleotides
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'
@@ -2444,7 +2465,7 @@ def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, con
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
-def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors):
+def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors, **text_kwargs):
     '''
     Plots the conversion at selected nucleotides but ignores non-substitutions (for example at nucs that are 'C' in the reference, bars show the proportion of A T G (not C))
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'
@@ -2516,7 +2537,7 @@ def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence,
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
-def plot_conversion_at_sel_nucs_not_include_ref_scaled(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors):
+def plot_conversion_at_sel_nucs_not_include_ref_scaled(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors, **kwargs):
     '''
     Plots the conversion at selected nucleotides not including reference base, scaled by number of events
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'
@@ -2786,7 +2807,7 @@ def prep_alleles_table_compare(df_alleles, sample_name_1, sample_name_2, MAX_N_R
 
     return X, annot, y_labels, insertion_dict, per_element_annot_kws
 
-def plot_alleles_heatmap(reference_seq,fig_filename_root,X,annot,y_labels,insertion_dict,per_element_annot_kws,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None):
+def plot_alleles_heatmap(reference_seq,fig_filename_root,X,annot,y_labels,insertion_dict,per_element_annot_kws,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,**kwargs):
     """
     Plots alleles in a heatmap (nucleotides color-coded for easy visualization)
     input:
@@ -2955,7 +2976,7 @@ def plot_alleles_heatmap(reference_seq,fig_filename_root,X,annot,y_labels,insert
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', bbox_extra_artists=(lgd,))
     plt.close(fig)
 
-def plot_alleles_heatmap_hist(reference_seq,fig_filename_root,X,annot,y_labels,insertion_dict,per_element_annot_kws,count_values,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None):
+def plot_alleles_heatmap_hist(reference_seq,fig_filename_root,X,annot,y_labels,insertion_dict,per_element_annot_kws,count_values,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,**kwargs):
     """
     Plots alleles in a heatmap (nucleotides color-coded for easy visualization)
     input:
@@ -3090,7 +3111,7 @@ def plot_alleles_heatmap_hist(reference_seq,fig_filename_root,X,annot,y_labels,i
         plt.savefig(fig_filename_root+'.png', bbox_inches='tight', bbox_extra_artists=(lgd,), pad_inches=0.1)
     plt.close()
 
-def plot_alleles_table(reference_seq,df_alleles,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,annotate_wildtype_allele='****'):
+def plot_alleles_table(reference_seq,df_alleles,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,annotate_wildtype_allele='****',**kwargs):
     """
     plots an allele table for a dataframe with allele frequencies
     input:
@@ -3114,7 +3135,7 @@ def plot_alleles_table(reference_seq,df_alleles,fig_filename_root,MIN_FREQUENCY=
                 y_labels[ix] += annotate_wildtype_allele
     plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, custom_colors)
 
-def plot_alleles_table_from_file(alleles_file_name,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,annotate_wildtype_allele=''):
+def plot_alleles_table_from_file(alleles_file_name,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,annotate_wildtype_allele='',**kwargs):
     """
     plots an allele table for a dataframe with allele frequencies
     infers the reference sequence by finding reference sequences without gaps (-)
@@ -3150,7 +3171,7 @@ def plot_alleles_table_from_file(alleles_file_name,fig_filename_root,MIN_FREQUEN
                 y_labels[ix] += annotate_wildtype_allele
     plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, custom_colors)
 
-def plot_alleles_tables_from_folder(crispresso_output_folder,fig_filename_root,MIN_FREQUENCY=None,MAX_N_ROWS=None,SAVE_ALSO_PNG=False,custom_colors=None,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None):
+def plot_alleles_tables_from_folder(crispresso_output_folder,fig_filename_root,MIN_FREQUENCY=None,MAX_N_ROWS=None,SAVE_ALSO_PNG=False,custom_colors=None,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,**kwargs):
     """
     plots an allele table for each sgRNA/amplicon in a CRISPresso run (useful for plotting after running using the plot harness)
     This function is only used for one-off plotting purposes and not for the general CRISPResso analysis
@@ -3221,7 +3242,7 @@ def plot_alleles_tables_from_folder(crispresso_output_folder,fig_filename_root,M
             plot_count += 1
     print('Plotted ' + str(plot_count) + ' plots')
 
-def plot_alleles_table_compare(reference_seq,df_alleles,sample_name_1,sample_name_2,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None):
+def plot_alleles_table_compare(reference_seq,df_alleles,sample_name_1,sample_name_2,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,**kwargs):
     """
     plots an allele table for a dataframe with allele frequencies from two CRISPResso runs
     input:
@@ -3241,7 +3262,7 @@ def plot_alleles_table_compare(reference_seq,df_alleles,sample_name_1,sample_nam
     X, annot, y_labels, insertion_dict, per_element_annot_kws = prep_alleles_table_compare(df_alleles, sample_name_1, sample_name_2, MAX_N_ROWS, MIN_FREQUENCY)
     plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, custom_colors)
 
-def plot_nucleotide_quilt_from_folder(crispresso_output_folder,fig_filename_root,save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True):
+def plot_nucleotide_quilt_from_folder(crispresso_output_folder,fig_filename_root,save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True,**kwargs):
     """
     plots an allele table for each sgRNA/amplicon in a CRISPresso run (useful for plotting after running using the plot harness)
     This function is only used for one-off plotting purposes and not for the general CRISPResso analysis
@@ -3317,7 +3338,7 @@ def plot_nucleotide_quilt_from_folder(crispresso_output_folder,fig_filename_root
             plot_count += 1
     print('Plotted ' + str(plot_count) + ' plots')
 
-def plot_unmod_mod_pcts(fig_filename_root,df_summary_quantification,save_png,cutoff=None,max_samples_to_include_unprocessed=20):
+def plot_unmod_mod_pcts(fig_filename_root,df_summary_quantification,save_png,cutoff=None,max_samples_to_include_unprocessed=20,**kwargs):
     """
     plots a stacked horizontal barplot for summarizing number of reads, and the percent that are modified and unmodified
     params:
@@ -3376,7 +3397,7 @@ def plot_unmod_mod_pcts(fig_filename_root,df_summary_quantification,save_png,cut
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight')
     plt.close(fig)
 
-def plot_reads_total(fig_filename_root,df_summary_quantification,save_png,cutoff=None):
+def plot_reads_total(fig_filename_root,df_summary_quantification,save_png,cutoff=None,**kwargs):
     """
     plots a horizontal barplot for summarizing number of reads aligned to each sample
     """
@@ -3409,7 +3430,7 @@ def plot_reads_total(fig_filename_root,df_summary_quantification,save_png,cutoff
 
 
 def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
-                      plot_root, save_png
+                      plot_root, save_png,**kwargs
                       ):
     """Plot barplot of total, processed, and aligned reads.
 
@@ -3464,7 +3485,7 @@ def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
 
 def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
                                     expected_hdr_amplicon_seq, N_TOTAL,
-                                    piechart_plot_root, barplot_plot_root, save_png):
+                                    piechart_plot_root, barplot_plot_root, custom_colors, save_png,**kwargs):
     """Plot a pie chart and barplot of class assignments for reads.
 
        Class assignments include: 'MODIFIED','UNMODIFIED','HDR',etc.
@@ -3559,7 +3580,7 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
     plt.close()
 
 
-def plot_class_dsODN_piechart(sizes, labels, plot_root, save_also_png=False):
+def plot_class_dsODN_piechart(sizes, labels, plot_root, save_also_png=False,**kwargs):
     fig, ax = plt.subplots(figsize=(12, 12))
     patches, texts, autotexts =ax.pie(sizes, labels=labels, autopct='%1.2f%%')
 
@@ -3584,6 +3605,7 @@ def plot_quantification_comparison_barchart(
     plot_titles,
     plot_path,
     save_also_png=False,
+    **kwargs
 ):
     fig, axs = plt.subplots(1, 2, figsize=(30, 15))
     n_groups = 2
@@ -3662,6 +3684,7 @@ def plot_quantification_positions(
     plot_title,
     plot_path,
     save_also_png=False,
+    **kwargs,
 ):
     fig, axs = plt.subplots(2, 1, figsize=(20, 10))
     ax1 = axs[0]
@@ -3805,7 +3828,7 @@ def plot_quantification_positions(
 
 
 def plot_allele_modification_heatmap(
-    sample_values, sample_sgRNA_intervals, plot_path, title,
+    sample_values, sample_sgRNA_intervals, plot_path, title,**kwargs,
 ):
     fig = px.imshow(
         sample_values,
@@ -3848,7 +3871,7 @@ def plot_allele_modification_heatmap(
 
 
 def plot_allele_modification_line(
-    sample_values, sample_sgRNA_intervals, plot_path, title,
+    sample_values, sample_sgRNA_intervals, plot_path, title,**kwargs,
 ):
     fig = px.line(sample_values.transpose())
     sgRNA_intervals = set(

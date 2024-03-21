@@ -24,6 +24,12 @@ import unicodedata
 import logging
 from inspect import getmodule, stack
 
+try:
+    from CRISPRessoPro import __version__
+    pro_installed = True
+except:
+    pro_installed = False
+
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
 
@@ -384,11 +390,16 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
         parser.add_argument('--bam_chr_loc', type=str,
                         help='Chromosome location in bam for reads to process. For example: "chr1:50-100" or "chrX".',
                         default='')
-
+        
+    # CRISPRessoPro params
+    parser.add_argument('--use_matplotlib', default=False, action='store_true',
+                        help='Use matplotlib for plotting instead of plotly when CRISPRessoPro is installed')
+    
     # deprecated params
     parser.add_argument('--save_also_png', default=False,
                         help=argparse.SUPPRESS)  # help='Save also .png images in addition to .pdf files') #depreciated -- now pngs are automatically created. Pngs can be suppressed by '--suppress_report'
 
+    
     return parser
 
 
@@ -1997,7 +2008,8 @@ def check_custom_config(args):
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
 
     #Check if crispresso.pro is installed
-    if not is_C2Pro_installed():
+    # if not is_C2Pro_installed():
+    if not pro_installed:
         return config
     if args.config_file:
         try:
