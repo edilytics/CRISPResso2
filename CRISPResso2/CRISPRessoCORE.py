@@ -282,7 +282,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
             #Substitutions out of quantification window
             payload['substitutions_outside_window'] = len(payload['all_substitution_positions']) - len(payload['substitution_positions'])
             #Sums
-            payload['total_mods'] = (len(payload['all_insertion_positions'])/2) + len(payload['all_deletion_coordinates']) + len(payload['all_substitution_positions'])
+            payload['total_mods'] = (len(payload['all_insertion_positions'])/2) + len(payload['all_deletion_positions']) + len(payload['all_substitution_positions'])
             payload['mods_in_window'] = payload['substitution_n'] + payload['deletion_n'] + payload['insertion_n']
             payload['mods_outside_window'] = payload['total_mods'] - payload['mods_in_window']
 
