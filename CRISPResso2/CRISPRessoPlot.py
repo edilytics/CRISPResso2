@@ -330,7 +330,6 @@ def plot_nucleotide_quilt_d3(
     custom_colors,
     save_also_png=False,
     sgRNA_intervals=None,
-    min_plot_pct=0.01,
     min_text_pct=0.5,
     max_text_pct=0.95,
     quantification_window_idxs=None,
@@ -349,7 +348,6 @@ def plot_nucleotide_quilt_d3(
     sgRNA_names: names to annotate sgRNAs with (if None, will just label left sgRNA with 'sgRNA')
     sgRNA_mismatches: locations in the sgRNA where there are mismatches from an original guide (flexiguides)
     quantification_window_idxs: indices for quantification window annotation on plot
-    min_plot_pct: minimum percentage to plot a modification, less than this and it isn't plotted
     min_text_pct: add text annotation if the percent is greater than this number
     max_text_pct: add text annotation if the percent is less than this number
     shade_unchanged: if true, unchanged/reference nucleotides will be shaded (only changes with regard to reference will be dark)
