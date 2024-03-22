@@ -156,7 +156,7 @@ def split_quant_window_coordinates(quant_window_coordinates):
     try:
         return [tuple(map(int, coord_re.match(c).groups())) for c in quant_window_coordinates.split('_')]
     except:
-        raise CRISPRessoShared.NTException("Cannot parse analysis window coordinate '" + str(quant_window_coordinates))
+        raise CRISPRessoShared.BadParameterException("Cannot parse analysis window coordinate '" + str(quant_window_coordinates))
 
 
 def get_include_idxs_from_quant_window_coordinates(quant_window_coordinates):
