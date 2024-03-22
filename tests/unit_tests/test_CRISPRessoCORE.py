@@ -143,7 +143,7 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_beginnin
     quant_window_coordinates = '1-10_12-20'
     # represents a 5bp deletion at the beginning (left)
     s1inds = [-1, -1, -1, -1, -1 ] + list(range(26))
-    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(1, 6)), *list(range(7, 16))]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(0, 6)), *list(range(7, 16))]
 
 def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion():
     quant_window_coordinates = '10-20_35-40'
@@ -187,6 +187,11 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_entire_q
     quant_window_coordinates = '1-4_7-10'
     s1inds = [0, 1, 2, 3, 4, 5, 6, 6, 6, 6, 6]
     assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [1, 2, 3, 4]
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_include_zero():
+    quant_window_coordinates = '0-5'
+    s1inds = [0, 1, 2, 3, 4, 5]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [0, 1, 2, 3, 4, 5]
     
 if __name__ == "__main__":
 # execute only if run as a script
