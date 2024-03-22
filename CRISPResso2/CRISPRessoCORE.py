@@ -189,7 +189,7 @@ def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinat
     quant_window_coordinates: str
         The quantification window coordinates, in the form "5-10_100-101", where
         the "_" delimits separate ranges and the "-" delimits the range itself.
-    s1inds: list of int
+    idxs: list of int
         The index values mapped to the amplicon from which this is being cloned.
 
     Returns
@@ -200,10 +200,9 @@ def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinat
         but adjusted according to s1inds.
     """
     include_idxs = []
-    for i, x in enumerate(idxs):
-        if i > 0:
-            if abs(idxs[i-1]) == x:
-                idxs[i] = -1 * abs(x)
+    for i in range(1, len(idxs)):
+        if abs(idxs[i-1]) == idxs[i]:
+            idxs[i] = -1 * abs(idxs[i])
     for coord in split_quant_window_coordinates(quant_window_coordinates):
         include_idxs.extend(idxs[coord[0]:coord[1] + 1])
         
