@@ -3619,7 +3619,7 @@ def main():
                     plot_2a_input = {
                         'nuc_pct_df': nuc_df_for_plot,
                         'mod_pct_df': mod_df_for_plot,
-                        'fig_filename_root': plot_root,
+                        'fig_filename_root': f'{_jp('2a.json')}' if not args.use_matplotlib and pro_installed else plot_root,
                         'save_also_png': save_png,
                         'sgRNA_intervals': sgRNA_intervals,
                         'sgRNA_names': sgRNA_names,

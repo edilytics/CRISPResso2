@@ -5,7 +5,7 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 '''
 
 import os
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, PackageLoader, ChoiceLoader
 from jinja_partials import generate_render_partial, render_partial
 from CRISPResso2 import CRISPRessoShared
 
@@ -115,6 +115,15 @@ def assemble_figs(run_data, crispresso_folder):
         amplicons.append(amplicon_name)
         amplicon_figures = {'names': [], 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}}
 
+        if pro_installed:
+            for fig in ['2a', '2b', '4g', '11a', '11b']:
+                if os.path.exists(os.path.join(crispresso_folder, f'{fig}.json')):
+                    with open(os.path.join(crispresso_folder, f'{fig}.json')) as fig_json_fh:
+                        amplicon_figures['htmls'][fig] = f"""
+                        <div class="d-flex justify-content-between" style="max-height: 80vh; overflow-y: auto;" id="{fig}"></div>
+                        <script type="text/javascript">const {fig} = {fig_json_fh.read().strip()}</script>
+                            """
+
         for fig in ['2a', '3a', '3b', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '6', '7', '8', '10a', '10b', '10c',
                     '11a']:
             fig_name = 'plot_' + fig
@@ -147,6 +156,7 @@ def assemble_figs(run_data, crispresso_folder):
         figures['datas'][amplicon_name] = amplicon_figures['datas']
         figures['htmls'][amplicon_name] = amplicon_figures['htmls']
     data = {'amplicons': amplicons, 'figures': figures}
+    breakpoint()
     return data
 
 
@@ -175,7 +185,9 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
         'crispresso_data_path': crispresso_data_path,
     }
 
-    j2_env = Environment(loader=FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')))
+    j2_env = Environment(
+        loader=ChoiceLoader([FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')), PackageLoader('CRISPRessoPro', 'templates')]),
+    )
 
     #    dest_dir = os.path.dirname(crispresso_report_file)
     #    shutil.copy2(os.path.join(_ROOT,'templates','CRISPResso_justcup.png'),dest_dir)
@@ -183,7 +195,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
 
     with open(crispresso_report_file, 'w', encoding="utf-8") as outfile:
         outfile.write(render_template(
-            'report.html', j2_env, report_data=report_data,
+            'report.html', j2_env, report_data=report_data, pro_installed=pro_installed,
         ))
 
 
@@ -326,7 +338,6 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
         nuc_conv_plots=nuc_conv_plots,
         allele_modification_heatmap_plot=allele_modification_heatmap_plot,
         allele_modification_line_plot=allele_modification_line_plot,
-        pro_installed=pro_installed,
     )
 
 
@@ -509,7 +520,7 @@ def make_multi_report(
             dictionary[key] = default_type()
 
     j2_env = Environment(
-        loader=FileSystemLoader([os.path.join(_ROOT, 'CRISPRessoReports', 'templates'), os.path.join(_ROOT, "CRISPRessoPro", "templates")]),
+        loader=ChoiceLoader([FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')), PackageLoader('CRISPRessoPro', 'templates')]),
     )
     j2_env.filters['dirname'] = dirname
     if crispresso_tool == 'batch':
@@ -594,6 +605,7 @@ def make_multi_report(
             allele_modification_line_plot_titles=allele_modification_line_plot['titles'],
             allele_modification_line_plot_labels=allele_modification_line_plot['labels'],
             allele_modification_line_plot_datas=allele_modification_line_plot['datas'],
+            pro_installed=pro_installed,
         ))
 
 
