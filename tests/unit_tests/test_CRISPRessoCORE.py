@@ -103,22 +103,22 @@ def test_split_quant_window_coordinates_multiple():
 
 
 def test_split_quant_window_coordinates_error():
-    with pytest.raises(CRISPRessoShared.NTException):
+    with pytest.raises(CRISPRessoShared.BadParameterException):
         CRISPRessoCORE.split_quant_window_coordinates('a-5')
 
 
 def test_split_quant_window_coordinates_empty():
-    with pytest.raises(CRISPRessoShared.NTException):
+    with pytest.raises(CRISPRessoShared.BadParameterException):
         CRISPRessoCORE.split_quant_window_coordinates('_')
 
 
 def test_split_quant_window_coordinates_partially_empty():
-    with pytest.raises(CRISPRessoShared.NTException):
+    with pytest.raises(CRISPRessoShared.BadParameterException):
         CRISPRessoCORE.split_quant_window_coordinates('1-3_')
 
 
 def test_split_quant_window_coordinates_blank():
-    with pytest.raises(CRISPRessoShared.NTException):
+    with pytest.raises(CRISPRessoShared.BadParameterException):
         CRISPRessoCORE.split_quant_window_coordinates('')
 
 
@@ -187,9 +187,6 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_entire_q
     quant_window_coordinates = '1-4_7-10'
     s1inds = [0, 1, 2, 3, 4, 5, 6, 6, 6, 6, 6]
     assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [1, 2, 3, 4]
-
-# NOTE: include_idxs should be exactly the numbers as specificed in the string, inclusively
-# For example: 20-30_175-185 --> [20, 21, ..., 30, 175, 176, ..., 185]
     
 if __name__ == "__main__":
 # execute only if run as a script
