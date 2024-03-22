@@ -168,12 +168,13 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_end_modi
 def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_and_deletion():
     # 5 bp deletion and 5 bp insertion
     quant_window_coordinates = '1-5_10-20'
-    s1inds = [0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 5, 6, 7, 8, 9, 15]
-    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(1, 6)), *[6, 7, 8, 9, 15]]
+    s1inds = [0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 5, 6, 7, 8, 9, 15, 16, 17, 18, 19, 20]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(1, 6)), *[6, 7, 8, 9, 15, 16, 17, 18, 19, 20]]
 
 def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_and_deletion_modified():
-    # 5 bp deletion and 5 bp insertion with modified QW
-    pytest.xfail('Not implemented yet')
+    quant_window_coordinates = '1-5_10-20'
+    s1inds = [0, 1, 2, 2, 4, 5, 6, 7, 7, 7, 7, 7, 7, 8, 9, 10, 15, 16, 17, 18, 19]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*[1,2,4,5], *[8, 9, 10, 15, 16, 17, 18, 19]]
 
 def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_across_qw():
     # 6 bp insertion in middle of 4 bp sequence
@@ -190,8 +191,6 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_entire_q
 # NOTE: include_idxs should be exactly the numbers as specificed in the string, inclusively
 # For example: 20-30_175-185 --> [20, 21, ..., 30, 175, 176, ..., 185]
     
-# BUG: you can't include the last base in the QW or you get an out of range error -- this is extant beyond the function tested here.
-
 if __name__ == "__main__":
 # execute only if run as a script
     test_get_consensus_alignment_from_pairs()
