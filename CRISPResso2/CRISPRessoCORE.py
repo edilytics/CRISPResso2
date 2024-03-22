@@ -206,7 +206,7 @@ def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinat
     for coord in split_quant_window_coordinates(quant_window_coordinates):
         include_idxs.extend(idxs[coord[0]:coord[1] + 1])
         
-    return list(filter(lambda x: x > 0, include_idxs))
+    return list(filter(lambda x: x >= 0, include_idxs))
 
 
 def get_pe_scaffold_search(prime_edited_ref_sequence, prime_editing_pegRNA_extension_seq, prime_editing_pegRNA_scaffold_seq, prime_editing_pegRNA_scaffold_min_match_length):
