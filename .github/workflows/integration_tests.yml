@@ -37,13 +37,13 @@ jobs:
       run: |
         mkdir ../CRISPResso2_copy
         cp -r * ../CRISPResso2_copy
-        
+
     - name: Copy C2_tests repo
       uses: actions/checkout@master
       with:
         repository: edilytics/CRISPResso2_tests
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
-        # ref: '<BRANCH_NAME>' // Use this to specify a branch other than master
+        ref: 'trevor/fastp-tests'
 
     - name: Run Basic
       run: |
