@@ -2039,7 +2039,7 @@ def main():
                     refs[ref_name]['contains_guide'] = refs[clone_ref_name]['contains_guide']
 
                 #quantification window coordinates override other options
-                if amplicon_quant_window_coordinates_arr[clone_ref_idx] != "":
+                if amplicon_quant_window_coordinates_arr[clone_ref_idx] != "" and amplicon_quant_window_coordinates_arr[this_ref_idx] != '0':
                     if amplicon_quant_window_coordinates_arr[this_ref_idx] != "":
                         this_include_idxs = get_include_idxs_from_quant_window_coordinates(amplicon_quant_window_coordinates_arr[this_ref_idx])
                     else:
