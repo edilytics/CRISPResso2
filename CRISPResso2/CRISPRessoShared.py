@@ -1677,38 +1677,10 @@ def set_guide_array(vals, guides, property_name):
     for idx, val in enumerate(vals_array):
         if val != '':
             ret_array[idx] = int(val)
-    return ret_array
+    return ret_array        
+
 
 def get_relative_coordinates(to_sequence, from_sequence):
-
-    s1inds_gap_left = []
-    s1inds_gap_right = []
-    left_val = -1
-    gap_length = 0
-    
-    for i in range(len(to_sequence)):
-        if to_sequence[i] == '-':
-            s1inds_gap_left.append(left_val)
-            gap_length += 1
-
-        elif from_sequence[i] == '-':
-            continue
-        
-        else:
-            s1inds_gap_right.extend([i]*(gap_length+1))
-            gap_length = 0
-
-            left_val = i
-            s1inds_gap_left.append(left_val)
-
-    return s1inds_gap_left, s1inds_gap_right
-
-        
-
-        
-
-
-def old_get_relative_coordinates(to_sequence, from_sequence):
     """Given an alignment, get the relative coordinates of the second sequence to the first.
 
     For example, from_sequence[i] matches to to_sequence[inds[i]]. A `-1`
@@ -1796,6 +1768,9 @@ def get_mismatches(seq_1, seq_2, aln_matrix, needleman_wunsch_gap_open, needlema
                 seq_2) or seq_1[i] != seq_2[coords_r[i]]:
             mismatch_coords.append(i)
     return mismatch_coords
+
+    for i in range(len(seq_1)):
+        pass
 
 
 def get_best_aln_pos_and_mismatches(guide_seq, within_amp_seq, aln_matrix, needleman_wunsch_gap_open,
