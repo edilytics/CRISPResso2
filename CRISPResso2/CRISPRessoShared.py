@@ -1769,9 +1769,6 @@ def get_mismatches(seq_1, seq_2, aln_matrix, needleman_wunsch_gap_open, needlema
             mismatch_coords.append(i)
     return mismatch_coords
 
-    for i in range(len(seq_1)):
-        pass
-
 
 def get_best_aln_pos_and_mismatches(guide_seq, within_amp_seq, aln_matrix, needleman_wunsch_gap_open,
                                     needleman_wunsch_gap_extend=0):
