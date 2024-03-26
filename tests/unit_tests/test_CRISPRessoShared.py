@@ -52,6 +52,7 @@ def test_get_relative_coordinates_to_gap():
     assert seq_1[2] == seq_2[s1inds_gap_left[2]]
     assert seq_1[4] == seq_2[s1inds_gap_left[4]]
 
+
 def test_get_relative_coordinates_start_gap():
     s1inds_gap_left, s1inds_gap_right = CRISPRessoShared.get_relative_coordinates('--CGT', 'TTCGT')
     assert s1inds_gap_left == [-1, -1, 0, 1, 2]
