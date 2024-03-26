@@ -20,12 +20,7 @@ def test_get_mismatches():
         -5,
         -3,
     )
-    assert len(mismatch_cords) == 6 # [0, 3, 9, 11, 13, 14] supposedly
-    # failing coords_l == [1, 2, 3, 4, 5, 6, 9, 10, 11, 11, 13, 13, 15, 15, 15]
-    # passing coords_l == [1, 2, 3, 4, 5, 6, 9, 10, 11, 11, 12, 12, 13, 13, 13] oof I'm actually thinking this is correct.
-    # fws1 = 'CCCACTGAAGGC-C-C--'
-    # fws2 = '-GCAGTG--GGCGCGCTA'
-
+    assert len(mismatch_cords) == 6 
 
 def test_get_relative_coordinates():
     s1inds_gap_left, s1inds_gap_right = CRISPRessoShared.get_relative_coordinates('ATCGT', 'TTCGT')
