@@ -1732,7 +1732,47 @@ def set_guide_array(vals, guides, property_name):
     for idx, val in enumerate(vals_array):
         if val != '':
             ret_array[idx] = int(val)
-    return ret_array
+    return ret_array        
+
+
+def get_relative_coordinates(to_sequence, from_sequence):
+    """Given an alignment, get the relative coordinates of the second sequence to the first.
+
+    For example, from_sequence[i] matches to to_sequence[inds[i]]. A `-1`
+    indicates a gap at the beginning of `to_sequence`.
+
+    Parameters
+    ----------
+    to_sequence : str
+        The alignment of the first sequence (where the coordinates are relative to)
+    from_sequence : str
+        The alignment of the second sequence
+
+    Returns
+    -------
+    s1inds_gap_left : list of int
+        The relative coordinates of the second sequence to the first, where gaps
+        in the first sequence are filled with the left value.
+    s1inds_gap_right : list of int
+        The relative coordinates of the second sequence to the first, where gaps
+        in the first sequence are filled with the right value.
+    """
+    s1inds_gap_left = []
+    s1inds_gap_right = []
+    s1idx_left = -1
+    s1idx_right = 0
+    s2idx = -1
+    for ix in range(len(to_sequence)):
+        if to_sequence[ix] != "-":
+            s1idx_left += 1
+        if from_sequence[ix] != "-":
+            s2idx += 1
+            s1inds_gap_left.append(s1idx_left)
+            s1inds_gap_right.append(s1idx_right)
+        if to_sequence[ix] != "-":
+            s1idx_right += 1
+
+    return s1inds_gap_left, s1inds_gap_right
 
 
 def get_relative_coordinates(to_sequence, from_sequence):
