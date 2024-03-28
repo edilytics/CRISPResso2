@@ -1316,7 +1316,7 @@ def main():
                 )
 
         else: #not auto
-            amplicon_seq_arr = args.amplicon_seq.split(",")
+            amplicon_seq_arr = list(map(lambda x: x.upper(), args.amplicon_seq.split(",")))
             amplicon_name_arr = args.amplicon_name.split(",")
             #split on commas, only accept empty values
             amplicon_min_alignment_score_arr = [float(x) for x in args.amplicon_min_alignment_score.split(",") if x]
