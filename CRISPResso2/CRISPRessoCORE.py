@@ -152,7 +152,7 @@ def get_pe_scaffold_search(prime_edited_ref_sequence, prime_editing_pegRNA_exten
     """
     info('Processing pegRNA scaffold sequence...')
     #first, define the sequence we are looking for (extension plus the first base(s) of the scaffold)
-    scaffold_dna = CRISPRessoShared.reverse_complement(prime_editing_pegRNA_scaffold_seq)
+    scaffold_dna = CRISPRessoShared.reverse_complement(prime_editing_pegRNA_scaffold_seq.upper().replace('U','T'))
 
     extension_seq_dna_top_strand = prime_editing_pegRNA_extension_seq.upper().replace('U', 'T')
     prime_editing_extension_seq_dna = CRISPRessoShared.reverse_complement(extension_seq_dna_top_strand)
@@ -4525,7 +4525,7 @@ def main():
             scaffold_insertion_sizes_filename = ""
             if args.prime_editing_pegRNA_scaffold_seq != "":
                 #first, define the sequence we are looking for (extension plus the first base(s) of the scaffold)
-                scaffold_dna_seq = CRISPRessoShared.reverse_complement(args.prime_editing_pegRNA_scaffold_seq)
+                scaffold_dna_seq = CRISPRessoShared.reverse_complement(args.prime_editing_pegRNA_scaffold_seq.upper().replace('U','T'))
                 pe_seq = refs['Prime-edited']['sequence']
                 pe_scaffold_dna_info = get_pe_scaffold_search(pe_seq, args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
