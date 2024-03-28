@@ -66,8 +66,8 @@ def make_report_from_folder(crispresso_report_file, crispresso_folder, _ROOT):
     make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT)
 
 
-def add_fig_if_exists(fig_name, fig_root, fig_title, fig_caption, fig_data,
-                      amplicon_fig_names, amplicon_figures, crispresso_folder):
+def add_fig_if_exists(fig, fig_name, fig_root, fig_title, fig_caption, fig_data,
+                      amplicon_fig_names, amplicon_figures, crispresso_folder, d3_nuc_quilt_names=[]):
     """
         Helper function to add figure if the file exists
         if fig at filename exists,
@@ -76,8 +76,9 @@ def add_fig_if_exists(fig_name, fig_root, fig_title, fig_caption, fig_data,
     # fullpath=os.path.join(crispresso_folder,fig_root+'.png')
     pngfullpath = os.path.join(crispresso_folder, fig_root + '.png')
     htmlfullpath = os.path.join(crispresso_folder, fig_root + '.html')
+    jsonfullpath = os.path.join(crispresso_folder, f'plot_{fig_root}.json')
     #            print('adding file ' + fig_root + ' at ' + fullpath)
-    if os.path.exists(pngfullpath) or os.path.exists(htmlfullpath):
+    if os.path.exists(pngfullpath) or os.path.exists(htmlfullpath) or os.path.exists(jsonfullpath):
         amplicon_fig_names.append(fig_name)
         # amplicon_fig_locs[fig_name]=os.path.basename(fig_root+'.png')
         amplicon_figures['locs'][fig_name] = os.path.basename(fig_root)
@@ -93,6 +94,14 @@ def add_fig_if_exists(fig_name, fig_root, fig_title, fig_caption, fig_data,
                 html_string += html.read()
                 html_string += "</div>"
             amplicon_figures['htmls'][fig_name] = html_string
+        elif os.path.exists(jsonfullpath) and pro_installed:
+            root_name = fig_root.replace('.', '_').replace('-', '_')
+            d3_nuc_quilt_names.append(f"nuc_quilt_{root_name}")
+            with open(jsonfullpath) as fig_json_fh:
+                amplicon_figures['htmls'][fig_name] = f"""
+                <div class="d-flex justify-content-between" style="max-height: 80vh; overflow-y: auto;" id="{f"nuc_quilt_{root_name}"}"></div>
+                <script type="text/javascript">const {f"nuc_quilt_{root_name}"} = {fig_json_fh.read().strip()}</script>
+                    """
 
 
 def assemble_figs(run_data, crispresso_folder):
@@ -100,39 +109,31 @@ def assemble_figs(run_data, crispresso_folder):
         Helper function create the data structre for the figures
     """
     figures = {'names': {}, 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}, 'sgRNA_based_names': {}}
+    d3_nuc_quilt_names = []
 
     global_fig_names = []
     for fig in ['1a', '1b', '1c', '1d', '5a', '6a', '8a', '11c']:
         fig_name = 'plot_' + fig
         if fig_name + '_root' in run_data['results']['general_plots']:
-            add_fig_if_exists(fig_name, run_data['results']['general_plots'][fig_name + '_root'], 'Figure ' + fig,
+            add_fig_if_exists(fig, fig_name, run_data['results']['general_plots'][fig_name + '_root'], 'Figure ' + fig,
                               run_data['results']['general_plots'][fig_name + '_caption'],
                               run_data['results']['general_plots'][fig_name + '_data'],
-                              global_fig_names, figures, crispresso_folder)
+                              global_fig_names, figures, crispresso_folder, d3_nuc_quilt_names)
 
     amplicons = []
     for amplicon_name in run_data['results']['ref_names']:
         amplicons.append(amplicon_name)
         amplicon_figures = {'names': [], 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}}
 
-        if pro_installed:
-            for fig in ['2a', '2b', '4g', '11a', '11b']:
-                if os.path.exists(os.path.join(crispresso_folder, f'{fig}.json')):
-                    with open(os.path.join(crispresso_folder, f'{fig}.json')) as fig_json_fh:
-                        amplicon_figures['htmls'][fig] = f"""
-                        <div class="d-flex justify-content-between" style="max-height: 80vh; overflow-y: auto;" id="{fig}"></div>
-                        <script type="text/javascript">const {fig} = {fig_json_fh.read().strip()}</script>
-                            """
-
         for fig in ['2a', '3a', '3b', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '6', '7', '8', '10a', '10b', '10c',
                     '11a']:
             fig_name = 'plot_' + fig
             if fig_name + '_root' in run_data['results']['refs'][amplicon_name]:
-                add_fig_if_exists(fig_name, run_data['results']['refs'][amplicon_name][fig_name + '_root'],
+                add_fig_if_exists(fig, fig_name, run_data['results']['refs'][amplicon_name][fig_name + '_root'],
                                   'Figure ' + fig_name,
                                   run_data['results']['refs'][amplicon_name][fig_name + '_caption'],
                                   run_data['results']['refs'][amplicon_name][fig_name + '_data'],
-                                  global_fig_names, amplicon_figures, crispresso_folder)
+                                  global_fig_names, amplicon_figures, crispresso_folder, d3_nuc_quilt_names)
 
         this_sgRNA_based_fig_names = {}
         for fig in ['2b', '9', '10d', '10e', '10f', '10g', '11b']:
@@ -141,10 +142,10 @@ def assemble_figs(run_data, crispresso_folder):
             if 'plot_' + fig + '_roots' in run_data['results']['refs'][amplicon_name]:
                 for idx, plot_root in enumerate(run_data['results']['refs'][amplicon_name]['plot_' + fig + '_roots']):
                     fig_name = "plot_" + fig + "_" + str(idx)
-                    add_fig_if_exists(fig_name, plot_root, 'Figure ' + fig_name + ' sgRNA ' + str(idx + 1),
+                    add_fig_if_exists(fig, fig_name, plot_root, 'Figure ' + fig_name + ' sgRNA ' + str(idx + 1),
                                       run_data['results']['refs'][amplicon_name]['plot_' + fig + '_captions'][idx],
                                       run_data['results']['refs'][amplicon_name]['plot_' + fig + '_datas'][idx],
-                                      this_fig_names, amplicon_figures, crispresso_folder)
+                                      this_fig_names, amplicon_figures, crispresso_folder, d3_nuc_quilt_names)
             this_sgRNA_based_fig_names[fig] = this_fig_names
 
         figures['names'][amplicon_name] = amplicon_figures['names']
@@ -155,8 +156,7 @@ def assemble_figs(run_data, crispresso_folder):
         figures['captions'][amplicon_name] = amplicon_figures['captions']
         figures['datas'][amplicon_name] = amplicon_figures['datas']
         figures['htmls'][amplicon_name] = amplicon_figures['htmls']
-    data = {'amplicons': amplicons, 'figures': figures}
-    breakpoint()
+    data = {'amplicons': amplicons, 'figures': figures, 'nuc_quilt_names': d3_nuc_quilt_names}
     return data
 
 
@@ -183,10 +183,12 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
         'run_data': run_data,
         'report_display_name': report_display_name,
         'crispresso_data_path': crispresso_data_path,
+        'nuc_quilt_names': data['nuc_quilt_names'],
     }
 
     j2_env = Environment(
-        loader=ChoiceLoader([FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')), PackageLoader('CRISPRessoPro', 'templates')]),
+        loader=ChoiceLoader([FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')), PackageLoader('CRISPRessoPro', 'templates')]) if pro_installed
+         else FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates'))
     )
 
     #    dest_dir = os.path.dirname(crispresso_report_file)
@@ -520,8 +522,10 @@ def make_multi_report(
             dictionary[key] = default_type()
 
     j2_env = Environment(
-        loader=ChoiceLoader([FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')), PackageLoader('CRISPRessoPro', 'templates')]),
+        loader=ChoiceLoader([FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')), PackageLoader('CRISPRessoPro', 'templates')]) if pro_installed
+         else FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates'))
     )
+
     j2_env.filters['dirname'] = dirname
     if crispresso_tool == 'batch':
         template = 'batchReport.html'
