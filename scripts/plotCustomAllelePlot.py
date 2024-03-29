@@ -33,13 +33,17 @@ def main():
     parser.add_argument("--plot_left",help="Number of bases to plot to the left of the cut site",type=int,default=20)
     parser.add_argument("--plot_right",help="Number of bases to plot to the right of the cut site",type=int,default=20)
     parser.add_argument("--plot_center",help="Center of plot. If set, plots for guide RNAs will not be generated -- only a plot centered at this position will be plotted.",type=int,default=None)
-
+    
+    # CRISPRessoPro params
+    parser.add_argument('--use_matplotlib', default=False, action='store_true',
+                        help='Use matplotlib for plotting instead of plotly when CRISPRessoPro is installed')
 
     args = parser.parse_args()
-    if not pro_installed:
+    if args.use_matplotlib or not pro_installed:
         from CRISPResso2 import CRISPRessoPlot
     else:
         from CRISPRessoPro import plot as CRISPRessoPlot
+
     plot_alleles_tables_from_folder(args.CRISPResso2_folder,args.output_root,MIN_FREQUENCY=args.min_freq,MAX_N_ROWS=args.max_rows,SAVE_ALSO_PNG=args.save_png,plot_cut_point=args.plot_cut_point,plot_left=args.plot_left,plot_right=args.plot_right,plot_center=args.plot_center)
 
 def arrStr_to_arr(val):

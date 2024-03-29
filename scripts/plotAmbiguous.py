@@ -25,9 +25,13 @@ def main():
     parser.add_argument("--plot_cut_point",help="If set, a line at the cut point will be plotted.",action="store_true")
     parser.add_argument("--save_png",help="If set, pngs will also be produced (as well as pdfs).",action="store_true")
 
+    #CRISPRessoPro params
+    parser.add_argument('--use_matplotlib', default=False, action='store_true',
+                        help='Use matplotlib for plotting instead of plotly when CRISPRessoPro is installed')
+
     args = parser.parse_args()
 
-    if not pro_installed:
+    if args.use_matplotlib or not pro_installed:
         from CRISPResso2 import CRISPRessoPlot
     else:
         from CRISPRessoPro import plot as CRISPRessoPlot

@@ -72,10 +72,14 @@ ___________________________________
 
         parser.add_argument('--debug', help='Show debug messages', action='store_true')
         parser.add_argument('-v', '--verbosity', type=int, help='Verbosity level of output to the console (1-4), 4 is the most verbose', default=3)
+        
+        # CRISPRessoPro params
+        parser.add_argument('--use_matplotlib', default=False, action='store_true',
+                        help='Use matplotlib for plotting instead of plotly when CRISPRessoPro is installed')
 
         args = parser.parse_args()
 
-        if not pro_installed:
+        if args.use_matplotlib or not pro_installed:
             from CRISPResso2 import CRISPRessoPlot
         else:
             from CRISPRessoPro import plot as CRISPRessoPlot
