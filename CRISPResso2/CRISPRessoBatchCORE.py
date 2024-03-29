@@ -15,10 +15,9 @@ import traceback
 from datetime import datetime
 from CRISPResso2 import CRISPRessoShared
 try:
-    from CRISPRessoPro import plot as CRISPRessoPlot
+    from CRISPRessoPro import __version__
     pro_installed = True
 except:
-    from CRISPResso2 import CRISPRessoPlot
     pro_installed = False
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport

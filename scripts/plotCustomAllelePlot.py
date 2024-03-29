@@ -10,9 +10,10 @@ import numpy as np
 import pandas as pd
 import zipfile
 try:
-    from CRISPRessoPro import plot as CRISPRessoPlot
+    from CRISPRessoPro import __version__
+    pro_installed = True
 except:
-    from CRISPResso2 import CRISPRessoPlot
+    pro_installed = False
 from CRISPResso2 import CRISPRessoShared
 import seaborn as sns
 import matplotlib
@@ -35,6 +36,10 @@ def main():
 
 
     args = parser.parse_args()
+    if not pro_installed:
+        from CRISPResso2 import CRISPRessoPlot
+    else:
+        from CRISPRessoPro import plot as CRISPRessoPlot
     plot_alleles_tables_from_folder(args.CRISPResso2_folder,args.output_root,MIN_FREQUENCY=args.min_freq,MAX_N_ROWS=args.max_rows,SAVE_ALSO_PNG=args.save_png,plot_cut_point=args.plot_cut_point,plot_left=args.plot_left,plot_right=args.plot_right,plot_center=args.plot_center)
 
 def arrStr_to_arr(val):

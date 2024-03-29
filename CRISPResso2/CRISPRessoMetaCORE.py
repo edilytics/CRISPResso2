@@ -14,9 +14,10 @@ import traceback
 import json
 from CRISPResso2 import CRISPRessoShared
 try:
-    from CRISPRessoPro import plot as CRISPRessoPlot
+    from CRISPRessoPro import __version__
+    pro_installed = True
 except:
-    from CRISPResso2 import CRISPRessoPlot
+    pro_installed = False
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
@@ -98,6 +99,11 @@ def main():
         parser.add_argument('--crispresso_command', help='CRISPResso command to call', default='CRISPResso')
 
         args = parser.parse_args()
+
+        if args.use_matplotlib or not pro_installed:
+            from CRISPResso2 import CRISPRessoPlot
+        else:
+            from CRISPRessoPro import plot as CRISPRessoPlot
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 

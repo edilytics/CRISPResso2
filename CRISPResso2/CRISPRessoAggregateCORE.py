@@ -18,9 +18,10 @@ import traceback
 from datetime import datetime
 from CRISPResso2 import CRISPRessoShared
 try:
-    from CRISPRessoPro import plot as CRISPRessoPlot
+    from CRISPRessoPro import __version__
+    pro_installed = True
 except:
-    from CRISPResso2 import CRISPRessoPlot
+    pro_installed = False
 
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2.CRISPRessoMultiProcessing import get_max_processes, run_plot
@@ -73,6 +74,11 @@ ___________________________________
         parser.add_argument('-v', '--verbosity', type=int, help='Verbosity level of output to the console (1-4), 4 is the most verbose', default=3)
 
         args = parser.parse_args()
+
+        if not pro_installed:
+            from CRISPResso2 import CRISPRessoPlot
+        else:
+            from CRISPRessoPro import plot as CRISPRessoPlot
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 

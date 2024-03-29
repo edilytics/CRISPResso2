@@ -10,9 +10,10 @@ import numpy as np
 import pandas as pd
 import zipfile
 try:
-    from CRISPRessoPro import plot as CRISPRessoPlot
+    from CRISPRessoPro import __version__
+    pro_installed = True
 except:
-    from CRISPResso2 import CRISPRessoPlot
+    pro_installed = False
 from CRISPResso2 import CRISPRessoShared
 
 def main():
@@ -25,6 +26,11 @@ def main():
     parser.add_argument("--save_png",help="If set, pngs will also be produced (as well as pdfs).",action="store_true")
 
     args = parser.parse_args()
+
+    if not pro_installed:
+        from CRISPResso2 import CRISPRessoPlot
+    else:
+        from CRISPRessoPro import plot as CRISPRessoPlot
 
     plot_ambiguous_alleles_tables_from_folder(args.CRISPResso2_folder,args.output_root,MIN_FREQUENCY=args.min_freq,MAX_N_ROWS=args.max_rows,SAVE_ALSO_PNG=args.save_png,plot_cut_point=args.plot_cut_point)
 
