@@ -246,7 +246,7 @@ def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root, custom_colors
 
     plot_y_start = ref_y_start - 0.1
 
-    if sgRNA_intervals and len(sgRNA_intervals) > 0:
+    if sgRNA_intervals:
         sgRNA_rows = get_rows_for_sgRNA_annotation(sgRNA_intervals, amp_len)
         num_sgRNA_rows = max(sgRNA_rows) + 1
         sgRNA_y_height = num_sgRNA_rows * 0.3
