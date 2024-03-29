@@ -2465,7 +2465,7 @@ def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, con
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
-def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors, **text_kwargs):
+def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors, **kwargs):
     '''
     Plots the conversion at selected nucleotides but ignores non-substitutions (for example at nucs that are 'C' in the reference, bars show the proportion of A T G (not C))
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'
