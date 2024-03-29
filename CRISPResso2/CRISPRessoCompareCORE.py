@@ -10,11 +10,6 @@ import sys
 import traceback
 import argparse
 from CRISPResso2 import CRISPRessoShared
-try:
-    from CRISPRessoPro import __version__
-    pro_installed = True
-except:
-    pro_installed = False
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
 import logging
@@ -113,7 +108,7 @@ def main():
 
         args = parser.parse_args()
 
-        if args.use_matplotlib or not pro_installed:
+        if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
             from CRISPResso2 import CRISPRessoPlot
         else:
             from CRISPRessoPro import plot as CRISPRessoPlot

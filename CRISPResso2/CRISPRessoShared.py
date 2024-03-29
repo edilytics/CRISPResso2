@@ -24,12 +24,6 @@ import unicodedata
 import logging
 from inspect import getmodule, stack
 
-try:
-    from CRISPRessoPro import __version__
-    pro_installed = True
-except:
-    pro_installed = False
-
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
 
@@ -1987,7 +1981,7 @@ def zip_results(results_folder):
 
 def is_C2Pro_installed():
     try:
-        spec = importlib.util.find_spec("crispressoPro")
+        spec = importlib.util.find_spec("CRISPRessoPro")
         if spec is None:
             return False
         else:
@@ -2032,8 +2026,7 @@ def check_custom_config(args):
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
 
     #Check if crispresso.pro is installed
-    # if not is_C2Pro_installed():
-    if not pro_installed:
+    if not is_C2Pro_installed():
         return config
     if args.config_file:
         try:

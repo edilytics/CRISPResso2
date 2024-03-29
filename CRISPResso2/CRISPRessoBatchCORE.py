@@ -14,11 +14,6 @@ import re
 import traceback
 from datetime import datetime
 from CRISPResso2 import CRISPRessoShared
-try:
-    from CRISPRessoPro import __version__
-    pro_installed = True
-except:
-    pro_installed = False
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
@@ -120,7 +115,7 @@ def main():
 
         _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename) #handy function to put a file in the output directory
 
-        if args.use_matplotlib or not pro_installed:
+        if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
             from CRISPResso2 import CRISPRessoPlot
         else:
             from CRISPRessoPro import plot as CRISPRessoPlot

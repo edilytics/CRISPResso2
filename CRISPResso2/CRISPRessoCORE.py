@@ -31,11 +31,11 @@ from CRISPResso2 import CRISPRessoCOREResources
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2 import CRISPRessoShared
 
-try:
+if CRISPRessoShared.is_C2Pro_installed():
     from CRISPRessoPro import __version__ as CRISPRessoProVersion
-    pro_installed = True
-except:
-    pro_installed = False
+    C2PRO_INSTALLED = True
+else:
+    C2PRO_INSTALLED = False
 
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoMultiProcessing
@@ -1172,7 +1172,7 @@ def main():
             raise CRISPRessoShared.BadParameterException("Needleman Wunsch gap extend penalty must be <= 0")
 
 
-        if args.use_matplotlib or not pro_installed:
+        if args.use_matplotlib or not C2PRO_INSTALLED:
             from CRISPResso2 import CRISPRessoPlot
         else:
             from CRISPRessoPro import plot as CRISPRessoPlot
@@ -1677,7 +1677,7 @@ def main():
 
         #now that we're done with adding possible guides and amplicons, go through each amplicon and compute quantification windows
         info('Computing quantification windows', {'percent_complete': 2})
-        if pro_installed:
+        if C2PRO_INSTALLED:
             info(f'CRISPRessoPro v{CRISPRessoProVersion} installed', {'percent_complete': 3})
         else:
             info(f'CRISPRessoPro not installed', {'percent_complete': 3})
@@ -3675,7 +3675,7 @@ def main():
                     plot_2a_input = {
                         'nuc_pct_df': nuc_df_for_plot,
                         'mod_pct_df': mod_df_for_plot,
-                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
+                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
                         'save_also_png': save_png,
                         'sgRNA_intervals': sgRNA_intervals,
                         'sgRNA_names': sgRNA_names,
@@ -3723,7 +3723,7 @@ def main():
                         plot_2b_input = {
                             'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
                             'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
-                            'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
+                            'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
                             'save_also_png': save_png,
                             'sgRNA_intervals': new_sgRNA_intervals,
                             'sgRNA_names': sgRNA_names,
@@ -4093,7 +4093,7 @@ def main():
                     plot_4g_input = {
                         'nuc_pct_df': hdr_nucleotide_percentage_summary_df,
                         'mod_pct_df': hdr_modification_percentage_summary_df,
-                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
+                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
                         'save_also_png': save_png,
                         'sgRNA_intervals': sgRNA_intervals,
                         'quantification_window_idxs': include_idxs_list,
@@ -4691,7 +4691,7 @@ def main():
                 plot_11a_input = {
                     'nuc_pct_df': pe_nucleotide_percentage_summary_df,
                     'mod_pct_df': pe_modification_percentage_summary_df,
-                    'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
+                    'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
                     'save_also_png': save_png,
                     'sgRNA_intervals': sgRNA_intervals,
                     'sgRNA_names': sgRNA_names,
@@ -4751,7 +4751,7 @@ def main():
                     plot_11b_input = {
                         'nuc_pct_df': pe_nucleotide_percentage_summary_df.iloc[:, sel_cols],
                         'mod_pct_df': pe_modification_percentage_summary_df.iloc[:, sel_cols],
-                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
+                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
                         'save_also_png': save_png,
                         'sgRNA_intervals': new_sgRNA_intervals,
                         'sgRNA_names': sgRNA_names,
