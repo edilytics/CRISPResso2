@@ -74,8 +74,8 @@ ___________________________________
         parser.add_argument('-v', '--verbosity', type=int, help='Verbosity level of output to the console (1-4), 4 is the most verbose', default=3)
         
         # CRISPRessoPro params
-        parser.add_argument('--use_matplotlib', default=False, action='store_true',
-                        help='Use matplotlib for plotting instead of plotly when CRISPRessoPro is installed')
+        parser.add_argument('--use_matplotlib', action='store_true',
+                        help='Use matplotlib for plotting instead of plotly/d3 when CRISPRessoPro is installed')
 
         args = parser.parse_args()
 

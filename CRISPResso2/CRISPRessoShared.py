@@ -392,8 +392,8 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
                         default='')
         
     # CRISPRessoPro params
-    parser.add_argument('--use_matplotlib', default=False, action='store_true',
-                        help='Use matplotlib for plotting instead of plotly when CRISPRessoPro is installed')
+    parser.add_argument('--use_matplotlib', action='store_true',
+                        help='Use matplotlib for plotting instead of plotl/d3 when CRISPRessoPro is installed')
     
     # deprecated params
     parser.add_argument('--save_also_png', default=False,

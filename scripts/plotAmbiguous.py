@@ -26,8 +26,8 @@ def main():
     parser.add_argument("--save_png",help="If set, pngs will also be produced (as well as pdfs).",action="store_true")
 
     #CRISPRessoPro params
-    parser.add_argument('--use_matplotlib', default=False, action='store_true',
-                        help='Use matplotlib for plotting instead of plotly when CRISPRessoPro is installed')
+    parser.add_argument('--use_matplotlib', action='store_true',
+                        help='Use matplotlib for plotting instead of plotly/d3 when CRISPRessoPro is installed')
 
     args = parser.parse_args()
 

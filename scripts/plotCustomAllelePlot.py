@@ -35,8 +35,8 @@ def main():
     parser.add_argument("--plot_center",help="Center of plot. If set, plots for guide RNAs will not be generated -- only a plot centered at this position will be plotted.",type=int,default=None)
     
     # CRISPRessoPro params
-    parser.add_argument('--use_matplotlib', default=False, action='store_true',
-                        help='Use matplotlib for plotting instead of plotly when CRISPRessoPro is installed')
+    parser.add_argument('--use_matplotlib', action='store_true',
+                        help='Use matplotlib for plotting instead of plotly/d3 when CRISPRessoPro is installed')
 
     args = parser.parse_args()
     if args.use_matplotlib or not pro_installed:
