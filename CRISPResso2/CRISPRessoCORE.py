@@ -3671,10 +3671,11 @@ def main():
                     mod_df_for_plot.insert(0, 'Batch', ref_name)
 
                     plot_root = _jp('2a.'+ ref_plot_name + 'Nucleotide_percentage_quilt')
+                    pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
                     plot_2a_input = {
                         'nuc_pct_df': nuc_df_for_plot,
                         'mod_pct_df': mod_df_for_plot,
-                        'fig_filename_root': f'{_jp(f'plot_{os.path.basename(plot_root)}.json')}' if not args.use_matplotlib and pro_installed else plot_root,
+                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
                         'save_also_png': save_png,
                         'sgRNA_intervals': sgRNA_intervals,
                         'sgRNA_names': sgRNA_names,
@@ -3718,10 +3719,11 @@ def main():
                         for x in include_idxs_list:
                             new_include_idx += [x - new_sel_cols_start]
                         plot_root = _jp('2b.'+ ref_plot_name + 'Nucleotide_percentage_quilt_around_' + sgRNA_label)
+                        pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
                         plot_2b_input = {
                             'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
                             'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
-                            'fig_filename_root': f'{_jp(f'plot_{os.path.basename(plot_root)}.json')}' if not args.use_matplotlib and pro_installed else plot_root,
+                            'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
                             'save_also_png': save_png,
                             'sgRNA_intervals': new_sgRNA_intervals,
                             'sgRNA_names': sgRNA_names,
@@ -4087,10 +4089,11 @@ def main():
                     hdr_nucleotide_percentage_summary_df.rename(columns={'Batch':'Amplicon'}).to_csv(nuc_freq_filename,sep='\t',header=True,index=False)
 
                     plot_root = _jp('4g.HDR_nucleotide_percentage_quilt')
+                    pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
                     plot_4g_input = {
                         'nuc_pct_df': hdr_nucleotide_percentage_summary_df,
                         'mod_pct_df': hdr_modification_percentage_summary_df,
-                        'fig_filename_root': f'{_jp(f'plot_{os.path.basename(plot_root)}.json')}' if not args.use_matplotlib and pro_installed else plot_root,
+                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
                         'save_also_png': save_png,
                         'sgRNA_intervals': sgRNA_intervals,
                         'quantification_window_idxs': include_idxs_list,
@@ -4684,10 +4687,11 @@ def main():
                 include_idxs_list = refs[ref_names[0]]['include_idxs']
 
                 plot_root = _jp('11a.Prime_editing_nucleotide_percentage_quilt')
+                pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
                 plot_11a_input = {
                     'nuc_pct_df': pe_nucleotide_percentage_summary_df,
                     'mod_pct_df': pe_modification_percentage_summary_df,
-                    'fig_filename_root': f'{_jp(f'plot_{os.path.basename(plot_root)}.json')}' if not args.use_matplotlib and pro_installed else plot_root,
+                    'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
                     'save_also_png': save_png,
                     'sgRNA_intervals': sgRNA_intervals,
                     'sgRNA_names': sgRNA_names,
@@ -4743,10 +4747,11 @@ def main():
                     for x in pe_include_idxs_list:
                         new_include_idx += [x - new_sel_cols_start]
                     plot_root = _jp('11b.Nucleotide_percentage_quilt_around_' + sgRNA_label)
+                    pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
                     plot_11b_input = {
                         'nuc_pct_df': pe_nucleotide_percentage_summary_df.iloc[:, sel_cols],
                         'mod_pct_df': pe_modification_percentage_summary_df.iloc[:, sel_cols],
-                        'fig_filename_root': f'{_jp(f'plot_{os.path.basename(plot_root)}.json')}' if not args.use_matplotlib and pro_installed else plot_root,
+                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and pro_installed else plot_root,
                         'save_also_png': save_png,
                         'sgRNA_intervals': new_sgRNA_intervals,
                         'sgRNA_names': sgRNA_names,
