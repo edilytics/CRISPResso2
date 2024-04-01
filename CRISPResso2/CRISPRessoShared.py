@@ -393,7 +393,6 @@ def getCRISPRessoArgParser(parser_title="CRISPResso Parameters", required_params
     parser.add_argument('--save_also_png', default=False,
                         help=argparse.SUPPRESS)  # help='Save also .png images in addition to .pdf files') #depreciated -- now pngs are automatically created. Pngs can be suppressed by '--suppress_report'
 
-    
     return parser
 
 
