@@ -42,7 +42,7 @@ def render_template(template_name, jinja2_env, **data):
             ),
             is_default_user=False,
             is_web=False,
-            is_pro=pro_installed,
+            pro_installed=pro_installed,
         )
         return template.render(**partial_data)
     return render_partial(

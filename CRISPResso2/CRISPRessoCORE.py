@@ -4363,6 +4363,7 @@ def main():
                         'reference_seq': ref_seq_around_cut,
                         'df_alleles': df_to_plot,
                         'fig_filename_root': fig_filename_root,
+                        'custom_colors': custom_config["colors"],
                         'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
                         'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
                         'SAVE_ALSO_PNG': save_png,
@@ -4371,9 +4372,10 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
-                        'custom_colors': custom_config["colors"],
                     }
                     debug('Plotting allele distribution around cut for {0}'.format(ref_name))
+                    logger.info("CUSTOM_COLORS::")
+                    logger.info(custom_config['colors'])
                     plot(CRISPRessoPlot.plot_alleles_table, plot_9_input)
                     crispresso2_info['results']['refs'][ref_name]['plot_9_roots'].append(os.path.basename(fig_filename_root))
                     crispresso2_info['results']['refs'][ref_name]['plot_9_captions'].append("Figure 9: Visualization of the distribution of identified alleles around the cleavage site for the " + sgRNA_legend + ". Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.")

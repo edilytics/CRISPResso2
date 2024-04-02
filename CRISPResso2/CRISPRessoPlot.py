@@ -452,8 +452,8 @@ def plot_frequency_deletions_insertions(
     xmax_del,
     xmax_ins,
     xmax_mut,
+    custom_colors,
     save_also_png=False,
-    custom_colors=None,
     **kwargs,
 ):
     y_values_mut = ref['y_values_mut']
@@ -2807,7 +2807,21 @@ def prep_alleles_table_compare(df_alleles, sample_name_1, sample_name_2, MAX_N_R
 
     return X, annot, y_labels, insertion_dict, per_element_annot_kws
 
-def plot_alleles_heatmap(reference_seq,fig_filename_root,X,annot,y_labels,insertion_dict,per_element_annot_kws,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,**kwargs):
+def plot_alleles_heatmap(
+        reference_seq,
+        fig_filename_root,
+        X,
+        annot,
+        y_labels,
+        insertion_dict,
+        per_element_annot_kws,
+        custom_colors,
+        SAVE_ALSO_PNG=False,
+        plot_cut_point=True,
+        sgRNA_intervals=None,
+        sgRNA_names=None,
+        sgRNA_mismatches=None,
+        **kwargs):
     """
     Plots alleles in a heatmap (nucleotides color-coded for easy visualization)
     input:
@@ -2976,7 +2990,7 @@ def plot_alleles_heatmap(reference_seq,fig_filename_root,X,annot,y_labels,insert
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', bbox_extra_artists=(lgd,))
     plt.close(fig)
 
-def plot_alleles_heatmap_hist(reference_seq,fig_filename_root,X,annot,y_labels,insertion_dict,per_element_annot_kws,count_values,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,**kwargs):
+def plot_alleles_heatmap_hist(reference_seq,fig_filename_root,X,annot,y_labels,insertion_dict,per_element_annot_kws,count_values,custom_colors,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,**kwargs):
     """
     Plots alleles in a heatmap (nucleotides color-coded for easy visualization)
     input:
@@ -3111,7 +3125,7 @@ def plot_alleles_heatmap_hist(reference_seq,fig_filename_root,X,annot,y_labels,i
         plt.savefig(fig_filename_root+'.png', bbox_inches='tight', bbox_extra_artists=(lgd,), pad_inches=0.1)
     plt.close()
 
-def plot_alleles_table(reference_seq,df_alleles,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,annotate_wildtype_allele='****',**kwargs):
+def plot_alleles_table(reference_seq,df_alleles,fig_filename_root,custom_colors,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,annotate_wildtype_allele='****',**kwargs):
     """
     plots an allele table for a dataframe with allele frequencies
     input:
@@ -3133,9 +3147,9 @@ def plot_alleles_table(reference_seq,df_alleles,fig_filename_root,MIN_FREQUENCY=
         for ix, is_ref in enumerate(is_reference):
             if is_ref:
                 y_labels[ix] += annotate_wildtype_allele
-    plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, custom_colors)
+    plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, custom_colors, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches)
 
-def plot_alleles_table_from_file(alleles_file_name,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,annotate_wildtype_allele='',**kwargs):
+def plot_alleles_table_from_file(alleles_file_name,fig_filename_root,custom_colors,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,annotate_wildtype_allele='',**kwargs):
     """
     plots an allele table for a dataframe with allele frequencies
     infers the reference sequence by finding reference sequences without gaps (-)
@@ -3169,9 +3183,9 @@ def plot_alleles_table_from_file(alleles_file_name,fig_filename_root,MIN_FREQUEN
         for ix, is_ref in enumerate(is_reference):
             if is_ref:
                 y_labels[ix] += annotate_wildtype_allele
-    plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, custom_colors)
+    plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, custom_colors, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches)
 
-def plot_alleles_tables_from_folder(crispresso_output_folder,fig_filename_root,MIN_FREQUENCY=None,MAX_N_ROWS=None,SAVE_ALSO_PNG=False,custom_colors=None,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,**kwargs):
+def plot_alleles_tables_from_folder(crispresso_output_folder,fig_filename_root,custom_colors,MIN_FREQUENCY=None,MAX_N_ROWS=None,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,**kwargs):
     """
     plots an allele table for each sgRNA/amplicon in a CRISPresso run (useful for plotting after running using the plot harness)
     This function is only used for one-off plotting purposes and not for the general CRISPResso analysis
@@ -3238,11 +3252,11 @@ def plot_alleles_tables_from_folder(crispresso_output_folder,fig_filename_root,M
                 new_sgRNA_intervals += [(int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1)]
 
             X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = prep_alleles_table(df_alleles, ref_seq_around_cut, MAX_N_ROWS, MIN_FREQUENCY)
-            plot_alleles_heatmap(ref_seq_around_cut, fig_filename_root+"_"+ref_name+"_"+sgRNA_label, X, annot, y_labels, insertion_dict, per_element_annot_kws, SAVE_ALSO_PNG, plot_cut_point, new_sgRNA_intervals, sgRNA_names, sgRNA_mismatches, custom_colors)
+            plot_alleles_heatmap(ref_seq_around_cut, fig_filename_root+"_"+ref_name+"_"+sgRNA_label, X, annot, y_labels, insertion_dict, per_element_annot_kws, custom_colors, SAVE_ALSO_PNG, plot_cut_point, new_sgRNA_intervals, sgRNA_names, sgRNA_mismatches)
             plot_count += 1
     print('Plotted ' + str(plot_count) + ' plots')
 
-def plot_alleles_table_compare(reference_seq,df_alleles,sample_name_1,sample_name_2,fig_filename_root,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,custom_colors=None,**kwargs):
+def plot_alleles_table_compare(reference_seq,df_alleles,sample_name_1,sample_name_2,fig_filename_root,custom_colors,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,**kwargs):
     """
     plots an allele table for a dataframe with allele frequencies from two CRISPResso runs
     input:
@@ -3260,7 +3274,7 @@ def plot_alleles_table_compare(reference_seq,df_alleles,sample_name_1,sample_nam
     custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
     """
     X, annot, y_labels, insertion_dict, per_element_annot_kws = prep_alleles_table_compare(df_alleles, sample_name_1, sample_name_2, MAX_N_ROWS, MIN_FREQUENCY)
-    plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, custom_colors)
+    plot_alleles_heatmap(reference_seq, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, custom_colors, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches)
 
 def plot_nucleotide_quilt_from_folder(crispresso_output_folder,fig_filename_root,save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True,**kwargs):
     """
