@@ -9,11 +9,18 @@ from jinja2 import Environment, FileSystemLoader, PackageLoader, ChoiceLoader
 from jinja_partials import generate_render_partial, render_partial
 from CRISPResso2 import CRISPRessoShared
 
-try:
-    from CRISPRessoPro import __version__
-    pro_installed = True
-except:
-    pro_installed = False
+if CRISPRessoShared.is_C2Pro_installed():
+    from CRISPRessoPro import __version__ as CRISPRessoProVersion
+    C2PRO_INSTALLED = True
+else:
+    C2PRO_INSTALLED = False
+
+
+def get_jinja_loader(_ROOT):
+    if CRISPRessoShared.is_C2Pro_installed():
+        return Environment(loader=ChoiceLoader([FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')), PackageLoader('CRISPRessoPro', 'templates')]))    
+    else:
+        return Environment(loader=FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')))
 
 
 def render_template(template_name, jinja2_env, **data):
@@ -42,7 +49,7 @@ def render_template(template_name, jinja2_env, **data):
             ),
             is_default_user=False,
             is_web=False,
-            pro_installed=pro_installed,
+            C2PRO_INSTALLED=C2PRO_INSTALLED,
         )
         return template.render(**partial_data)
     return render_partial(
@@ -67,7 +74,7 @@ def make_report_from_folder(crispresso_report_file, crispresso_folder, _ROOT):
 
 
 def add_fig_if_exists(fig, fig_name, fig_root, fig_title, fig_caption, fig_data,
-                      amplicon_fig_names, amplicon_figures, crispresso_folder, d3_nuc_quilt_names=[]):
+                      amplicon_fig_names, amplicon_figures, crispresso_folder, d3_nuc_quilt_names):
     """
         Helper function to add figure if the file exists
         if fig at filename exists,
@@ -94,7 +101,7 @@ def add_fig_if_exists(fig, fig_name, fig_root, fig_title, fig_caption, fig_data,
                 html_string += html.read()
                 html_string += "</div>"
             amplicon_figures['htmls'][fig_name] = html_string
-        elif os.path.exists(jsonfullpath) and pro_installed:
+        elif os.path.exists(jsonfullpath) and C2PRO_INSTALLED:
             root_name = fig_root.replace('.', '_').replace('-', '_')
             d3_nuc_quilt_names.append(f"nuc_quilt_{root_name}")
             with open(jsonfullpath) as fig_json_fh:
@@ -186,10 +193,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
         'nuc_quilt_names': data['nuc_quilt_names'],
     }
 
-    j2_env = Environment(
-        loader=ChoiceLoader([FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')), PackageLoader('CRISPRessoPro', 'templates')]) if pro_installed
-         else FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates'))
-    )
+    j2_env = get_jinja_loader(_ROOT)
 
     #    dest_dir = os.path.dirname(crispresso_report_file)
     #    shutil.copy2(os.path.join(_ROOT,'templates','CRISPResso_justcup.png'),dest_dir)
@@ -197,7 +201,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _ROOT):
 
     with open(crispresso_report_file, 'w', encoding="utf-8") as outfile:
         outfile.write(render_template(
-            'report.html', j2_env, report_data=report_data, pro_installed=pro_installed,
+            'report.html', j2_env, report_data=report_data, C2PRO_INSTALLED=C2PRO_INSTALLED,
         ))
 
 
@@ -521,10 +525,7 @@ def make_multi_report(
         if key not in dictionary:
             dictionary[key] = default_type()
 
-    j2_env = Environment(
-        loader=ChoiceLoader([FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates')), PackageLoader('CRISPRessoPro', 'templates')]) if pro_installed
-         else FileSystemLoader(os.path.join(_ROOT, 'CRISPRessoReports', 'templates'))
-    )
+    j2_env = get_jinja_loader(_ROOT)
 
     j2_env.filters['dirname'] = dirname
     if crispresso_tool == 'batch':
@@ -609,7 +610,7 @@ def make_multi_report(
             allele_modification_line_plot_titles=allele_modification_line_plot['titles'],
             allele_modification_line_plot_labels=allele_modification_line_plot['labels'],
             allele_modification_line_plot_datas=allele_modification_line_plot['datas'],
-            pro_installed=pro_installed,
+            C2PRO_INSTALLED=C2PRO_INSTALLED,
         ))
 
 
