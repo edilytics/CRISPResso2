@@ -17,6 +17,12 @@ from CRISPResso2 import CRISPRessoShared
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
+if CRISPRessoShared.is_C2Pro_installed():
+    from CRISPRessoPro import __version__ as CRISPRessoProVersion
+    C2PRO_INSTALLED = True
+else:
+    C2PRO_INSTALLED = False
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -115,7 +121,7 @@ def main():
 
         _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename) #handy function to put a file in the output directory
 
-        if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
+        if args.use_matplotlib or not C2PRO_INSTALLED:
             from CRISPResso2 import CRISPRessoPlot
         else:
             from CRISPRessoPro import plot as CRISPRessoPlot
@@ -611,7 +617,7 @@ def main():
                             nucleotide_quilt_input = {
                                 'nuc_pct_df': sub_nucleotide_percentage_summary_df,
                                 'mod_pct_df': sub_modification_percentage_summary_df,
-                                'fig_filename_root': f'{this_window_nuc_pct_quilt_plot_name}.json',
+                                'fig_filename_root': f'{this_window_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_window_nuc_pct_quilt_plot_name,
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': sub_sgRNA_intervals,
                                 'quantification_window_idxs': include_idxs,
@@ -663,7 +669,7 @@ def main():
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
                             'mod_pct_df': modification_percentage_summary_df,
-                            'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json',
+                            'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_nuc_pct_quilt_plot_name,
                             'save_also_png': save_png,
                             'sgRNA_intervals': consensus_sgRNA_intervals,
                             'quantification_window_idxs': include_idxs,
@@ -713,7 +719,7 @@ def main():
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
                             'mod_pct_df': modification_percentage_summary_df,
-                            'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json',
+                            'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_nuc_pct_quilt_plot_name,
                             'save_also_png': save_png,
                             'custom_colors': custom_config['colors'],
                         }
@@ -747,7 +753,7 @@ def main():
                             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
 
                 # allele modification frequency heatmap and line plots
-                if not args.suppress_plots and not args.suppress_batch_summary_plots and (nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
+                if C2PRO_INSTALLED and not args.use_matplotlib and not args.suppress_plots and not args.suppress_batch_summary_plots and (nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
                     if guides_all_same:
                         sgRNA_intervals = [consensus_sgRNA_intervals] * modification_frequency_summary_df.shape[0]
                     else:

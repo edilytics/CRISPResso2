@@ -20,6 +20,11 @@ from CRISPResso2 import CRISPRessoShared
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2.CRISPRessoMultiProcessing import get_max_processes, run_plot
 
+if CRISPRessoShared.is_C2Pro_installed():
+    from CRISPRessoPro import __version__ as CRISPRessoProVersion
+    C2PRO_INSTALLED = True
+else:
+    C2PRO_INSTALLED = False
 
 import logging
 
@@ -603,7 +608,7 @@ ___________________________________
                                 this_plot_suffix_int += 1
                                 this_plot_suffix = "_" + str(this_plot_suffix_int)
 
-                    if not args.suppress_plots:
+                    if C2PRO_INSTALLED and not args.use_matplotlib and not args.suppress_plots:
                         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_names'] = []
                         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_paths'] = {}
                         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_titles'] = {}
