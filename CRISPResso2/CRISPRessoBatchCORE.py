@@ -719,13 +719,9 @@ def main():
                         }
                         debug('Plotting nucleotide quilt for {0}'.format(amplicon_name))
                         plot(
-                                CRISPRessoPlot.plot_nucleotide_quilt_d3,
+                                CRISPRessoPlot.plot_nucleotide_quilt,
                                 nucleotide_quilt_input,
                             )
-                        # plot(
-                        #     CRISPRessoPlot.plot_nucleotide_quilt,
-                        #     nucleotide_quilt_input,
-                        # )
                         plot_name = os.path.basename(this_nuc_pct_quilt_plot_name)
                         nuc_pct_quilt_plot_names.append(plot_name)
                         crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base for the amplicon ' + amplicon_name
