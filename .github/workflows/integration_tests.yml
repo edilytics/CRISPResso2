@@ -2,6 +2,9 @@ name: Run Integration Tests
 
 on:
   push:
+  
+  pull_request:
+    types: [opened, reopened]
 
 jobs:
   build:
@@ -37,9 +40,9 @@ jobs:
       run: |
         mkdir ../CRISPResso2_copy
         cp -r * ../CRISPResso2_copy
-        
+
     - name: Copy C2_tests repo
-      uses: actions/checkout@master
+      uses: actions/checkout@v3
       with:
         repository: edilytics/CRISPResso2_tests
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
