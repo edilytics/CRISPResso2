@@ -433,7 +433,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
 
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
-        fastqIn: name of fastq (e.g. output of FLASH)
+        fastqIn: name of fastq (e.g. output of fastp)
             This file can be gzipped or plain text
 
         variantCache: dict with keys: sequence

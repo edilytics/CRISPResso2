@@ -48,7 +48,7 @@ Next, adapters are trimmed from the reads. If no adapter are present, select 'No
 
 #### Read merging
 
-If paired-end reads are provided, reads are merged using FLASh . This produces a single read for alignment to the amplicon sequence, and reduces sequencing errors that may be present at the end of sequencing reads.
+If paired-end reads are provided, reads are merged using fastp. This produces a single read for alignment to the amplicon sequence, and reduces sequencing errors that may be present at the end of sequencing reads.
 
 #### Alignment
 
@@ -259,15 +259,9 @@ This should produce a folder called 'CRISPResso_on_base_editor'. Open the file c
 
 --trim_sequences: Enable the trimming of Illumina adapters with fastp (default: False)
 
---trimmomatic_command: Command to run [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic). Alternate executables for Trimmomatic should be specified here. The default uses the conda-installed trimmomatic. (default: trimmomatic)
+--fastp_options_string: Override options for fastp, e.g. `--length_required 70 --umi`
 
---trimmomatic_options_string: Override options for Trimmomatic (default: ). This parameter can be used to specify different adaptor sequences used in the experiment if you need to trim them. For example: `ILLUMINACLIP:NexteraPE-PE.fa:0:90:10:0:true`, where NexteraPE-PE.fa is a file containing sequences of adapters to be trimmed.
-
---min_paired_end_reads_overlap: Parameter for the FLASH read merging step. Minimum required overlap length between two reads to provide a confident overlap. (default: 10)
-
---max_paired_end_reads_overlap: Parameter for the FLASH merging step. Maximum overlap length expected in approximately 90% of read pairs. Please see the FLASH manual for more information. (default: 100)
-
---stringent_flash_merging: Use stringent parameters for flash merging. In the case where flash could merge R1 and R2 reads ambiguously, the expected overlap is calculated as 2\*average_read_length - amplicon_length. The flash parameters for --min-overlap and --max-overlap will be set to prefer merged reads with length within 10bp of the expected overlap. These values override the --min_paired_end_reads_overlap or --max_paired_end_reads_overlap CRISPResso parameters. (default: False)
+--min_paired_end_reads_overlap: Parameter for the fastp read merging step. Minimum required overlap length between two reads to provide a confident overlap. (default: 10)
 
 #### Quantification window parameters
 
@@ -600,10 +594,10 @@ To run the tool in this mode the user must provide:
   If not available, enter _NA._
 
 - _PRIME_EDITING_PEGRNA_SCAFFOLD_SEQ (OPTIONAL)_: If given, reads containing any of this scaffold sequence
-  before extension sequence (provided by --prime_editing_extension_seq) will be classified
+  before extension sequence (provided by --prime*editing_extension_seq) will be classified
   as 'Scaffold-incorporated'. The sequence should be given in the 5'->3' order such that
   the RT template directly follows this sequence. A common value ends with 'GGCACCGAGUCGGUGC'.
-  If not available, enter _NA._
+  If not available, enter \_NA.*
 
 - _PRIME_EDITING_PEGRNA_SCAFFOLD_MIN_MATCH_LENGTH (OPTIONAL)_: Minimum number of bases matching
   scaffold sequence for the read to be counted as 'Scaffold-incorporated'. If the scaffold
@@ -621,7 +615,7 @@ To run the tool in this mode the user must provide:
   the first nucleotide is position 0. Ranges are separated by the dash sign like "start-stop",
   and multiple ranges can be separated by the underscore (\_). A value of 0 disables this filter.
   If not available, enter _NA._
-- _W or QUANTIFICATION_WINDOW_SIZE (OPTIONAL)_: Defines the size (in bp) of the quantification window extending from the position specified by the "--cleavage_offset" or "--quantification_window_center" parameter in relation to the provided guide RNA sequence(s) (--sgRNA). Mutations within this number of bp from the quantification window center are used in classifying reads as modified or unmodified. A value of 0 disables this window and indels in the entire amplicon are considered. Default is 1, 1bp on each side of the cleavage position for a total length of 2bp. (default: 1) If not available, enter _NA._
+- _W or QUANTIFICATION_WINDOW_SIZE (OPTIONAL)_: Defines the size (in bp) of the quantification window extending from the position specified by the "--cleavage_offset" or "--quantification_window_center" parameter in relation to the provided guide RNA sequence(s) (--sgRNA). Mutations within this number of bp from the quantification window center are used in classifying reads as modified or unmodified. A value of 0 disables this window and indels in the entire amplicon are considered. Default is 1, 1bp on each side of the cleavage position for a total length of 2bp. (default: 1) If not available, enter \_NA.\*
 
 - _WC or QUANTIFICATION_WINDOW_CENTER (OPTIONAL)_: Center of quantification window to use within respect to the 3' end of the provided sgRNA sequence. Remember that the sgRNA sequence must be entered without the PAM. For cleaving nucleases, this is the predicted cleavage position. The default is -3 and is suitable for the Cas9 system. For alternate nucleases, other cleavage offsets may be appropriate, for example, if using Cpf1 this parameter would be set to 1. For base editors, this could be set to -17. (default: -3) If not available, enter _NA._
 
