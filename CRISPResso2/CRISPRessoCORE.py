@@ -4923,9 +4923,9 @@ def main():
         crispresso2_info['running_info']['running_time_string'] = running_time_string
 
         if args.disable_guardrails:
-            crispresso2_info['results']['guardrails'] = []
+            crispresso2_info['results']['guardrails_htmls'] = []
         else:
-            crispresso2_info['results']['guardrails'] = CRISPRessoShared.safety_check(crispresso2_info, aln_stats, config['guardrails'])
+            crispresso2_info['results']['guardrails_htmls'] = CRISPRessoShared.safety_check(crispresso2_info, aln_stats, config['guardrails'])
 
         if not args.suppress_report:
             if (args.place_report_in_output_folder):

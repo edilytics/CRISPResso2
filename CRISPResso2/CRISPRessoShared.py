@@ -2149,7 +2149,9 @@ def safety_check(crispresso2_info, aln_stats, guardrails):
     longAmpliconShortReadsGuardRail = LongAmpliconShortReadsGuardRail(messageHandler, guardrails['amplicon_to_read_length'])
     longAmpliconShortReadsGuardRail.safety(amplicons, aln_stats['READ_LENGTH'])
 
-    return messageHandler.get_messages()
+    crispresso2_info['results']['guardrails'] = messageHandler.get_messages()
+
+    return messageHandler.get_html_messages()
 
 
 class GuardRailMessageHandler:
@@ -2163,9 +2165,10 @@ class GuardRailMessageHandler:
             logger object used to display messages
         """
         self.logger = logger
-        self.messages = []
+        self.html_messages = []
+        self.messages = {}
 
-    def display_warning(self, message):
+    def display_warning(self, guardrail, message):
         """Send the message to the logger to be displayed
 
         Parameters:
@@ -2174,6 +2177,7 @@ class GuardRailMessageHandler:
             Related guardrail message
         """
         self.logger.warning(message)
+        self.messages[guardrail] = message
 
     def report_warning(self, message):
         """Create and store the html message to display on the report
@@ -2184,11 +2188,15 @@ class GuardRailMessageHandler:
             Related guardrail message
         """
         html_warning = '<div class="alert alert-danger"><strong>Guardrail Warning!</strong>{0}</div>'.format(message)
-        self.messages.append(html_warning)
+        self.html_messages.append(html_warning)
 
     def get_messages(self):
         """Return the messages accumulated by the message handler"""
         return self.messages
+    
+    def get_html_messages(self):
+        """Return the html messages accumulated by the message handler"""
+        return self.html_messages
 
 
 class TotalReadsGuardRail:
@@ -2217,7 +2225,7 @@ class TotalReadsGuardRail:
         """
         if total_reads < self.minimum:
             self.message = self.message + " Total reads: {}.".format(total_reads)
-            self.messageHandler.display_warning(self.message)
+            self.messageHandler.display_warning('TotalReadsGuardRail', self.message)
             self.messageHandler.report_warning(self.message)
 
 
@@ -2251,7 +2259,7 @@ class OverallReadsAlignedGuardRail:
             return
         if (n_read_aligned/total_reads) <= self.cutoff:
             self.message = self.message + " Total reads: {}, Aligned reads: {}.".format(total_reads, n_read_aligned)
-            self.messageHandler.display_warning(self.message)
+            self.messageHandler.display_warning('OverallReadsAlignedGuardRail', self.message)
             self.messageHandler.report_warning(self.message)
 
 
@@ -2287,7 +2295,7 @@ class DisproportionateReadsAlignedGuardRail:
         for amplicon, aligned in reads_aln_amplicon.items():
             if aligned <= (expected_per_amplicon * self.cutoff) or aligned >= (expected_per_amplicon * (1 - self.cutoff)):
                 amplicon_message = self.message + amplicon + ", Percent of aligned reads aligned to this amplicon: {}.".format((aligned/n_read_aligned) * 100)
-                self.messageHandler.display_warning(amplicon_message)
+                self.messageHandler.display_warning('DisproportionateReadsAlignedGuardRail', amplicon_message)
                 self.messageHandler.report_warning(amplicon_message)
 
 
@@ -2322,7 +2330,7 @@ class LowRatioOfModsInWindowToOutGuardRail:
             return
         if ((mods_in_window / total_mods) <= self.cutoff):
             self.message = self.message + " Total modifications: {}, Modifications in window: {}, Modifications outside window: {}.".format(total_mods, mods_in_window, mods_outside_window)
-            self.messageHandler.display_warning(self.message)
+            self.messageHandler.display_warning('LowRatioOfModsInWindowToOutGuardRail', self.message)
             self.messageHandler.report_warning(self.message)
 
 
@@ -2356,7 +2364,7 @@ class HighRateOfModificationAtEndsGuardRail:
             return
         if (irregular_reads / total_reads) >= self.percent:
             self.message = self.message + " Total reads: {}, Irregular reads: {}.".format(total_reads, irregular_reads)
-            self.messageHandler.display_warning(self.message)
+            self.messageHandler.display_warning('HighRateOfModificationAtEndsGuardRail', self.message)
             self.messageHandler.report_warning(self.message)
 
 
@@ -2390,7 +2398,7 @@ class HighRateOfSubstitutionsOutsideWindowGuardRail:
             return
         if ((subs_outside_window / global_subs) >= self.cutoff):
             self.message = self.message + " Total substitutions: {}, Substitutions outside window: {}.".format(global_subs, subs_outside_window)
-            self.messageHandler.display_warning(self.message)
+            self.messageHandler.display_warning('HighRateOfSubstitutionsOutsideWindowGuardRail', self.message)
             self.messageHandler.report_warning(self.message)
 
 
@@ -2427,7 +2435,7 @@ class HighRateOfSubstitutionsGuardRail:
             return
         if ((global_subs / total_mods) >= self.cutoff):
             self.message = self.message + " Total modifications: {}, Substitutions: {}.".format(total_mods, global_subs)
-            self.messageHandler.display_warning(self.message)
+            self.messageHandler.display_warning('HighRateOfSubstitutionsGuardRail', self.message)
             self.messageHandler.report_warning(self.message)
 
 
@@ -2460,7 +2468,7 @@ class ShortSequenceGuardRail:
         for name, length in sequences.items():
             if length < self.cutoff:
                 sequence_message = self.message + name + ", Length: {}.".format(length)
-                self.messageHandler.display_warning(sequence_message)
+                self.messageHandler.display_warning('ShortSequenceGuardRail', sequence_message)
                 self.messageHandler.report_warning(sequence_message)
 
 
@@ -2494,5 +2502,5 @@ class LongAmpliconShortReadsGuardRail:
         for name, length in amplicons.items():
             if length > (read_len * self.cutoff):
                 sequence_message = self.message + name + ", Amplicon length: {}, Read length: {}.".format(length, read_len)
-                self.messageHandler.display_warning(sequence_message)
+                self.messageHandler.display_warning('LongAmpliconShortReadsGuardRail', sequence_message)
                 self.messageHandler.report_warning(sequence_message)
