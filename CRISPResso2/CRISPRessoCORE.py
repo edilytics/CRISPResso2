@@ -4959,7 +4959,7 @@ def main():
         if args.disable_guardrails:
             crispresso2_info['results']['guardrails_htmls'] = []
         else:
-            crispresso2_info['results']['guardrails_htmls'] = CRISPRessoShared.safety_check(crispresso2_info, aln_stats, config['guardrails'])
+            crispresso2_info['results']['guardrails_htmls'] = CRISPRessoShared.safety_check(crispresso2_info, aln_stats, custom_config['guardrails'])
 
         if not args.suppress_report:
             if (args.place_report_in_output_folder):
