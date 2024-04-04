@@ -4961,6 +4961,7 @@ def main():
         else:
             crispresso2_info['results']['guardrails_htmls'] = CRISPRessoShared.safety_check(crispresso2_info, aln_stats, custom_config['guardrails'])
 
+
         if not args.suppress_report:
             if (args.place_report_in_output_folder):
                 report_name = _jp("CRISPResso2_report.html")
