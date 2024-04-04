@@ -2040,6 +2040,8 @@ def check_custom_config(args):
     }
 
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
+    if not is_C2Pro_installed():
+        return config
 
     if args.config_file:
         try:
