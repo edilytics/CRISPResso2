@@ -46,7 +46,6 @@ jobs:
       with:
         repository: edilytics/CRISPResso2_tests
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
-        ref: 'status_json_test'
         # ref: '<BRANCH_NAME>' // Use this to specify a branch other than master
 
     - name: Run Basic
