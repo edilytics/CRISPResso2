@@ -218,28 +218,28 @@
             "help": "Command to run fastp",
             "type": "str",
             "default": "fastp",
-            "tools": ["Core"]
+            "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "fastp_options_string": {
             "keys": ["--fastp_options_string"],
             "help": "Override options for fastp, e.g. `--length_required 70 --umi`",
             "type": "str",
             "default": "",
-            "tools": ["Core"]
+            "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "min_paired_end_reads_overlap": {
             "keys": ["--min_paired_end_reads_overlap"],
             "help": "Parameter for the fastp read merging step. Minimum required overlap length between two reads to provide a confident overlap",
             "type": "int",
             "default": 10,
-            "tools": ["Core"]
+            "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "max_paired_end_reads_overlap": {
             "keys": ["--max_paired_end_reads_overlap"],
             "help": "DEPRECATED in v2.3.0",
             "type": "str",
             "default": "None",
-            "tools": ["Core"]
+            "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "stringent_flash_merging": {
             "keys": ["--stringent_flash_merging"],
@@ -714,7 +714,7 @@
             "keys": ["--min_reads_to_use_region"],
             "help": "Minimum number of reads that align to a region to perform the CRISPResso analysis",
             "type": "float",
-            "default": "1000",
+            "default": 1000,
             "tools": ["Pooled"]
         },
         "skip_reporting_problematic_regions": {
@@ -824,7 +824,7 @@
             "keys": ["--disable_guardrails"],
             "help": "Disable guardrail warnings",
             "action": "store_true",
-            "tools": ["Core"]
+            "tools": ["Core", "Batch", "Pooled", "WGS", "Compare"]
         },
         "use_matplotlib": {
             "keys": ["--use_matplotlib"],
