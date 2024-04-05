@@ -150,6 +150,20 @@ def get_n_reads_bam(bam_filename,bam_chr_loc=""):
         raise CRISPRessoShared.InstallationException('Error when running the command:' + cmd + '\nCheck that samtools is installed correctly.')
     return retval
 
+#import time
+#start = time.time()
+matplotlib=check_library('matplotlib')
+#end = time.time()
+#start = time.time()
+from matplotlib import font_manager as fm
+#end = time.time()
+
+#start = time.time()
+plt=check_library('pylab')
+#end = time.time()
+
+from matplotlib import font_manager as fm
+import matplotlib.gridspec as gridspec
 
 pd=check_library('pandas')
 np=check_library('numpy')
@@ -232,7 +246,7 @@ def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinat
             idxs[i] = -1 * abs(idxs[i])
     for coord in split_quant_window_coordinates(quant_window_coordinates):
         include_idxs.extend(idxs[coord[0]:coord[1] + 1])
-        
+
     return list(filter(lambda x: x >= 0, include_idxs))
 
 
@@ -586,7 +600,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
                 if new_variant[match_name]['irregular_ends']:
                     N_READS_IRREGULAR_ENDS += 1
-
+                
 
     fastq_handle.close()
 
@@ -1288,7 +1302,7 @@ def main():
             with open(log_filename, 'w+') as outfile:
                 outfile.write('CRISPResso version %s\n[Command used]:\n%s\n\n[Execution log]:\n' %(CRISPRessoShared.__version__, crispresso_cmd_to_write))
 
-        logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_status.json')))
+        logger.addHandler(CRISPRessoShared.StatusHandler(_jp('CRISPResso_status.json')))
 
         aln_matrix_loc = os.path.join(_ROOT, "EDNAFULL")
         CRISPRessoShared.check_file(aln_matrix_loc)
@@ -2355,134 +2369,89 @@ def main():
             raise CRISPRessoShared.BadParameterException('Read trimming options are not available with bam input')
         elif args.fastq_r1 != '' and args.fastq_r2 == '': #single end reads
             if not args.trim_sequences: #no trimming or merging required
-                output_forward_filename=args.fastq_r1
+                output_forward_filename = args.fastq_r1
             else:
+                check_fastp()
+                info('Trimming sequences with fastp...')
                 output_forward_filename=_jp('reads.trimmed.fq.gz')
-                #Trimming with trimmomatic
-                cmd='%s SE -phred33 %s  %s %s >>%s 2>&1'\
-                % (args.trimmomatic_command, args.fastq_r1,
-                   output_forward_filename,
-                   args.trimmomatic_options_string.replace('NexteraPE-PE.fa', 'TruSeq3-SE.fa'),
-                   log_filename)
-                #print cmd
-                TRIMMOMATIC_STATUS=sb.call(cmd, shell=True)
+                cmd = '{command} -i {r1} -o {out} {options} --json {json_report} --html {html_report} >> {log} 2>&1'.format(
+                    command=args.fastp_command,
+                    r1=args.fastq_r1,
+                    out=output_forward_filename,
+                    options=args.fastp_options_string,
+                    json_report=_jp('fastp_report.json'),
+                    html_report=_jp('fastp_report.html'),
+                    log=log_filename,
+                )
+                fastp_status = sb.call(cmd, shell=True)
 
-                if TRIMMOMATIC_STATUS:
-                        raise CRISPRessoShared.TrimmomaticException('TRIMMOMATIC failed to run, please check the log file.')
-                crispresso2_info['trimmomatic_command'] = cmd
+                if fastp_status:
+                    raise CRISPRessoShared.FastpException('FASTP failed to run, please check the log file.')
+                crispresso2_info['fastp_command'] = cmd
 
                 files_to_remove += [output_forward_filename]
 
-            processed_output_filename=output_forward_filename
+                info('Done!')
+
+            processed_output_filename = output_forward_filename
 
         elif args.fastq_r1 != '' and args.fastq_r2 != '':#paired end reads
+            processed_output_filename = _jp('oet.extendedFrags.fastq.gz')
+            not_combined_1_filename = _jp('out.notCombined_1.fastq.gz')
+            not_combined_2_filename = _jp('out.notCombined_2.fastq.gz')
+            check_fastp()
+            info('Processing sequences with fastp...')
             if not args.trim_sequences:
-                output_forward_paired_filename=args.fastq_r1
-                output_reverse_paired_filename=args.fastq_r2
+                args.fastp_options_string += ' --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering'
             else:
-                info('Trimming sequences with Trimmomatic...')
-                output_forward_paired_filename=_jp('output_forward_paired.fq.gz')
-                output_forward_unpaired_filename=_jp('output_forward_unpaired.fq.gz')
-                output_reverse_paired_filename=_jp('output_reverse_paired.fq.gz')
-                output_reverse_unpaired_filename=_jp('output_reverse_unpaired.fq.gz')
+                args.fastp_options_string += ' --detect_adapter_for_pe'
 
-                #Trimming with trimmomatic
-                cmd='%s PE -phred33 %s  %s %s  %s  %s  %s %s >>%s 2>&1'\
-                    % (args.trimmomatic_command,
-                        args.fastq_r1, args.fastq_r2, output_forward_paired_filename,
-                        output_forward_unpaired_filename, output_reverse_paired_filename,
-                        output_reverse_unpaired_filename, args.trimmomatic_options_string, log_filename)
-                #print cmd
-                TRIMMOMATIC_STATUS=sb.call(cmd, shell=True)
-                if TRIMMOMATIC_STATUS:
-                    raise CRISPRessoShared.TrimmomaticException('TRIMMOMATIC failed to run, please check the log file.')
-                crispresso2_info['trimmomatic_command'] = cmd
+            fastp_cmd = '{command} -i {r1} -I {r2} --merge --merged_out {out_merged} --unpaired1 {unpaired1} --unpaired2 {unpaired2} --overlap_len_require {min_overlap} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
+                command=args.fastp_command,
+                r1=args.fastq_r1,
+                r2=args.fastq_r2,
+                out_merged=processed_output_filename,
+                unpaired1=not_combined_1_filename,
+                unpaired2=not_combined_2_filename,
+                min_overlap=args.min_paired_end_reads_overlap,
+                num_threads=n_processes,
+                json_report=_jp('fastp_report.json'),
+                html_report=_jp('fastp_report.html'),
+                options=args.fastp_options_string,
+                log=log_filename,
+            )
+            fastp_status = sb.call(fastp_cmd, shell=True)
+            if fastp_status:
+                raise CRISPRessoShared.FastpException('Fastp failed to run, please check the log file.')
+            crispresso2_info['running_info']['fastp_command'] = fastp_cmd
 
-                files_to_remove += [output_forward_paired_filename]
-                files_to_remove += [output_reverse_paired_filename]
+            if not os.path.isfile(processed_output_filename):
+                raise CRISPRessoShared.FastpException('Fastp failed to produce merged reads file, please check the log file.')
 
-                info('Done!', {'percent_complete': 6})
+            info('Done!', {'percent_complete': 6})
 
-            #for paired-end reads, merge them
-            info('Estimating average read length...')
-            if args.debug:
-                info('Checking average read length from ' + output_forward_paired_filename)
-            if get_n_reads_fastq(output_forward_paired_filename):
-                avg_read_length=get_avg_read_length_fastq(output_forward_paired_filename)
-                if args.debug:
-                    info('Average read length is ' + str(avg_read_length) + ' from ' + output_forward_paired_filename)
-            else:
-               raise CRISPRessoShared.NoReadsAfterQualityFilteringException('No reads survived the average or single bp quality filtering.')
+            files_to_remove += [
+                processed_output_filename,
+                not_combined_1_filename,
+                not_combined_2_filename,
+            ]
 
-            #Merging with Flash
-            info('Merging paired sequences with Flash...')
-            min_overlap = args.min_paired_end_reads_overlap
-            max_overlap = args.max_paired_end_reads_overlap
-            if args.stringent_flash_merging:
-                expected_max_overlap=2*avg_read_length - min_amplicon_len
-                expected_min_overlap=2*avg_read_length - max_amplicon_len
-    #            print('avg read len: ' + str(avg_read_length))
-    #            print('expected_max_overlap' + str(expected_max_overlap))
-    #            print('expected_min_overlap' + str(expected_min_overlap))
-    #            print('min amplicon len:' + str(min_amplicon_len))
-    #            print('max amplicon len:' + str(max_amplicon_len))
-                indel_overlap_tolerance = 10 # magic number bound on how many bp inserted/deleted in ~90% of reads (for flash)
-                #max overlap is either the entire read (avg_read_length) or the expected amplicon length + indel tolerance
-                max_overlap = max(10, min(avg_read_length, expected_max_overlap+indel_overlap_tolerance))
-                #min overlap is either 4bp (as in crispresso1) or the expected amplicon length - indel tolerance
-                min_overlap = max(4, expected_min_overlap-indel_overlap_tolerance)
-    #            print('max_overlap: ' + str(max_overlap))
-    #            print('min_overlap: ' + str(min_overlap))
-                # if reads are longer than the amplicon, there is no way to tell flash to have them overlap like this..
-                if avg_read_length > min_amplicon_len:
-                    info('Warning: Reads are longer than amplicon.')
-                    min_overlap = avg_read_length-10
-                    max_overlap = 2*avg_read_length
-
-            output_prefix = "out"
-            if clean_file_prefix != "":
-                output_prefix = clean_file_prefix + "out"
-            cmd='%s "%s" "%s" --min-overlap %d --max-overlap %d --allow-outies -z -d %s -o %s >>%s 2>&1' %\
-            (args.flash_command,
-                 output_forward_paired_filename,
-                 output_reverse_paired_filename,
-                 min_overlap,
-                 max_overlap,
-                 OUTPUT_DIRECTORY,
-                 output_prefix,
-                 log_filename)
-
-            info('Running FLASH command: ' + cmd)
-            crispresso2_info['flash_command'] = cmd
-            FLASH_STATUS=sb.call(cmd, shell=True)
-            if FLASH_STATUS:
-                raise CRISPRessoShared.FlashException('Flash failed to run, please check the log file.')
-
-            flash_hist_filename=_jp('out.hist')
-            flash_histogram_filename=_jp('out.histogram')
-            flash_not_combined_1_filename=_jp('out.notCombined_1.fastq.gz')
-            flash_not_combined_2_filename=_jp('out.notCombined_2.fastq.gz')
-
-            processed_output_filename=_jp('out.extendedFrags.fastq.gz')
-            if os.path.isfile(processed_output_filename) is False:
-                raise CRISPRessoShared.FlashException('Flash failed to produce merged reads file, please check the log file.')
-
-            files_to_remove+=[processed_output_filename, flash_hist_filename, flash_histogram_filename,\
-                    flash_not_combined_1_filename, flash_not_combined_2_filename, _jp('out.hist.innie'), _jp('out.histogram.innie'), _jp('out.histogram.outie'), _jp('out.hist.outie')]
-
-            if (args.force_merge_pairs):
-                 old_flashed_filename = processed_output_filename
+            if args.force_merge_pairs:
                  new_merged_filename=_jp('out.forcemerged_uncombined.fastq.gz')
-                 num_reads_force_merged = CRISPRessoShared.force_merge_pairs(flash_not_combined_1_filename, flash_not_combined_2_filename, new_merged_filename)
+                 num_reads_force_merged = CRISPRessoShared.force_merge_pairs(not_combined_1_filename, not_combined_2_filename, new_merged_filename)
                  new_output_filename=_jp('out.forcemerged.fastq.gz')
-                 merge_command = "cat %s %s > %s"%(processed_output_filename, new_merged_filename, new_output_filename)
-                 MERGE_STATUS=sb.call(merge_command, shell=True)
-                 if MERGE_STATUS:
-                     raise FlashException('Force-merging read pairs failed to run, please check the log file.')
+                 merge_command = "cat {0} {1} > {2}".format(
+                     processed_output_filename, new_merged_filename, new_output_filename,
+                 )
+                 merge_status = sb.call(merge_command, shell=True)
+                 if merge_status:
+                     raise CRISPRessoShared.FastpException('Force-merging read pairs failed to run, please check the log file.')
+                 else:
+                     info(f'Forced {num_reads_force_merged} read paisr together.')
                  processed_output_filename = new_output_filename
 
-                 files_to_remove+=[new_merged_filename]
-                 files_to_remove+=[new_output_filename]
+                 files_to_remove += [new_merged_filename]
+                 files_to_remove += [new_output_filename]
                  if args.debug:
                      info('Wrote force-merged reads to ' + new_merged_filename)
 
@@ -3598,7 +3567,7 @@ def main():
             info('Making Plots...')
         ###############################################################################################################################################
         save_png = True
-        config = CRISPRessoShared.check_custom_config(args)
+        custom_config = CRISPRessoShared.check_custom_config(args)
         if args.suppress_report:
             save_png = False
 
@@ -3821,18 +3790,18 @@ def main():
                     mod_df_for_plot.insert(0, 'Batch', ref_name)
 
                     plot_root = _jp('2a.'+ ref_plot_name + 'Nucleotide_percentage_quilt')
-                    pro_output_name = os.path.join(OUTPUT_DIRECTORY, f'plot_{os.path.basename(plot_root)}.json')
+                    pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
                     plot_2a_input = {
                         'nuc_pct_df': nuc_df_for_plot,
                         'mod_pct_df': mod_df_for_plot,
-                        'fig_filename_root': pro_output_name if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
+                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
                         'save_also_png': save_png,
                         'sgRNA_intervals': sgRNA_intervals,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'sgRNA_sequences': sgRNA_sequences,
                         'quantification_window_idxs': include_idxs_list,
-                        'custom_colors': config["colors"],
+                        'custom_colors': custom_config["colors"],
                     }
                     debug('Plotting nucleotide quilt across amplicon')
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2a_input)
@@ -3870,18 +3839,18 @@ def main():
                         for x in include_idxs_list:
                             new_include_idx += [x - new_sel_cols_start]
                         plot_root = _jp('2b.'+ ref_plot_name + 'Nucleotide_percentage_quilt_around_' + sgRNA_label)
-                        pro_output_name = os.path.join(OUTPUT_DIRECTORY, f'plot_{os.path.basename(plot_root)}.json')
+                        pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
                         plot_2b_input = {
                             'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
                             'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
-                            'fig_filename_root': pro_output_name if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
+                            'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
                             'save_also_png': save_png,
                             'sgRNA_intervals': new_sgRNA_intervals,
                             'sgRNA_names': sgRNA_names,
                             'sgRNA_mismatches': sgRNA_mismatches,
                             'sgRNA_sequences': sgRNA_sequences,
                             'quantification_window_idxs': new_include_idx,
-                            'custom_colors': config["colors"],
+                            'custom_colors': custom_config["colors"],
                         }
                         debug('Plotting nucleotide distribuition around {0} for {1}'.format(sgRNA_legend, ref_name))
                         plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2b_input)
@@ -4062,7 +4031,7 @@ def main():
                         ),
                     },
                     'plot_root': plot_root,
-                    'custom_colors': config["colors"],
+                    'custom_colors': custom_config["colors"],
                     'save_also_png': save_png,
                 }
                 debug('Plotting amplication modifications for {0}'.format(ref_name))
@@ -4092,7 +4061,7 @@ def main():
                         'Mutation position distribution', ref_name,
                     ),
                     'plot_root': plot_root,
-                    'custom_colors': config["colors"],
+                    'custom_colors': custom_config["colors"],
                     'save_also_png': save_png,
                 }
                 debug('Plotting modification frequency for {0}'.format(ref_name))
@@ -4121,7 +4090,7 @@ def main():
                     ),
                     'ref_name': ref_name,
                     'plot_root': plot_root,
-                    'custom_colors': config["colors"],
+                    'custom_colors': custom_config["colors"],
                     'save_also_png': save_png,
                 }
                 debug('Plotting quantification window locations for {0}'.format(ref_name))
@@ -4179,7 +4148,7 @@ def main():
                         'n_total': N_TOTAL,
                         'ref_len': ref_len,
                         'ref_name': ref_names[0],
-                        'custom_colors': config["colors"],
+                        'custom_colors': custom_config["colors"],
                         'save_also_png': save_png,
                     }
                     if ref_name == ref_names[0]:
@@ -4252,7 +4221,7 @@ def main():
                         'quantification_window_idxs': include_idxs_list,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
-                        'custom_colors': config["colors"],
+                        'custom_colors': custom_config["colors"],
                     }
                     debug('Plotting HDR nucleotide quilt')
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_4g_input)
@@ -4355,7 +4324,7 @@ def main():
                             ref_name,
                         ),
                         'plot_root': plot_root,
-                        'custom_colors': config["colors"],
+                        'custom_colors': custom_config["colors"],
                         'save_also_png': save_png,
                         'ref_name': ref_name,
                     }
@@ -4398,7 +4367,8 @@ def main():
                         'fig_filename_root': fig_filename_root,
                         'save_also_png': save_png,
                         'quantification_window_idxs': include_idxs_list,
-                        'custom_colors': config['colors']
+                        'custom_colors': custom_config['colors'],
+                        'ref_name': ref_name,
                     }
                     debug('Plotting substitutions across reference for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_subs_across_ref, plot_10a_input)
@@ -4417,7 +4387,7 @@ def main():
                         ),
                         'fig_filename_root': fig_filename_root,
                         'save_also_png': save_png,
-                        'custom_colors': config['colors']
+                        'custom_colors': custom_config['colors']
                     }
                     debug('Plotting substitution frequency barplot for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_sub_freqs, plot_10b_input)
@@ -4432,7 +4402,7 @@ def main():
                         'plot_title': get_plot_title_with_ref_name('Substitution frequency\nin quantification window', ref_name),
                         'fig_filename_root': fig_filename_root,
                         'save_also_png': save_png,
-                        'custom_colors': config['colors']
+                        'custom_colors': custom_config['colors']
                     }
                     debug('Plotting substitution frequency barplot in quantification window for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_sub_freqs, plot_10c_input)
@@ -4524,7 +4494,6 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
-                        'custom_colors': config["colors"],
                     }
                     debug('Plotting allele distribution around cut for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_alleles_table, plot_9_input)
@@ -4611,7 +4580,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
-                            'custom_colors': config['colors'],
+                            'custom_colors': custom_config['colors'],
                         }
                         debug('Plotting conversion at {0}s around the {1} for {2}'.format(args.conversion_nuc_from, sgRNA_legend, ref_name))
                         plot(
@@ -4631,7 +4600,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
-                            'custom_colors': config['colors']
+                            'custom_colors': custom_config['colors']
                         }
                         debug('Plotting non-reference conversion at {0}s around the {1} for {2}'.format(args.conversion_nuc_from, sgRNA_legend, ref_name))
                         plot(
@@ -4654,7 +4623,7 @@ def main():
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'fig_filename_root': fig_filename_root,
                             'save_also_png': save_png,
-                            'custom_colors': config['colors']
+                            'custom_colors': custom_config['colors']
                         }
                         debug('Plotting scaled non-reference conversion at {0}s around the {1} for {2}'.format(args.conversion_nuc_from, sgRNA_legend, ref_name))
                         plot(
@@ -4851,7 +4820,7 @@ def main():
                     'sgRNA_mismatches': sgRNA_mismatches,
                     'sgRNA_sequences': sgRNA_sequences,
                     'quantification_window_idxs': include_idxs_list,
-                    'custom_colors': config['colors']
+                    'custom_colors': custom_config['colors']
                 }
                 info('Plotting prime editing nucleotide percentage quilt', {'percent_complete': 96})
                 plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11a_input)
@@ -4912,7 +4881,7 @@ def main():
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'sgRNA_sequences': sgRNA_sequences,
                         'quantification_window_idxs': new_include_idx,
-                        'custom_colors': config['colors']
+                        'custom_colors': custom_config['colors']
                     }
                     info('Plotting nucleotide quilt', {'percent_complete': 97})
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11b_input)

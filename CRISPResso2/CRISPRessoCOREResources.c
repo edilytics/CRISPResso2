@@ -5111,9 +5111,8 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *     all_deletion_positions = []
  *     all_deletion_coordinates = []             # <<<<<<<<<<<<<<
  *     deletion_positions = []
- *     deletion_coordinates = []
  */
-  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 116, __pyx_L1_error)
+  __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 38, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_all_deletion_coordinates = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
@@ -5881,9 +5880,9 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *             all_deletion_coordinates.append((start_deletion, end_deletion))
  *             if include_indx_set.intersection(range(start_deletion, end_deletion)):
  */
-      __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_start_deletion); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 172, __pyx_L1_error)
+      __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_start_deletion); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 173, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
-      __pyx_t_8 = PyTuple_New(2); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 172, __pyx_L1_error)
+      __pyx_t_8 = PyTuple_New(2); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 173, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_8);
       __Pyx_GIVEREF(__pyx_t_5);
       if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_5)) __PYX_ERR(0, 95, __pyx_L1_error);
@@ -5891,22 +5890,16 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
       __Pyx_GIVEREF(__pyx_v_end_deletion);
       if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 1, __pyx_v_end_deletion)) __PYX_ERR(0, 95, __pyx_L1_error);
       __pyx_t_5 = 0;
-      __pyx_t_5 = __Pyx_PyObject_Call(__pyx_builtin_range, __pyx_t_8, NULL); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 172, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_5);
+      __pyx_t_7 = __Pyx_PyList_Append(__pyx_v_all_deletion_coordinates, __pyx_t_8); if (unlikely(__pyx_t_7 == ((int)-1))) __PYX_ERR(0, 96, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-      __pyx_t_7 = __Pyx_PyList_Extend(__pyx_v_all_deletion_positions, __pyx_t_5); if (unlikely(__pyx_t_7 == ((int)-1))) __PYX_ERR(0, 172, __pyx_L1_error)
-      __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-      /* "CRISPResso2/CRISPRessoCOREResources.pyx":173
- *             end_deletion = ref_positions[idx_c]
+      /* "CRISPResso2/CRISPRessoCOREResources.pyx":97
  *             all_deletion_positions.extend(range(start_deletion, end_deletion))
  *             all_deletion_coordinates.append((start_deletion, end_deletion))             # <<<<<<<<<<<<<<
  *             if include_indx_set.intersection(range(start_deletion, end_deletion)):
  *                 deletion_positions.extend(range(start_deletion, end_deletion))
  */
-      __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_start_deletion); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 173, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_5);
-      __pyx_t_8 = PyTuple_New(2); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 173, __pyx_L1_error)
+      __pyx_t_8 = __Pyx_PyInt_From_int(__pyx_v_start_deletion); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 97, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_8);
       __Pyx_GIVEREF(__pyx_t_5);
       if (__Pyx_PyTuple_SET_ITEM(__pyx_t_8, 0, __pyx_t_5)) __PYX_ERR(0, 96, __pyx_L1_error);

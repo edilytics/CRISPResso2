@@ -19,8 +19,6 @@ import unicodedata
 from CRISPResso2 import CRISPRessoShared
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
-from CRISPResso2 import CRISPRessoPlot
-
 
 import logging
 
@@ -322,27 +320,7 @@ def main():
             ))
             sys.exit()
 
-        parser = CRISPRessoShared.getCRISPRessoArgParser(parser_title = 'CRISPRessoWGS Parameters', required_params=[],
-                    suppress_params=[
-                        'bam_input',
-                        'bam_chr_loc',
-                        'fastq_r1',
-                        'fastq_r2',
-                        'amplicon_seq',
-                        'amplicon_name',
-                        'split_interleaved_input',
-                    ])
-
-        #tool specific optional
-        parser.add_argument('-b', '--bam_file', type=str,  help='WGS aligned bam file', required=True, default='bam filename' )
-        parser.add_argument('-f', '--region_file', type=str,  help='Regions description file. A BED format  file containing the regions to analyze, one per line. The REQUIRED\
-        columns are: chr_id(chromosome name), bpstart(start position), bpend(end position), the optional columns are:name (an unique indentifier for the region), guide_seq, expected_hdr_amplicon_seq,coding_seq, see CRISPResso help for more details on these last 3 parameters)', required=True)
-        parser.add_argument('-r', '--reference_file', type=str, help='A FASTA format reference file (for example hg19.fa for the human genome)', default='', required=True)
-        parser.add_argument('--min_reads_to_use_region',  type=float, help='Minimum number of reads that align to a region to perform the CRISPResso analysis', default=10)
-        parser.add_argument('--skip_failed',  help='Continue with pooled analysis even if one sample fails', action='store_true')
-        parser.add_argument('--gene_annotations', type=str, help='Gene Annotation Table from UCSC Genome Browser Tables (http://genome.ucsc.edu/cgi-bin/hgTables?command=start), \
-        please select as table "knownGene", as output format "all fields from selected table" and as file returned "gzip compressed"', default='')
-        parser.add_argument('--crispresso_command', help='CRISPResso command to call', default='CRISPResso')
+        parser = CRISPRessoShared.getCRISPRessoArgParser("WGS", parser_title = 'CRISPRessoWGS Parameters')
 
         args = parser.parse_args()
 
@@ -369,7 +347,7 @@ def main():
         except:
             warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
 
-        logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoWGS_status.json')))
+        logger.addHandler(CRISPRessoShared.StatusHandler(_jp('CRISPRessoWGS_status.json')))
 
         info('Checking dependencies...')
 

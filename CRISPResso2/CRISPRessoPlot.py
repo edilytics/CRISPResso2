@@ -95,7 +95,7 @@ def hex_to_rgb(value):
     lv = len(value)
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
 
-def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root, custom_colors, save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True,group_column='Batch'):
+def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root, custom_colors, save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True,group_column='Batch', **kwargs):
     """
     Plots a nucleotide quilt with each square showing the percentage of each base at that position in the reference
     nuc_pct_df: dataframe with percents of each base (ACTGN-) at each position
@@ -2012,7 +2012,7 @@ def add_sgRNA_to_ax(ax,sgRNA_intervals,sgRNA_y_start,sgRNA_y_height,amp_len,x_of
         else:
             ax.text(x_offset+min_sgRNA_x, this_sgRNA_y_start + this_sgRNA_y_height/2, 'sgRNA ', horizontalalignment='right', verticalalignment='center', fontsize=font_size)
 
-def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,conversion_nuc_to,save_also_png,custom_colors,plotPct = 0.9,min_text_pct=0.3,max_text_pct=0.9,conversion_scale_max=None,sgRNA_intervals=None,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None):
+def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,conversion_nuc_to,save_also_png,custom_colors,plotPct = 0.9,min_text_pct=0.3,max_text_pct=0.9,conversion_scale_max=None,sgRNA_intervals=None,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,**kwargs):
     """
     Plots a heatmap of conversion across several sequences
     :param nuc_pct_df combined df of multiple batches
@@ -2184,7 +2184,7 @@ def plot_conversion_map(nuc_pct_df,fig_filename_root,conversion_nuc_from,convers
     plt.close(fig)
 
 
-def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution_base_vectors, plot_title, fig_filename_root, save_also_png, custom_colors, quantification_window_idxs=None):
+def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution_base_vectors, plot_title, fig_filename_root, save_also_png, custom_colors, quantification_window_idxs=None,**kwargs):
     """
     Plots substitutions across the reference sequece - each position on the x axis reprsents a nucleotide in the reference
     bars at each x posion show the number of times the reference nucleotide was substituted for another reference
@@ -2249,7 +2249,7 @@ def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution
         fig.savefig(fig_filename_root + '.png', bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.close(fig)
 
-def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png, custom_colors):
+def plot_sub_freqs(alt_nuc_counts, plot_title, fig_filename_root, save_also_png, custom_colors,**kwargs):
     """
     Plots histogram of substitution frequencies for each nucleotide (from nuc X to nuc Y)
     input:
@@ -2333,7 +2333,7 @@ def plot_log_nuc_freqs(df_nuc_freq,tot_aln_reads,plot_title,fig_filename_root,sa
     plt.close(fig)
 
 
-def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors):
+def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors,**kwargs):
     '''
     Plots the conversion at selected nucleotides
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'
@@ -2395,7 +2395,7 @@ def plot_conversion_at_sel_nucs(df_subs, ref_name, ref_sequence, plot_title, con
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
-def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors):
+def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors, **kwargs):
     '''
     Plots the conversion at selected nucleotides but ignores non-substitutions (for example at nucs that are 'C' in the reference, bars show the proportion of A T G (not C))
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'
@@ -2467,7 +2467,7 @@ def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence,
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
-def plot_conversion_at_sel_nucs_not_include_ref_scaled(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors):
+def plot_conversion_at_sel_nucs_not_include_ref_scaled(df_subs, ref_name, ref_sequence, plot_title, conversion_nuc_from, fig_filename_root, save_also_png, custom_colors, **kwargs):
     '''
     Plots the conversion at selected nucleotides not including reference base, scaled by number of events
     Looks for the 'conversion_nuc_from' in the ref_sequence and sets those as 'selected nucleotides'

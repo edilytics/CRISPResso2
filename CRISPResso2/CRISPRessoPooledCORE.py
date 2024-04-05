@@ -19,7 +19,7 @@ import zipfile
 from CRISPResso2 import CRISPRessoShared
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
-from CRISPResso2 import CRISPRessoPlot
+
 import traceback
 
 import logging
@@ -305,7 +305,7 @@ def main():
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
-        crispresso_options = CRISPRessoShared.get_crispresso_options()
+        crispresso_options = CRISPRessoShared.get_core_crispresso_options()
         options_to_ignore = {'fastq_r1', 'fastq_r2', 'amplicon_seq', 'amplicon_name', 'output_folder', 'name', 'zip_output', 'split_interleaved_input'}
         crispresso_options_for_pooled = list(crispresso_options-options_to_ignore)
 
@@ -327,7 +327,7 @@ def main():
 
         log_filename = _jp('CRISPRessoPooled_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
-        logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoPooled_status.json')))
+        logger.addHandler(CRISPRessoShared.StatusHandler(_jp('CRISPRessoPooled_status.json')))
 
         if args.zip_output and not args.place_report_in_output_folder:
             logger.warn('Invalid arguement combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True.')
@@ -516,10 +516,6 @@ def main():
 
                 if fastp_status:
                     raise CRISPRessoShared.FastpException('FASTP failed to run, please check the log file.')
-
-                if not args.keep_intermediate:
-                    files_to_remove += [output_forward_filename]
-
                 info('Done!', {'percent_complete': 7})
 
             processed_output_filename = output_forward_filename
@@ -554,9 +550,6 @@ def main():
             if args.debug:
                 info('Fastp command: {0}'.format(fastp_cmd))
 
-            if not args.keep_intermediate:
-                files_to_remove += [processed_output_filename, not_combined_1_filename, not_combined_2_filename]
-
             if fastp_status:
                 raise CRISPRessoShared.FastpException('Fastp failed to run, please check the log file.')
             crispresso2_info['running_info']['fastp_command'] = fastp_cmd
@@ -572,9 +565,6 @@ def main():
                 else:
                     info(f'Forced {num_reads_force_merged} read pairs together.')
                 processed_output_filename = new_output_filename
-
-                if not args.keep_intermediate:
-                    files_to_remove += [new_merged_filename, new_output_filename]
 
             info('Done!', {'percent_complete': 7})
 

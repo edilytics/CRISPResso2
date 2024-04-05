@@ -9,7 +9,6 @@ from copy import deepcopy
 import sys
 import traceback
 from CRISPResso2 import CRISPRessoShared
-from CRISPResso2 import CRISPRessoPlot
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
 import logging
@@ -105,7 +104,7 @@ def main():
         '''
         compare_header = CRISPRessoShared.get_crispresso_header(description, compare_header)
         print(compare_header)
-
+        
         parser = CRISPRessoShared.getCRISPRessoArgParser("Compare", parser_title = 'CRISPRessoCompare Parameters')
 
         args = parser.parse_args()
@@ -164,7 +163,7 @@ def main():
 
         log_filename = _jp('CRISPRessoCompare_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
-        logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoCompare_status.json')))
+        logger.addHandler(CRISPRessoShared.StatusHandler(_jp('CRISPRessoCompare_status.json')))
 
         with open(log_filename, 'w+') as outfile:
             outfile.write('[Command used]:\nCRISPRessoCompare %s\n\n[Execution log]:\n' % ' '.join(sys.argv))
