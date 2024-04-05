@@ -40,5 +40,9 @@ RUN python setup.py install \
   && CRISPRessoWGS -h \
   && CRISPRessoCompare -h
 
+RUN if [ -f "/CRISPResso2/CRISPRessoPro/setup.py" ]; then \
+    pip install kaleido && \
+    pip install -e ./CRISPRessoPro; \
+fi
 
 ENTRYPOINT ["python","/CRISPResso2/CRISPResso2_router.py"]
