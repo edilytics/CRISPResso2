@@ -823,7 +823,7 @@
         },
         "disable_guardrails":{
             "keys": ["--disable_guardrails"],
-            "help": "isable guardrail warnings",
+            "help": "Disable guardrail warnings",
             "action": "store_true",
             "tools": ["Core"]
         },
