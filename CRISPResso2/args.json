@@ -174,7 +174,7 @@
         },
         "verbosity": {
             "keys": ["-v", "--verbosity"],
-            "help": "Verbosity level of output to the console (1-4)",
+            "help": "Verbosity level of output to the console (1-4) 4 is the most verbose",
             "type": "int",
             "default": 3,
             "tools": ["Core", "Batch", "Pooled", "WGS", "Compare"]
@@ -403,7 +403,7 @@
         "quantification_window_coordinates": {
             "keys": ["-qwc", "--quantification_window_coordinates"],
             "type": "str",
-            "help": "Bp positions in the amplicon sequence specifying the quantification window. This parameter overrides values of the '--quantification_window_center', '--cleavage_offset', '--window_around_sgrna' or '--window_around_sgrna' values. Any indels/substitutions outside this window are excluded. Indexes are 0-based, meaning that the first nucleotide is position 0. Ranges are separted by the dash sign (e.g. 'start-stop'), and multiple ranges can be separated by the underscore (_). A value of 0 disables this filter. (can be comma-separated list of values, corresponding to amplicon sequences given in --amplicon_seq e.g. 5-10,5-10_20-30 would specify the 5th-10th bp in the first reference and the 5th-10th and 20th-30th bp in the second reference)",
+            "help": "Bp positions in the amplicon sequence specifying the quantification window. This parameter overrides values of the '--quantification_window_center', '--cleavage_offset', '--window_around_sgrna' or '--window_around_sgrna' values. Any indels/substitutions outside this window are excluded. Indexes are 0-based, meaning that the first nucleotide is position 0. Ranges are separted by the dash sign (e.g. 'start-stop'), and multiple ranges can be separated by the underscore (_) (can be comma-separated list of values, corresponding to amplicon sequences given in --amplicon_seq e.g. 5-10,5-10_20-30 would specify the 6th-11th bp in the first reference and the 6th-11th and 21st-31st bp in the second reference). A value of 0 disables this filter for a particular amplicon (e.g. 0,90-110 This would disable the quantification window for the first amplicon and specify the quantification window of 90-110 for the second).Note that if there are multiple amplicons provided, and only one quantification window coordinate is provided, the same quantification window will be used for all amplicons and be adjusted to account for insertions/deletions.(default: None)",
             "default": null,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
