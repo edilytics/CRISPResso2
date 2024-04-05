@@ -340,8 +340,6 @@ def clean_filename(filename):
     return (''.join(c for c in cleanedFilename if c in validFilenameChars))
 
 def check_file(filename):
-    print("about to check:")
-    print(filename)
     try:
         with open(filename):
             pass
