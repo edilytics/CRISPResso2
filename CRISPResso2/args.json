@@ -4,7 +4,6 @@
             "keys": ["-r1", "--fastq_r1"],
             "help": "First fastq file",
             "type": "str",
-            "required": true,
             "default": "",
             "tools": ["Core", "Pooled"]
         },
