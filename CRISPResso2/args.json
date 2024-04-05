@@ -250,7 +250,7 @@
         "force_merge_pairs": {
             "keys": ["--force_merge_pairs"],
             "action": "store_true",
-            "help": "Force-merges R1 and R2 if they cannot be merged using flash (use with caution -- may create non-biological apparent indels at the joining site)",
+            "help": "SUPPRESS",
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "quantification_window_size": {
@@ -348,21 +348,21 @@
         },
         "aln_seed_count": {
             "keys": ["--aln_seed_count"],
-            "help": "number of seeds that must match to call the read forward/reverse",
+            "help": "SUPPRESS",
             "type": "int",
             "default": 5,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "aln_seed_len": {
             "keys": ["--aln_seed_len"],
-            "help": "Length of seeds to test whether read is forward or reverse",
+            "help": "SUPPRESS",
             "type": "int",
             "default": 10,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "aln_seed_min": {
             "keys": ["--aln_seed_min"],
-            "help": "Number of seeds that must match to call the read forward/reverse",
+            "help": "SUPPRESS",
             "type": "int",
             "default": 2,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
@@ -484,7 +484,7 @@
         },
         "write_cleaned_report": {
             "keys": ["--write_cleaned_report"],
-            "help": "",
+            "help": "SUPPRESS",
             "action": "store_true",
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
@@ -574,14 +574,14 @@
         "prime_editing_gap_open_penalty": {
             "keys": ["--prime_editing_gap_open_penalty"],
             "type": "int",
-            "help": "If set, adjusts the alignment gap open penalty for calculating alignment between pegRNA components (e.g. spacer and extension).",
+            "help": "SUPPRESS",
             "default": -50,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "prime_editing_gap_extend_penalty": {
             "keys": ["--prime_editing_gap_extend_penalty"],
             "type": "int",
-            "help": "If set, adjusts the alignment gap extension penalty for calculating alignment between pegRNA components (e.g. spacer and extension). Because prime editing may introduce large insertions/deletions, this is set to 0 to preference these large insertions.",
+            "help": "SUPPRESS",
             "default": 0,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
@@ -640,7 +640,7 @@
         "save_also_png": {
             "keys": ["--save_also_png"],
             "action": "store_true",
-            "help": "",
+            "help": "SUPPRESS",
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "batch_settings": {
