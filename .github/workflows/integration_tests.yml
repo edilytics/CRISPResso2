@@ -2,7 +2,7 @@ name: Run Integration Tests
 
 on:
   push:
-  
+
   pull_request:
     types: [opened, reopened]
 
@@ -46,7 +46,7 @@ jobs:
       with:
         repository: edilytics/CRISPResso2_tests
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
-        # ref: '<BRANCH_NAME>' // Use this to specify a branch other than master
+        ref: 'cole/update-expected-results' # // Use this to specify a branch other than master
 
     - name: Run Basic
       run: |
