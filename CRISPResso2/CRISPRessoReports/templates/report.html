@@ -196,7 +196,7 @@
             		{# end HDR summary #}
 
 			{# start prime editing report #}
-			{% if 'plot_11a' in report_data['figures']['locs'][report_data.amplicons[0]] %}
+			{% if report_data['figures']['locs'][report_data.amplicons[0]]['plot_11a'] %}
 			<div class='card text-center mb-2 breakinpage'>
 				<div class='card-header'>
 					{% if report_data.amplicons|length == 1 %} {# if only one amplicon #}
