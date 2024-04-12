@@ -1,5 +1,5 @@
-[![Docker Cloud Automated build](https://img.shields.io/docker/cloud/automated/pinellolab/crispresso2.svg)](https://hub.docker.com/r/pinellolab/crispresso2)
-[![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/pinellolab/crispresso2.svg)](https://hub.docker.com/r/pinellolab/crispresso2)
+[![Docker Image Version (tag)](https://img.shields.io/docker/v/pinellolab/crispresso2/latest?logo=docker&label=Docker)
+](https://hub.docker.com/r/pinellolab/crispresso2/tags)
 [![CircleCI branch](https://img.shields.io/circleci/project/github/pinellolab/CRISPResso2/master.svg)](https://circleci.com/gh/pinellolab/CRISPResso2)
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/crispresso2/README.html)
 
