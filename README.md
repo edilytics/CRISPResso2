@@ -33,6 +33,7 @@ In addition, CRISPResso can be run as part of a larger tool suite:
 - [CRISPRessoWGS](#crispressowgs) - for analyzing specific sites in whole-genome sequencing samples
 - [CRISPRessoCompare](#crispressocompare) - for comparing editing between two samples (e.g., treated vs control)
 - [CRISPRessoAggregate](#crispressoaggregate) - for aggregating results from previously-run CRISPResso analyses
+- [CRISPRessoPro](#crispressopro) - enhanced interactive plots, color customization, and guardrail customization
 
 ## CRISPResso2 processing
 
@@ -176,54 +177,6 @@ HighRateOfSubstitutionsOutsideWindowGuardrail : Checks if there is a high rate o
 HighRateOfSubstitutionsGuardrail : Checks if the proportion of substitutions to other modifications is higher than expected. (Default: 0.3)
 ShortSequenceGuardrail : Checks if the provided sequences (both Amplicons and Guides) are shorter than expected. (Amplicon Default: 50, Guide Default: 19)
 LongAmpliconShortReadsGuardrail : Checks if the rovided amplicon is more than <value> times the average length of read. (Default: 1.5)
-
-### CRISPRessoPro
-
-CRISPResso is an open source tool for free use by academics. However, for-profit organizations are required to purchase a license to use CRISPResso. As a part of this license, organizations gain access to the CRISPRessoPro package which supplements CRISPResso
-with several useful features:
-
-- Interactive and improved plots using D3 and Plotly
-- Customizable colors
-- Customizable warnings based on potential issues in results (guardrails)
-
-#### Installation
-
-To add CRISPRessoPro to CRISPResso contact Edilytics - licensing@edilytics.com
-
-#### D3 and Plotly
-
-If CRISPRessoPro is installed, by default reports will include interactive plots. To use matplotlib for figures add the `--use_matplotlib` argument.
-
-#### Customizable Colors and Guardrails
-
-If CRISPRessoPro is installed, by default the colors and guardrails will remain the same as CRISPResso. To alter this, use the `--config_file` argument and a filepath to a `.json` file with the following format:
-
-`"colors": {
-'Substitution': '#0000FF',
-'Insertion': '#008000',
-'Deletion': '#FF0000',
-'A': '#7FC97F',
-'T': '#BEAED4',
-'C': '#FDC086',
-'G': '#FFFF99',
-'N': '#C8C8C8',
-'-': '#1E1E1E',
-},
-"guardrails": {
-'min_total_reads': 10000,
-'aligned_cutoff': 0.9,
-'alternate_alignment': 0.3,
-'min_ratio_of_mods_in_to_out': 0.01,
-'modifications_at_ends': 0.01,
-'outside_window_max_sub_rate': 0.002,
-'max_rate_of_subs': 0.3,
-'guide_len': 19,
-'amplicon_len': 50,
-'amplicon_to_read_length': 1.5
-}`
-(These are the default values as an example).
-
-Change the values as desired to any color or guardrail specification.
 
 ### Example run: Non-homologous end joining (NHEJ)
 
@@ -1234,3 +1187,54 @@ The output will consist of:
 3.  CRISPRessoAggregate_mapping_statistics.txt: A tab-separated file showing the number of reads sequenced and mapped for each run.
 4.  CRISPRessoAggregate_quantification_of_editing_frequency.txt: A tab-separated with the number of reads and edits for each run folder. Data from run folders with multiple amplicons show the sum totals for all amplicons.
 5.  CRISPRessoAggregate_quantification_of_editing_frequency_by_amplicon.txt: A tab-separated file showing the number of reads and edits for each amplicon for each run folder. Data from run folders with multiple amplicons will appear on multiple lines, with one line per amplicon.
+
+### CRISPRessoPro
+
+CRISPResso is an open source tool for free use by academics. However, for-profit organizations are required to purchase a license to use CRISPResso. As a part of this license, organizations gain access to the CRISPRessoPro package which supplements CRISPResso
+with several useful features:
+
+- Interactive and improved plots using D3 and Plotly
+- Customizable colors
+- Customizable warnings based on potential issues in results (guardrails)
+
+#### Installation
+
+To add CRISPRessoPro to CRISPResso contact Edilytics - licensing@edilytics.com
+
+#### D3 and Plotly
+
+If CRISPRessoPro is installed, by default reports will include interactive plots. To use matplotlib for figures add the `--use_matplotlib` argument.
+
+#### Customizable Colors and Guardrails
+
+If CRISPRessoPro is installed, by default the colors and guardrails will remain the same as CRISPResso. To alter this, use the `--config_file` argument and a filepath to a `.json` file with the following format:
+
+``` json
+{
+  "colors": {
+    "Substitution": "#0000FF",
+    "Insertion": "#008000",
+    "Deletion": "#FF0000",
+    "A": "#7FC97F",
+    "T": "#BEAED4",
+    "C": "#FDC086",
+    "G": "#FFFF99",
+    "N": "#C8C8C8",
+    "-": "#1E1E1E"
+  },
+  "guardrails": {
+    "min_total_reads": 10000,
+    "aligned_cutoff": 0.9,
+    "alternate_alignment": 0.3,
+    "min_ratio_of_mods_in_to_out": 0.01,
+    "modifications_at_ends": 0.01,
+    "outside_window_max_sub_rate": 0.002,
+    "max_rate_of_subs": 0.3,
+    "guide_len": 19,
+    "amplicon_len": 50,
+    "amplicon_to_read_length": 1.5
+  }
+}
+```
+
+Above are the default values as an example, change the values as desired to any color or guardrail specification.
