@@ -33,7 +33,6 @@ In addition, CRISPResso can be run as part of a larger tool suite:
 - [CRISPRessoWGS](#crispressowgs) - for analyzing specific sites in whole-genome sequencing samples
 - [CRISPRessoCompare](#crispressocompare) - for comparing editing between two samples (e.g., treated vs control)
 - [CRISPRessoAggregate](#crispressoaggregate) - for aggregating results from previously-run CRISPResso analyses
-- [CRISPRessoPro](#crispressopro) - enhanced interactive plots, color customization, and guardrail customization
 
 ## CRISPResso2 processing
 
