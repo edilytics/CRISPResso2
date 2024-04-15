@@ -1,6 +1,5 @@
 {% extends "layout.html" %}
 {% block head %}
-<script src="https://cdn.plot.ly/plotly-2.11.1.min.js"></script>
 <style>
 .nav-tabs.amp-header {
   border-bottom:none !important;
@@ -41,6 +40,10 @@
 	}
 }
 </style>
+
+{% if C2PRO_INSTALLED %}
+  <script src="https://cdn.plot.ly/plotly-2.11.1.min.js"></script>
+{% endif %}
 
 {% endblock %}
 
@@ -196,55 +199,6 @@
                });
               </script>
             {% endfor %}
-              {#
-              <!-- The below code is another failed attempt to make the heatmaps go fullscreen.
-                   To implement this behavior, wrap the `allele_modification_heatmap_plot_htmls[plot_name]` in a `div`
-                   of class `plotly-full-screen`. -->
-              <!-- <style>
-                   .plot-zoom {
-                   position: absolute;
-                   border: none;
-                   background-color: transparent;
-                   bottom: 0;
-                   right: 0;
-                   }
-                   .full-screen {
-                   position: fixed;
-                   height: 98vh !important;
-                   width: 98vw !important;
-                   left: 0;
-                   top: 0;
-                   z-index: 9999;
-                   overflow: hidden;
-                   }
-                   </style> -->
-              <!-- <script type="application/javascript">
-                   const plotZoom = (el) => {
-                   el = $(el);
-                   let parent = el.parent().parent();
-                   if (el.attr("data-full_screen") === "false") {
-                   parent.addClass("full-screen").trigger("resize").fadeOut().fadeIn();
-                   el.attr("data-full_screen", "true");
-                   Plotly.Plots.resize(parent.find(".plotly-graph-div")[0]);
-                   } else {
-                   parent.removeClass("full-screen").trigger("resize").fadeOut().fadeIn();
-                   el.attr("data-full_screen", "false");
-                   Plotly.Plots.resize(parent.find(".plotly-graph-div")[0]);
-                   }
-                   }
-                   document.addEventListener("DOMContentLoaded", () => {
-                   $(function() {
-                   $(".plotly-full-screen").append(`
-                   <div style="position: relative;">
-                   <button onclick=plotZoom(this) class="plot-zoom" data-full_screen="false" title="Full Screen">
-                   <i class="fa fa-expand-arrows-alt"></i>
-                   </button>
-                   </div>
-                   `);
-                   });
-                   });
-                   </script> -->
-              #}
           {% endif %}
 
           </div>
