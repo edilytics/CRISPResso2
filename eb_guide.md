@@ -22,9 +22,9 @@ In order to deploy C2Web on AWS Elastic Beanstalk with this guide you will need 
    - https://us-east-2.console.aws.amazon.com/vpc/home?region=us-east-2#SecurityGroups:sort=groupId
    - Create one for EFS access
    - Set outbound rules: 
-     - Type: “All TCP” Destination: “Anywhere”
+      - Type: “All TCP” Destination: “Anywhere”
    - Set inbound rules:
-     - Type “NFS” Source: “Anywhere”
+      - Type “NFS” Source: “Anywhere”
 3. Create EFS
    - Create a new filesystem https://us-east-2.console.aws.amazon.com/efs/home?region=us-east-2#/filesystems
    - 30 day lifecycle policy - all others default
@@ -73,7 +73,7 @@ In order to deploy C2Web on AWS Elastic Beanstalk with this guide you will need 
    - Add DNS on AWS
      - https://us-east-2.console.aws.amazon.com/acm/home?region=us-east-2#/wizard/
      - Request a Certificate
-     - Type in ‘{demo}.edilytics.com’0
+     - Type in ‘{demo}.edilytics.com’
      - ‘Add another name’
      - ‘www.{demo}.edilytics.com’
      - Use DNS verification
