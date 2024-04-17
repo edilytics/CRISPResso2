@@ -15,21 +15,27 @@ In order to deploy C2Web on AWS Elastic Beanstalk with this guide you will need 
 ## AWS EB INSTRUCTIONS
 
 1. Create a Key pair
+
    - https://us-east-2.console.aws.amazon.com/ec2/v2/home?region=us-east-2#CreateKeyPair
    - Set a Name (to be used in step 4)
    - save the .ppk file (for use with PuTTY on Windows) or .pem (for use with OpenSSH on Linux or OSX)
+
 2. Create Security group
+
    - https://us-east-2.console.aws.amazon.com/vpc/home?region=us-east-2#SecurityGroups:sort=groupId
    - Create one for EFS access
    - Set outbound rules: 
      - Type: “All TCP” Destination: “Anywhere”
    - Set inbound rules:
      - Type “NFS” Source: “Anywhere”
+
 3. Create EFS
+
    - Create a new filesystem https://us-east-2.console.aws.amazon.com/efs/home?region=us-east-2#/filesystems
    - 30 day lifecycle policy - all others default
    - ‘Manage Network Access’ -> add security group in step 1 to all three mount targets
    - [storage-efs-mountfilesystem.config](.ebextensions/storage-efs-mountfilesystem.config) <- add id of filesystem in 2 here
+   
 4. Create EB
    - https://us-east-2.console.aws.amazon.com/elasticbeanstalk/home?region=us-east-2#/newEnvironment
    - **Environment Tier**:Select `Web server environment`
