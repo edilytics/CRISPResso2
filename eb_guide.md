@@ -7,6 +7,7 @@
 ## Prerequesites
 
 In order to deploy C2Web on AWS Elastic Beanstalk with this guide you will need the following:
+
 - An AWS account with access to EC2, EFS, VPC, ECR, and Elastic Beanstalk
 - [AWS EB CLI](https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/eb-cli3.html)
 - [Docker](https://docs.docker.com/get-docker/)
@@ -16,13 +17,13 @@ In order to deploy C2Web on AWS Elastic Beanstalk with this guide you will need 
 
 1. Create a Key pair
 
-   - https://us-east-2.console.aws.amazon.com/ec2/v2/home?region=us-east-2#CreateKeyPair
+   - [New Key pair](https://us-east-2.console.aws.amazon.com/ec2/v2/home?region=us-east-2#CreateKeyPair)
    - Set a Name (to be used in step 4)
    - save the .ppk file (for use with PuTTY on Windows) or .pem (for use with OpenSSH on Linux or OSX)
 
 2. Create Security group
 
-   - https://us-east-2.console.aws.amazon.com/vpc/home?region=us-east-2#SecurityGroups:sort=groupId
+   - [New Security Group](https://us-east-2.console.aws.amazon.com/vpc/home?region=us-east-2#SecurityGroups:sort=groupId)
    - Create one for EFS access
    - Set outbound rules: 
      - Type: “All TCP” Destination: “Anywhere”
@@ -31,14 +32,14 @@ In order to deploy C2Web on AWS Elastic Beanstalk with this guide you will need 
 
 3. Create EFS
 
-   - Create a new filesystem https://us-east-2.console.aws.amazon.com/efs/home?region=us-east-2#/filesystems
+   - [Create a new filesystem](https://us-east-2.console.aws.amazon.com/efs/home?region=us-east-2#/filesystems)
    - 30 day lifecycle policy - all others default
    - ‘Manage Network Access’ -> add security group in step 1 to all three mount targets
    - [storage-efs-mountfilesystem.config](.ebextensions/storage-efs-mountfilesystem.config) <- add id of filesystem in 2 here
 
 4. Create EB
 
-   - https://us-east-2.console.aws.amazon.com/elasticbeanstalk/home?region=us-east-2#/newEnvironment
+   - [New Environment](https://us-east-2.console.aws.amazon.com/elasticbeanstalk/home?region=us-east-2#/newEnvironment)
    - **Environment Tier**:Select `Web server environment`
    - **Application information**: Set desired Application name
    - **Environment information**: Set desired Environment name
@@ -49,12 +50,12 @@ In order to deploy C2Web on AWS Elastic Beanstalk with this guide you will need 
 
 5. Upload C2Web image to your ECR private repo
 
-   - https://us-east-2.console.aws.amazon.com/ecr/private-registry/repositories
+   - [ECR](https://us-east-2.console.aws.amazon.com/ecr/private-registry/repositories)
    - click *Create repository*
    - **General settings**: Select *Private*
    - Repository name: `c2web` (or whatever you prefer)
    - click *Create repository*
-   - https://us-east-2.console.aws.amazon.com/ecr/private-registry/repositories
+   - [Back to ECR](https://us-east-2.console.aws.amazon.com/ecr/private-registry/repositories)
    - click your new repository name
    - click *View push commands* and follow instructions to build images locally and push to your ECR repo
 
@@ -83,11 +84,11 @@ In order to deploy C2Web on AWS Elastic Beanstalk with this guide you will need 
 8. Set up forwarding
 
    - Add zones on bluehost (don’t add subdomain)
-     - https://my.bluehost.com/cgi/dm/zoneedit
+     - [https://my.bluehost.com/cgi/dm/zoneedit](https://my.bluehost.com/cgi/dm/zoneedit)
      - Add zone for {demo} -> {elasticbeanstalk.com} (type = CNAME)
      - Add zone for www.demo -> elasticbeanstalk.com (type=CNAME)
    - Add DNS on AWS
-     - https://us-east-2.console.aws.amazon.com/acm/home?region=us-east-2#/wizard/
+     - [https://us-east-2.console.aws.amazon.com/acm/home?region=us-east-2#/wizard/](https://us-east-2.console.aws.amazon.com/acm/home?region=us-east-2#/wizard/)
      - Request a Certificate
      - Type in ‘{demo}.edilytics.com’
      - ‘Add another name’
@@ -113,14 +114,14 @@ In order to deploy C2Web on AWS Elastic Beanstalk with this guide you will need 
 
 10. Set up SSL (Optional)
 
-   - https://us-east-2.console.aws.amazon.com/acm/home?region=us-east-2#/certificates/request
+   - [https://us-east-2.console.aws.amazon.com/acm/home?region=us-east-2#/certificates/request](https://us-east-2.console.aws.amazon.com/acm/home?region=us-east-2#/certificates/request)
    - Select `Request a public certificate`
    - **Domain Names** Enter the domain name(s) from which you will access your instace (e.g. "crispresso.my-biotech-company.com")
    - **Validation method** select DNS validation if possible
    - Click *Request*
    - Click on the certificate you just requested
    - In your DNS Settings, add the CNAME record shown under **Domains**
-   - Return to EB https://us-east-2.console.aws.amazon.com/elasticbeanstalk/home?region=us-east-2#/environments
+   - [Return to EB](https://us-east-2.console.aws.amazon.com/elasticbeanstalk/home?region=us-east-2#/environments)
    - select the environment you created in step 4
    [//]: # (Warning: Instructions below seem to be out-of-date)
    - **Configuration** (in left side bar under the name of environment)
