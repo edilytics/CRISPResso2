@@ -211,7 +211,7 @@
 			</div>
 			{% endif %}
 
-			{% if report_data['figures']['sgRNA_based_names'][report_data.amplicons[0]] and '11b' in report_data['figures']['sgRNA_based_names'][report_data.amplicons[0]] and report_data['figures']['sgRNA_based_names'][report_data.amplicons[0]]['11b']|length > 0 %}
+			{% if report_data.amplicons[0] in report_data['figures']['sgRNA_based_names'] and '11b' in report_data['figures']['sgRNA_based_names'][report_data.amplicons[0]] and report_data['figures']['sgRNA_based_names'][report_data.amplicons[0]]['11b']|length > 0 %}
 			<div class='card text-center mb-2 breakinpage'>
 				<div class='card-header'>
 					{% if report_data.amplicons|length == 1 %} {# if only one amplicon #}
