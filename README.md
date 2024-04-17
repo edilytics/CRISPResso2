@@ -167,15 +167,15 @@ docker run -v ${PWD}:/DATA -w /DATA -i pinellolab/crispresso2 CRISPResso --fastq
 
 Guardrails automatically check the inputs and results of experiments against standardized values. The guardrail warnings that are triggered are printed in the commandline and at the top of generated reports. In order to turn off the guardrails, add the `--disable_guardrails` argument.
 
-TotalReadsGuardrail : Checks if the number of reads is lower than expected. (Default: 10000)
-OverallReadsAlignedGuardrail : Checks if the number of aligned reads is lower than expected. (Default: 90% of the total reads)
-DisproportionateReadsAlignedGuardrail : Checks if the number of reads aligned to an amplicon is higher or lower than expected proportionally. (Default: 30% more or less than expected)
-LowRatioOfModsInWindowToOutGuardrail : Checks if the ratio of modifications inside to outside the quantification window is lower than expected. (Default: 0.01)
-HighRateOfModificationAtEndsGuardrail : Checks if there is a high rate of modifications at the ends of the read. (Default: 0.01)
-HighRateOfSubstitutionsOutsideWindowGuardrail : Checks if there is a high rate of substitutions outside of the quantification windows. (Default: 0.002)
-HighRateOfSubstitutionsGuardrail : Checks if the proportion of substitutions to other modifications is higher than expected. (Default: 0.3)
-ShortSequenceGuardrail : Checks if the provided sequences (both Amplicons and Guides) are shorter than expected. (Amplicon Default: 50, Guide Default: 19)
-LongAmpliconShortReadsGuardrail : Checks if the rovided amplicon is more than <value> times the average length of read. (Default: 1.5)
+- `TotalReadsGuardrail` : Checks if the number of reads is lower than expected. (Default: 10000)
+- `OverallReadsAlignedGuardrail` : Checks if the number of aligned reads is lower than expected. (Default: 90% of the total reads)
+- `DisproportionateReadsAlignedGuardrail` : Checks if the number of reads aligned to an amplicon is higher or lower than expected proportionally. (Default: 30% more or less than expected)
+- `LowRatioOfModsInWindowToOutGuardrail` : Checks if the ratio of modifications inside to outside the quantification window is lower than expected. (Default: 0.01)
+- `HighRateOfModificationAtEndsGuardrail` : Checks if there is a high rate of modifications at the ends of the read. (Default: 0.01)
+- `HighRateOfSubstitutionsOutsideWindowGuardrail` : Checks if there is a high rate of substitutions outside of the quantification windows. (Default: 0.002)
+- `HighRateOfSubstitutionsGuardrail` : Checks if the proportion of substitutions to other modifications is higher than expected. (Default: 0.3)
+- `ShortSequenceGuardrail` : Checks if the provided sequences (both Amplicons and Guides) are shorter than expected. (Amplicon Default: 50, Guide Default: 19)
+- `LongAmpliconShortReadsGuardrail` : Checks if the rovided amplicon is more than <value> times the average length of read. (Default: 1.5)
 
 ### Example run: Non-homologous end joining (NHEJ)
 
