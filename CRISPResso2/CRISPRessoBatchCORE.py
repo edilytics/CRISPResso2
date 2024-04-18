@@ -197,7 +197,7 @@ def main():
         num_batches = batch_params.shape[0]
         if int(n_processes_for_batch/num_batches) > 1:
             args.n_processes = int(n_processes_for_batch/num_batches)
-        
+
         int_columns = ['default_min_aln_score', 'min_average_read_quality', 'min_single_bp_quality',
                        'min_bp_quality_or_N',
                        'quantification_window_size', 'quantification_window_center', 'exclude_bp_from_left',

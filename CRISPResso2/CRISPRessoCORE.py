@@ -600,7 +600,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
                 if new_variant[match_name]['irregular_ends']:
                     N_READS_IRREGULAR_ENDS += 1
-                
+
 
     fastq_handle.close()
 

@@ -104,7 +104,7 @@ def main():
         '''
         compare_header = CRISPRessoShared.get_crispresso_header(description, compare_header)
         print(compare_header)
-        
+
         parser = CRISPRessoShared.getCRISPRessoArgParser("Compare", parser_title = 'CRISPRessoCompare Parameters')
 
         args = parser.parse_args()
