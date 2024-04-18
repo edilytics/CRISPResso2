@@ -150,20 +150,6 @@ def get_n_reads_bam(bam_filename,bam_chr_loc=""):
         raise CRISPRessoShared.InstallationException('Error when running the command:' + cmd + '\nCheck that samtools is installed correctly.')
     return retval
 
-#import time
-#start = time.time()
-matplotlib=check_library('matplotlib')
-#end = time.time()
-#start = time.time()
-from matplotlib import font_manager as fm
-#end = time.time()
-
-#start = time.time()
-plt=check_library('pylab')
-#end = time.time()
-
-from matplotlib import font_manager as fm
-import matplotlib.gridspec as gridspec
 
 pd=check_library('pandas')
 np=check_library('numpy')
@@ -600,7 +586,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
                 if new_variant[match_name]['irregular_ends']:
                     N_READS_IRREGULAR_ENDS += 1
-                
+
 
     fastq_handle.close()
 
