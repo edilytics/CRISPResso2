@@ -72,6 +72,11 @@ jobs:
       run: |
         make pooled test
 
+    - name: Run Pooled Paired Sim
+      if: success() || failure()
+      run: |
+        make pooled-paired-sim test
+
     - name: Run WGS
       if: success() || failure()
       run: |
