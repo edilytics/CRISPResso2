@@ -607,7 +607,7 @@ def main():
                                 # and add it to the list
                                 sub_sgRNA_intervals.append((newstart, newend))
 
-                            this_window_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name + 'Nucleotide_percentage_quilt_around_sgRNA_'+sgRNA)
+                            this_window_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + '_Nucleotide_percentage_quilt_around_sgRNA_'+sgRNA)
                             nucleotide_quilt_input = {
                                 'nuc_pct_df': sub_nucleotide_percentage_summary_df,
                                 'mod_pct_df': sub_modification_percentage_summary_df,
@@ -620,13 +620,11 @@ def main():
                             debug('Plotting nucleotide percentage quilt for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
                             plot(
                                 CRISPRessoPlot.plot_nucleotide_quilt,
-                                nucleotide_quilt_input,
+                                nucleotide_quilt_input, 
                             )
                             plot_name = os.path.basename(this_window_nuc_pct_quilt_plot_name)
                             window_nuc_pct_quilt_plot_names.append(plot_name)
                             crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'sgRNA: ' + sgRNA + ' Amplicon: ' + amplicon_name
-                            if len(consensus_guides) == 1:
-                                crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = ''
                             crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base around the guide ' + sgRNA + ' for the amplicon ' + amplicon_name
                             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
 
@@ -659,7 +657,7 @@ def main():
                         # done with per-sgRNA plots
 
                     if not args.suppress_plots and not args.suppress_batch_summary_plots:  # plot the whole region
-                        this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name + 'Nucleotide_percentage_quilt')
+                        this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + '_Nucleotide_percentage_quilt')
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
                             'mod_pct_df': modification_percentage_summary_df,
@@ -709,7 +707,7 @@ def main():
 
                 else:  # guides are not the same
                     if not args.suppress_plots and not args.suppress_batch_summary_plots:
-                        this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name + 'Nucleotide_percentage_quilt')
+                        this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + '_Nucleotide_percentage_quilt')
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
                             'mod_pct_df': modification_percentage_summary_df,
@@ -778,6 +776,7 @@ def main():
                             'sample_sgRNA_intervals': sgRNA_intervals,
                             'plot_path': plot_path,
                             'title': modification_type,
+                            'amplicon_name': amplicon_name,
                         }
                         debug('Plotting allele modification heatmap for {0}'.format(amplicon_name))
                         plot(
@@ -809,6 +808,7 @@ def main():
                             'sample_sgRNA_intervals': sgRNA_intervals,
                             'plot_path': plot_path,
                             'title': modification_type,
+                            'amplicon_name': amplicon_name,
                         }
                         debug('Plotting allele modification line plot for {0}'.format(amplicon_name))
                         plot(
