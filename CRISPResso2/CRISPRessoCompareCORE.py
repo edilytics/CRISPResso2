@@ -238,7 +238,7 @@ def main():
             crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'Editing efficiency comparison'
             crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Figure 1: Comparison for amplicon ' + amplicon_name + '; Left: Percentage of modified and unmodified reads in each sample; Right: relative percentage of modified and unmodified reads'
             output_1 = os.path.join(args.crispresso_output_folder_1, run_info_1['running_info']['report_filename'])
-            output_2 = os.path.join(args.crispresso_output_folder_1, run_info_2['running_info']['report_filename'])
+            output_2 = os.path.join(args.crispresso_output_folder_2, run_info_2['running_info']['report_filename'])
             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = []
             if os.path.isfile(output_1):
                 crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name].append((sample_1_name +' output', os.path.relpath(output_1, OUTPUT_DIRECTORY)))
