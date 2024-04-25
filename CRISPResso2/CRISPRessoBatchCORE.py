@@ -607,7 +607,7 @@ def main():
                                 # and add it to the list
                                 sub_sgRNA_intervals.append((newstart, newend))
 
-                            this_window_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + '_Nucleotide_percentage_quilt_around_sgRNA_'+sgRNA)
+                            this_window_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt_around_sgRNA_'+sgRNA)
                             nucleotide_quilt_input = {
                                 'nuc_pct_df': sub_nucleotide_percentage_summary_df,
                                 'mod_pct_df': sub_modification_percentage_summary_df,
@@ -657,7 +657,7 @@ def main():
                         # done with per-sgRNA plots
 
                     if not args.suppress_plots and not args.suppress_batch_summary_plots:  # plot the whole region
-                        this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + '_Nucleotide_percentage_quilt')
+                        this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt')
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
                             'mod_pct_df': modification_percentage_summary_df,
@@ -707,7 +707,7 @@ def main():
 
                 else:  # guides are not the same
                     if not args.suppress_plots and not args.suppress_batch_summary_plots:
-                        this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + '_Nucleotide_percentage_quilt')
+                        this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt')
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
                             'mod_pct_df': modification_percentage_summary_df,
