@@ -8,7 +8,6 @@ import os
 from copy import deepcopy
 import sys
 import traceback
-import argparse
 from CRISPResso2 import CRISPRessoShared
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
@@ -31,13 +30,6 @@ def check_library(library_name):
                 error('You need to install %s module to use CRISPRessoCompare!' % library_name)
                 sys.exit(1)
 
-
-def get_amplicon_output(amplicon_name, output_folder):
-    profile_file=os.path.join(output_folder, amplicon_name+'.effect_vector_combined.txt')
-    if os.path.exists(quantification_file) and profile_file:
-        return quantification_file, profile_file
-    else:
-        raise CRISPRessoShared.OutputFolderIncompleteException('The folder %s is not a valid CRISPResso2 output folder. Cannot find profile file %s for amplicon %s.' % (output_folder, profile_file, amplicon_name))
 
 def parse_profile(profile_file):
     return np.loadtxt(profile_file, skiprows=1)
