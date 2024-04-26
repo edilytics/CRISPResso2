@@ -63,3 +63,23 @@ def test_get_matching_allele_files_different_amplicon_names_same_sequence(run_in
     del run_info_2['results']['refs']['Reference']
     matching_allele_files = CRISPRessoCompareCORE.get_matching_allele_files(run_info_1, run_info_2)
     assert matching_allele_files == [('Alleles_frequency_table_around_sgRNA_GGCCCTTAAAA.txt', 'Alleles_frequency_table_around_sgRNA_GGCCCTTAAAA.txt')]
+
+
+def test_get_matching_allele_files_some_different_guides(run_info_1, run_info_2):
+    run_info_1['results']['refs']['Reference']['sgRNA_orig_sequences'] += ['AAAAAAAAAAAAAAAAAAA']
+    run_info_1['results']['refs']['Reference']['allele_frequency_files'] += ['Alleles_frequency_table_around_sgRNA_AAAAAAAAAAAAAAAAAAA.txt']
+    matching_allele_files = CRISPRessoCompareCORE.get_matching_allele_files(run_info_1, run_info_2)
+    assert matching_allele_files == [('Alleles_frequency_table_around_sgRNA_GGCCCTTAAAA.txt', 'Alleles_frequency_table_around_sgRNA_GGCCCTTAAAA.txt')]
+
+
+def test_get_matching_allele_files_multiple_guides(run_info_1, run_info_2):
+    run_info_1['results']['refs']['Reference']['sgRNA_orig_sequences'] += ['AAAAAAAAAAAAAAAAAAA']
+    run_info_1['results']['refs']['Reference']['allele_frequency_files'] += ['Alleles_frequency_table_around_sgRNA_AAAAAAAAAAAAAAAAAAA.txt']
+    run_info_2['results']['refs']['Reference']['sgRNA_orig_sequences'] += ['AAAAAAAAAAAAAAAAAAA']
+    run_info_2['results']['refs']['Reference']['allele_frequency_files'] += ['Alleles_frequency_table_around_sgRNA_AAAAAAAAAAAAAAAAAAA.txt']
+    matching_allele_files = CRISPRessoCompareCORE.get_matching_allele_files(run_info_1, run_info_2)
+    assert matching_allele_files == [
+        ('Alleles_frequency_table_around_sgRNA_GGCCCTTAAAA.txt', 'Alleles_frequency_table_around_sgRNA_GGCCCTTAAAA.txt'),
+        ('Alleles_frequency_table_around_sgRNA_AAAAAAAAAAAAAAAAAAA.txt', 'Alleles_frequency_table_around_sgRNA_AAAAAAAAAAAAAAAAAAA.txt'),
+    ]
+

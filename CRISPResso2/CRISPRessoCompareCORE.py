@@ -79,11 +79,13 @@ def get_matching_allele_files(run_info_1, run_info_2):
     matching_allele_files = []
     for sequence_1 in amplicons_1:
         if sequence_1 in amplicons_2:
-            if amplicons_1[sequence_1]['guides'] != amplicons_2[sequence_1]['guides']:
-                warn(f'Report 1 has different guides than report 2 for amplicon {amplicons_1[sequence_1]["name"]}, skipping comparison')
-                continue
             if amplicons_1[sequence_1]['cut_points'] != amplicons_2[sequence_1]['cut_points']:
                 warn(f'Report 1 has different cut points than report 2 for amplicon {amplicons_1[sequence_1]["name"]}, skipping comparison')
+                continue
+            guides_1 = set(amplicons_1[sequence_1]['guides'])
+            guides_2 = set(amplicons_2[sequence_1]['guides'])
+            if not guides_1 & guides_2:
+                warn(f'Report 1 has no shared guides with report 2 for amplicon {amplicons_1[sequence_1]["name"]}, skipping comparison')
                 continue
             matching_allele_files.extend((f_1, f_2) for f_1, f_2 in zip(amplicons_1[sequence_1]['allele_files'], amplicons_2[sequence_1]['allele_files']))
 
