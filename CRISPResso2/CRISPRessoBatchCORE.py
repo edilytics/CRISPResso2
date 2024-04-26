@@ -18,7 +18,7 @@ from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
 if CRISPRessoShared.is_C2Pro_installed():
-    from CRISPRessoPro import __version__ as CRISPRessoProVersion
+    import CRISPRessoPro
     C2PRO_INSTALLED = True
 else:
     C2PRO_INSTALLED = False
