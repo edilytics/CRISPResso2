@@ -46,7 +46,7 @@ jobs:
       with:
         repository: edilytics/CRISPResso2_tests
         token: ${{ secrets.ACCESS_CRISPRESSO2_TESTS }}
-        ref: 'cole/add-file-prefix-to-batch' # Use this to specify a branch other than master
+        # ref: '<BRANCH-NAME>' # Use this to specify a branch other than master
 
     - name: Run Basic
       run: |
