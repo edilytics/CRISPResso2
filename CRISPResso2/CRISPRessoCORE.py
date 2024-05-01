@@ -4893,7 +4893,11 @@ def main():
                 debug('Plot pool results:')
                 for future in process_futures:
                     debug('future: ' + str(future))
-            future_results = [f.result() for f in process_futures] #required to raise exceptions thrown from within futures
+            for result in process_futures:
+                try:
+                    result.result()
+                except Exception as e:
+                    logger.warning('Error in plot pool: %s' % e)
             process_pool.shutdown()
 
         info('Done!')

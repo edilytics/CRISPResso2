@@ -398,6 +398,7 @@ def main():
         large_plot_cutoff = 300
 
         percent_complete_start, percent_complete_end = 90, 99
+        breakpoint()
         percent_complete_step = (percent_complete_end - percent_complete_start) / len(all_amplicons)
         # report for amplicons
         for amplicon_index, amplicon_seq in enumerate(all_amplicons):
@@ -901,7 +902,11 @@ def main():
                 debug('CRISPResso batch results:')
                 for future in process_futures:
                     debug('future: ' + str(future))
-            future_results = [f.result() for f in process_futures] #required to raise exceptions thrown from within future
+            for result in process_futures:
+                try:
+                    result.result()
+                except Exception as e:
+                    logger.warning('Error in plot pool: %s' % e)
             process_pool.shutdown()
 
         if not args.suppress_report:
