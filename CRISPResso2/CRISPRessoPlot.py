@@ -3373,7 +3373,7 @@ def plot_reads_total(fig_filename_root,df_summary_quantification,save_png,cutoff
     plt.close(fig)
 
 
-def plot_read_barplot(Failure, N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
+def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
                       plot_root, save_png,**kwargs
                       ):
     """Plot barplot of total, processed, and aligned reads.
@@ -3427,7 +3427,7 @@ def plot_read_barplot(Failure, N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOT
     plt.close()
 
 
-def plot_class_piechart_and_barplot(Failure, class_counts_order, class_counts, ref_names,
+def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
                                     expected_hdr_amplicon_seq, N_TOTAL,
                                     piechart_plot_root, barplot_plot_root, custom_colors, save_png,**kwargs):
     """Plot a pie chart and barplot of class assignments for reads.
