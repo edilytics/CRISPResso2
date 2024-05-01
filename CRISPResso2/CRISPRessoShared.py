@@ -28,7 +28,7 @@ from inspect import getmodule, stack
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
 
-__version__ = "2.3.0"
+__version__ = "2.3.1"
 
 
 ###EXCEPTIONS############################
@@ -1701,7 +1701,7 @@ def get_crispresso_header(description, header_str):
                 term_width) + "\n" + output_line
 
     output_line += '\n' + ('[CRISPResso version ' + __version__ + ']').center(term_width) + '\n' + (
-        '[Note that as of version 2.3.0 FLASh and Trimmomatic have been replaced by fastp for read merging and trimming. Accordingly, the --flash_command and --trimmomatic_command parameters have been replaced with --fastp_command. Also, --trimmomatic_options_string has been replaced with --fastp_options_string.\n\nAlso in version 2.3.1, when running CRISPRessoPooled in mixed-mode (amplicon file and genome are provided) the default behavior will be as if the --demultiplex_only_at_amplicons parameter is provided. This change means that reads and amplicons do not need to align to the exact locations.]').center(
+        '[Note that as of version 2.3.0 FLASh and Trimmomatic have been replaced by fastp for read merging and trimming. Accordingly, the --flash_command and --trimmomatic_command parameters have been replaced with --fastp_command. Also, --trimmomatic_options_string has been replaced with --fastp_options_string.\n\nAlso in version 2.3.2, when running CRISPRessoPooled in mixed-mode (amplicon file and genome are provided) the default behavior will be as if the --demultiplex_only_at_amplicons parameter is provided. This change means that reads and amplicons do not need to align to the exact locations.]').center(
         term_width) + "\n" + ('[For support contact k.clement@utah.edu or support@edilytics.com]').center(term_width) + "\n"
 
     description_str = ""
@@ -1856,9 +1856,11 @@ def check_custom_config(args):
                 custom_config['colors'] = config['colors']
 
             return custom_config
-        except Exception as e:
-            logger.warn("Cannot read json file '%s', defaulting config parameters." % args.config_file)
-            print(e)
+        except Exception:
+            if args.config_file:
+                logger.warn("Cannot read config file '%s', defaulting config parameters." % args.config_file)
+            else:
+                logger.warn("No config file provided, defaulting config parameters.")
     return config
 
 
