@@ -271,7 +271,11 @@ def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool)
     -------
     None
     """
-    if num_processes > 1:
-        process_futures[process_pool.submit(plot_func, **plot_args)] = (plot_func, plot_args)
-    else:
-        plot_func(**plot_args)
+    try:
+        if num_processes > 1:
+            process_futures[process_pool.submit(plot_func, **plot_args)] = (plot_func, plot_args)
+        else:
+            plot_func(**plot_args)
+    except Exception as e:
+        print(f"WARNING: Plot error {e}, skipping plot \n")
+

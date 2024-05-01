@@ -3373,7 +3373,7 @@ def plot_reads_total(fig_filename_root,df_summary_quantification,save_png,cutoff
     plt.close(fig)
 
 
-def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
+def plot_read_barplot(Failure, N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
                       plot_root, save_png,**kwargs
                       ):
     """Plot barplot of total, processed, and aligned reads.
