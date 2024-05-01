@@ -178,7 +178,7 @@ def main():
                        'plot_window_size', 'max_rows_alleles_around_cut_to_plot']
         for int_col in int_columns:
             if int_col in batch_params.columns:
-                batch_params[int_col].fillna(getattr(args, int_col), inplace=True)
+                batch_params.fillna(value={int_col: getattr(args, int_col)}, inplace=True)
                 batch_params[int_col] = batch_params[int_col].astype(int)
 
         # rename column "a" to "amplicon_seq", etc
@@ -620,7 +620,7 @@ def main():
                             debug('Plotting nucleotide percentage quilt for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
                             plot(
                                 CRISPRessoPlot.plot_nucleotide_quilt,
-                                nucleotide_quilt_input, 
+                                nucleotide_quilt_input,
                             )
                             plot_name = os.path.basename(this_window_nuc_pct_quilt_plot_name)
                             window_nuc_pct_quilt_plot_names.append(plot_name)
