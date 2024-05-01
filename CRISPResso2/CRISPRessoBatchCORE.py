@@ -18,7 +18,7 @@ from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
 if CRISPRessoShared.is_C2Pro_installed():
-    from CRISPRessoPro import __version__ as CRISPRessoProVersion
+    import CRISPRessoPro
     C2PRO_INSTALLED = True
 else:
     C2PRO_INSTALLED = False
@@ -154,7 +154,7 @@ def main():
 
         log_filename = _jp('CRISPRessoBatch_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
-        status_handler = CRISPRessoShared.StatusHandler(_jp('CRISPRessoBatch_status.json'))
+        status_handler = CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoBatch_status.json'))
         logger.addHandler(status_handler)
 
         with open(log_filename, 'w+') as outfile:
@@ -686,7 +686,7 @@ def main():
                                                                                 ]
                         # done with per-sgRNA plots
 
-                    if not args.suppress_plots and not args.suppress_batch_summary_plots and should_plot_large_plots(nucleotide_percentage_summary_df.shape[0], C2PRO_INSTALLED, args.use_matplotlib):  # plot the whole region
+                    if not args.suppress_plots and not args.suppress_batch_summary_plots:  # plot the whole region
                         this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt')
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
@@ -737,7 +737,7 @@ def main():
                             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
 
                 else:  # guides are not the same
-                    if not args.suppress_plots and not args.suppress_batch_summary_plots and should_plot_large_plots(nucleotide_percentage_summary_df.shape[0], C2PRO_INSTALLED, args.use_matplotlib):
+                    if not args.suppress_plots and not args.suppress_batch_summary_plots:
                         this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt')
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
@@ -808,7 +808,7 @@ def main():
                             'sample_sgRNA_intervals': sgRNA_intervals,
                             'plot_path': plot_path,
                             'title': modification_type,
-                            'div_id': heatmap_div_id,
+                            'amplicon_name': amplicon_name,
                         }
                         debug('Plotting allele modification heatmap for {0}'.format(amplicon_name))
                         plot(
@@ -842,7 +842,7 @@ def main():
                             'sample_sgRNA_intervals': sgRNA_intervals,
                             'plot_path': plot_path,
                             'title': modification_type,
-                            'div_id': line_div_id,
+                            'amplicon_name': amplicon_name,
                         }
                         debug('Plotting allele modification line plot for {0}'.format(amplicon_name))
                         plot(

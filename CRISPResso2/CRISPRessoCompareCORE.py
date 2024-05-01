@@ -163,7 +163,7 @@ def main():
 
         log_filename = _jp('CRISPRessoCompare_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
-        logger.addHandler(CRISPRessoShared.StatusHandler(_jp('CRISPRessoCompare_status.json')))
+        logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoCompare_status.json')))
 
         with open(log_filename, 'w+') as outfile:
             outfile.write('[Command used]:\nCRISPRessoCompare %s\n\n[Execution log]:\n' % ' '.join(sys.argv))
@@ -393,16 +393,16 @@ def main():
                             ref_seq_around_cut=consensus_sequence[max(0, this_cut_point-args.offset_around_cut_to_plot+1):min(seq_len, cut_point+args.offset_around_cut_to_plot+1)]
                             break
 
-                        merged = pd.merge(df1, df2, on = ['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated'], suffixes=('_' + sample_1_name, '_'+sample_2_name), how='outer')
-                        quant_cols = ['#Reads_'+sample_1_name, '%Reads_'+sample_1_name, '#Reads_'+sample_2_name, '%Reads_'+sample_2_name]
-                        merged[quant_cols] = merged[quant_cols].fillna(0)
-                        lfc_error =0.1
-                        merged['each_LFC'] = np.log2(((merged['%Reads_'+sample_1_name]+lfc_error)/(merged['%Reads_'+sample_2_name]+lfc_error)).astype(float)).replace([np.inf, np.NaN], 0)
-                        merged = merged.sort_values(['%Reads_'+sample_1_name, 'Reference_Sequence', 'n_deleted', 'n_inserted', 'n_mutated'], ascending=False)
-                        merged = merged.reset_index(drop=True).set_index('Aligned_Sequence')
-                        output_root = allele_file_1_name.replace(".txt", "")
-                        allele_comparison_file = _jp(output_root+'.txt')
-                        merged.to_csv(allele_comparison_file, sep="\t", index=None)
+                merged = pd.merge(df1, df2, on = ['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated'], suffixes=('_' + sample_1_name, '_'+sample_2_name), how='outer')
+                quant_cols = ['#Reads_'+sample_1_name, '%Reads_'+sample_1_name, '#Reads_'+sample_2_name, '%Reads_'+sample_2_name]
+                merged[quant_cols] = merged[quant_cols].fillna(0)
+                lfc_error =0.1
+                merged['each_LFC'] = np.log2(((merged['%Reads_'+sample_1_name]+lfc_error)/(merged['%Reads_'+sample_2_name]+lfc_error)).astype(float)).replace([np.inf, np.NaN], 0)
+                merged = merged.sort_values(['%Reads_'+sample_1_name, 'Reference_Sequence', 'n_deleted', 'n_inserted', 'n_mutated'], ascending=False)
+                merged = merged.reset_index(drop=True).set_index('Aligned_Sequence')
+                args.crispresso_output_folder_root = os.path.split(allele_file_1)[1].replace(".txt", "")
+                allele_comparison_file = _jp(args.crispresso_output_folder_root+'.txt')
+                merged.to_csv(allele_comparison_file, sep="\t", index=None)
 
                 plot_name = '3.'+args.crispresso_output_folder_root+'_top'
                 CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC'], ascending=True), sample_1_name, sample_2_name, _jp(plot_name),
