@@ -11,6 +11,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Get AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install awscli
+          aws --verion
+    
       - name: Login to ECR
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
