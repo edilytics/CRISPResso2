@@ -9,23 +9,28 @@ jobs:
   build-and-push:
     name: Build and Push Docker image
     runs-on: ubuntu-latest
-    env: 
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET }}
-      AWS_DEFAULT_REGION: 'us-east-2'
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@0e613a0980cbf65ed5b322eb7a1e075d28913a83
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: 'us-east-2'
 
-    - name: Login to Amazon ECR
-      run: aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin 388123136160.dkr.ecr.us-east-2.amazonaws.com
-  
-    - name: Build Docker image
-      run: docker build -t CRISPResso2_test .
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@62f4f872db3836360b72999f4b87f1ff13310f3a
 
-    - name: Tag Docker image with version
-      run: docker tag CRISPResso2_test:latest 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
-
-    - name: Push Docker image to Amazon ECR
-      run: docker push 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build a docker container and
+          # push it to ECR so that it can
+          # be deployed to ECS.
+          docker build -t CRISPResso2_test .
+          docker tag CRISPResso2_test:latest 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
+          docker push 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
