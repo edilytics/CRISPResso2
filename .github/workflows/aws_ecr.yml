@@ -15,18 +15,18 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: 'us-east-2'
+          AWS_REGION: 'us-east-1'
         run: |
-          export TOKEN=$(aws ecr get-login-password --region us-east-2)
+          export TOKEN=$(aws ecr get-login-password --region us-east-1)
     
       - name: Build, tag, and push image to Amazon ECR
         id: build-image
         env: 
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: 'us-east-2'
+          AWS_REGION: 'us-east-1'
         run: |
-          script -e -c echo $TOKEN | docker login -u AWS --password-stdin 388123136160.dkr.ecr.us-east-2.amazonaws.com
+          script -e -c echo $TOKEN | docker login -u AWS --password-stdin 388123136160.dkr.ecr.us-east-1.amazonaws.com
           docker build -t CRISPResso2_test .
           docker tag CRISPResso2_test:latest 388123136160.dkr.ecr.us-east-2.amazonaws.com/crispresso2_test:latest
           docker push 388123136160.dkr.ecr.us-east-2.amazonaws.com/crispresso2_test:latest
