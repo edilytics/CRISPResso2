@@ -869,11 +869,12 @@ ___________________________________
                 debug('Plot pool results:')
                 for future in process_futures:
                     debug('future: ' + str(future))
-            for result in process_futures:
+            for future in process_futures:
                 try:
-                    result.result()
+                    future.result()
                 except Exception as e:
                     logger.warning('Error in plot pool: %s' % e)
+                    logger.debug(traceback.format_exc())
             process_pool.shutdown()
 
         info('Analysis Complete!', {'percent_complete': 100})
