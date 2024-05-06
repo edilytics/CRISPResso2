@@ -33,7 +33,7 @@ jobs:
         IMAGE_TAG: latest
       run: |
         # Build a docker container and push it to ECR 
-        docker build -t 388123136160.dkr.ecr.us-east-2.amazonaws.com/crispresso2_test:latest .
+        docker build -t 388123136160.dkr.ecr.us-east-1.amazonaws.com/crispresso2_test:latest .
         echo "Pushing image to ECR..."
-        docker push 388123136160.dkr.ecr.us-east-2.amazonaws.com/crispresso2_test:latest
-        echo "::set-output name=image::388123136160.dkr.ecr.us-east-2.amazonaws.com/crispresso2_test:latest"
+        docker push 388123136160.dkr.ecr.us-east-1.amazonaws.com/crispresso2_test:latest
+        echo "::set-output name=image::388123136160.dkr.ecr.us-east-1.amazonaws.com/crispresso2_test:latest"
