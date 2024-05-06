@@ -11,13 +11,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Login to ECR
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: 'us-east-2'
+        run: |
+          export TOKEN=$(aws ecr get-login-password --region us-east-2)
+    
       - name: Build, tag, and push image to Amazon ECR
         id: build-image
         env: 
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: 'us-east-2'
-          TOKEN: $(aws ecr get-login-password --region us-east-2)
         run: |
           # Build a docker container and
           # push it to ECR so that it can
