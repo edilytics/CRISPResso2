@@ -9,9 +9,6 @@ jobs:
   build-and-push:
     name: Build and Push Docker image
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: 'script --return --quiet --log-out /dev/null --command "bash -e {0}"'
 
     steps:
       - name: Login to ECR
@@ -29,7 +26,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: 'us-east-2'
         run: |
-          echo $TOKEN | docker login -u AWS --password-stdin 388123136160.dkr.ecr.us-east-2.amazonaws.com
+          script -e -c echo $TOKEN | docker login -u AWS --password-stdin 388123136160.dkr.ecr.us-east-2.amazonaws.com
           docker build -t CRISPResso2_test .
           docker tag CRISPResso2_test:latest 388123136160.dkr.ecr.us-east-2.amazonaws.com/crispresso2_test:latest
           docker push 388123136160.dkr.ecr.us-east-2.amazonaws.com/crispresso2_test:latest
