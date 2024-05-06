@@ -31,5 +31,5 @@ jobs:
           # be deployed to ECS.
           docker login -u AWS -p $TOKEN 388123136160.dkr.ecr.us-east-2.amazonaws.com
           docker build -t CRISPResso2_test .
-          docker tag CRISPResso2_test:latest 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
-          docker push 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
+          docker tag CRISPResso2_test:latest 388123136160.dkr.ecr.us-east-2.amazonaws.com/crispresso2_test:latest
+          docker push 388123136160.dkr.ecr.us-east-2.amazonaws.com/crispresso2_test:latest
