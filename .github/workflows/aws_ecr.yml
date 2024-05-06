@@ -14,6 +14,10 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
+    - id: get_version
+      name: Get version
+      uses: jannemattila/get-version-from-tag@v3
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       with:
@@ -28,12 +32,13 @@ jobs:
     - name: Build, tag, and push the image to Amazon ECR
       id: build-image
       env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        AWS_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
         ECR_REPOSITORY: 'crispresso2_test'
-        IMAGE_TAG: latest
+        AWS_REGION: 'us-east-1'
+        IMAGE_TAG: ${{ steps.get_version.outputs.version }}
       run: |
         # Build a docker container and push it to ECR 
-        docker build -t 388123136160.dkr.ecr.us-east-1.amazonaws.com/crispresso2_test:latest .
+        docker build -t $AWS_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG .
         echo "Pushing image to ECR..."
-        docker push 388123136160.dkr.ecr.us-east-1.amazonaws.com/crispresso2_test:latest
-        echo "::set-output name=image::388123136160.dkr.ecr.us-east-1.amazonaws.com/crispresso2_test:latest"
+        docker push $AWS_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "::set-output name=image::$AWS_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG"
