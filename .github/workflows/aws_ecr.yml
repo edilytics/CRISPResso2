@@ -15,7 +15,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install awscli
-          aws --verion
+          aws --version
     
       - name: Login to ECR
         env:
