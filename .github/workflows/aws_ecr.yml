@@ -21,7 +21,7 @@ jobs:
           # Build a docker container and
           # push it to ECR so that it can
           # be deployed to ECS.
-          docker login -p $(aws ecr get-login-password --region us-east-2) --username AWS 388123136160.dkr.ecr.us-east-2.amazonaws.com
+          docker login -p "$(aws ecr get-login-password --region us-east-2)" --username AWS 388123136160.dkr.ecr.us-east-2.amazonaws.com
           docker build -t CRISPResso2_test .
           docker tag CRISPResso2_test:latest 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
           docker push 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
