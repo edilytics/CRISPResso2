@@ -1,0 +1,32 @@
+name: Push Docker image to Amazon ECR
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker image
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+      with:
+        registry: 388123136160.dkr.ecr.us-east-2.amazonaws.com
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        
+    - name: Build Docker image
+      run: docker build -t CRISPResso2_test .
+
+    - name: Tag Docker image with version
+      run: docker tag CRISPResso2_test:latest 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
+
+    - name: Push Docker image to Amazon ECR
+      run: docker push 388123136160.dkr.ecr.us-east-2.amazonaws.com/CRISPResso2_test:latest
