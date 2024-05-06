@@ -1,7 +1,10 @@
 name: Push Docker image to Amazon ECR
 
 on:
-  push:
+  release:
+    types:
+      - edited
+      - released
     branches:
       - master
 
@@ -14,9 +17,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
-    # - id: get_version
-    #   name: Get version
-    #   uses: jannemattila/get-version-from-tag@v3
+    - id: get_version
+      name: Get version
+      uses: jannemattila/get-version-from-tag@v3
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -35,7 +38,7 @@ jobs:
         AWS_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
         ECR_REPOSITORY: 'crispresso2_test'
         AWS_REGION: 'us-east-1'
-        IMAGE_TAG: latest #${{ steps.get_version.outputs.version }}
+        IMAGE_TAG: ${{ steps.get_version.outputs.version }}
       run: |
         # Build a docker container and push it to ECR 
         docker build -t $AWS_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG .
