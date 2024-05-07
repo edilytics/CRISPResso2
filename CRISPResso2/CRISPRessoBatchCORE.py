@@ -605,7 +605,7 @@ def main():
                         sub_modification_percentage_summary_filename = _jp(amplicon_plot_name + 'Modification_percentage_summary_around_sgRNA_'+sgRNA+'.txt')
                         sub_modification_percentage_summary_df.to_csv(sub_modification_percentage_summary_filename, sep='\t', index=None)
 
-                        if not args.suppress_plots and not args.suppress_batch_summary_plots and should_plot_large_plots(nucleotide_percentage_summary_df.shape[0], C2PRO_INSTALLED, args.use_matplotlib):
+                        if not args.suppress_plots and not args.suppress_batch_summary_plots and should_plot_large_plots(sub_nucleotide_percentage_summary_df.shape[0], C2PRO_INSTALLED, args.use_matplotlib):
                             # plot for each guide
                             # show all sgRNA's on the plot
                             sub_sgRNA_intervals = []
