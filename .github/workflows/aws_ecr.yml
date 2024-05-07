@@ -36,7 +36,7 @@ jobs:
       id: build-image
       env:
         AWS_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-        ECR_REPOSITORY: 'crispresso2_test'
+        ECR_REPOSITORY: 'crispresso2'
         AWS_REGION: 'us-east-1'
         IMAGE_TAG: ${{ steps.get_version.outputs.version }}
       run: |
