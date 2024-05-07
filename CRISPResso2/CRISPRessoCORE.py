@@ -1562,6 +1562,11 @@ def main():
             amplicon_name_arr = args.amplicon_name.split(",")
             #split on commas, only accept empty values
             amplicon_min_alignment_score_arr = [float(x) for x in args.amplicon_min_alignment_score.split(",") if x]
+            if len(amplicon_min_alignment_score_arr) != len(amplicon_seq_arr):
+                warn("Number of amplicon min alignment scores ({0}) does not match number of amplicons ({1}). Using default min alignment score for some amplicons.\n\t To resolve, provide comma separated values to --amplicon_min_alignmen_score.".format(
+                    len(amplicon_min_alignment_score_arr),
+                    len(amplicon_seq_arr),
+                ))
 
             for idx, amp_seq in enumerate(amplicon_seq_arr):
                 if len(amp_seq) == 0:
