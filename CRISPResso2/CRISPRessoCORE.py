@@ -3776,15 +3776,16 @@ def main():
                     mod_df_for_plot.insert(0, 'Batch', ref_name)
 
                     plot_root = _jp('2a.'+ ref_plot_name + 'Nucleotide_percentage_quilt')
-                    pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
+                    pro_output_name = os.path.join(OUTPUT_DIRECTORY, f'plot_{os.path.basename(plot_root)}.json')
                     plot_2a_input = {
                         'nuc_pct_df': nuc_df_for_plot,
                         'mod_pct_df': mod_df_for_plot,
-                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
+                        'fig_filename_root': pro_output_name if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
                         'save_also_png': save_png,
                         'sgRNA_intervals': sgRNA_intervals,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
+                        'sgRNA_sequences': sgRNA_sequences,
                         'quantification_window_idxs': include_idxs_list,
                         'custom_colors': custom_config["colors"],
                     }
@@ -3824,15 +3825,16 @@ def main():
                         for x in include_idxs_list:
                             new_include_idx += [x - new_sel_cols_start]
                         plot_root = _jp('2b.'+ ref_plot_name + 'Nucleotide_percentage_quilt_around_' + sgRNA_label)
-                        pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
+                        pro_output_name = os.path.join(OUTPUT_DIRECTORY, f'plot_{os.path.basename(plot_root)}.json')
                         plot_2b_input = {
                             'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
                             'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
-                            'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
+                            'fig_filename_root': pro_output_name if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
                             'save_also_png': save_png,
                             'sgRNA_intervals': new_sgRNA_intervals,
                             'sgRNA_names': sgRNA_names,
                             'sgRNA_mismatches': sgRNA_mismatches,
+                            'sgRNA_sequences': [sgRNA],
                             'quantification_window_idxs': new_include_idx,
                             'custom_colors': custom_config["colors"],
                         }
@@ -4184,6 +4186,7 @@ def main():
                     sgRNA_intervals = refs[ref_names_for_hdr[0]]['sgRNA_intervals']
                     sgRNA_names = refs[ref_names_for_hdr[0]]['sgRNA_names']
                     sgRNA_mismatches = refs[ref_names_for_hdr[0]]['sgRNA_mismatches']
+                    sgRNA_sequences = refs[ref_names_for_hdr[0]]['sgRNA_sequences']
 #                    include_idxs_list = refs[ref_names_for_hdr[0]]['include_idxs']
                     include_idxs_list = [] # the quantification windows may be different between different amplicons
 
@@ -4204,6 +4207,7 @@ def main():
                         'quantification_window_idxs': include_idxs_list,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
+                        'sgRNA_sequences': sgRNA_sequences,
                         'custom_colors': custom_config["colors"],
                     }
                     debug('Plotting HDR nucleotide quilt')
@@ -4789,6 +4793,7 @@ def main():
                 sgRNA_intervals = refs[ref_names[0]]['sgRNA_intervals']
                 sgRNA_names = refs[ref_names[0]]['sgRNA_names']
                 sgRNA_mismatches = refs[ref_names[0]]['sgRNA_mismatches']
+                sgRNA_sequences = refs[ref_names[0]]['sgRNA_sequences']
                 include_idxs_list = refs[ref_names[0]]['include_idxs']
 
                 plot_root = _jp('11a.Prime_editing_nucleotide_percentage_quilt')
@@ -4801,6 +4806,7 @@ def main():
                     'sgRNA_intervals': sgRNA_intervals,
                     'sgRNA_names': sgRNA_names,
                     'sgRNA_mismatches': sgRNA_mismatches,
+                    'sgRNA_sequences': sgRNA_sequences,
                     'quantification_window_idxs': include_idxs_list,
                     'custom_colors': custom_config['colors']
                 }
@@ -4861,6 +4867,7 @@ def main():
                         'sgRNA_intervals': new_sgRNA_intervals,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
+                        'sgRNA_sequences': [sgRNA],
                         'quantification_window_idxs': new_include_idx,
                         'custom_colors': custom_config['colors']
                     }
@@ -4893,7 +4900,12 @@ def main():
                 debug('Plot pool results:')
                 for future in process_futures:
                     debug('future: ' + str(future))
-            future_results = [f.result() for f in process_futures] #required to raise exceptions thrown from within future
+            for future in process_futures:
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.warning('Error in plot pool: %s' % e)
+                    logger.debug(traceback.format_exc())
             process_pool.shutdown()
 
         info('Done!')
