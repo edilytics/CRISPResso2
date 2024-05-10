@@ -388,12 +388,14 @@ def main():
         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_titles'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_labels'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_datas'] = {}
+        crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_divs'] = {}
 
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_names'] = []
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_paths'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_titles'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_labels'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_datas'] = {}
+        crispresso2_info['results']['general_plots']['allele_modification_line_plot_divs'] = {}
 
         large_plot_cutoff = 300
 
@@ -771,12 +773,13 @@ def main():
                         plot_name = 'CRISPRessoBatch_percentage_of_{0}_across_alleles_{1}_heatmap'.format(modification_type.lower(), amplicon_name)
                         plot_path = '{0}.html'.format(_jp(plot_name))
 
+                        heatmap_div_id = '{0}-allele-modification-heatmap-{1}'.format(amplicon_name.lower(), modification_type.lower())
                         allele_modification_heatmap_input = {
                             'sample_values': modification_df,
                             'sample_sgRNA_intervals': sgRNA_intervals,
                             'plot_path': plot_path,
                             'title': modification_type,
-                            'amplicon_name': amplicon_name,
+                            'div_id': heatmap_div_id,
                         }
                         debug('Plotting allele modification heatmap for {0}'.format(amplicon_name))
                         plot(
@@ -799,16 +802,18 @@ def main():
                                 ),
                             ),
                         ]
+                        crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_divs'][plot_name] = heatmap_div_id
 
                         plot_name = 'CRISPRessoBatch_percentage_of_{0}_across_alleles_{1}_line'.format(modification_type.lower(), amplicon_name)
                         plot_path = '{0}.html'.format(_jp(plot_name))
 
+                        line_div_id = '{0}-allele-modification-line-{1}'.format(amplicon_name.lower(), modification_type.lower())
                         allele_modification_line_input = {
                             'sample_values': modification_df,
                             'sample_sgRNA_intervals': sgRNA_intervals,
                             'plot_path': plot_path,
                             'title': modification_type,
-                            'amplicon_name': amplicon_name,
+                            'div_id': line_div_id,
                         }
                         debug('Plotting allele modification line plot for {0}'.format(amplicon_name))
                         plot(
@@ -831,6 +836,7 @@ def main():
                                 ),
                             ),
                         ]
+                        crispresso2_info['results']['general_plots']['allele_modification_line_plot_divs'][plot_name] = line_div_id
             #end if amp_found_count > 0 (how many folders had information for this amplicon)
         #end per-amplicon analysis
 
