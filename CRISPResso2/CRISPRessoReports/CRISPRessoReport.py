@@ -633,6 +633,7 @@ def make_multi_report(
             allele_modification_line_plot_titles=allele_modification_line_plot['titles'],
             allele_modification_line_plot_labels=allele_modification_line_plot['labels'],
             allele_modification_line_plot_datas=allele_modification_line_plot['datas'],
+            allele_modification_line_plot_divs=allele_modification_line_plot['divs'],
             C2PRO_INSTALLED=C2PRO_INSTALLED,
         ))
 

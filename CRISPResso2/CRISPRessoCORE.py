@@ -4207,6 +4207,7 @@ def main():
                         'quantification_window_idxs': include_idxs_list,
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
+                        'sgRNA_sequences': sgRNA_sequences,
                         'custom_colors': custom_config["colors"],
                     }
                     debug('Plotting HDR nucleotide quilt')
@@ -4792,6 +4793,7 @@ def main():
                 sgRNA_intervals = refs[ref_names[0]]['sgRNA_intervals']
                 sgRNA_names = refs[ref_names[0]]['sgRNA_names']
                 sgRNA_mismatches = refs[ref_names[0]]['sgRNA_mismatches']
+                sgRNA_sequences = refs[ref_names[0]]['sgRNA_sequences']
                 include_idxs_list = refs[ref_names[0]]['include_idxs']
 
                 plot_root = _jp('11a.Prime_editing_nucleotide_percentage_quilt')
