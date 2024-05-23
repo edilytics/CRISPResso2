@@ -2382,7 +2382,7 @@ def main():
             processed_output_filename = output_forward_filename
 
         elif args.fastq_r1 != '' and args.fastq_r2 != '':#paired end reads
-            processed_output_filename = _jp('oet.extendedFrags.fastq.gz')
+            processed_output_filename = _jp('out.extendedFrags.fastq.gz')
             not_combined_1_filename = _jp('out.notCombined_1.fastq.gz')
             not_combined_2_filename = _jp('out.notCombined_2.fastq.gz')
             check_fastp()
