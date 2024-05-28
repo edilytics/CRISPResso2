@@ -72,7 +72,7 @@
           {% if window_nuc_pct_quilts|length > 0 %}
             <div class='card text-center mb-2'>
               <div class='card-header'>
-                <h5>Nucleotide percentages around guides</h5>
+                <h5 id="nucleotide-header">Nucleotide percentages around guides</h5>
               </div>
               <div class='card-body'>
                 {% for plot_name in window_nuc_pct_quilts %}
@@ -86,7 +86,7 @@
           {% if nuc_pct_quilts|length > 0 %}
             <div class='card text-center mb-2'>
               <div class='card-header'>
-                <h5>Nucleotide percentages in the entire amplicon</h5>
+                <h5 id="nucleotide-header-full-amplicon">Nucleotide percentages in the entire amplicon</h5>
               </div>
               <div class='card-body'>
                 {% for plot_name in nuc_pct_quilts %}
