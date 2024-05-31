@@ -634,6 +634,9 @@ def main():
                                 # and add it to the list
                                 sub_sgRNA_intervals.append((newstart, newend))
 
+                            # scale the include_idxs to be in terms of the plot centered around the sgRNA
+                            sub_include_idxs = include_idxs - consensus_sgRNA_plot_idxs[0][0]
+
                             this_window_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt_around_sgRNA_'+sgRNA)
                             nucleotide_quilt_input = {
                                 'nuc_pct_df': sub_nucleotide_percentage_summary_df,
@@ -642,7 +645,7 @@ def main():
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': sub_sgRNA_intervals,
                                 'sgRNA_sequences': consensus_guides,
-                                'quantification_window_idxs': include_idxs,
+                                'quantification_window_idxs': sub_include_idxs,
                                 'custom_colors': custom_config['colors'],
                             }
                             debug('Plotting nucleotide percentage quilt for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
@@ -665,7 +668,7 @@ def main():
                                     'conversion_nuc_to': args.conversion_nuc_to,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': sub_sgRNA_intervals,
-                                    'quantification_window_idxs': include_idxs,
+                                    'quantification_window_idxs': sub_include_idxs,
                                     'custom_colors': custom_config['colors']
                                 }
                                 debug('Plotting nucleotide conversion map for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
