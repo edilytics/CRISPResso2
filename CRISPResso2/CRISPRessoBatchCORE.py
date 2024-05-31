@@ -807,6 +807,7 @@ def main():
                             'plot_path': plot_path,
                             'title': modification_type,
                             'div_id': heatmap_div_id,
+                            'amplicon_name': amplicon_name,
                         }
                         debug('Plotting allele modification heatmap for {0}'.format(amplicon_name))
                         plot(
@@ -841,6 +842,7 @@ def main():
                             'plot_path': plot_path,
                             'title': modification_type,
                             'div_id': line_div_id,
+                            'amplicon_name': amplicon_name,
                         }
                         debug('Plotting allele modification line plot for {0}'.format(amplicon_name))
                         plot(
