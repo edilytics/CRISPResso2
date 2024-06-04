@@ -635,7 +635,7 @@ def main():
                                 sub_sgRNA_intervals.append((newstart, newend))
 
                             # scale the include_idxs to be in terms of the plot centered around the sgRNA
-                            sub_include_idxs = include_idxs - consensus_sgRNA_plot_idxs[0][0]
+                            sub_include_idxs = include_idxs - sgRNA_plot_idxs[0]
 
                             this_window_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt_around_sgRNA_'+sgRNA)
                             nucleotide_quilt_input = {
