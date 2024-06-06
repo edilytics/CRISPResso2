@@ -757,7 +757,7 @@ def main():
                         crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base for the amplicon ' + amplicon_name
                         crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
                         if args.base_editor_output and should_plot_large_plots(nucleotide_percentage_summary_df.shape[0], False, args.use_matplotlib):
-                            this_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_percentage_quilt')
+                            this_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_conversion_map')
                             conversion_map_input = {
                                 'nuc_pct_df': nucleotide_percentage_summary_df,
                                 'fig_filename_root': this_nuc_conv_plot_name,
