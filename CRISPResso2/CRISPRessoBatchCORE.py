@@ -610,8 +610,8 @@ def main():
                         if not args.suppress_plots and not args.suppress_batch_summary_plots and should_plot_large_plots(sub_nucleotide_percentage_summary_df.shape[0], C2PRO_INSTALLED, args.use_matplotlib):
                             # plot for each guide
                             # show all sgRNA's on the plot
-                            sub_sgRNA_intervals = []
-                            for sgRNA_interval in consensus_sgRNA_intervals:
+                            sub_sgRNA_intervals, sub_consensus_guides = [], []
+                            for sgRNA_index, sgRNA_interval in enumerate(consensus_sgRNA_intervals):
                                 newstart = None
                                 newend = None
                                 for idx, i in enumerate(sgRNA_plot_idxs):
@@ -633,6 +633,7 @@ def main():
                                     newend = len(include_idxs) - 1
                                 # and add it to the list
                                 sub_sgRNA_intervals.append((newstart, newend))
+                                sub_consensus_guides.append(consensus_guides[sgRNA_index])
 
                             # scale the include_idxs to be in terms of the plot centered around the sgRNA
                             sub_include_idxs = include_idxs - sgRNA_plot_idxs[0]
@@ -644,7 +645,7 @@ def main():
                                 'fig_filename_root': f'{this_window_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_window_nuc_pct_quilt_plot_name,
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': sub_sgRNA_intervals,
-                                'sgRNA_sequences': consensus_guides,
+                                'sgRNA_sequences': sub_consensus_guides,
                                 'quantification_window_idxs': sub_include_idxs,
                                 'custom_colors': custom_config['colors'],
                             }
