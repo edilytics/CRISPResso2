@@ -75,7 +75,6 @@
 </style>
 {% if C2PRO_INSTALLED %}
 <script src="https://cdn.plot.ly/plotly-2.11.1.min.js"></script>
-<script>var c2ProInstalled=true</script>
 {% endif %}
 {% endblock %}
 
@@ -318,7 +317,7 @@
 								{% for (data_label,data_path) in report_data['figures']['datas'][amplicon_name]['plot_2a'] %}
 									<p class="m-0"><small>Data: <a href="{{report_data['crispresso_data_path']}}{{data_path}}">{{data_label}}</a></small></p>
 								{% endfor %}
-								
+
 								{% if 'plot_2b' in report_data['figures']['htmls'][amplicon_name] %}
 								  	{{ report_data['figures']['htmls'][amplicon_name]['plot_2b']|safe }}
 								{% elif report_data['figures']['sgRNA_based_names'][amplicon_name] and  report_data['figures']['sgRNA_based_names'][amplicon_name]['2b']%}
