@@ -91,11 +91,12 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor = 'region',
         int_n_processes = int(n_processes)
 
     logger.info("Running CRISPResso with %d processes" % int_n_processes)
-    pool = mp.Pool(processes=int_n_processes)
+    if int_n_processes > 1:
+        pool = mp.Pool(processes=int_n_processes)
+        pFunc = partial(run_crispresso, crispresso_cmds, descriptor)
+        p_wrapper = partial(wrapper, pFunc)
     idxs = range(len(crispresso_cmds))
     ret_vals = [None] * len(crispresso_cmds)
-    pFunc = partial(run_crispresso, crispresso_cmds, descriptor)
-    p_wrapper = partial(wrapper, pFunc)
     if start_end_percent is not None:
         percent_complete_increment = start_end_percent[1] - start_end_percent[0]
         percent_complete_step = percent_complete_increment / len(crispresso_cmds)
@@ -109,14 +110,24 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor = 'region',
     signal.signal(signal.SIGINT, original_sigint_handler)
     try:
         completed = 0
-        for idx, res in pool.imap_unordered(p_wrapper, enumerate(idxs)):
-            ret_vals[idx] = res
-            completed += 1
-            percent_complete += percent_complete_step
-            logger.info(
-                "Completed {0}/{1} runs".format(completed, len(crispresso_cmds)),
-                {'percent_complete': percent_complete},
-            )
+        if int_n_processes == 1:
+            for idx, cmd in enumerate(crispresso_cmds):
+                ret_vals[idx] = run_crispresso(crispresso_cmds, descriptor, idx)
+                completed += 1
+                percent_complete += percent_complete_step
+                logger.info(
+                    "Completed {0}/{1} runs".format(completed, len(crispresso_cmds)),
+                    {'percent_complete': percent_complete},
+                )
+        else:
+            for idx, res in pool.imap_unordered(p_wrapper, enumerate(idxs)):
+                ret_vals[idx] = res
+                completed += 1
+                percent_complete += percent_complete_step
+                logger.info(
+                    "Completed {0}/{1} runs".format(completed, len(crispresso_cmds)),
+                    {'percent_complete': percent_complete},
+                )
         for idx, ret in enumerate(ret_vals):
             if ret == 137:
                 raise Exception('CRISPResso %s #%d was killed by your system. Please decrease the number of processes (-p) and run again.'%(descriptor, idx))
@@ -135,8 +146,10 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor = 'region',
         if descriptor.endswith("ch") or descriptor.endswith("sh"):
             plural = descriptor+"es"
         logger.info("Finished all " + plural)
-        pool.close()
-    pool.join()
+        if int_n_processes > 1:
+            pool.close()
+    if int_n_processes > 1:
+        pool.join()
 
 def run_pandas_apply_parallel(input_df, input_function_chunk, n_processes=1):
     """
