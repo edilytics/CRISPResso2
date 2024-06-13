@@ -98,7 +98,7 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "expected_hdr_amplicon_seq": {
-            "name": "Expected HDR Amplicon Sequence:",
+            "name": "Expected HDR Amplicon Sequence",
             "keys": ["-e", "--expected_hdr_amplicon_seq"],
             "help": "Amplicon sequence expected after HDR",
             "type": "str",
@@ -106,7 +106,7 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "coding_seq": {
-            "name": "Exon Specification Coding Sequence/s:",
+            "name": "Exon Specification Coding Sequence/s",
             "keys": ["-c", "--coding_seq"],
             "help": "Subsequence/s of the amplicon sequence covering one or more coding sequences for frameshift analysis. If more than one (for example, split by intron/s), please separate by commas.",
             "type": "str",
