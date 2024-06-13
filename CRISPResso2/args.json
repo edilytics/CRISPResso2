@@ -18,7 +18,7 @@
             "name": "Amplicon Sequence",
             "keys": ["-a", "--amplicon_seq"],
             "help": "Amplicon Sequence (can be comma-separated list of multiple sequences)",
-            "type": "str", 
+            "type": "str",
             "tools": ["Core", "Batch", "Pooled"]
         },
         "amplicon_name": {
@@ -711,6 +711,7 @@
             "tools": ["Pooled"]
         },
         "min_reads_to_use_region_pooled": {
+            "name": "Minimum Reads to Use Region",
             "keys": ["--min_reads_to_use_region"],
             "help": "Minimum number of reads that align to a region to perform the CRISPResso analysis",
             "type": "float",
@@ -785,6 +786,7 @@
             "tools": ["WGS"]
         },
         "min_reads_to_use_region_wgs": {
+            "name": "Minimum Reads to Use Region",
             "keys": ["--min_reads_to_use_region"],
             "help": "Minimum number of reads that align to a region to perform the CRISPResso analysis for WGS",
             "type": "float",
