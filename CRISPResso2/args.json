@@ -772,7 +772,7 @@
         },
         "region_file": {
             "keys": ["-f", "--region_file"],
-            "help": "Regions description file. A BED format file containing the regions to analyze, one per line. The REQUIRED columns are: chr_id(chromosome name), bpstart(start position), bpend(end position), the optional columns are:name (an unique indentifier for the region), guide_seq, expected_hdr_amplicon_seq, coding_seq, see CRISPResso help for more details on these last 3 parameters)",
+            "help": "R|Regions description file. A BED format file containing the regions to analyze, one per line. The REQUIRED columns are:\n  - chr_id (chromosome name)\n  - bpstart (start position)\n  - bpend (end position)\nThe optional columns are:\n  - name (an unique indentifier for the region)\n  - guide_seq\n  - expected_hdr_amplicon_seq\n  - coding_seq\nSee CRISPResso --help for more details on these last 3 parameters",
             "type": "str",
             "required": true,
             "tools": ["WGS"]
