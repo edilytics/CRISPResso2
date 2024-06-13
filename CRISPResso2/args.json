@@ -121,7 +121,7 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "min_average_read_quality": {
-            "name": "Minimum Average Read Quality(phred33 Scale)",
+            "name": "Minimum Average Read Quality (phred33 Scale)",
             "keys": ["-q", "--min_average_read_quality"],
             "help": "Minimum average quality score (phred33) to keep a read",
             "type": "int",
@@ -129,7 +129,7 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "min_single_bp_quality": {
-            "name": "Minimum Single bp Quality(phred33 Scale)",
+            "name": "Minimum Single bp Quality (phred33 Scale)",
             "keys": ["-s", "--min_single_bp_quality"],
             "help": "Minimum single bp score (phred33) to keep a read",
             "type": "int",
@@ -137,7 +137,7 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "min_bp_quality_or_N": {
-            "name": "Minimum bp Quality or N(phred33 Scale)",
+            "name": "Minimum bp Quality or N (phred33 Scale)",
             "keys": ["--min_bp_quality_or_N"],
             "help": "Bases with a quality score (phred33) less than this value will be set to 'N'",
             "type": "int",
