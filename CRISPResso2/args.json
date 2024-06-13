@@ -340,6 +340,7 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "needleman_wunsch_aln_matrix_loc": {
+            "name": "Needleman Wunsch Alignment Matrix Location",
             "keys": ["--needleman_wunsch_aln_matrix_loc"],
             "help": "Location of the matrix specifying substitution scores in the NCBI format (see ftp://ftp.ncbi.nih.gov/blast/matrices/)",
             "type": "str",
@@ -395,6 +396,7 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "allele_plot_pcts_only_for_assigned_reference": {
+            "name": "Allele Plot Percentages Only for Assigned Reference",
             "keys": ["--allele_plot_pcts_only_for_assigned_reference"],
             "help": "If set, in the allele plots, the percentages will show the percentage as a percent of reads aligned to the assigned reference. Default behavior is to show percentage as a percent of all reads.",
             "action": "store_true",
@@ -586,12 +588,14 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "crispresso1_mode": {
+            "name": "CRISPResso 1 Mode",
             "keys": ["--crispresso1_mode"],
             "help": "Parameter usage as in CRISPResso 1",
             "action": "store_true",
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "dsODN": {
+            "name": "dsODN",
             "keys": ["--dsODN"],
             "type": "str",
             "help": "Label reads with the dsODN sequence provided",
@@ -617,6 +621,7 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "n_processes": {
+            "name": "Number of Processes",
             "keys": ["-p", "--n_processes"],
             "type": "str",
             "help": "Specify the number of processes to use for analysis. Please use with caution since increasing this parameter will significantly increase the memory required to run CRISPResso. Can be set to 'max'.",
@@ -631,6 +636,7 @@
             "tools": ["Core", "Batch", "Pooled"]
         },
         "bam_chr_loc": {
+            "name": "BAM Chromosome Location",
             "keys": ["--bam_chr_loc"],
             "type": "str",
             "help": "Chromosome location in bam for reads to process. For example: 'chr1:50-100' or 'chrX'.",
@@ -677,6 +683,7 @@
             "tools": ["Batch"]
         },
         "crispresso_command": {
+            "name": "CRISPResso Command",
             "keys": ["--crispresso_command"],
             "help": "CRISPResso command to call",
             "type": "str",
@@ -830,7 +837,7 @@
         },
         "use_matplotlib": {
             "keys": ["--use_matplotlib"],
-            "help": "Use matplotlib for plotting instead of plotl/d3 when CRISPRessoPro is installed",
+            "help": "Use matplotlib for plotting instead of plotly/d3 when CRISPRessoPro is installed",
             "action": "store_true",
             "tools": ["Core", "Batch", "Pooled", "WGS", "Compare"]
         }
