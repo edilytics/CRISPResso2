@@ -801,13 +801,13 @@
             "tools": ["WGS"]
         },
         "crispresso_output_folder_1": {
-            "keys": ["crispresso_output_folder_1"],
+            "keys": ["--crispresso_output_folder_1"],
             "help": "First output folder with CRISPResso analysis",
             "type": "str",
             "tools": ["Compare"]
         },
         "crispresso_output_folder_2": {
-            "keys": ["crispresso_output_folder_2"],
+            "keys": ["--crispresso_output_folder_2"],
             "help": "Second output folder with CRISPResso analysis",
             "type": "str",
             "tools": ["Compare"]
