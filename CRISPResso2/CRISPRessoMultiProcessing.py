@@ -29,17 +29,18 @@ def run_crispresso(crispresso_cmds, descriptor, idx):
     idx: index of the command to run
     """
     crispresso_cmd=crispresso_cmds[idx]
+    logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
 
-    logging.info('Running CRISPResso on %s #%d/%d: %s' % (descriptor, idx, len(crispresso_cmds), crispresso_cmd))
+    logger.info('Running CRISPResso on %s #%d/%d: %s' % (descriptor, idx, len(crispresso_cmds), crispresso_cmd))
 
     return_value = sb.call(crispresso_cmd, shell=True)
 
     if return_value == 137:
-        logging.warn('CRISPResso was killed by your system (return value %d) on %s #%d: "%s"\nPlease reduce the number of processes (-p) and run again.'%(return_value, descriptor, idx, crispresso_cmd))
+        logger.warn('CRISPResso was killed by your system (return value %d) on %s #%d: "%s"\nPlease reduce the number of processes (-p) and run again.'%(return_value, descriptor, idx, crispresso_cmd))
     elif return_value != 0:
-        logging.warn('CRISPResso command failed (return value %d) on %s #%d: "%s"'%(return_value, descriptor, idx, crispresso_cmd))
+        logger.warn('CRISPResso command failed (return value %d) on %s #%d: "%s"'%(return_value, descriptor, idx, crispresso_cmd))
     else:
-        logging.info('Finished CRISPResso %s #%d' %(descriptor, idx))
+        logger.info('Finished CRISPResso %s #%d' %(descriptor, idx))
     return return_value
 
 
