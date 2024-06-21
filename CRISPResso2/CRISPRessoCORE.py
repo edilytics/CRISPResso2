@@ -25,6 +25,7 @@ import os
 import re
 import subprocess as sb
 import traceback
+from multiprocessing import Manager, Lock, Process
 
 
 from CRISPResso2 import CRISPRessoCOREResources
@@ -537,10 +538,84 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
     not_aln = {} #cache for reads that don't align
 
-    if fastq_filename.endswith('.gz'):
-        fastq_handle = gzip.open(fastq_filename, 'rt')
-    else:
-        fastq_handle=open(fastq_filename)
+    # This section of code will break up the fastq file into equal chunks
+    # First we find out how many processes we can run
+    n_processes = 1 
+    if args.n_processes == "max":
+        n_processes = CRISPRessoMultiProcessing.get_max_processes()
+    elif args.n_processes.isdigit():
+        n_processes = int(args.n_processes)
+    print(f"Number of Processes: {n_processes}")
+
+    # Now we'll break the fastq file into equal chunks for each process
+    # We'll use the number of processes 
+    # and the number of lines in the fastq file to determine the chunk size
+
+    # Get the size of the file in bytes
+    file_size = os.path.getsize(fastq_handle)
+
+    # Average number of bytes in ints for the average chunk size 
+    chunk_size = file_size // n_processes
+
+    boundaries = []
+    with open(fastq_handle, 'rb') as f:
+        for _ in range(n_processes - 1):
+            start = f.tell()
+            f.seek(chunk_size, 1)  # Move chunk_size bytes ahead
+            f.readline()  # Move to the end of the current line
+
+            # Now find the start of the next FASTQ read
+            while True:
+                pos = f.tell()
+                line = f.readline()  # Read the next line
+                if line.startswith(b'@'):  # Check if this line is the start of a new FASTQ read
+                    boundaries.append(pos)  # Save this position as it starts with '@'
+                    break
+
+                # Safety check to prevent infinite loops
+                if pos >= file_size:
+                    boundaries.append(pos)
+                    break
+
+
+
+    def process_chunks(filename, boundaries):
+        for i in range(len(boundaries) - 1):
+            start, end = boundaries[i], boundaries[i+1]
+            with open(filename, 'r') as f:
+                f.seek(start)
+                data = f.read(end - start)
+
+        
+
+    def fastq_read_processor(variantCache, lock, generate_variant_object):
+      
+      print("process successfully started")
+        # # simulate processing
+        # with lock:
+        #     if data not in variantCache:
+        #         # Process and store the result
+        #         variantCache[data] = f"Processed {data}"
+        #     else:
+        #         print(f"Data already processed: {variantCache[data]}")
+
+    manager = Manager()
+    lock = Lock()
+    
+
+
+
+    
+    processes = [] # list to hold the processes for later checking with join()
+    managerCache = manager.dict()
+    
+    # Load the variantCache into the special managerCache dictionary
+    for key, value in variantCache.items():
+        managerCache[key] = value
+
+    for i in range(n_processes):
+        process = Process(target=fastq_read_processor, args=(managerCache, lock, get_new_variant_object))
+        process.start()
 
     while(fastq_handle.readline()):
         #read through fastq in sets of 4
@@ -603,8 +678,23 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
                "READ_LENGTH": READ_LENGTH
                }
-    return(aln_stats)
 
+    # End timing
+    end_time = datetime.now()
+
+    # Calculate duration
+    duration = end_time - start_time
+    # print("Old processing time: 0:00:00.082741")
+    # print(f"New processing time: {duration}")
+
+    descriptor = "gigantic batch file time:"
+    formatted_duration = str(duration)  # Outputs as HH:MM:SS.microseconds if less than a day
+
+    # Record the duration in a text file with a descriptor
+    with open("timing_log.txt", "a") as file:
+        file.write(f"{descriptor}: {formatted_duration}\n")
+
+    return(aln_stats)
 
 def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, refs, args):
     """
