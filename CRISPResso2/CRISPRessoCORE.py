@@ -515,6 +515,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
            -allelic varaints if two variants are known to exist
 
         """
+
+    # Start timing
+    start_time = datetime.now()
     N_TOT_READS = 0
     N_CACHED_ALN = 0 # read was found in cache
     N_CACHED_NOTALN = 0 #read was found in 'not aligned' cache
@@ -537,6 +540,11 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
     not_aln = {} #cache for reads that don't align
+
+    if fastq_filename.endswith('.gz'):
+        fastq_handle = gzip.open(fastq_filename, 'rt')
+    else:
+        fastq_handle=open(fastq_filename)
 
     # This section of code will break up the fastq file into equal chunks
     # First we find out how many processes we can run
