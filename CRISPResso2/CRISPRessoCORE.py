@@ -609,8 +609,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         
 
     def fastq_read_processor(fastq_filename, open_func, managerCache, lock, generate_variant_object, start, end, process_id):
-        print("process successfully started")
-          # Open the file and seek to the start position
+        # print(f"process successfully started")
+        # Open the file and seek to the start position
+        new_variant = {}
         with open_func(fastq_filename, 'r') as f:
             f.seek(start)
             current_position = f.tell()  # Get the current position
@@ -618,18 +619,77 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 current_position = f.tell()
                 line = f.readline()  # Read the next line
                 if line.startswith('@'):
-                    # fastq_id = f.readline().strip()
+                    fastq_id = line.strip()
                     fastq_seq = f.readline().strip()
                     fastq_plus = f.readline()
-                    fastq_qual = f.readline()  
+                    fastq_qual = f.readline()
+                else:
+                    print("DISASTER")
+
+                # Grabbing seq status so we can check later without being in a lock
+                seq_status = ""
+                # This lock freezes the dict for all processes while checking whether the sequence is in the cache
                 with lock:
-                    # if managerCache[]
-                    if fastq_seq not in managerCache:
-                        # Process and store the result
-                        managerCache[fastq_seq] = generate_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-                        print(f"{process_id} added data to cache")
+                    managerCache["N_TOT_READS"] += 1
+                    if fastq_seq in managerCache["not_aln"]:
+                        managerCache["N_CACHED_NOTALN"] += 1
+                        continue
+                    if fastq_seq in managerCache:
+                        seq_status = "aln"
                     else:
-                        print(f"{process_id} saw data that was already processed")
+                        seq_status = "generate_variant"
+                if managerCache["N_TOT_READS"] % 10000 == 0:
+                    info(f"Processing reads; N_TOT_READS: {managerCache['N_TOT_READS']} N_COMPUTED_ALN: {managerCache['N_COMPUTED_ALN']} N_CACHED_ALN: {managerCache['N_CACHED_ALN']} N_COMPUTED_NOTALN: {managerCache['N_COMPUTED_NOTALN']} N_CACHED_NOTALN: {managerCache['N_CACHED_NOTALN']}")
+                
+                # The fact that this section is not in a lock means that multiple processes can be generating new variants at the same time
+                # This frees up the lock for other processes to check for other sequences while this process crunches
+                if seq_status == "generate_variant":
+                    new_variant = generate_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)        
+                        # print(f"{process_id} added data to cache")
+                        # print(managerCache[fastq_seq])
+                  
+
+                with lock:
+                    if seq_status == "generate_variant":
+                        managerCache[fastq_seq] = new_variant
+                    if new_variant['best_match_score'] <= 0:
+                        managerCache["N_COMPUTED_NOTALN"]+=1
+                        managerCache["not_aln"][fastq_seq] = 1
+                    if fastq_seq in managerCache:
+                        managerCache["N_CACHED_ALN"] += 1
+                        # Update the variant object counters
+                        if 'best_match_name' in managerCache[fastq_seq]:
+                            match_name = "variant_" + managerCache[fastq_seq]['best_match_name']
+                            managerCache[fastq_seq]['count'] += 1
+                            managerCache["N_GLOBAL_SUBS"] += managerCache[fastq_seq][match_name]['substitution_n'] + managerCache[fastq_seq][match_name]['substitutions_outside_window']
+                            managerCache["N_SUBS_OUTSIDE_WINDOW"] += managerCache[fastq_seq][match_name]['substitutions_outside_window']
+                            managerCache["N_MODS_IN_WINDOW"] += managerCache[fastq_seq][match_name]['mods_in_window']
+                            managerCache["N_MODS_OUTSIDE_WINDOW"] += managerCache[fastq_seq][match_name]['mods_outside_window']
+                            if managerCache[fastq_seq][match_name]['irregular_ends']:
+                                managerCache["N_READS_IRREGULAR_ENDS"] += 1
+                    else:
+                        # Process and create a new variant object
+                        # new_variant = generate_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+                        # print(new_variant["best_match_name"])
+                        # managerCache[fastq_seq] = new_variant
+                        if new_variant['best_match_score'] > 0:
+                            match_name = "variant_" + new_variant['best_match_name']
+                        managerCache["N_COMPUTED_ALN"] += 1
+                        if managerCache["READ_LENGTH"] == 0:
+                            managerCache["READ_LENGTH"] = len(new_variant[match_name]['aln_seq'])
+                        managerCache["N_GLOBAL_SUBS"] += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
+                        managerCache["N_SUBS_OUTSIDE_WINDOW"] += new_variant[match_name]['substitutions_outside_window']
+                        managerCache["N_MODS_IN_WINDOW"] += new_variant[match_name]['mods_in_window']
+                        managerCache["N_MODS_OUTSIDE_WINDOW"] += new_variant[match_name]['mods_outside_window']
+                        if new_variant[match_name]['irregular_ends']:
+                            managerCache["N_READS_IRREGULAR_ENDS"] += 1    
+                # with lock:
+                #     if fastq_seq not in managerCache:
+                #         # Process and store the result
+                #         managerCache[fastq_seq] = generate_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+                #         print(f"{process_id} added data to cache")
+                #     else:
+                #         print(f"{process_id} saw data that was already processed")
 
  
     managerCache = Manager().dict()
@@ -638,7 +698,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     # Load the variantCache into the special managerCache dictionary
     for key, value in variantCache.items():
         managerCache[key] = value
-        # Initialize statistical counters
+
+    # Initialize statistical counters
     managerCache["N_TOT_READS"] = 0
     managerCache["N_CACHED_ALN"] = 0
     managerCache["N_CACHED_NOTALN"] = 0
@@ -652,9 +713,10 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     managerCache["READ_LENGTH"] = 0
     managerCache["not_aln"] = not_aln
 
+
     for i in range(n_processes):
-        print(f"Starting process {i}")
-        process = Process(target=fastq_read_processor, args=(fastq_filename, open_func, managerCache, lock, get_new_variant_object, boundaries[i], boundaries[i+1], i))
+        # print(f"Starting process {i}")
+        process = Process(target=fastq_read_processor, args=(fastq_filename, open_func, managerCache, lock, get_new_variant_object, boundaries[i], boundaries[i+1], i + 1))
         process.start()
         processes.append(process)
 
@@ -662,8 +724,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         p.join()
 
     # check how many keys in managerCache
-    print("Keys in managerCache: ", len(managerCache.keys()))
-    print(managerCache["GAGTCTTAGACACAACATTGAAGATGGAAGCGTTCGGTAGCAGATTTGGGTCTAGGGGAATATGGTCCTTCTTGAGTGGATAACAGCTGCTGGG"])
     # for key, value in managerCache.items():
     #     print(key)
 
