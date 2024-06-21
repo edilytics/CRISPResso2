@@ -546,7 +546,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     else:
         fastq_handle=open(fastq_filename)
 
-    # This section of code will break up the fastq file into equal chunks
+    # This section of code will break up the fastq file into roughly equal chunks for parallelization
     # First we find out how many processes we can run
     n_processes = 1 
     if args.n_processes == "max":
@@ -559,21 +559,29 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     # We'll use the number of processes 
     # and the number of lines in the fastq file to determine the chunk size
 
-    # Get the size of the file in bytes
-    file_size = os.path.getsize(fastq_handle)
+    # Get the total size of the fastq file in bytes
+    file_size = os.path.getsize(fastq_filename)
+    print(f"File Size: {file_size}")
 
     # Average number of bytes in ints for the average chunk size 
     chunk_size = file_size // n_processes
+    print(f"Chunk Size: {chunk_size}")
+    boundaries = [0]
 
-    boundaries = []
-    with open(fastq_handle, 'rb') as f:
-        for _ in range(n_processes - 1):
+    open_func = gzip.open if fastq_filename.endswith('.gz') else open
+
+
+    with open_func(fastq_filename, 'rb') as f:
+        for i in range(n_processes):
             start = f.tell()
             f.seek(chunk_size, 1)  # Move chunk_size bytes ahead
             f.readline()  # Move to the end of the current line
 
             # Now find the start of the next FASTQ read
             while True:
+                if i == n_processes - 1:
+                    boundaries.append(file_size)
+                    break
                 pos = f.tell()
                 line = f.readline()  # Read the next line
                 if line.startswith(b'@'):  # Check if this line is the start of a new FASTQ read
@@ -584,46 +592,80 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 if pos >= file_size:
                     boundaries.append(pos)
                     break
+    
+    print("Boundaries in byte locations:")
+    print(boundaries)
 
 
+    # for i in range(len(boundaries) - 1):
+    #     start, end = boundaries[i], boundaries[i+1]
+    #     with open(fastq_filename, 'r') as f:
+    #         f.seek(start)
+    #         data = f.read(end - start)
+    #         data_chunks.append(data)
 
-    def process_chunks(filename, boundaries):
-        for i in range(len(boundaries) - 1):
-            start, end = boundaries[i], boundaries[i+1]
-            with open(filename, 'r') as f:
-                f.seek(start)
-                data = f.read(end - start)
+    print("Processes: ", n_processes)
 
         
 
-    def fastq_read_processor(variantCache, lock, generate_variant_object):
-      
-      print("process successfully started")
-        # # simulate processing
-        # with lock:
-        #     if data not in variantCache:
-        #         # Process and store the result
-        #         variantCache[data] = f"Processed {data}"
-        #     else:
-        #         print(f"Data already processed: {variantCache[data]}")
+    def fastq_read_processor(fastq_filename, open_func, managerCache, lock, generate_variant_object, start, end, process_id):
+        print("process successfully started")
+          # Open the file and seek to the start position
+        with open_func(fastq_filename, 'r') as f:
+            f.seek(start)
+            current_position = f.tell()  # Get the current position
+            while current_position < end:
+                current_position = f.tell()
+                line = f.readline()  # Read the next line
+                if line.startswith('@'):
+                    # fastq_id = f.readline().strip()
+                    fastq_seq = f.readline().strip()
+                    fastq_plus = f.readline()
+                    fastq_qual = f.readline()  
+                with lock:
+                    # if managerCache[]
+                    if fastq_seq not in managerCache:
+                        # Process and store the result
+                        managerCache[fastq_seq] = generate_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+                        print(f"{process_id} added data to cache")
+                    else:
+                        print(f"{process_id} saw data that was already processed")
 
-    manager = Manager()
+ 
+    managerCache = Manager().dict()
     lock = Lock()
-    
-
-
-
-    
     processes = [] # list to hold the processes for later checking with join()
-    managerCache = manager.dict()
-    
     # Load the variantCache into the special managerCache dictionary
     for key, value in variantCache.items():
         managerCache[key] = value
+        # Initialize statistical counters
+    managerCache["N_TOT_READS"] = 0
+    managerCache["N_CACHED_ALN"] = 0
+    managerCache["N_CACHED_NOTALN"] = 0
+    managerCache["N_COMPUTED_ALN"] = 0
+    managerCache["N_COMPUTED_NOTALN"] = 0
+    managerCache["N_GLOBAL_SUBS"] = 0
+    managerCache["N_SUBS_OUTSIDE_WINDOW"] = 0
+    managerCache["N_MODS_IN_WINDOW"] = 0
+    managerCache["N_MODS_OUTSIDE_WINDOW"] = 0
+    managerCache["N_READS_IRREGULAR_ENDS"] = 0
+    managerCache["READ_LENGTH"] = 0
+    managerCache["not_aln"] = not_aln
 
     for i in range(n_processes):
-        process = Process(target=fastq_read_processor, args=(managerCache, lock, get_new_variant_object))
+        print(f"Starting process {i}")
+        process = Process(target=fastq_read_processor, args=(fastq_filename, open_func, managerCache, lock, get_new_variant_object, boundaries[i], boundaries[i+1], i))
         process.start()
+        processes.append(process)
+
+    for p in processes:
+        p.join()
+
+    # check how many keys in managerCache
+    print("Keys in managerCache: ", len(managerCache.keys()))
+    print(managerCache["GAGTCTTAGACACAACATTGAAGATGGAAGCGTTCGGTAGCAGATTTGGGTCTAGGGGAATATGGTCCTTCTTGAGTGGATAACAGCTGCTGGG"])
+    # for key, value in managerCache.items():
+    #     print(key)
 
     while(fastq_handle.readline()):
         #read through fastq in sets of 4
@@ -695,7 +737,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     # print("Old processing time: 0:00:00.082741")
     # print(f"New processing time: {duration}")
 
-    descriptor = "gigantic batch file time:"
+    descriptor = "huge batch file time:"
     formatted_duration = str(duration)  # Outputs as HH:MM:SS.microseconds if less than a day
 
     # Record the duration in a text file with a descriptor
