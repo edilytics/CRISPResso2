@@ -662,14 +662,12 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 # if fastq_seq == "TGGTCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGAAGGGAGGCAAGAGGGCGGCTTTGGGCGGGGTCCAGTTCCGGGATTAGCGAACTTAGAGCACACGTCTGAACTCCAGTCACCGATGTATATCTCGTATGCCGTCTTCTGCTTGAAAAAAAAAAACAATTCTGAGCACCCTGCACTCTCCTCCATC":
                 # print(not_aln)
                 # print("Checking if read is in not_aln cache")
-                if fastq_seq in not_aln:
-                    print("5156")
                 # print(not_aln)
                 if fastq_seq in not_aln:
-                    print("Read is in not_aln cache!")
+                    # print("Read is in not_aln cache!")
                     seq_status = "already_not_aln"
                 elif fastq_seq in managerCache:
-                    print("Already in cache!")
+                    # print("Already in cache!")
                     seq_status = "already_in_cache"
                     # print("Already in cache!")
                 else:
@@ -703,9 +701,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 # This if/elif block handles the case where a new variant object was generated above
                     # If the new variant sequence is a bad read
                     # we store it in the not_aln cache
-                    if seq_status == "generate_new_variant" and new_variant['best_match_score'] <= 0:
-                        print(f"seq_status: {seq_status}")
-                        print(f"new_variant['best_match_score']: {new_variant['best_match_score']}")
                     if seq_status == "generate_new_variant" and new_variant['best_match_score'] <= 0:
                         not_aln[fastq_seq] = 1
                         managerCache["N_COMPUTED_NOTALN"] += 1
