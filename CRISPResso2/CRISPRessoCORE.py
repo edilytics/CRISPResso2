@@ -1001,98 +1001,66 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     READ_LENGTH = 0
 
     for seq in seq_list:
+        variantCache[seq] = managerCache[seq]
         N_TOT_READS += seq_cache[seq]
         N_COMPUTED_ALN
         if managerCache[seq]['best_match_score'] <= 0:
             N_COMPUTED_NOTALN += 1
             N_CACHED_NOTALN += seq_cache[seq]
-        elif managerCache[seq]['best_match_score'] > 0:\
+        elif managerCache[seq]['best_match_score'] > 0:
             N_COMPUTED_ALN += 1
             N_CACHED_ALN += seq_cache[seq]
+            variantCache[seq]['count'] = seq_cache[seq]
+            match_name = "variant_" + managerCache[seq]['best_match_name']
         
 
+    # while(fastq_handle.readline()):
+    #     #read through fastq in sets of 4
+    #     fastq_seq = fastq_handle.readline().strip()
+    #     fastq_plus = fastq_handle.readline()
+    #     fastq_qual = fastq_handle.readline()
+
+    #     if (N_TOT_READS % 10000 == 0):
+    #         info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
+
+    #     N_TOT_READS+=1
+    #     #if the sequence has been seen and can't be aligned, skip it
+    #     if (fastq_seq in not_aln):
+    #         N_CACHED_NOTALN += 1
+    #         continue
+    #     #if the sequence is already associated with a variant in the variant cache, pull it out
+    #     if (fastq_seq in variantCache):
+    #         N_CACHED_ALN+=1
+    #         variantCache[fastq_seq]['count'] += 1
+    #         match_name = "variant_" + variantCache[fastq_seq]['best_match_name']
+    #         N_GLOBAL_SUBS += variantCache[fastq_seq][match_name]['substitution_n'] + variantCache[fastq_seq][match_name]['substitutions_outside_window']
+    #         N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['substitutions_outside_window']
+    #         N_MODS_IN_WINDOW += variantCache[fastq_seq][match_name]['mods_in_window']
+    #         N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['mods_outside_window']
+    #         if variantCache[fastq_seq][match_name]['irregular_ends']:
+    #             N_READS_IRREGULAR_ENDS += 1
+
+    #     #otherwise, create a new variant object, and put it in the cache
+    #     else:
+    #         new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+    #         if new_variant['best_match_score'] <= 0:
+    #             N_COMPUTED_NOTALN+=1
+    #             not_aln[fastq_seq] = 1
+    #         else:
+    #             N_COMPUTED_ALN+=1
+    #             variantCache[fastq_seq] = new_variant
+    #             match_name = "variant_" + new_variant['best_match_name']
+    #             if READ_LENGTH == 0:
+    #                 READ_LENGTH = len(new_variant[match_name]['aln_seq'])
+    #             N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
+    #             N_SUBS_OUTSIDE_WINDOW += new_variant[match_name]['substitutions_outside_window']
+    #             N_MODS_IN_WINDOW += new_variant[match_name]['mods_in_window']
+    #             N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
+    #             if new_variant[match_name]['irregular_ends']:
+    #                 N_READS_IRREGULAR_ENDS += 1
 
 
-#         N_TOT_READS+=1
-
-#         #if the sequence has been seen and can't be aligned, skip it
-#         if fastq_seq in not_aln:
-#             N_CACHED_NOTALN += 1
-#             fastq_out_handle.write(fastq_id+fastq_seq+"\n"+fastq_plus+not_aln[fastq_seq]+"\n"+fastq_qual) #not_aln[fastq_seq] is alignment: NA
-#         elif fastq_seq in variantCache: #if the sequence is already associated with a variant in the variant cache, pull it out
-#             N_CACHED_ALN+=1
-#             variantCache[fastq_seq]['count'] += 1
-#             match_name = "variant_" + variantCache[fastq_seq]['best_match_name']
-#             N_GLOBAL_SUBS += variantCache[fastq_seq][match_name]['substitution_n'] + variantCache[fastq_seq][match_name]['substitutions_outside_window']
-#             N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['substitutions_outside_window']
-#             N_MODS_IN_WINDOW += variantCache[fastq_seq][match_name]['mods_in_window']
-#             N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['mods_outside_window']
-#             if variantCache[fastq_seq][match_name]['irregular_ends']:
-#                 N_READS_IRREGULAR_ENDS += 1
-#             fastq_out_handle.write(fastq_id+fastq_seq+"\n"+fastq_plus+variantCache[fastq_seq]['crispresso2_annotation']+"\n"+fastq_qual)
-
-#         #otherwise, create a new variant object, and put it in the cache
-#         else:
-#             new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-#             if new_variant['best_match_score'] <= 0:
-#                 N_COMPUTED_NOTALN+=1
-#                 crispresso2_annotation = " ALN=NA" +\
-#                         " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
-#                         " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
-#                 not_aln[fastq_seq] = crispresso2_annotation
-#                 fastq_out_handle.write(fastq_id+fastq_seq+"\n"+fastq_plus+crispresso2_annotation+"\n"+fastq_qual)
-#             else:
-#                 N_COMPUTED_ALN+=1
-#                 ins_inds = []
-#                 del_inds = []
-#                 sub_inds = []
-#                 edit_strings = []
-
-# #                for idx, best_match_name in enumerate(best_match_names):
-#                 for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
-#                     payload=new_variant['variant_'+best_match_name]
-
-#                     del_inds.append([str(x[0][0])+"("+str(x[1])+")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
-
-#                     ins_vals = []
-#                     for ins_coord,ins_size in zip(payload['insertion_coordinates'],payload['insertion_sizes']):
-#                         ins_start = payload['ref_positions'].index(ins_coord[0])
-#                         ins_vals.append(payload['aln_seq'][ins_start+1:ins_start+1+ins_size])
-#                     ins_inds.append([str(x[0][0])+"("+str(x[1])+"+"+x[2]+")" for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)])
-
-#                     sub_inds.append(payload['substitution_positions'])
-#                     edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
-
-#                 crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
-#                         " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
-#                         " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
-#                         " CLASS="+new_variant['class_name']+\
-#                         " MODS="+("&".join(edit_strings))+\
-#                         " DEL="+("&".join([';'.join(x) for x in del_inds])) +\
-#                         " INS="+("&".join([';'.join(x) for x in ins_inds])) +\
-#                         " SUB=" + ("&".join([';'.join([str(y) for y in x]) for x in sub_inds])) +\
-#                         " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
-#                         " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
-
-#                 new_variant['crispresso2_annotation'] = crispresso2_annotation
-
-#                 fastq_out_handle.write(fastq_id+fastq_seq+"\n"+fastq_plus+crispresso2_annotation+"\n"+fastq_qual)
-
-#                 variantCache[fastq_seq] = new_variant
-#                 match_name = 'variant_' + new_variant['best_match_name']
-#                 if READ_LENGTH == 0:
-#                     READ_LENGTH = len(new_variant[match_name]['aln_seq'])
-#                 N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
-#                 N_SUBS_OUTSIDE_WINDOW += new_variant[match_name]['substitutions_outside_window']
-#                 N_MODS_IN_WINDOW += new_variant[match_name]['mods_in_window']
-#                 N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
-#                 if new_variant[match_name]['irregular_ends']:
-#                     N_READS_IRREGULAR_ENDS += 1
-
-        #last step of loop = read next line
-
-#     fastq_input_handle.close()
-#     fastq_out_handle.close()
+    # fastq_handle.close()
 
 
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
