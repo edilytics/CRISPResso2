@@ -920,13 +920,14 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     
     # End timing
     end_time = datetime.now()
+    
     # Calculate duration
     duration = end_time - start_time
     descriptor = "half cached 2 processes:"
     formatted_duration = str(duration)
 
     # Record the duration in a text file with a descriptor
-    with open("timing_log.txt", "a") as file:
+    with open("fastq_timing_log.txt", "a") as file:
         file.write(f"{descriptor}: {formatted_duration}\n")
 
     return(aln_stats)
