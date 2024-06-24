@@ -442,6 +442,51 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
 
     return new_variant
 
+def find_chunk_boundary_coordinates(fastq_filename, n_processes, open_func):
+    file_size = os.path.getsize(fastq_filename)
+    rough_chunk_size = file_size // n_processes
+    boundary_byte_coordinates = [0]  # Start with the beginning of the file
+
+    with open_func(fastq_filename, 'rb') as f:
+        for i in range(1, n_processes):
+            target_pos = boundary_byte_coordinates[-1] + rough_chunk_size
+            f.seek(target_pos)
+            
+            # Move to the end of the current read
+            while f.tell() < file_size:
+                line = f.readline()
+                # print(line)
+                if line.startswith(b'+'):
+                    f.readline()  # Skip the quality line
+                    break
+            
+            # Find the start of the next FASTQ read
+            while f.tell() < file_size:
+                pos = f.tell()
+                line = f.readline()
+                if line.startswith(b'@'):  # Check if this line is the start of a new FASTQ read
+                    next_line = f.readline()
+                    if len(next_line.strip()) > 0 and not next_line.startswith(b'@'):
+                        # Confirm it's a sequence line, not a quality line starting with '@'
+                        boundary_byte_coordinates.append(pos)
+                        # print(f"Found boundary at {line.strip()}")
+                        break
+                
+                # If we've gone too far, break and let the next chunk handle it
+                if f.tell() > target_pos + rough_chunk_size:
+                    boundary_byte_coordinates.append(pos)
+                    break
+
+    # The last process always goes to the end of the file
+    boundary_byte_coordinates.append(file_size)
+
+    print("boundary_byte_coordinates in byte locations:")
+    print(boundary_byte_coordinates)
+    print("Processes: ", n_processes)
+    print("File Size in bytes: ", file_size)
+
+    return boundary_byte_coordinates
+
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
         fastqIn: name of fastq (e.g. output of fastp)
@@ -539,12 +584,12 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
         pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
-    not_aln = {} #cache for reads that don't align
+     #cache for reads that don't align
 
-    # if fastq_filename.endswith('.gz'):
-    #     fastq_handle = gzip.open(fastq_filename, 'rt')
-    # else:
-    #     fastq_handle=open(fastq_filename)
+    if fastq_filename.endswith('.gz'):
+        fastq_handle = gzip.open(fastq_filename, 'rt')
+    else:
+        fastq_handle=open(fastq_filename)
 
     # This section of code will break up the fastq file into roughly equal chunks for parallelization
     # First we find out how many processes we can run
@@ -555,60 +600,27 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         n_processes = int(args.n_processes)
     print(f"Number of Processes: {n_processes}")
 
-    # Now we'll break the fastq file into equal chunks for each process
-    # We'll use the number of processes 
-    # and the number of lines in the fastq file to determine the chunk size
-
-    # Get the total size of the fastq file in bytes
-    file_size = os.path.getsize(fastq_filename)
-    print(f"File Size: {file_size}")
-
-    # Average number of bytes in ints for the average chunk size 
-    chunk_size = file_size // n_processes
-    print(f"Chunk Size: {chunk_size}")
-    boundaries = [0]
-
     open_func = gzip.open if fastq_filename.endswith('.gz') else open
+    finding_boundaries_start_time = datetime.now()
+    boundary_byte_coordinates = find_chunk_boundary_coordinates(fastq_filename, n_processes, open_func)
+    finding_boundaries_end_time = datetime.now()
+    print(f"Finding boundaries took {finding_boundaries_end_time - finding_boundaries_start_time}")
 
-
-    with open_func(fastq_filename, 'rb') as f:
-        for i in range(n_processes):
-            start = f.tell()
-            f.seek(chunk_size, 1)  # Move chunk_size bytes ahead
-            f.readline()  # Move to the end of the current line
-            # Now find the start of the next FASTQ read
-            another_loop = False
-            while True:
-                if another_loop:
-                    print("Another Loop")
-                if i == n_processes - 1:
-                    boundaries.append(file_size)
-                    break
-                pos = f.tell()
-                line = f.readline()  # Read the next line
-                if line.startswith(b'@'):  # Check if this line is the start of a new FASTQ read
-                    boundaries.append(pos)  # Save this position as it starts with '@'
-                    break
-
-                # Safety check to prevent infinite loops
-                if pos >= file_size:
-                    boundaries.append(pos)
-                    break
-                another_loop = True
-    print("Boundaries in byte locations:")
-    print(boundaries)
-    print("Processes: ", n_processes)
-
-    def fastq_read_processor(fastq_filename, open_func, managerCache, lock, generate_variant_object, start, end, process_id):
-        # print(f"process successfully started")
+    def fastq_read_processor(fastq_filename, open_func, managerCache, not_aln, lock, generate_variant_object, start, end, process_id):
+        print(f"process successfully started")
         # Open the file and seek to the start position
         new_variant = {}
+        # I know this section works correctly.
         with open_func(fastq_filename, 'r') as f:
             f.seek(start)
             current_position = f.tell()  # Get the current position
             while current_position < end:
                 current_position = f.tell()
                 line = f.readline()  # Read the next line
+                if not line:
+                    break  # End of file
+                if current_position >= end:
+                    break  # Stop if the next read starts beyond the end boundary
                 if line.startswith('@'):
                     fastq_id = line.strip()
                     fastq_seq = f.readline().strip()
@@ -616,8 +628,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                     fastq_qual = f.readline()
                 else:
                     print("End of file reached")
-                    print(line)
-                    continue
+                    break
 
                 # Ok, the function does three things:
                 # 1. Check if the sequence has already been found to be not aligned
@@ -646,16 +657,25 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 # Interesting
 
                 seq_status = ""
-                if fastq_seq in managerCache["not_aln"]:
+                # print(f"Checking if {fastq_seq} is in not aligned cache.")
+                # print(fastq_seq)
+                # if fastq_seq == "TGGTCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGAAGGGAGGCAAGAGGGCGGCTTTGGGCGGGGTCCAGTTCCGGGATTAGCGAACTTAGAGCACACGTCTGAACTCCAGTCACCGATGTATATCTCGTATGCCGTCTTCTGCTTGAAAAAAAAAAACAATTCTGAGCACCCTGCACTCTCCTCCATC":
+                # print(not_aln)
+                # print("Checking if read is in not_aln cache")
+                if fastq_seq in not_aln:
+                    print("5156")
+                # print(not_aln)
+                if fastq_seq in not_aln:
+                    print("Read is in not_aln cache!")
                     seq_status = "already_not_aln"
-                    print("Already not aligned!")
                 elif fastq_seq in managerCache:
-                    seq_status = "already_in_cache"
                     print("Already in cache!")
+                    seq_status = "already_in_cache"
+                    # print("Already in cache!")
                 else:
                     seq_status = "generate_new_variant"
-                print(seq_status)
-                print(managerCache["num_variants_generated"])
+                # print(seq_status)
+                # print(managerCache["num_variants_generated"])
                 if managerCache["N_TOT_READS"] % 10000 == 0:
                     info(f"Processing reads; N_TOT_READS: {managerCache['N_TOT_READS']} N_COMPUTED_ALN: {managerCache['N_COMPUTED_ALN']} N_CACHED_ALN: {managerCache['N_CACHED_ALN']} N_COMPUTED_NOTALN: {managerCache['N_COMPUTED_NOTALN']} N_CACHED_NOTALN: {managerCache['N_CACHED_NOTALN']}")
                 
@@ -663,19 +683,18 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 # The fact that this function call is not in a lock means that multiple processes can be generating new variants at the same time
                 # This frees up the lock for other processes to check for other sequences while this process crunches
                 if seq_status == "generate_new_variant":
-                    print("seq_status:")
-                    print(seq_status)
-                    print(managerCache["num_variants_generated"])
+                    # print("seq_status:")
+                    # print(seq_status)
+                    # print(managerCache["num_variants_generated"])
                     new_variant = generate_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info) 
                     managerCache["num_variants_generated"] += 1
+
                 # This lock means only one process can update the managerCache at a time
                 # It means that we're slowed down considerably, but it's necessary
                 # to prevent overlapping writes to the managerCache
                 with lock:
-                    
                     # Increasing the total reads counter
                     managerCache["N_TOT_READS"] += 1
-                    
                     # This if block handles the case where the sequence is already in the not_aln cache
                     if seq_status == "already_not_aln":
                         managerCache["N_CACHED_NOTALN"] += 1
@@ -685,8 +704,12 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                     # If the new variant sequence is a bad read
                     # we store it in the not_aln cache
                     if seq_status == "generate_new_variant" and new_variant['best_match_score'] <= 0:
-                        managerCache["not_aln"][fastq_seq] = 1
+                        print(f"seq_status: {seq_status}")
+                        print(f"new_variant['best_match_score']: {new_variant['best_match_score']}")
+                    if seq_status == "generate_new_variant" and new_variant['best_match_score'] <= 0:
+                        not_aln[fastq_seq] = 1
                         managerCache["N_COMPUTED_NOTALN"] += 1
+                        print("adding to not_aln cache")
                     # Implicitly the new variant sequence is a good read 
                     # and we should store it in the managerCache
                     elif seq_status == "generate_new_variant":
@@ -715,11 +738,11 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                         managerCache["N_MODS_OUTSIDE_WINDOW"] += managerCache[fastq_seq][match_name]['mods_outside_window']
                         if managerCache[fastq_seq][match_name]['irregular_ends']:
                             managerCache["N_READS_IRREGULAR_ENDS"] += 1
-
  
     managerCache = Manager().dict()
+    not_aln = Manager().dict()
     lock = Lock()
-    processes = [] # list to hold the processes for later checking with join()
+    
     # Load the variantCache into the special managerCache dictionary
     for key, value in variantCache.items():
         managerCache[key] = value
@@ -737,12 +760,12 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     managerCache["N_READS_IRREGULAR_ENDS"] = 0
     managerCache["READ_LENGTH"] = 0
     managerCache["num_variants_generated"] = 0
-    managerCache["not_aln"] = not_aln
+    # not_aln = not_aln
 
-
+    processes = [] # list to hold the processes for later checking with join()
     for i in range(n_processes):
         # print(f"Starting process {i}")
-        process = Process(target=fastq_read_processor, args=(fastq_filename, open_func, managerCache, lock, get_new_variant_object, boundaries[i], boundaries[i+1], i + 1))
+        process = Process(target=fastq_read_processor, args=(fastq_filename, open_func, managerCache, not_aln, lock, get_new_variant_object, boundary_byte_coordinates[i], boundary_byte_coordinates[i+1], i + 1))
         process.start()
         processes.append(process)
 
@@ -761,6 +784,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     #     N_TOT_READS+=1
     #     #if the sequence has been seen and can't be aligned, skip it
     #     if (fastq_seq in not_aln):
+    #         print("We found a cached not align")
     #         N_CACHED_NOTALN += 1
     #         continue
     #     #if the sequence is already associated with a variant in the variant cache, pull it out
@@ -779,6 +803,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     #     else:
     #         new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
     #         if new_variant['best_match_score'] <= 0:
+    #             print("We computed a not aligned read")
     #             N_COMPUTED_NOTALN+=1
     #             not_aln[fastq_seq] = 1
     #         else:
@@ -839,7 +864,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     end_time = datetime.now()
     # Calculate duration
     duration = end_time - start_time
-    descriptor = "huge fastq file max processes(20):"
+    descriptor = "huge fastq file 1 process:"
     formatted_duration = str(duration)
 
     # Record the duration in a text file with a descriptor
