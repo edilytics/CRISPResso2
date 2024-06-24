@@ -797,21 +797,25 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         print(f"process successfully started")
         new_variants = {}
         # I know this section works correctly.
+        num_processed = 0
         for fastq_seq in seq_list:
             new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-            if "aln_ref_names" not in new_variant:
-                print("New variant does not have aln ref names")
-                print(new_variant)
             new_variants[fastq_seq] = new_variant
+            num_processed += 1
+            if num_processed % 10000 == 0:
+                info(f"Processed {num_processed} reads")
             # print("New variant generated")
 
         # print the number of keys of new variants
-        print("Process ", process_id, "generated a new variant dictionary conatining", len(new_variants.keys()))
-
+        lock_time = datetime.now()
+        print("New variants generated, ", process_id, " is locking to update managerCache")
         # Now store the new variants in the managerCache
         with lock:
             for fastq_seq in new_variants.keys():
                 managerCache[fastq_seq] = new_variants[fastq_seq]
+        end_lock_time = datetime.now()
+        print(f"Locking took {end_lock_time - lock_time}")
+        
 
         
     fastq_id = fastq_handle.readline()
@@ -839,9 +843,11 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
     # create a list of sequences to be processed from the seq_cache
     seq_list = list(seq_cache.keys())
+    print(f"Length of seq_list: {len(seq_list)}")
     boundaries = [0]
     for i in range(n_processes):
         boundaries.append((i+1) * (len(seq_list) // n_processes))
+    boundaries[-1] = len(seq_list)
     print(boundaries)
     print(len(boundaries))
 
@@ -864,6 +870,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     # print length of keys in managerCache
     print(f"Time to generate cache: {end_process_time - process_time}")
     print(f"Length of managerCache: {len(managerCache.keys())}")
+    print(f"Length of seq_cache: {len(seq_cache.keys())}")
 
     # Ok, so now we have two objects: 
     # A managerCache with all the variant objects
@@ -884,7 +891,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     READ_LENGTH = 0
 
     for seq in seq_list:
-        print(seq)
+        print("going over another seq")
         
         N_TOT_READS += seq_cache[seq]
         if managerCache[seq]['best_match_score'] <= 0:
@@ -896,13 +903,12 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             N_CACHED_ALN += seq_cache[seq]
             variantCache[seq]['count'] = seq_cache[seq]
             match_name = "variant_" + managerCache[seq]['best_match_name']
-            N_GLOBAL_SUBS += managerCache[fastq_seq][match_name]['substitution_n'] + managerCache[fastq_seq][match_name]['substitutions_outside_window']
-            N_SUBS_OUTSIDE_WINDOW += managerCache[fastq_seq][match_name]['substitutions_outside_window']
-            N_MODS_IN_WINDOW += managerCache[fastq_seq][match_name]['mods_in_window']
-            N_MODS_OUTSIDE_WINDOW += managerCache[fastq_seq][match_name]['mods_outside_window']
-            if managerCache[fastq_seq][match_name]['irregular_ends']:
+            N_GLOBAL_SUBS += managerCache[seq][match_name]['substitution_n'] + managerCache[seq][match_name]['substitutions_outside_window']
+            N_SUBS_OUTSIDE_WINDOW += managerCache[seq][match_name]['substitutions_outside_window']
+            N_MODS_IN_WINDOW += managerCache[seq][match_name]['mods_in_window']
+            N_MODS_OUTSIDE_WINDOW += managerCache[seq][match_name]['mods_outside_window']
+            if managerCache[seq][match_name]['irregular_ends']:
                 N_READS_IRREGULAR_ENDS += 1
-
 
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
     aln_stats = {"N_TOT_READS" : N_TOT_READS,
@@ -923,7 +929,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     
     # Calculate duration
     duration = end_time - start_time
-    descriptor = "half cached 2 processes:"
+    descriptor = "OHara, 77k unique reads, 1 process:"
     formatted_duration = str(duration)
 
     # Record the duration in a text file with a descriptor
