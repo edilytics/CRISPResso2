@@ -890,8 +890,10 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     N_READS_IRREGULAR_ENDS = 0 #number of reads with modifications at the 0 or -1 position
     READ_LENGTH = 0
 
+
+    stat_track_time = datetime.now()
     for seq in seq_list:
-        print("going over another seq")
+        # print("going over another seq")
         
         N_TOT_READS += seq_cache[seq]
         if managerCache[seq]['best_match_score'] <= 0:
@@ -909,6 +911,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             N_MODS_OUTSIDE_WINDOW += managerCache[seq][match_name]['mods_outside_window']
             if managerCache[seq][match_name]['irregular_ends']:
                 N_READS_IRREGULAR_ENDS += 1
+    end_stat_track_time = datetime.now()
 
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
     aln_stats = {"N_TOT_READS" : N_TOT_READS,
@@ -929,7 +932,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     
     # Calculate duration
     duration = end_time - start_time
-    descriptor = "OHara, 77k unique reads, 1 process:"
+    descriptor = "OHara, 77k unique reads, 5 process:"
     formatted_duration = str(duration)
 
     # Record the duration in a text file with a descriptor
