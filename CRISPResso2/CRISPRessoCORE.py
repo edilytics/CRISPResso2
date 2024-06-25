@@ -842,15 +842,15 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     # print(f"Length of seq_cache: {len(seq_cache)}")
 
     # create a list of sequences to be processed from the seq_cache
-    seq_list = list(seq_cache.keys())
-    print(f"Length of seq_list: {len(seq_list)}")
+    # seq_list = list(seq_cache.keys())
+    print(f"Length of seq_list: {len(seq_cache.keys())}")
     boundaries = [0]
     for i in range(n_processes):
-        boundaries.append((i+1) * (len(seq_list) // n_processes))
-    boundaries[-1] = len(seq_list)
+        boundaries.append((i+1) * (len(seq_cache.keys()) // n_processes))
+    boundaries[-1] = len(seq_cache.keys())
     print(boundaries)
     print(len(boundaries))
-
+    from itertools import islice
     # Now that we have our cache, we can pass it to our processes to generate the variant objects
     managerCache = Manager().dict()
     lock = Lock()
@@ -859,7 +859,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
         right_sublist_index = boundaries[i+1]
-        process = Process(target=variant_generator_process, args=(seq_list[left_sublist_index:right_sublist_index], managerCache, lock, get_new_variant_object, i))
+        process = Process(target=variant_generator_process, args=(list(islice(seq_cache.keys(), left_sublist_index, right_sublist_index)), managerCache, lock, get_new_variant_object, i))
         process.start()
         processes.append(process)
 
@@ -892,26 +892,29 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
 
     stat_track_time = datetime.now()
-    for seq in seq_list:
+    for seq in seq_cache.keys():
+        variant = managerCache[seq]
+        variant_count = seq_cache[seq]
         # print("going over another seq")
         
-        N_TOT_READS += seq_cache[seq]
-        if managerCache[seq]['best_match_score'] <= 0:
+        N_TOT_READS += variant_count
+        if variant['best_match_score'] <= 0:
             N_COMPUTED_NOTALN += 1
-            N_CACHED_NOTALN += seq_cache[seq]
-        elif managerCache[seq]['best_match_score'] > 0:
-            variantCache[seq] = managerCache[seq]
+            N_CACHED_NOTALN += variant_count
+        elif variant['best_match_score'] > 0:
+            variantCache[seq] = variant
             N_COMPUTED_ALN += 1
-            N_CACHED_ALN += seq_cache[seq]
-            variantCache[seq]['count'] = seq_cache[seq]
-            match_name = "variant_" + managerCache[seq]['best_match_name']
-            N_GLOBAL_SUBS += managerCache[seq][match_name]['substitution_n'] + managerCache[seq][match_name]['substitutions_outside_window']
-            N_SUBS_OUTSIDE_WINDOW += managerCache[seq][match_name]['substitutions_outside_window']
-            N_MODS_IN_WINDOW += managerCache[seq][match_name]['mods_in_window']
-            N_MODS_OUTSIDE_WINDOW += managerCache[seq][match_name]['mods_outside_window']
-            if managerCache[seq][match_name]['irregular_ends']:
+            N_CACHED_ALN += variant_count
+            variantCache[seq]['count'] = variant_count
+            match_name = "variant_" + variant['best_match_name']
+            N_GLOBAL_SUBS += variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']
+            N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
+            N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
+            N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
+            if variant[match_name]['irregular_ends']:
                 N_READS_IRREGULAR_ENDS += 1
     end_stat_track_time = datetime.now()
+    print(f"Time to track stats: {end_stat_track_time - stat_track_time}")
 
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
     aln_stats = {"N_TOT_READS" : N_TOT_READS,
