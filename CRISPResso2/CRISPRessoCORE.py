@@ -828,7 +828,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
         # if (N_TOT_READS % 10000 == 0):
         #     info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
-        if fastq_seq in seq_cache and isinstance(seq_cache[fastq_seq], int):
+        # if fastq_seq in seq_cache and isinstance(seq_cache[fastq_seq], int):
+        if fastq_seq in seq_cache:
             # if the read has already been seen, we increment it by 1
             seq_cache[fastq_seq] += 1
             # To not screw up the reading of the file, we skip to the next read
@@ -850,7 +851,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     boundaries[-1] = len(seq_cache.keys())
     print(boundaries)
     print(len(boundaries))
-    from itertools import islice
+    # from itertools import islice
     # Now that we have our cache, we can pass it to our processes to generate the variant objects
     managerCache = Manager().dict()
     lock = Lock()
@@ -859,7 +860,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
         right_sublist_index = boundaries[i+1]
-        process = Process(target=variant_generator_process, args=(list(islice(seq_cache.keys(), left_sublist_index, right_sublist_index)), managerCache, lock, get_new_variant_object, i))
+        # process = Process(target=variant_generator_process, args=(list(islice(seq_cache.keys(), left_sublist_index, right_sublist_index)), managerCache, lock, get_new_variant_object, i))
+        process = Process(target=variant_generator_process, args=(list(seq_cache.keys())[left_sublist_index:right_sublist_index], managerCache, lock, get_new_variant_object, i))
         process.start()
         processes.append(process)
 
@@ -868,7 +870,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     
     end_process_time = datetime.now()
     # print length of keys in managerCache
-    print(f"Time to generate cache: {end_process_time - process_time}")
+    print(f"Time to generate all variant objects: {end_process_time - process_time}")
     print(f"Length of managerCache: {len(managerCache.keys())}")
     print(f"Length of seq_cache: {len(seq_cache.keys())}")
 
