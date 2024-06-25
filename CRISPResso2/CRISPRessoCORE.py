@@ -803,7 +803,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             new_variants[fastq_seq] = new_variant
             num_processed += 1
             if num_processed % 10000 == 0:
-                info(f"Processed {num_processed} reads")
+                info(f"Process {process_id} has processed {num_processed} reads")
             # print("New variant generated")
 
         # print the number of keys of new variants
@@ -820,6 +820,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         
     fastq_id = fastq_handle.readline()
     seq_cache = {}
+    read_fastq_time = datetime.now()
     while(fastq_id):
         #read through fastq in sets of 4
         fastq_seq = fastq_handle.readline().strip()
@@ -841,6 +842,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
         fastq_id = fastq_handle.readline()
     # print(f"Length of seq_cache: {len(seq_cache)}")
+    done_reading_time = datetime.now()
+    print(f"Time to read fastq: {done_reading_time - read_fastq_time}")
 
     # create a list of sequences to be processed from the seq_cache
     # seq_list = list(seq_cache.keys())
