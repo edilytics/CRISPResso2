@@ -847,11 +847,33 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
     # create a list of sequences to be processed from the seq_cache
     # seq_list = list(seq_cache.keys())
-    print(f"Length of seq_list: {len(seq_cache.keys())}")
+    # print(f"Length of seq_list: {len(seq_cache.keys())}")
+    # boundaries = [0]
+    # for i in range(n_processes):
+    #     boundaries.append((i+1) * (len(seq_cache.keys()) // n_processes))
+    # boundaries[-1] = len(seq_cache.keys())
+    # print(boundaries)
+    # print(len(boundaries))
+    # We start with the first boundary at 0
     boundaries = [0]
-    for i in range(n_processes):
-        boundaries.append((i+1) * (len(seq_cache.keys()) // n_processes))
-    boundaries[-1] = len(seq_cache.keys())
+    # Total length of seq_list
+    total_length = len(seq_cache.keys())
+    # Accumulator to keep track of the current boundary position
+    current_boundary = 0
+    # Determine the total sum of indices to use it for weighted distribution
+    total_indices = sum(range(1, n_processes + 1))
+    for i in range(1, n_processes):
+        # Determine the weight for this particular process
+        weight = i / total_indices
+        # Calculate the next boundary
+        next_boundary = current_boundary + int(weight * total_length)
+        # Append the calculated boundary to the list
+        boundaries.append(next_boundary)
+        # Update the current boundary
+        current_boundary = next_boundary
+    # Ensure the last boundary is exactly the total length of the seq_list
+    boundaries.append(total_length)
+
     print(boundaries)
     print(len(boundaries))
     # from itertools import islice
