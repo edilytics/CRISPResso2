@@ -632,11 +632,11 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         n_processes = int(args.n_processes)
     print(f"Number of Processes: {n_processes}")
 
-    open_func = gzip.open if fastq_filename.endswith('.gz') else open
-    finding_boundaries_start_time = datetime.now()
-    # boundary_byte_coordinates = find_chunk_boundary_coordinates(fastq_filename, n_processes, open_func)
-    finding_boundaries_end_time = datetime.now()
-    print(f"Finding boundaries took {finding_boundaries_end_time - finding_boundaries_start_time}")
+    # open_func = gzip.open if fastq_filename.endswith('.gz') else open
+    # finding_boundaries_start_time = datetime.now()
+    # # boundary_byte_coordinates = find_chunk_boundary_coordinates(fastq_filename, n_processes, open_func)
+    # finding_boundaries_end_time = datetime.now()
+    # print(f"Finding boundaries took {finding_boundaries_end_time - finding_boundaries_start_time}")
 
     def fastq_read_processor(fastq_filename, open_func, managerCache, not_aln, lock, generate_variant_object, start, end, process_id):
         print(f"process successfully started")
@@ -837,7 +837,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             fastq_id = fastq_handle.readline()
             continue
         # If the sequence is not in the cache, we set it to 1
-        elif fastq_seq not in seq_cache:
+        # elif fastq_seq not in seq_cache:
+        else:
             seq_cache[fastq_seq] = 1
 
         fastq_id = fastq_handle.readline()
@@ -876,17 +877,19 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
     print(boundaries)
     print(len(boundaries))
-    # from itertools import islice
+    from itertools import islice
     # Now that we have our cache, we can pass it to our processes to generate the variant objects
     managerCache = Manager().dict()
     lock = Lock()
     processes = [] # list to hold the processes for later checking with join()
     process_time = datetime.now()
+    seq_keys_generator = seq_cache.keys()
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
         right_sublist_index = boundaries[i+1]
+        seq_list = islice(seq_keys_generator, right_sublist_index - left_sublist_index)
         # process = Process(target=variant_generator_process, args=(list(islice(seq_cache.keys(), left_sublist_index, right_sublist_index)), managerCache, lock, get_new_variant_object, i))
-        process = Process(target=variant_generator_process, args=(list(seq_cache.keys())[left_sublist_index:right_sublist_index], managerCache, lock, get_new_variant_object, i))
+        process = Process(target=variant_generator_process, args=(seq_list, managerCache, lock, get_new_variant_object, i))
         process.start()
         processes.append(process)
 
@@ -901,7 +904,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
     # Ok, so now we have two objects: 
     # A managerCache with all the variant objects
-    # And seq_list with the number of times each sequence was seen
+    # And seq_cache.keys() with the number of times each sequence was seen
 
 
     N_TOT_READS = 0
@@ -962,7 +965,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     
     # Calculate duration
     duration = end_time - start_time
-    descriptor = "OHara, 77k unique reads, 5 process:"
+    descriptor = "OHara, 77k unique reads, max process:"
     formatted_duration = str(duration)
 
     # Record the duration in a text file with a descriptor
