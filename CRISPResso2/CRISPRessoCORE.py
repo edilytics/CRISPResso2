@@ -927,11 +927,11 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         N_TOT_READS += variant_count
         if variant['best_match_score'] <= 0:
             N_COMPUTED_NOTALN += 1
-            N_CACHED_NOTALN += variant_count
+            N_CACHED_NOTALN += (variant_count - 1)
         elif variant['best_match_score'] > 0:
             variantCache[seq] = variant
             N_COMPUTED_ALN += 1
-            N_CACHED_ALN += variant_count
+            N_CACHED_ALN += (variant_count - 1)
             variantCache[seq]['count'] = variant_count
             match_name = "variant_" + variant['best_match_name']
             N_GLOBAL_SUBS += variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']
@@ -966,7 +966,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     formatted_duration = str(duration)
 
     # Record the duration in a text file with a descriptor
-    with open("fastq_timing_log.txt", "a") as file:
+    with open("cole_timing_log.txt", "a") as file:
         file.write(f"{descriptor}: {formatted_duration}\n")
 
     return(aln_stats)
