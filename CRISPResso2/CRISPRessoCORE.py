@@ -532,6 +532,29 @@ def dict_keys_generator(dict_keys):
     for k in dict_keys:
         yield k
 
+def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, process_id):
+    print(f"process successfully started")
+    new_variants = {}
+    # I know this section works correctly.
+    num_processed = 0
+    for fastq_seq in seq_list:
+        new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+        new_variants[fastq_seq] = new_variant
+        num_processed += 1
+        if num_processed % 10000 == 0:
+            info(f"Process {process_id} has processed {num_processed} reads")
+        # print("New variant generated")
+
+    # print the number of keys of new variants
+    lock_time = datetime.now()
+    print("New variants generated, ", process_id, " is locking to update managerCache")
+    # Now store the new variants in the managerCache
+    with lock:
+        for fastq_seq in new_variants.keys():
+            managerCache[fastq_seq] = new_variants[fastq_seq]
+    end_lock_time = datetime.now()
+    print(f"Locking took {end_lock_time - lock_time}")
+
 
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
@@ -795,30 +818,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 #         managerCache["N_MODS_OUTSIDE_WINDOW"] += managerCache[fastq_seq][match_name]['mods_outside_window']
                 #         if managerCache[fastq_seq][match_name]['irregular_ends']:
                 #             managerCache["N_READS_IRREGULAR_ENDS"] += 1
-
-    def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, process_id):
-        print(f"process successfully started")
-        new_variants = {}
-        # I know this section works correctly.
-        num_processed = 0
-        for fastq_seq in seq_list:
-            new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-            new_variants[fastq_seq] = new_variant
-            num_processed += 1
-            if num_processed % 10000 == 0:
-                info(f"Process {process_id} has processed {num_processed} reads")
-            # print("New variant generated")
-
-        # print the number of keys of new variants
-        lock_time = datetime.now()
-        print("New variants generated, ", process_id, " is locking to update managerCache")
-        # Now store the new variants in the managerCache
-        with lock:
-            for fastq_seq in new_variants.keys():
-                managerCache[fastq_seq] = new_variants[fastq_seq]
-        end_lock_time = datetime.now()
-        print(f"Locking took {end_lock_time - lock_time}")
-
 
 
     fastq_id = fastq_handle.readline()
