@@ -451,7 +451,7 @@ def find_chunk_boundary_coordinates(fastq_filename, n_processes, open_func):
         for i in range(1, n_processes):
             target_pos = boundary_byte_coordinates[-1] + rough_chunk_size
             f.seek(target_pos)
-            
+
             # Move to the end of the current read
             while f.tell() < file_size:
                 line = f.readline()
@@ -459,7 +459,7 @@ def find_chunk_boundary_coordinates(fastq_filename, n_processes, open_func):
                 if line.startswith(b'+'):
                     f.readline()  # Skip the quality line
                     break
-            
+
             # Find the start of the next FASTQ read
             while f.tell() < file_size:
                 pos = f.tell()
@@ -471,7 +471,7 @@ def find_chunk_boundary_coordinates(fastq_filename, n_processes, open_func):
                         boundary_byte_coordinates.append(pos)
                         # print(f"Found boundary at {line.strip()}")
                         break
-                
+
                 # If we've gone too far, break and let the next chunk handle it
                 if f.tell() > target_pos + rough_chunk_size:
                     boundary_byte_coordinates.append(pos)
@@ -528,7 +528,10 @@ def generate_fastq_seq_cache(fastq_filename, open_func, start, end, output_queue
     output_queue.put(process_dict)
     print("process has been put")
 
-                
+def dict_keys_generator(dict_keys):
+    for k in dict_keys:
+        yield k
+
 
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
@@ -603,7 +606,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
            -allelic varaints if two variants are known to exist
 
         """
-    
+
     # Start timing
     start_time = datetime.now()
 
@@ -625,7 +628,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
     # This section of code will break up the fastq file into roughly equal chunks for parallelization
     # First we find out how many processes we can run
-    n_processes = 1 
+    n_processes = 1
     if args.n_processes == "max":
         n_processes = CRISPRessoMultiProcessing.get_max_processes()
     elif args.n_processes.isdigit():
@@ -679,7 +682,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                         # print("starting to process read")
                         managerCache[fastq_seq] = 1
 
-            
+
 
                 # Ok, so at this point we've got a managerCache
 
@@ -692,12 +695,12 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 # # Ok, the function does three things:
                 # # 1. Check if the sequence has already been found to be not aligned
                 #     # This not_aln dict is found in managerCache['not_aln']
-                #     # If it has already been found as not_aln, 
+                #     # If it has already been found as not_aln,
                 #     # Increment N_CACHED_NOTALN and skip the rest of the read
                 # # 2. Check if the sequence is in the managerCache
                 #     # If it is, update the relevant counters within the managerCache
                 # # 3. If the sequence is not in the cache, generate a new variant object
-                #     # If the new variant has a best match score of <= 0, 
+                #     # If the new variant has a best match score of <= 0,
                 #         # add it to the not_aln cache instead of the main cache
                 #         # and increment the N_COMPUTED_NOTALN counter
                 #     # If the new variant has a best match score > 0,
@@ -735,7 +738,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 # # print(managerCache["num_variants_generated"])
                 # if managerCache["N_TOT_READS"] % 10000 == 0:
                 #     info(f"Processing reads; N_TOT_READS: {managerCache['N_TOT_READS']} N_COMPUTED_ALN: {managerCache['N_COMPUTED_ALN']} N_CACHED_ALN: {managerCache['N_CACHED_ALN']} N_COMPUTED_NOTALN: {managerCache['N_COMPUTED_NOTALN']} N_CACHED_NOTALN: {managerCache['N_CACHED_NOTALN']}")
-                
+
                 # # At this point we've checked if the sequence is in either the main managerCache or the not_aln cache
                 # # The fact that this function call is not in a lock means that multiple processes can be generating new variants at the same time
                 # # This frees up the lock for other processes to check for other sequences while this process crunches
@@ -743,7 +746,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 #     # print("seq_status:")
                 #     # print(seq_status)
                 #     # print(managerCache["num_variants_generated"])
-                #     new_variant = generate_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info) 
+                #     new_variant = generate_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
                 #     managerCache["num_variants_generated"] += 1
 
                 # # This lock means only one process can update the managerCache at a time
@@ -764,7 +767,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 #         not_aln[fastq_seq] = 1
                 #         managerCache["N_COMPUTED_NOTALN"] += 1
                 #         # print("adding to not_aln cache")
-                #     # Implicitly the new variant sequence is a good read 
+                #     # Implicitly the new variant sequence is a good read
                 #     # and we should store it in the managerCache
                 #     elif seq_status == "generate_new_variant":
                 #         managerCache["N_COMPUTED_ALN"] += 1
@@ -792,7 +795,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 #         managerCache["N_MODS_OUTSIDE_WINDOW"] += managerCache[fastq_seq][match_name]['mods_outside_window']
                 #         if managerCache[fastq_seq][match_name]['irregular_ends']:
                 #             managerCache["N_READS_IRREGULAR_ENDS"] += 1
- 
+
     def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, process_id):
         print(f"process successfully started")
         new_variants = {}
@@ -815,9 +818,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 managerCache[fastq_seq] = new_variants[fastq_seq]
         end_lock_time = datetime.now()
         print(f"Locking took {end_lock_time - lock_time}")
-        
 
-        
+
+
     fastq_id = fastq_handle.readline()
     seq_cache = {}
     read_fastq_time = datetime.now()
@@ -883,11 +886,11 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     lock = Lock()
     processes = [] # list to hold the processes for later checking with join()
     process_time = datetime.now()
-    seq_keys_generator = seq_cache.keys()
+    seq_keys_generator = dict_keys_generator(seq_cache.keys())
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
         right_sublist_index = boundaries[i+1]
-        seq_list = islice(seq_keys_generator, right_sublist_index - left_sublist_index)
+        seq_list = list(islice(seq_keys_generator, right_sublist_index - left_sublist_index))
         # process = Process(target=variant_generator_process, args=(list(islice(seq_cache.keys(), left_sublist_index, right_sublist_index)), managerCache, lock, get_new_variant_object, i))
         process = Process(target=variant_generator_process, args=(seq_list, managerCache, lock, get_new_variant_object, i))
         process.start()
@@ -895,14 +898,14 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
     for p in processes:
         p.join()
-    
+
     end_process_time = datetime.now()
     # print length of keys in managerCache
     print(f"Time to generate all variant objects: {end_process_time - process_time}")
     print(f"Length of managerCache: {len(managerCache.keys())}")
     print(f"Length of seq_cache: {len(seq_cache.keys())}")
 
-    # Ok, so now we have two objects: 
+    # Ok, so now we have two objects:
     # A managerCache with all the variant objects
     # And seq_cache.keys() with the number of times each sequence was seen
 
@@ -926,7 +929,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         variant = managerCache[seq]
         variant_count = seq_cache[seq]
         # print("going over another seq")
-        
+
         N_TOT_READS += variant_count
         if variant['best_match_score'] <= 0:
             N_COMPUTED_NOTALN += 1
@@ -959,10 +962,10 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
                "READ_LENGTH": READ_LENGTH
                }
-    
+
     # End timing
     end_time = datetime.now()
-    
+
     # Calculate duration
     duration = end_time - start_time
     descriptor = "OHara, 77k unique reads, max process:"
