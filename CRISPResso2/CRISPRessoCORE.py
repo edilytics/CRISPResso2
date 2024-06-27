@@ -528,11 +528,8 @@ def generate_fastq_seq_cache(fastq_filename, open_func, start, end, output_queue
     output_queue.put(process_dict)
     print("process has been put")
 
-def dict_keys_generator(dict_keys):
-    for k in dict_keys:
-        yield k
 
-def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, process_id):
+def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
     print(f"process successfully started")
     new_variants = {}
     # I know this section works correctly.
@@ -885,13 +882,13 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     lock = Lock()
     processes = [] # list to hold the processes for later checking with join()
     process_time = datetime.now()
-    seq_keys_generator = dict_keys_generator(seq_cache.keys())
+    seq_generator = (seq for seq in seq_cache.keys())
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
         right_sublist_index = boundaries[i+1]
-        seq_list = list(islice(seq_keys_generator, right_sublist_index - left_sublist_index))
+        seq_list = islice(seq_generator, right_sublist_index - left_sublist_index)
         # process = Process(target=variant_generator_process, args=(list(islice(seq_cache.keys(), left_sublist_index, right_sublist_index)), managerCache, lock, get_new_variant_object, i))
-        process = Process(target=variant_generator_process, args=(seq_list, managerCache, lock, get_new_variant_object, i))
+        process = Process(target=variant_generator_process, args=(list(seq_list), managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
         process.start()
         processes.append(process)
 
