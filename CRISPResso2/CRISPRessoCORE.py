@@ -528,6 +528,29 @@ def generate_fastq_seq_cache(fastq_filename, open_func, start, end, output_queue
     output_queue.put(process_dict)
     print("process has been put")
 
+
+def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
+    print(f"process successfully started")
+    new_variants = {}
+    # I know this section works correctly.
+    num_processed = 0
+    for fastq_seq in seq_list:
+        new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+        new_variants[fastq_seq] = new_variant
+        num_processed += 1
+        if num_processed % 10000 == 0:
+            info(f"Process {process_id} has processed {num_processed} reads")
+        # print("New variant generated")
+
+    # print the number of keys of new variants
+    lock_time = datetime.now()
+    print("New variants generated, ", process_id, " is locking to update managerCache")
+    # Now store the new variants in the managerCache
+    with lock:
+        for fastq_seq in new_variants.keys():
+            managerCache[fastq_seq] = new_variants[fastq_seq]
+    end_lock_time = datetime.now()
+    print(f"Locking took {end_lock_time - lock_time}")
                 
 
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
@@ -793,28 +816,28 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 #         if managerCache[fastq_seq][match_name]['irregular_ends']:
                 #             managerCache["N_READS_IRREGULAR_ENDS"] += 1
  
-    def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, process_id):
-        print(f"process successfully started")
-        new_variants = {}
-        # I know this section works correctly.
-        num_processed = 0
-        for fastq_seq in seq_list:
-            new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-            new_variants[fastq_seq] = new_variant
-            num_processed += 1
-            if num_processed % 10000 == 0:
-                info(f"Process {process_id} has processed {num_processed} reads")
-            # print("New variant generated")
+def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
+    print(f"process successfully started")
+    new_variants = {}
+    # I know this section works correctly.
+    num_processed = 0
+    for fastq_seq in seq_list:
+        new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+        new_variants[fastq_seq] = new_variant
+        num_processed += 1
+        if num_processed % 10000 == 0:
+            info(f"Process {process_id} has processed {num_processed} reads")
+        # print("New variant generated")
 
-        # print the number of keys of new variants
-        lock_time = datetime.now()
-        print("New variants generated, ", process_id, " is locking to update managerCache")
-        # Now store the new variants in the managerCache
-        with lock:
-            for fastq_seq in new_variants.keys():
-                managerCache[fastq_seq] = new_variants[fastq_seq]
-        end_lock_time = datetime.now()
-        print(f"Locking took {end_lock_time - lock_time}")
+    # print the number of keys of new variants
+    lock_time = datetime.now()
+    print("New variants generated, ", process_id, " is locking to update managerCache")
+    # Now store the new variants in the managerCache
+    with lock:
+        for fastq_seq in new_variants.keys():
+            managerCache[fastq_seq] = new_variants[fastq_seq]
+    end_lock_time = datetime.now()
+    print(f"Locking took {end_lock_time - lock_time}")
         
 
         
@@ -887,9 +910,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
         right_sublist_index = boundaries[i+1]
-        seq_list = islice(seq_keys_generator, right_sublist_index - left_sublist_index)
-        # process = Process(target=variant_generator_process, args=(list(islice(seq_cache.keys(), left_sublist_index, right_sublist_index)), managerCache, lock, get_new_variant_object, i))
-        process = Process(target=variant_generator_process, args=(seq_list, managerCache, lock, get_new_variant_object, i))
+        # seq_list = islice(seq_keys_generator, right_sublist_index - left_sublist_index)
+        process = Process(target=variant_generator_process, args=(list(islice(seq_cache.keys(), left_sublist_index, right_sublist_index)), managerCache, lock, get_new_variant_object,  args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
+        # process = Process(target=variant_generator_process, args=(seq_list, managerCache, lock, get_new_variant_object, i))
         process.start()
         processes.append(process)
 
