@@ -565,16 +565,12 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     # Start timing
     start_time = datetime.now()
 
-
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
-
     pe_scaffold_dna_info = (0, None) #scaffold start loc, scaffold seq to search
     if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
         pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
-
-     #cache for reads that don't align
 
     if fastq_filename.endswith('.gz'):
         fastq_handle = gzip.open(fastq_filename, 'rt')
@@ -609,6 +605,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             seq_cache[fastq_seq] = 1
 
         fastq_id = fastq_handle.readline()
+
     boundaries = get_seq_cache_boundaries(len(seq_cache.keys()), n_processes)
 
     # Now that we have our cache, we can pass it to our processes to generate the variant objects
@@ -619,19 +616,12 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
         right_sublist_index = boundaries[i+1]
-        # seq_list = islice(seq_keys_generator, right_sublist_index - left_sublist_index)
         process = Process(target=variant_generator_process, args=((list(seq_cache.keys())[left_sublist_index:right_sublist_index]), managerCache, lock, get_new_variant_object,  args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
-        # process = Process(target=variant_generator_process, args=(seq_list, managerCache, lock, get_new_variant_object, i))
         process.start()
         processes.append(process)
 
     for p in processes:
         p.join()
-
-    # Ok, so now we have two objects: 
-    # A managerCache with all the variant objects
-    # And seq_list with the number of times each sequence was seen
-
 
     N_TOT_READS = 0
     N_CACHED_ALN = 0 # read was found in cache
@@ -651,7 +641,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     for seq in seq_cache.keys():
         variant = managerCache[seq]
         variant_count = seq_cache[seq]
-        # print("going over another seq")
         
         N_TOT_READS += variant_count
         if variant['best_match_score'] <= 0:
