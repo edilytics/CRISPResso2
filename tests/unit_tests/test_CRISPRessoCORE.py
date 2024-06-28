@@ -192,6 +192,27 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_include_zero():
     quant_window_coordinates = '0-5'
     s1inds = [0, 1, 2, 3, 4, 5]
     assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [0, 1, 2, 3, 4, 5]
+
+
+# Testing parallelization functions
+def test_regular_input():
+    # Test with typical input
+    assert CRISPRessoCORE.get_seq_cache_boundaries(100, 4) == [0, 10, 30, 60, 100]
+
+def test_single_process():
+    # Test with a single process
+    assert CRISPRessoCORE.get_seq_cache_boundaries(50, 1) == [0, 50]
+
+def test_zero_sequences():
+    # Test with zero unique sequences
+    assert CRISPRessoCORE.get_seq_cache_boundaries(0, 3) == [0, 0, 0, 0]
+
+def test_large_numbers():
+    # Test with large number of processes and sequences
+    boundaries = CRISPRessoCORE.get_seq_cache_boundaries(10000, 10)
+    assert len(boundaries) == 11  # Check that there are 11 boundaries
+
+
     
 if __name__ == "__main__":
 # execute only if run as a script
