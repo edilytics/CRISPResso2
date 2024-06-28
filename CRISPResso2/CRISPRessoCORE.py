@@ -442,92 +442,27 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
 
     return new_variant
 
-def find_chunk_boundary_coordinates(fastq_filename, n_processes, open_func):
-    file_size = os.path.getsize(fastq_filename)
-    rough_chunk_size = file_size // n_processes
-    boundary_byte_coordinates = [0]  # Start with the beginning of the file
-
-    with open_func(fastq_filename, 'rb') as f:
-        for i in range(1, n_processes):
-            target_pos = boundary_byte_coordinates[-1] + rough_chunk_size
-            f.seek(target_pos)
-            
-            # Move to the end of the current read
-            while f.tell() < file_size:
-                line = f.readline()
-                # print(line)
-                if line.startswith(b'+'):
-                    f.readline()  # Skip the quality line
-                    break
-            
-            # Find the start of the next FASTQ read
-            while f.tell() < file_size:
-                pos = f.tell()
-                line = f.readline()
-                if line.startswith(b'@'):  # Check if this line is the start of a new FASTQ read
-                    next_line = f.readline()
-                    if len(next_line.strip()) > 0 and not next_line.startswith(b'@'):
-                        # Confirm it's a sequence line, not a quality line starting with '@'
-                        boundary_byte_coordinates.append(pos)
-                        # print(f"Found boundary at {line.strip()}")
-                        break
-                
-                # If we've gone too far, break and let the next chunk handle it
-                if f.tell() > target_pos + rough_chunk_size:
-                    boundary_byte_coordinates.append(pos)
-                    break
-
-    # The last process always goes to the end of the file
-    boundary_byte_coordinates.append(file_size)
-
-    # print("boundary_byte_coordinates in byte locations:")
-    # print(boundary_byte_coordinates)
-    # print("Processes: ", n_processes)
-    # print("File Size in bytes: ", file_size)
-
-    return boundary_byte_coordinates
 
 
-
-def generate_fastq_seq_cache(fastq_filename, open_func, start, end, output_queue):
-    print("Generating cache")
-    process_dict = {}
-    with open_func(fastq_filename, 'r') as f:
-        f.seek(start)
-        current_position = f.tell()  # Get the current position
-        while current_position < end:
-            print("New read processing")
-            current_position = f.tell()
-            line = f.readline()  # Read the next line
-            if not line:
-                break  # End of file
-            if current_position >= end:
-                break  # Stop if the next read starts beyond the end boundary
-            if line.startswith('@'):
-                fastq_id = line.strip()
-                fastq_seq = f.readline().strip()
-                fastq_plus = f.readline()
-                fastq_qual = f.readline()
-            else:
-                print("End of file reached")
-                break
-
-            if fastq_seq in process_dict and isinstance(process_dict[fastq_seq], int):
-                # print("Read is already being processed!")
-                process_dict[fastq_seq] += 1
-                # if managerCache[fastq_seq] > 10:
-                #     print("Multiple processes attempted to process this read!")
-                #     print("Read count is: ", managerCache[fastq_seq])
-                continue
-            # If the sequence is not in the cache, we set it to 1, signifying that it's being processed
-            elif fastq_seq not in process_dict:
-                # print("starting to process read")
-                process_dict[fastq_seq] = 1
-                print("Getting another")
-    print("reached here in the code")
-    output_queue.put(process_dict)
-    print("process has been put")
-
+def get_seq_cache_boundaries(num_unique_sequences, n_processes):
+    
+    boundaries = [0]
+    # Accumulator to keep track of the current boundary position
+    current_boundary = 0
+    # Determine the total sum of indices to use it for weighted distribution
+    total_indices = sum(range(1, n_processes + 1))
+    for i in range(1, n_processes):
+        # Determine the weight for this particular process
+        weight = i / total_indices
+        # Calculate the next boundary
+        next_boundary = current_boundary + int(weight * num_unique_sequences)
+        # Append the calculated boundary to the list
+        boundaries.append(next_boundary)
+        # Update the current boundary
+        current_boundary = next_boundary
+    # Ensure the last boundary is exactly the total length of the seq_list
+    boundaries.append(num_unique_sequences)
+    return boundaries
 
 def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
     print(f"process successfully started")
@@ -655,204 +590,14 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         n_processes = int(args.n_processes)
     print(f"Number of Processes: {n_processes}")
 
-    # open_func = gzip.open if fastq_filename.endswith('.gz') else open
-    # finding_boundaries_start_time = datetime.now()
-    # # boundary_byte_coordinates = find_chunk_boundary_coordinates(fastq_filename, n_processes, open_func)
-    # finding_boundaries_end_time = datetime.now()
-    # print(f"Finding boundaries took {finding_boundaries_end_time - finding_boundaries_start_time}")
-
-    def fastq_read_processor(fastq_filename, open_func, managerCache, not_aln, lock, generate_variant_object, start, end, process_id):
-        print(f"process successfully started")
-        # Open the file and seek to the start position
-        new_variant = {}
-        # I know this section works correctly.
-        with open_func(fastq_filename, 'r') as f:
-            f.seek(start)
-            current_position = f.tell()  # Get the current position
-            while current_position < end:
-                current_position = f.tell()
-                line = f.readline()  # Read the next line
-                if not line:
-                    break  # End of file
-                if current_position >= end:
-                    break  # Stop if the next read starts beyond the end boundary
-                if line.startswith('@'):
-                    fastq_id = line.strip()
-                    fastq_seq = f.readline().strip()
-                    fastq_plus = f.readline()
-                    fastq_qual = f.readline()
-                else:
-                    print("End of file reached")
-                    break
-
-                # This should hopefully prevent multiple processes from generating the same variant object
-                with lock:
-                    # we check if the seq is represented by a number
-                    # If it is, it means a process is processing it
-                    # We increment that number, and move onto the next read
-                    if fastq_seq in managerCache and isinstance(managerCache[fastq_seq], int):
-                        # print("Read is already being processed!")
-                        managerCache[fastq_seq] += 1
-                        if managerCache[fastq_seq] > 10:
-                            print("Multiple processes attempted to process this read!")
-                            print("Read count is: ", managerCache[fastq_seq])
-                        continue
-                    # If the sequence is not in the cache, we set it to 1, signifying that it's being processed
-                    elif fastq_seq not in managerCache and fastq_seq not in not_aln:
-                        # print("starting to process read")
-                        managerCache[fastq_seq] = 1
-
-            
-
-                # Ok, so at this point we've got a managerCache
-
-
-
-
-
-
-
-                # # Ok, the function does three things:
-                # # 1. Check if the sequence has already been found to be not aligned
-                #     # This not_aln dict is found in managerCache['not_aln']
-                #     # If it has already been found as not_aln, 
-                #     # Increment N_CACHED_NOTALN and skip the rest of the read
-                # # 2. Check if the sequence is in the managerCache
-                #     # If it is, update the relevant counters within the managerCache
-                # # 3. If the sequence is not in the cache, generate a new variant object
-                #     # If the new variant has a best match score of <= 0, 
-                #         # add it to the not_aln cache instead of the main cache
-                #         # and increment the N_COMPUTED_NOTALN counter
-                #     # If the new variant has a best match score > 0,
-                #         # Increment the N_COMPUTED_ALN counter
-                #         # Add the new variant to the cache with the sequence as the key
-                #         # Check if the READ_LENGTH variable has a length of 0
-                #         # If so, set the READ_LENGTH to the length of new_variant[match_name]['aln_seq']
-                #         # Update the relevant counters within the managerCache
-                #         # using data provided by the new variant object
-
-                # # I'm running into an issue where I think multiple variants are being generated for the same sequence
-                # # This will happen a lot in real-world data, where a lot of reads will just match the amplicon
-                # # Maybe I can have a field in the managerCache that stores a "currently processing" flag for a given sequence
-                # # If the flag is set, the process will skip that sequence and move on to the next one
-                # # This will prevent multiple processes from generating the same variant object
-                # # Interesting
-
-                # seq_status = ""
-                # # print(f"Checking if {fastq_seq} is in not aligned cache.")
-                # # print(fastq_seq)
-                # # if fastq_seq == "TGGTCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGAAGGGAGGCAAGAGGGCGGCTTTGGGCGGGGTCCAGTTCCGGGATTAGCGAACTTAGAGCACACGTCTGAACTCCAGTCACCGATGTATATCTCGTATGCCGTCTTCTGCTTGAAAAAAAAAAACAATTCTGAGCACCCTGCACTCTCCTCCATC":
-                # # print(not_aln)
-                # # print("Checking if read is in not_aln cache")
-                # # print(not_aln)
-                # if fastq_seq in not_aln:
-                #     # print("Read is in not_aln cache!")
-                #     seq_status = "already_not_aln"
-                # elif fastq_seq in managerCache:
-                #     # print("Already in cache!")
-                #     seq_status = "already_in_cache"
-                #     # print("Already in cache!")
-                # else:
-                #     seq_status = "generate_new_variant"
-                # # print(seq_status)
-                # # print(managerCache["num_variants_generated"])
-                # if managerCache["N_TOT_READS"] % 10000 == 0:
-                #     info(f"Processing reads; N_TOT_READS: {managerCache['N_TOT_READS']} N_COMPUTED_ALN: {managerCache['N_COMPUTED_ALN']} N_CACHED_ALN: {managerCache['N_CACHED_ALN']} N_COMPUTED_NOTALN: {managerCache['N_COMPUTED_NOTALN']} N_CACHED_NOTALN: {managerCache['N_CACHED_NOTALN']}")
-                
-                # # At this point we've checked if the sequence is in either the main managerCache or the not_aln cache
-                # # The fact that this function call is not in a lock means that multiple processes can be generating new variants at the same time
-                # # This frees up the lock for other processes to check for other sequences while this process crunches
-                # if seq_status == "generate_new_variant":
-                #     # print("seq_status:")
-                #     # print(seq_status)
-                #     # print(managerCache["num_variants_generated"])
-                #     new_variant = generate_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info) 
-                #     managerCache["num_variants_generated"] += 1
-
-                # # This lock means only one process can update the managerCache at a time
-                # # It means that we're slowed down considerably, but it's necessary
-                # # to prevent overlapping writes to the managerCache
-                # with lock:
-                #     # Increasing the total reads counter
-                #     managerCache["N_TOT_READS"] += 1
-                #     # This if block handles the case where the sequence is already in the not_aln cache
-                #     if seq_status == "already_not_aln":
-                #         managerCache["N_CACHED_NOTALN"] += 1
-                #         continue
-
-                # # This if/elif block handles the case where a new variant object was generated above
-                #     # If the new variant sequence is a bad read
-                #     # we store it in the not_aln cache
-                #     if seq_status == "generate_new_variant" and new_variant['best_match_score'] <= 0:
-                #         not_aln[fastq_seq] = 1
-                #         managerCache["N_COMPUTED_NOTALN"] += 1
-                #         # print("adding to not_aln cache")
-                #     # Implicitly the new variant sequence is a good read 
-                #     # and we should store it in the managerCache
-                #     elif seq_status == "generate_new_variant":
-                #         managerCache["N_COMPUTED_ALN"] += 1
-                #         managerCache[fastq_seq] = new_variant
-                #         match_name = "variant_" + new_variant['best_match_name']
-                #         if managerCache["READ_LENGTH"] == 0:
-                #             managerCache["READ_LENGTH"] = len(new_variant[match_name]['aln_seq'])
-                #         managerCache["N_GLOBAL_SUBS"] += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
-                #         managerCache["N_SUBS_OUTSIDE_WINDOW"] += new_variant[match_name]['substitutions_outside_window']
-                #         managerCache["N_MODS_IN_WINDOW"] += new_variant[match_name]['mods_in_window']
-                #         managerCache["N_MODS_OUTSIDE_WINDOW"] += new_variant[match_name]['mods_outside_window']
-                #         if new_variant[match_name]['irregular_ends']:
-                #             managerCache["N_READS_IRREGULAR_ENDS"] += 1
-                #         managerCache[fastq_seq] = new_variant
-
-                #     # This if block handles the case where the sequence is already in the cache
-                #     # We just update the relevant counters in the managerCache
-                #     if seq_status == "already_in_cache":
-                #         managerCache["N_CACHED_ALN"] += 1
-                #         managerCache[fastq_seq]['count'] += 1
-                #         match_name = "variant_" + managerCache[fastq_seq]['best_match_name']
-                #         managerCache["N_GLOBAL_SUBS"] += managerCache[fastq_seq][match_name]['substitution_n'] + managerCache[fastq_seq][match_name]['substitutions_outside_window']
-                #         managerCache["N_SUBS_OUTSIDE_WINDOW"] += managerCache[fastq_seq][match_name]['substitutions_outside_window']
-                #         managerCache["N_MODS_IN_WINDOW"] += managerCache[fastq_seq][match_name]['mods_in_window']
-                #         managerCache["N_MODS_OUTSIDE_WINDOW"] += managerCache[fastq_seq][match_name]['mods_outside_window']
-                #         if managerCache[fastq_seq][match_name]['irregular_ends']:
-                #             managerCache["N_READS_IRREGULAR_ENDS"] += 1
- 
-def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
-    print(f"process successfully started")
-    new_variants = {}
-    # I know this section works correctly.
-    num_processed = 0
-    for fastq_seq in seq_list:
-        new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-        new_variants[fastq_seq] = new_variant
-        num_processed += 1
-        if num_processed % 10000 == 0:
-            info(f"Process {process_id} has processed {num_processed} reads")
-        # print("New variant generated")
-
-    # print the number of keys of new variants
-    lock_time = datetime.now()
-    print("New variants generated, ", process_id, " is locking to update managerCache")
-    # Now store the new variants in the managerCache
-    with lock:
-        for fastq_seq in new_variants.keys():
-            managerCache[fastq_seq] = new_variants[fastq_seq]
-    end_lock_time = datetime.now()
-    print(f"Locking took {end_lock_time - lock_time}")
-        
-
-        
     fastq_id = fastq_handle.readline()
     seq_cache = {}
-    read_fastq_time = datetime.now()
     while(fastq_id):
         #read through fastq in sets of 4
         fastq_seq = fastq_handle.readline().strip()
         fastq_plus = fastq_handle.readline().strip()
         fastq_qual = fastq_handle.readline()
 
-        # if (N_TOT_READS % 10000 == 0):
-        #     info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
-        # if fastq_seq in seq_cache and isinstance(seq_cache[fastq_seq], int):
         if fastq_seq in seq_cache:
             # if the read has already been seen, we increment it by 1
             seq_cache[fastq_seq] += 1
@@ -860,74 +605,32 @@ def variant_generator_process(seq_list, managerCache, lock, get_new_variant_obje
             fastq_id = fastq_handle.readline()
             continue
         # If the sequence is not in the cache, we set it to 1
-        # elif fastq_seq not in seq_cache:
-        else:
+        elif fastq_seq not in seq_cache:
             seq_cache[fastq_seq] = 1
 
         fastq_id = fastq_handle.readline()
-    # print(f"Length of seq_cache: {len(seq_cache)}")
-    done_reading_time = datetime.now()
-    print(f"Time to read fastq: {done_reading_time - read_fastq_time}")
+    boundaries = get_seq_cache_boundaries(len(seq_cache.keys()), n_processes)
 
-    # create a list of sequences to be processed from the seq_cache
-    # seq_list = list(seq_cache.keys())
-    # print(f"Length of seq_list: {len(seq_cache.keys())}")
-    # boundaries = [0]
-    # for i in range(n_processes):
-    #     boundaries.append((i+1) * (len(seq_cache.keys()) // n_processes))
-    # boundaries[-1] = len(seq_cache.keys())
-    # print(boundaries)
-    # print(len(boundaries))
-    # We start with the first boundary at 0
-    boundaries = [0]
-    # Total length of seq_list
-    total_length = len(seq_cache.keys())
-    # Accumulator to keep track of the current boundary position
-    current_boundary = 0
-    # Determine the total sum of indices to use it for weighted distribution
-    total_indices = sum(range(1, n_processes + 1))
-    for i in range(1, n_processes):
-        # Determine the weight for this particular process
-        weight = i / total_indices
-        # Calculate the next boundary
-        next_boundary = current_boundary + int(weight * total_length)
-        # Append the calculated boundary to the list
-        boundaries.append(next_boundary)
-        # Update the current boundary
-        current_boundary = next_boundary
-    # Ensure the last boundary is exactly the total length of the seq_list
-    boundaries.append(total_length)
-
-    print(boundaries)
-    print(len(boundaries))
-    from itertools import islice
     # Now that we have our cache, we can pass it to our processes to generate the variant objects
     managerCache = Manager().dict()
     lock = Lock()
     processes = [] # list to hold the processes for later checking with join()
-    process_time = datetime.now()
-    seq_keys_generator = seq_cache.keys()
+
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
         right_sublist_index = boundaries[i+1]
         # seq_list = islice(seq_keys_generator, right_sublist_index - left_sublist_index)
-        process = Process(target=variant_generator_process, args=(list(islice(seq_cache.keys(), left_sublist_index, right_sublist_index)), managerCache, lock, get_new_variant_object,  args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
+        process = Process(target=variant_generator_process, args=((list(seq_cache.keys())[left_sublist_index:right_sublist_index]), managerCache, lock, get_new_variant_object,  args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
         # process = Process(target=variant_generator_process, args=(seq_list, managerCache, lock, get_new_variant_object, i))
         process.start()
         processes.append(process)
 
     for p in processes:
         p.join()
-    
-    end_process_time = datetime.now()
-    # print length of keys in managerCache
-    print(f"Time to generate all variant objects: {end_process_time - process_time}")
-    print(f"Length of managerCache: {len(managerCache.keys())}")
-    print(f"Length of seq_cache: {len(seq_cache.keys())}")
 
     # Ok, so now we have two objects: 
     # A managerCache with all the variant objects
-    # And seq_cache.keys() with the number of times each sequence was seen
+    # And seq_list with the number of times each sequence was seen
 
 
     N_TOT_READS = 0
@@ -988,7 +691,7 @@ def variant_generator_process(seq_list, managerCache, lock, get_new_variant_obje
     
     # Calculate duration
     duration = end_time - start_time
-    descriptor = "OHara, 77k unique reads, max process:"
+    descriptor = "OHara, 77k unique reads, 5 process:"
     formatted_duration = str(duration)
 
     # Record the duration in a text file with a descriptor
