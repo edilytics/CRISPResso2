@@ -77,7 +77,7 @@ jobs:
       run: |
         make pooled-mixed-mode test
 
-    - name: Run Pooled Mixed Mode with Genome
+    - name: Run Pooled Mixed Mode with Genome Align
       if: success() || failure()
       run: |
         make pooled-mixed-mode-align-to-genome test
