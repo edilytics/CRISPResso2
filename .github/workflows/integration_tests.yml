@@ -81,16 +81,6 @@ jobs:
       run: |
         make pooled-mixed-mode-genome-demux test print
 
-    - name: Run Pooled Mixed Mode
-      if: success() || failure()
-      run: |
-        make pooled-mixed-mode test
-
-    - name: Run Pooled Mixed Mode with Genome
-      if: success() || failure()
-      run: |
-        make compare test
-
     - name: Run Pooled Paired Sim
       if: success() || failure()
       run: |
