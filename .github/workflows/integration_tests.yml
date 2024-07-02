@@ -71,6 +71,16 @@ jobs:
       run: |
         make pooled test
 
+    - name: Run Pooled Mixed Mode
+      if: success() || failure()
+      run: |
+        make pooled-mixed-mode test
+
+    - name: Run Pooled Mixed Mode with Genome
+      if: success() || failure()
+      run: |
+        make compare test
+
     - name: Run Pooled Paired Sim
       if: success() || failure()
       run: |
@@ -85,3 +95,5 @@ jobs:
       if: success() || failure()
       run: |
         make compare test
+
+    
