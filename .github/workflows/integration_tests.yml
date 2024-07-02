@@ -80,7 +80,7 @@ jobs:
     - name: Run Pooled Mixed Mode with Genome
       if: success() || failure()
       run: |
-        make compare test
+        make pooled-mixed-mode-align-to-genome test
 
     - name: Run Pooled Paired Sim
       if: success() || failure()
