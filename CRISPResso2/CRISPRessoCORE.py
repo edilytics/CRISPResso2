@@ -466,6 +466,7 @@ def get_seq_cache_boundaries(num_unique_sequences, n_processes):
 
 def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
     print(f"process successfully started")
+    process_time = datetime.now()
     new_variants = {}
     # I know this section works correctly.
     num_processed = 0
@@ -476,16 +477,20 @@ def variant_generator_process(seq_list, managerCache, lock, get_new_variant_obje
         if num_processed % 10000 == 0:
             info(f"Process {process_id} has processed {num_processed} reads")
         # print("New variant generated")
-
+    end_process_time = datetime.now()
     # print the number of keys of new variants
     lock_time = datetime.now()
-    print("New variants generated, ", process_id, " is locking to update managerCache")
+    # print("New variants generated, ", process_id, " is locking to update managerCache")
     # Now store the new variants in the managerCache
     with lock:
+        lock_wait_time = datetime.now() - lock_time 
         for fastq_seq in new_variants.keys():
             managerCache[fastq_seq] = new_variants[fastq_seq]
     end_lock_time = datetime.now()
-    print(f"Locking took {end_lock_time - lock_time}")
+    print("Process spent", end_lock_time - lock_time, "total lock time to update managerCache and ", lock_wait_time, " waiting for lock to become available. Process ID", process_id, )
+    # print("Process ID", process_id, " spent ", lock_wait_time, " waiting for lock and ", end_lock_time - lock_time, "locking to update managerCache")
+    print("Process spent", end_process_time - process_time, "processing all ", len(seq_list), " variants. Process ID:", process_id, "\n")
+    # print(f"Locking took {end_lock_time - lock_time}")
                 
 
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
@@ -606,23 +611,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
         fastq_id = fastq_handle.readline()
 
-    boundaries = get_seq_cache_boundaries(len(seq_cache.keys()), n_processes)
-
-    # Now that we have our cache, we can pass it to our processes to generate the variant objects
-    managerCache = Manager().dict()
-    lock = Lock()
-    processes = [] # list to hold the processes for later checking with join()
-
-    for i in range(n_processes):
-        left_sublist_index = boundaries[i]
-        right_sublist_index = boundaries[i+1]
-        process = Process(target=variant_generator_process, args=((list(seq_cache.keys())[left_sublist_index:right_sublist_index]), managerCache, lock, get_new_variant_object,  args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
-        process.start()
-        processes.append(process)
-
-    for p in processes:
-        p.join()
-
     N_TOT_READS = 0
     N_CACHED_ALN = 0 # read was found in cache
     N_CACHED_NOTALN = 0 #read was found in 'not aligned' cache
@@ -636,8 +624,109 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     N_READS_IRREGULAR_ENDS = 0 #number of reads with modifications at the 0 or -1 position
     READ_LENGTH = 0
 
+    if n_processes > 1:
+        boundaries = get_seq_cache_boundaries(len(seq_cache.keys()), n_processes)
+        # Now that we have our cache, we can pass it to our processes to generate the variant objects
+        managerCache = Manager().dict()
+        lock = Lock()
+        processes = [] # list to hold the processes for later checking with join()
+        for i in range(n_processes):
+            left_sublist_index = boundaries[i]
+            right_sublist_index = boundaries[i+1]
+            process = Process(target=variant_generator_process, args=((list(seq_cache.keys())[left_sublist_index:right_sublist_index]), managerCache, lock, get_new_variant_object,  args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
+            process.start()
+            processes.append(process)
+        for p in processes:
+            p.join()
+        
+        # stat_track_time = datetime.now()
+    
+        # for seq in seq_cache.keys():
+        #     variant = managerCache[seq]
+        #     variant_count = seq_cache[seq]
+            
+        #     N_TOT_READS += variant_count
+        #     if variant['best_match_score'] <= 0:
+        #         N_COMPUTED_NOTALN += 1
+        #         N_CACHED_NOTALN += (variant_count - 1)
+        #     elif variant['best_match_score'] > 0:
+        #         variantCache[seq] = variant
+        #         N_COMPUTED_ALN += 1
+        #         N_CACHED_ALN += (variant_count - 1)
+        #         variantCache[seq]['count'] = variant_count
+        #         match_name = "variant_" + variant['best_match_name']
+        #         N_GLOBAL_SUBS += variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']
+        #         N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
+        #         N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
+        #         N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
+        #         if variant[match_name]['irregular_ends']:
+        #             N_READS_IRREGULAR_ENDS += 1
+        # end_stat_track_time = datetime.now()
+        # print(f"Time to track stats: {end_stat_track_time - stat_track_time}")
+    else:
+        # we create a non Manager managerCache to store the variants
+        managerCache = {}
+        num_reads = len(seq_cache.keys())
+        for index, fastq_seq in enumerate(seq_cache.keys()):
+            managerCache[fastq_seq] = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
 
-    stat_track_time = datetime.now()
+            if (index % 10000 == 0):
+                info("Processing Reads; %d Completed out of %d Unique Reads"%(index, num_reads))
+            # # variantCache[seq] = get_new_variant_object(args, seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+            # N_TOT_READS += variant_count
+            # if variant['best_match_score'] <= 0:
+            #     N_COMPUTED_NOTALN += 1
+            #     N_CACHED_NOTALN += (variant_count - 1)
+            # elif variant['best_match_score'] > 0:
+            #     variantCache[seq] = variant
+            #     N_COMPUTED_ALN += 1
+            #     N_CACHED_ALN += (variant_count - 1)
+            #     variantCache[seq]['count'] = variant_count
+            #     match_name = "variant_" + variant['best_match_name']
+            #     N_GLOBAL_SUBS += variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']
+            #     N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
+            #     N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
+            #     N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
+            #     if variant[match_name]['irregular_ends']:
+            #         N_READS_IRREGULAR_ENDS += 1
+
+            # N_TOT_READS+=1
+            # #if the sequence has been seen and can't be aligned, skip it
+            # if (fastq_seq in not_aln):
+            #     N_CACHED_NOTALN += 1
+            #     continue
+            # #if the sequence is already associated with a variant in the variant cache, pull it out
+            # if (fastq_seq in variantCache):
+            #     N_CACHED_ALN+=1
+            #     variantCache[fastq_seq]['count'] += 1
+            #     match_name = "variant_" + variantCache[fastq_seq]['best_match_name']
+            #     N_GLOBAL_SUBS += variantCache[fastq_seq][match_name]['substitution_n'] + variantCache[fastq_seq][match_name]['substitutions_outside_window']
+            #     N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['substitutions_outside_window']
+            #     N_MODS_IN_WINDOW += variantCache[fastq_seq][match_name]['mods_in_window']
+            #     N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['mods_outside_window']
+            #     if variantCache[fastq_seq][match_name]['irregular_ends']:
+            #         N_READS_IRREGULAR_ENDS += 1
+
+            # #otherwise, create a new variant object, and put it in the cache
+            # else:
+            #     new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+            #     if new_variant['best_match_score'] <= 0:
+            #         N_COMPUTED_NOTALN+=1
+            #         not_aln[fastq_seq] = 1
+            #     else:
+            #         N_COMPUTED_ALN+=1
+            #         variantCache[fastq_seq] = new_variant
+            #         match_name = "variant_" + new_variant['best_match_name']
+            #         if READ_LENGTH == 0:
+            #             READ_LENGTH = len(new_variant[match_name]['aln_seq'])
+            #         N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
+            #         N_SUBS_OUTSIDE_WINDOW += new_variant[match_name]['substitutions_outside_window']
+            #         N_MODS_IN_WINDOW += new_variant[match_name]['mods_in_window']
+            #         N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
+            #         if new_variant[match_name]['irregular_ends']:
+            #             N_READS_IRREGULAR_ENDS += 1
+    
+
     for seq in seq_cache.keys():
         variant = managerCache[seq]
         variant_count = seq_cache[seq]
@@ -658,8 +747,183 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
             if variant[match_name]['irregular_ends']:
                 N_READS_IRREGULAR_ENDS += 1
-    end_stat_track_time = datetime.now()
-    print(f"Time to track stats: {end_stat_track_time - stat_track_time}")
+
+    info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
+    aln_stats = {"N_TOT_READS" : N_TOT_READS,
+            "N_CACHED_ALN" : N_CACHED_ALN,
+            "N_CACHED_NOTALN" : N_CACHED_NOTALN,
+            "N_COMPUTED_ALN" : N_COMPUTED_ALN,
+            "N_COMPUTED_NOTALN" : N_COMPUTED_NOTALN,
+            "N_GLOBAL_SUBS": N_GLOBAL_SUBS,
+            "N_SUBS_OUTSIDE_WINDOW": N_SUBS_OUTSIDE_WINDOW,
+            "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
+            "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
+            "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
+            "READ_LENGTH": READ_LENGTH
+            }
+    
+    # End timing
+    end_time = datetime.now()
+    
+    # Calculate duration
+    duration = end_time - start_time
+    descriptor = "OHara, 77k unique reads, 5 process:"
+    formatted_duration = str(duration)
+
+    # Record the duration in a text file with a descriptor
+    with open("cole_timing_log.txt", "a") as file:
+        file.write(f"{descriptor}: {formatted_duration}\n")
+
+    return(aln_stats)
+
+def old_process_fastq(fastq_filename, variantCache, ref_names, refs, args):
+    """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
+        fastqIn: name of fastq (e.g. output of fastp)
+            This file can be gzipped or plain text
+
+        variantCache: dict with keys: sequence
+            dict with keys:
+                'count' : number of time sequence was observed
+                'aln_ref_names' : names of reference it was aligned to
+                'aln_scores' : score of alignment to each reference
+                'aln_details' # details (seq1, seq2, score) of alignment to each other reference sequence
+                'class_name' : string with class names it was aligned to
+                'best_match_score' : score of best match (0 if no alignments matched above amplicon threshold)
+                for each reference, there is a key: variant_ref_name with a payload object
+            # payload object:
+            The payload is a dict with keys:
+                ### from CRISPRessoCOREResources.find_indels_substitutions
+                # 'all_insertion_positions' #arr with 1's where there are insertions (including those outside of include_idxs quantification window)
+                # 'all_insertion_left_positions' #arr with 1's to the left of where the insertion occurs
+                # 'insertion_positions' # arr with 1's where there are insertions (1bp before and 1bp after insertion) that overlap with include_idxs quantification window
+                # 'insertion_coordinates' # one entry per insertion, tuple of (start,end)
+                # 'insertion_sizes'
+                # 'insertion_n'
+                # 'all_deletion_positions' #arr with 1's where there are insertions
+                # 'deletion_positions' #arr with 1's where there are insertions that overlap the include_idxs quantification window
+                # 'deletion_coordinates' # one entry per deletion
+                # 'deletion_sizes' # correspond to entries in 'deletion_coordinates'
+                # 'deletion_n'
+                # 'all_substitution_positions'
+                # 'substitution_positions'
+                # 'substitution_n'
+                # 'substitution_values'
+                # 'ref_positions'
+                ### added in this function
+                # 'ref_name' # name of sequence that it most closely aligns to
+                # 'classification' # MODIFIED or UNMODIFIED or AMBIGUOUS
+                # 'aln_scores' # scores of alignment to each other reference sequence
+                # 'aln_seq' # NW-aligned sequence
+                # 'aln_ref' # NW-aligned sequence of corresponding reference (ref_name)
+
+        refNameList: list of reference names
+        refs: dictionary of sequences name>ref object
+            ##ref object:
+                # 'name'
+                # 'sequence'
+                # 'sequence_length'
+                # 'min_aln_score' #sequence must align with at least this score
+                # 'gap_incentive' #incentive for gaps at each position of the reference - to force gaps at the cut points, the indices of these cut points are set to 1  i.e. gap_incentive[4] = 1 would incentivise alignments with insertions to the right of the 4th character in the reference, or deletions of the 4th character in the reference.
+                # 'contains_guide'
+                # 'sgRNA_intervals'
+                # 'sgRNA_sequences'
+                # 'sgRNA_cut_points'
+                # 'sgRNA_plot_cut_points'#whether cut points should be plotted (not plotted for base editing, prime editing flap)
+                # 'sgRNA_plot_idxs' #indices along reference sequence for which to plot the allele plot (allele frequency plot around sgRNA)
+                # 'sgRNA_names' #names of sgRNAs (in case there are multiple matches for a single sgRNA)
+                # 'sgRNA_mismatches' #indices along guide that are mismatched against a 'flexiguide_seq'
+                # 'sgRNA_orig_sequences' #original sgRNA sequences as passed in as parameters (e.g. not including flexiguide changes or case changes)
+                # 'contains_coding_seq'
+                # 'exon_positions'
+                # 'exon_intervals'
+                # 'exon_len_mods': the modification to the original exon length (if we copied the exon positions from another reference, this reference could introduce an indel, resulting in a non-zero length modification)
+                # 'splicing_positions'
+                # 'include_idxs' # sorted numpy array
+                # 'exclude_idxs'
+                # 'plot_idxs' #sorted numpy array
+                # 'plot_name' #unique plotting name
+                # 'idx_cloned_from' #if this reference didn't contain a guide (or exon sequence), it was aligned to 'idx_cloned_from' reference, and cut_points, plot_cut_points, gap_incentive, sgRNA_intervals, inculde_idx, ane exon information were cloned from it (at the appropriate indices)
+           Examples of these seqences can include:
+           -the amplicon sequence
+           -the repaired CRISPR expected output
+           -allelic varaints if two variants are known to exist
+
+        """
+    N_TOT_READS = 0
+    N_CACHED_ALN = 0 # read was found in cache
+    N_CACHED_NOTALN = 0 #read was found in 'not aligned' cache
+    N_COMPUTED_ALN = 0 # not in cache, aligned to at least 1 sequence with min cutoff
+    N_COMPUTED_NOTALN = 0 #not in cache, not aligned to any sequence with min cutoff
+
+    N_GLOBAL_SUBS = 0 #number of substitutions across all reads - indicator of sequencing quality
+    N_SUBS_OUTSIDE_WINDOW = 0
+    N_MODS_IN_WINDOW = 0 #number of modifications found inside the quantification window
+    N_MODS_OUTSIDE_WINDOW = 0 #number of modifications found outside the quantification window
+    N_READS_IRREGULAR_ENDS = 0 #number of reads with modifications at the 0 or -1 position
+    READ_LENGTH = 0
+
+    aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
+    CRISPRessoShared.check_file(aln_matrix_loc)
+    aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
+
+    pe_scaffold_dna_info = (0, None) #scaffold start loc, scaffold seq to search
+    if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
+        pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
+
+    not_aln = {} #cache for reads that don't align
+
+    if fastq_filename.endswith('.gz'):
+        fastq_handle = gzip.open(fastq_filename, 'rt')
+    else:
+        fastq_handle=open(fastq_filename)
+
+    while(fastq_handle.readline()):
+        #read through fastq in sets of 4
+        fastq_seq = fastq_handle.readline().strip()
+        fastq_plus = fastq_handle.readline()
+        fastq_qual = fastq_handle.readline()
+
+        if (N_TOT_READS % 10000 == 0):
+            info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
+
+        N_TOT_READS+=1
+        #if the sequence has been seen and can't be aligned, skip it
+        if (fastq_seq in not_aln):
+            N_CACHED_NOTALN += 1
+            continue
+        #if the sequence is already associated with a variant in the variant cache, pull it out
+        if (fastq_seq in variantCache):
+            N_CACHED_ALN+=1
+            variantCache[fastq_seq]['count'] += 1
+            match_name = "variant_" + variantCache[fastq_seq]['best_match_name']
+            N_GLOBAL_SUBS += variantCache[fastq_seq][match_name]['substitution_n'] + variantCache[fastq_seq][match_name]['substitutions_outside_window']
+            N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['substitutions_outside_window']
+            N_MODS_IN_WINDOW += variantCache[fastq_seq][match_name]['mods_in_window']
+            N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['mods_outside_window']
+            if variantCache[fastq_seq][match_name]['irregular_ends']:
+                N_READS_IRREGULAR_ENDS += 1
+
+        #otherwise, create a new variant object, and put it in the cache
+        else:
+            new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+            if new_variant['best_match_score'] <= 0:
+                N_COMPUTED_NOTALN+=1
+                not_aln[fastq_seq] = 1
+            else:
+                N_COMPUTED_ALN+=1
+                variantCache[fastq_seq] = new_variant
+                match_name = "variant_" + new_variant['best_match_name']
+                if READ_LENGTH == 0:
+                    READ_LENGTH = len(new_variant[match_name]['aln_seq'])
+                N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
+                N_SUBS_OUTSIDE_WINDOW += new_variant[match_name]['substitutions_outside_window']
+                N_MODS_IN_WINDOW += new_variant[match_name]['mods_in_window']
+                N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
+                if new_variant[match_name]['irregular_ends']:
+                    N_READS_IRREGULAR_ENDS += 1
+
+
+    fastq_handle.close()
 
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
     aln_stats = {"N_TOT_READS" : N_TOT_READS,
@@ -674,19 +938,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
                "READ_LENGTH": READ_LENGTH
                }
-    
-    # End timing
-    end_time = datetime.now()
-    
-    # Calculate duration
-    duration = end_time - start_time
-    descriptor = "OHara, 77k unique reads, 5 process:"
-    formatted_duration = str(duration)
-
-    # Record the duration in a text file with a descriptor
-    with open("cole_timing_log.txt", "a") as file:
-        file.write(f"{descriptor}: {formatted_duration}\n")
-
     return(aln_stats)
 
 def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, refs, args):
