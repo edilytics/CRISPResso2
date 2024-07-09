@@ -647,10 +647,10 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
             if (index % 10000 == 0):
                 info("Processing Reads; %d Completed out of %d Unique Reads"%(index, num_reads))
-
     for seq in seq_cache.keys():
         variant = managerCache[seq]
         variant_count = seq_cache[seq]
+        
         
         
         N_TOT_READS += variant_count
@@ -672,8 +672,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             # if variantCache[fastq_seq][match_name]['irregular_ends']:
             #     N_READS_IRREGULAR_ENDS += 1
             if variant[match_name]['irregular_ends']:
-                N_READS_IRREGULAR_ENDS += 1
-
+                N_READS_IRREGULAR_ENDS += variant_count
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
     aln_stats = {"N_TOT_READS" : N_TOT_READS,
             "N_CACHED_ALN" : N_CACHED_ALN,
