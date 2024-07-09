@@ -731,11 +731,14 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         variant = managerCache[seq]
         variant_count = seq_cache[seq]
         
+        
         N_TOT_READS += variant_count
         if variant['best_match_score'] <= 0:
             N_COMPUTED_NOTALN += 1
             N_CACHED_NOTALN += (variant_count - 1)
         elif variant['best_match_score'] > 0:
+            if READ_LENGTH == 0:
+                READ_LENGTH = len(variant[match_name]['aln_seq'])
             variantCache[seq] = variant
             N_COMPUTED_ALN += 1
             N_CACHED_ALN += (variant_count - 1)
