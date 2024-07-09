@@ -638,31 +638,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             processes.append(process)
         for p in processes:
             p.join()
-        
-        # stat_track_time = datetime.now()
-    
-        # for seq in seq_cache.keys():
-        #     variant = managerCache[seq]
-        #     variant_count = seq_cache[seq]
-            
-        #     N_TOT_READS += variant_count
-        #     if variant['best_match_score'] <= 0:
-        #         N_COMPUTED_NOTALN += 1
-        #         N_CACHED_NOTALN += (variant_count - 1)
-        #     elif variant['best_match_score'] > 0:
-        #         variantCache[seq] = variant
-        #         N_COMPUTED_ALN += 1
-        #         N_CACHED_ALN += (variant_count - 1)
-        #         variantCache[seq]['count'] = variant_count
-        #         match_name = "variant_" + variant['best_match_name']
-        #         N_GLOBAL_SUBS += variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']
-        #         N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
-        #         N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
-        #         N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
-        #         if variant[match_name]['irregular_ends']:
-        #             N_READS_IRREGULAR_ENDS += 1
-        # end_stat_track_time = datetime.now()
-        # print(f"Time to track stats: {end_stat_track_time - stat_track_time}")
     else:
         # we create a non Manager managerCache to store the variants
         managerCache = {}
@@ -672,60 +647,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
             if (index % 10000 == 0):
                 info("Processing Reads; %d Completed out of %d Unique Reads"%(index, num_reads))
-            # # variantCache[seq] = get_new_variant_object(args, seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-            # N_TOT_READS += variant_count
-            # if variant['best_match_score'] <= 0:
-            #     N_COMPUTED_NOTALN += 1
-            #     N_CACHED_NOTALN += (variant_count - 1)
-            # elif variant['best_match_score'] > 0:
-            #     variantCache[seq] = variant
-            #     N_COMPUTED_ALN += 1
-            #     N_CACHED_ALN += (variant_count - 1)
-            #     variantCache[seq]['count'] = variant_count
-            #     match_name = "variant_" + variant['best_match_name']
-            #     N_GLOBAL_SUBS += variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']
-            #     N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
-            #     N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
-            #     N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
-            #     if variant[match_name]['irregular_ends']:
-            #         N_READS_IRREGULAR_ENDS += 1
-
-            # N_TOT_READS+=1
-            # #if the sequence has been seen and can't be aligned, skip it
-            # if (fastq_seq in not_aln):
-            #     N_CACHED_NOTALN += 1
-            #     continue
-            # #if the sequence is already associated with a variant in the variant cache, pull it out
-            # if (fastq_seq in variantCache):
-            #     N_CACHED_ALN+=1
-            #     variantCache[fastq_seq]['count'] += 1
-            #     match_name = "variant_" + variantCache[fastq_seq]['best_match_name']
-            #     N_GLOBAL_SUBS += variantCache[fastq_seq][match_name]['substitution_n'] + variantCache[fastq_seq][match_name]['substitutions_outside_window']
-            #     N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['substitutions_outside_window']
-            #     N_MODS_IN_WINDOW += variantCache[fastq_seq][match_name]['mods_in_window']
-            #     N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['mods_outside_window']
-            #     if variantCache[fastq_seq][match_name]['irregular_ends']:
-            #         N_READS_IRREGULAR_ENDS += 1
-
-            # #otherwise, create a new variant object, and put it in the cache
-            # else:
-            #     new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-            #     if new_variant['best_match_score'] <= 0:
-            #         N_COMPUTED_NOTALN+=1
-            #         not_aln[fastq_seq] = 1
-            #     else:
-            #         N_COMPUTED_ALN+=1
-            #         variantCache[fastq_seq] = new_variant
-            #         match_name = "variant_" + new_variant['best_match_name']
-            #         if READ_LENGTH == 0:
-            #             READ_LENGTH = len(new_variant[match_name]['aln_seq'])
-            #         N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
-            #         N_SUBS_OUTSIDE_WINDOW += new_variant[match_name]['substitutions_outside_window']
-            #         N_MODS_IN_WINDOW += new_variant[match_name]['mods_in_window']
-            #         N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
-            #         if new_variant[match_name]['irregular_ends']:
-            #             N_READS_IRREGULAR_ENDS += 1
-    
 
     for seq in seq_cache.keys():
         variant = managerCache[seq]
@@ -737,17 +658,19 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             N_COMPUTED_NOTALN += 1
             N_CACHED_NOTALN += (variant_count - 1)
         elif variant['best_match_score'] > 0:
-            if READ_LENGTH == 0:
-                READ_LENGTH = len(variant[match_name]['aln_seq'])
             variantCache[seq] = variant
             N_COMPUTED_ALN += 1
             N_CACHED_ALN += (variant_count - 1)
             variantCache[seq]['count'] = variant_count
             match_name = "variant_" + variant['best_match_name']
+            if READ_LENGTH == 0:
+                READ_LENGTH = len(variant[match_name]['aln_seq'])
             N_GLOBAL_SUBS += variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']
             N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
             N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
             N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
+            # if variantCache[fastq_seq][match_name]['irregular_ends']:
+            #     N_READS_IRREGULAR_ENDS += 1
             if variant[match_name]['irregular_ends']:
                 N_READS_IRREGULAR_ENDS += 1
 
