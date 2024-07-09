@@ -665,10 +665,10 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             match_name = "variant_" + variant['best_match_name']
             if READ_LENGTH == 0:
                 READ_LENGTH = len(variant[match_name]['aln_seq'])
-            N_GLOBAL_SUBS += variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']
-            N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
-            N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
-            N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
+            N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
+            N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
+            N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
+            N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
             # if variantCache[fastq_seq][match_name]['irregular_ends']:
             #     N_READS_IRREGULAR_ENDS += 1
             if variant[match_name]['irregular_ends']:
