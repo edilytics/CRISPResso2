@@ -76,6 +76,11 @@ jobs:
       run: |
         make pooled-mixed-mode test print
 
+    - name: Run Pooled Mixed Mode Demux
+      if: success() || failure()
+      run: |
+        make pooled-mixed-mode-genome-demux test print
+
     - name: Run Pooled Paired Sim
       if: success() || failure()
       run: |
