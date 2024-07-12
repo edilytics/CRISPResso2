@@ -498,9 +498,11 @@ def variant_generator_process(seq_list, managerCache, lock, get_new_variant_obje
         if num_processed % 10000 == 0:
             info(f"Process {process_id} has processed {num_processed} reads")
     # Now store the new variants in the managerCache
+    # with lock:
+    #     managerCache.update(new_variants)
     with lock:
         for fastq_seq in new_variants.keys():
-            managerCache.update(new_variants)
+            managerCache[fastq_seq] = new_variants[fastq_seq]
                 
 
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
@@ -618,7 +620,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             seq_cache[fastq_seq] = 1
 
         fastq_id = fastq_handle.readline()
-    fastq_handle.close()
+    # fastq_handle.close()
 
 
     if n_processes > 1:
