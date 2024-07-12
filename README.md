@@ -23,6 +23,8 @@ In addition, CRISPResso can be run as part of a larger tool suite:
 - [CRISPRessoCompare](https://docs.crispresso.com/suite/compare/tool.html) - for comparing editing between two samples (e.g., treated vs control)
 - [CRISPRessoAggregate](https://docs.crispresso.com/suite/aggregate/tool.html) - for aggregating results from previously-run CRISPResso analyses
 
+![CRISPResso2 Schematic](https://raw.githubusercontent.com/pinellolab/CRISPResso2/master/crispresso_schematic.png "CRISPResso2 Schematic")
+
 ## Installation
 
 CRISPResso2 can be [installed](https://docs.crispresso.com/installation.html) in the following ways:
@@ -30,3 +32,17 @@ CRISPResso2 can be [installed](https://docs.crispresso.com/installation.html) in
 - [Bioconda](https://docs.crispresso.com/installation.html#bioconda)
   - [Bioconda on Apple Silicon](https://docs.crispresso.com/installation.html#bioconda-for-apple-silicon)
 - [Docker](https://docs.crispresso.com/installation.html#docker)
+
+## Examples
+
+- [CRISPResso example runs](https://docs.crispresso.com/suite/core/examples.html)
+- [CRISPRessoBatch example runs](https://docs.crispresso.com/suite/batch/examples.html)
+- [CRISPRessoPooled example runs](https://docs.crispresso.com/suite/pooled/examples.html)
+- [CRISPRessoWGS example runs](https://docs.crispresso.com/suite/wgs/examples.html)
+- [CRISPRessoCompare example runs](https://docs.crispresso.com/suite/compare/examples.html)
+- [CRISPRessoPooledWGCompare example runs](https://docs.crispresso.com/suite/pooledwgscompare/examples.html)
+- [CRISPRessoAggregate example runs](https://docs.crispresso.com/suite/aggregate/examples.html)
+
+## Troubleshooting
+
+If you run into any issues, check out the [Troubleshooting page](https://docs.crispresso.com/troubleshooting.html) or submit a [new discussion](https://github.com/pinellolab/CRISPResso2/discussions/new?category=troubleshooting).
