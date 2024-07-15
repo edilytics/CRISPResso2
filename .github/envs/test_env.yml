@@ -4,7 +4,7 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - pip=24.1.2
+  - pip
   - fastp
   - numpy<2
   - cython
