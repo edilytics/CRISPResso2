@@ -14,6 +14,7 @@ jobs:
         shell: bash -l {0}
     env:
       CRISPRESSO2_DIR: ${GITHUB_WORKSPACE}/../CRISPResso2_copy
+      YDIFF_OPTIONS: -p cat
 
     strategy:
       fail-fast: false
