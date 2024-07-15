@@ -21,30 +21,39 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Cache Conda
+    - name: Setup Conda Env
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        activate-environment: test_env
+        channels: conda-forge,bioconda,defaults
+        auto-activate-base: false
+        use-mamba: true
+
+    - name: Get Date
+      run: echo "today=$(/bin/date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Cache Conda Env
+      id: cache
       uses: actions/cache@v3
       env:
         # Increase this number to reset the cache if envs/test_env.yml hasn't changed
         CACHE_NUMBER: 0
       with:
-        path: ~/conda_pkgs_dir
+        path: ${{ env.CONDA }}/envs
         key:
-          ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
+          conda-${{ runner.os }}--${{ runner.arch }}--${{ steps.get-date.outputs.today }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
 
-    - name: Set up Conda
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-          channels: conda-forge,bioconda,defaults
-          auto-activate-base: false
-          use-only-tar-bz2: true
-          activate-environment: test_env
-          environment-file: .github/envs/test_env.yml
+    - name: Update Conda Env
+      run: |
+        mamba env update -n test_env -f .github/envs/test_env.yml
+      if: steps.cache.outputs.cache-hit != 'true'
 
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
-        conda list
+        mamba list
 
     - name: Create directory for files
       run: |
