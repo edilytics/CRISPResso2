@@ -14,6 +14,8 @@ jobs:
         shell: bash -l {0}
     env:
       CRISPRESSO2_DIR: ${GITHUB_WORKSPACE}/../CRISPResso2_copy
+      # Use this to specify a specific branch other than master
+      TEST_BRANCH: 'master'
 
     strategy:
       fail-fast: false
@@ -62,11 +64,8 @@ jobs:
 
     - name: Get C2_tests latest SHA
       id: get-c2-tests
-      env:
-        # Use this to specify a specific branch other than master
-        BRANCH: 'master'
       run: |
-        echo sha=$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/${{ env.BRANCH }} | jq .object.sha | tr -d '"' ) >> $GITHUB_OUTPUT
+        echo sha=$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/${{ env.TEST_BRANCH }} | jq .object.sha | tr -d '"' ) >> $GITHUB_OUTPUT
 
     - name: Cache C2_tests repo
       id: cache-tests
@@ -74,7 +73,7 @@ jobs:
       with:
         path: tests
         key:
-          tests-${{ steps.get-c2-tests.outputs.sha }}
+          tests-${{ env.TEST_BRANCH }}-${{ steps.get-c2-tests.outputs.sha }}
 
     - name: Copy C2_tests repo
       uses: actions/checkout@v3
