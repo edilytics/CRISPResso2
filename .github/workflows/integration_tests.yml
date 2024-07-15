@@ -63,7 +63,7 @@ jobs:
     - name: Get C2_tests latest SHA
       id: get-c2-tests
       run: |
-        echo ::set-output name=sha::$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/master | jq .object.sha | tr -d '"'
+        echo ::set-output name=sha::$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/master | jq .object.sha | tr -d '"' )
 
     - name: Cache C2_tests repo
       id: cache-tests
