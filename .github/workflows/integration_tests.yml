@@ -27,6 +27,7 @@ jobs:
           mamba-version: "*"
           channels: conda-forge,bioconda,defaults
           auto-activate-base: false
+          use-only-tar-bz2: true
           activate-environment: test_env
           environment-file: .github/envs/test_env.yml
 
@@ -34,7 +35,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
-        pip install ydiff
 
     - name: Create directory for files
       run: |
