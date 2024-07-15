@@ -63,7 +63,7 @@ jobs:
     - name: Get C2_tests latest SHA
       id: get-c2-tests
       env:
-        # Use thir to specify a specific branch other than master
+        # Use this to specify a specific branch other than master
         BRANCH: 'master'
       run: |
         echo sha=$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/${{ env.BRANCH }} | jq .object.sha | tr -d '"' ) >> $GITHUB_OUTPUT
@@ -72,7 +72,7 @@ jobs:
       id: cache-tests
       uses: actions/cache@v3
       with:
-        path: $GITHUB_WORKSPACE/tests
+        path: tests
         key:
           tests-${{ steps.get-c2-tests.outputs.sha }}
 
