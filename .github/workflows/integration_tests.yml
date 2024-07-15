@@ -34,7 +34,6 @@ jobs:
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v3
       with:
-          mamba-version: "*"
           channels: conda-forge,bioconda,defaults
           auto-activate-base: false
           use-only-tar-bz2: true
