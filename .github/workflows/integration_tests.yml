@@ -62,8 +62,11 @@ jobs:
 
     - name: Get C2_tests latest SHA
       id: get-c2-tests
+      env:
+        # Use thir to specify a specific branch other than master
+        BRANCH: 'master'
       run: |
-        echo ::set-output name=sha::$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/master | jq .object.sha | tr -d '"' )
+        echo ::set-output name=sha::$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/${{ env.BRANCH }} | jq .object.sha | tr -d '"' )
 
     - name: Cache C2_tests repo
       id: cache-tests
@@ -71,14 +74,13 @@ jobs:
       with:
         path: .
         key:
-          tests-${{ steps.get-c2-tests.sha }}
+          tests-${{ steps.get-c2-tests.outputs.sha }}
 
     - name: Copy C2_tests repo
       uses: actions/checkout@v3
       with:
         repository: edilytics/CRISPResso2_tests
         ref: ${{ steps.get-c2-tests.sha }}
-        # ref: '<BRANCH-NAME>' # Use this to specify a branch other than master
       if: steps.cache-tests.outputs.cache-hit != 'true'
 
     - name: Run Basic
