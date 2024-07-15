@@ -34,7 +34,7 @@ jobs:
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v3
       with:
-          channels: conda-forge,bioconda,defaults
+          channels: conda-forge,bioconda
           auto-activate-base: false
           use-only-tar-bz2: true
           activate-environment: test_env
