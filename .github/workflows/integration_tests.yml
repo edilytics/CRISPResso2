@@ -40,7 +40,7 @@ jobs:
         # Increase this number to reset the cache if envs/test_env.yml hasn't changed
         CACHE_NUMBER: 0
       with:
-        path: ${{ env.CONDA }}/envs
+        path: /usr/share/miniconda/envs/test_env
         key:
           conda-${{ runner.os }}--${{ runner.arch }}--${{ steps.get-date.outputs.today }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
 
