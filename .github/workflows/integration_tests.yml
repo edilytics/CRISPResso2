@@ -72,7 +72,7 @@ jobs:
       id: cache-tests
       uses: actions/cache@v3
       with:
-        path: .
+        path: $GITHUB_WORKSPACE/tests
         key:
           tests-${{ steps.get-c2-tests.outputs.sha }}
 
@@ -81,44 +81,44 @@ jobs:
       with:
         repository: edilytics/CRISPResso2_tests
         ref: ${{ steps.get-c2-tests.sha }}
+        path: tests
       if: steps.cache-tests.outputs.cache-hit != 'true'
 
     - name: Run Basic
       run: |
-        ls
-        make basic test
+        cd tests && make basic test
 
     - name: Run Params
       if: success() || failure()
       run: |
-        make params test
+        cd tests && make params test
 
     - name: Run Prime Editor
       if: success() || failure()
       run: |
-        make prime-editor test
+        cd tests && make prime-editor test
 
     - name: Run Batch
       if: success() || failure()
       run: |
-        make batch test
+        cd tests && make batch test
 
     - name: Run Pooled
       if: success() || failure()
       run: |
-        make pooled test
+        cd tests && make pooled test
 
     - name: Run Pooled Paired Sim
       if: success() || failure()
       run: |
-        make pooled-paired-sim test
+        cd tests && make pooled-paired-sim test
 
     - name: Run WGS
       if: success() || failure()
       run: |
-        make wgs test
+        cd tests && make wgs test
 
     - name: Run Compare
       if: success() || failure()
       run: |
-        make compare test
+        cd tests && make compare test
