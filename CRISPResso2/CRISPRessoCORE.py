@@ -641,6 +641,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             managerCache[fastq_seq] = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
             if (index % 10000 == 0):
                 info("Processing Reads; %d Completed out of %d Unique Reads"%(index, num_reads))
+    info("Finished creating %d variant objects, tracking stats..."%(len(seq_cache.keys())))
     
     N_TOT_READS = 0
     N_CACHED_ALN = 0 # read was found in cache
@@ -697,11 +698,11 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     
     # Calculate duration
     duration = end_time - start_time
-    descriptor = "OHara, 77k unique reads, 5 process:"
+    descriptor = "6 gigs, max processes:"
     formatted_duration = str(duration)
 
     # Record the duration in a text file with a descriptor
-    with open("cole_timing_log.txt", "a") as file:
+    with open("6_gig_timing_log.txt", "a") as file:
         file.write(f"{descriptor}: {formatted_duration}\n")
 
     return(aln_stats)
