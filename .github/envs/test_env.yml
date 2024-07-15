@@ -2,6 +2,7 @@ name: test_env
 channels:
   - conda-forge
   - bioconda
+  - defaults
 dependencies:
   - pip=24.1.2
   - fastp
