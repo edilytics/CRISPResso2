@@ -27,7 +27,6 @@ jobs:
           mamba-version: "*"
           channels: conda-forge,bioconda,defaults
           auto-activate-base: false
-          use-only-tar-bz2: true
           activate-environment: test_env
           environment-file: .github/envs/test_env.yml
 

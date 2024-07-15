@@ -14,3 +14,5 @@ dependencies:
   - scipy
   - matplotlib=3.8.4
   - pandas
+  - pip:
+    - ydiff
