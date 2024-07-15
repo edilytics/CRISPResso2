@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - pip
+  - pip=24.1.2
   - fastp
   - numpy<2
   - cython
@@ -13,3 +13,5 @@ dependencies:
   - scipy
   - matplotlib=3.8.4
   - pandas>2
+  - pip:
+    - ydiff
