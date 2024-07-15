@@ -641,7 +641,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             managerCache[fastq_seq] = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
             if (index % 10000 == 0):
                 info("Processing Reads; %d Completed out of %d Unique Reads"%(index, num_reads))
-    info("Finished creating %d variant objects, tracking stats..."%(len(seq_cache.keys())))
     
     N_TOT_READS = 0
     N_CACHED_ALN = 0 # read was found in cache
