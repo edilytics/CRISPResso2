@@ -66,7 +66,7 @@ jobs:
         # Use thir to specify a specific branch other than master
         BRANCH: 'master'
       run: |
-        echo ::set-output name=sha::$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/${{ env.BRANCH }} | jq .object.sha | tr -d '"' )
+        echo sha=$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/${{ env.BRANCH }} | jq .object.sha | tr -d '"' ) >> $GITHUB_OUTPUT
 
     - name: Cache C2_tests repo
       id: cache-tests
