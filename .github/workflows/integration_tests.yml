@@ -69,7 +69,8 @@ jobs:
 
     - name: Cache C2_tests repo
       id: cache-tests
-      uses: actions/cache@v3
+      uses: actions/cache/save@v3
+      if: always()
       with:
         path: tests
         key:
