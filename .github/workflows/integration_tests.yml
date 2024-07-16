@@ -85,39 +85,49 @@ jobs:
 
     - name: Run Basic
       run: |
-        cd tests && make basic test
+        cd tests && make basic test print
 
     - name: Run Params
       if: success() || failure()
       run: |
-        cd tests && make params test
+        cd tests && make params test print
 
     - name: Run Prime Editor
       if: success() || failure()
       run: |
-        cd tests && make prime-editor test
+        cd tests && make prime-editor test print
 
     - name: Run Batch
       if: success() || failure()
       run: |
-        cd tests && make batch test
+        cd tests && make batch test print
 
     - name: Run Pooled
       if: success() || failure()
       run: |
-        cd tests && make pooled test
+        cd tests && make pooled test print
+
+    - name: Run Pooled Mixed Mode
+      if: success() || failure()
+      run: |
+        cd tests && make pooled-mixed-mode test print
+
+    - name: Run Pooled Mixed Mode Demux
+      if: success() || failure()
+      run: |
+        cd tests && make pooled-mixed-mode-genome-demux test print
 
     - name: Run Pooled Paired Sim
       if: success() || failure()
       run: |
-        cd tests && make pooled-paired-sim test
+        cd tests && make pooled-paired-sim test print
 
     - name: Run WGS
       if: success() || failure()
       run: |
-        cd tests && make wgs test
+        cd tests && make wgs test print
 
     - name: Run Compare
       if: success() || failure()
       run: |
-        cd tests && make compare test
+        cd tests && make compare test print
