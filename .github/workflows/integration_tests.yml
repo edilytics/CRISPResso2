@@ -14,8 +14,6 @@ jobs:
         shell: bash -l {0}
     env:
       CRISPRESSO2_DIR: ${GITHUB_WORKSPACE}/../CRISPResso2_copy
-      # Use this to specify a specific branch other than master
-      TEST_BRANCH: 'master'
 
     strategy:
       fail-fast: false
@@ -62,72 +60,58 @@ jobs:
         mkdir ../CRISPResso2_copy
         cp -r * ../CRISPResso2_copy
 
-    - name: Get C2_tests latest SHA
-      id: get-c2-tests
-      run: |
-        echo sha=$( curl -u "u:${{ github.token }}" https://api.github.com/repos/edilytics/CRISPResso2_tests/git/ref/heads/${{ env.TEST_BRANCH }} | jq .object.sha | tr -d '"' ) >> $GITHUB_OUTPUT
-
-    - name: Cache C2_tests repo
-      id: cache-tests
-      uses: actions/cache@v3
-      with:
-        path: tests
-        key:
-          tests-${{ env.TEST_BRANCH }}-${{ steps.get-c2-tests.outputs.sha }}
-
-    - name: Copy C2_tests repo
+     - name: Copy C2_tests repo
       uses: actions/checkout@v3
       with:
         repository: edilytics/CRISPResso2_tests
-        ref: ${{ steps.get-c2-tests.sha }}
+        # ref: '<BRANCH-NAME>' # update to specific branch
         path: tests
-      if: steps.cache-tests.outputs.cache-hit != 'true'
 
     - name: Run Basic
       run: |
-        cd tests && make basic test print
+        make basic test print
 
     - name: Run Params
       if: success() || failure()
       run: |
-        cd tests && make params test print
+        make params test print
 
     - name: Run Prime Editor
       if: success() || failure()
       run: |
-        cd tests && make prime-editor test print
+        make prime-editor test print
 
     - name: Run Batch
       if: success() || failure()
       run: |
-        cd tests && make batch test print
+        make batch test print
 
     - name: Run Pooled
       if: success() || failure()
       run: |
-        cd tests && make pooled test print
+        make pooled test print
 
     - name: Run Pooled Mixed Mode
       if: success() || failure()
       run: |
-        cd tests && make pooled-mixed-mode test print
+        make pooled-mixed-mode test print
 
     - name: Run Pooled Mixed Mode Demux
       if: success() || failure()
       run: |
-        cd tests && make pooled-mixed-mode-genome-demux test print
+        make pooled-mixed-mode-genome-demux test print
 
     - name: Run Pooled Paired Sim
       if: success() || failure()
       run: |
-        cd tests && make pooled-paired-sim test print
+        make pooled-paired-sim test print
 
     - name: Run WGS
       if: success() || failure()
       run: |
-        cd tests && make wgs test print
+        make wgs test print
 
     - name: Run Compare
       if: success() || failure()
       run: |
-        cd tests && make compare test print
+        make compare test print
