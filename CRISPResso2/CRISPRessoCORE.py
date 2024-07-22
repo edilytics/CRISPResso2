@@ -574,7 +574,16 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
            -allelic varaints if two variants are known to exist
 
         """
+    import resource
+    def using(point=""):
+        usage=resource.getrusage(resource.RUSAGE_SELF)
+        return '''%s: usertime=%s systime=%s mem=%s mb
+            '''%(point,usage[0],usage[1],
+                    usage[2]/1024.0 )
     
+
+    
+    print(using("start"))
     # Start timing
     start_time = datetime.now()
 
@@ -589,6 +598,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         fastq_handle = gzip.open(fastq_filename, 'rt')
     else:
         fastq_handle=open(fastq_filename)
+
+    print("fastq size: ")
+    print(os.path.getsize(fastq_filename))
 
     n_processes = 1 
     if args.n_processes == "max":
@@ -655,6 +667,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     N_READS_IRREGULAR_ENDS = 0 #number of reads with modifications at the 0 or -1 position
     READ_LENGTH = 0
 
+
     for seq in seq_cache.keys():
         variant = managerCache[seq]
         variant_count = seq_cache[seq]
@@ -704,6 +717,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     with open("6_gig_timing_log.txt", "a") as file:
         file.write(f"{descriptor}: {formatted_duration}\n")
 
+    print(using("end"))
     return(aln_stats)
 
 def old_process_fastq(fastq_filename, variantCache, ref_names, refs, args):
