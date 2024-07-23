@@ -636,6 +636,19 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
 
         fastq_id = fastq_handle.readline()
 
+    N_TOT_READS = 0
+    N_CACHED_ALN = 0 # read was found in cache
+    N_CACHED_NOTALN = 0 #read was found in 'not aligned' cache
+    N_COMPUTED_ALN = 0 # not in cache, aligned to at least 1 sequence with min cutoff
+    N_COMPUTED_NOTALN = 0 #not in cache, not aligned to any sequence with min cutoff
+
+    N_GLOBAL_SUBS = 0 #number of substitutions across all reads - indicator of sequencing quality
+    N_SUBS_OUTSIDE_WINDOW = 0
+    N_MODS_IN_WINDOW = 0 #number of modifications found inside the quantification window
+    N_MODS_OUTSIDE_WINDOW = 0 #number of modifications found outside the quantification window
+    N_READS_IRREGULAR_ENDS = 0 #number of reads with modifications at the 0 or -1 position
+    READ_LENGTH = 0
+    unaligned_reads = []
 
     if n_processes > 1:
         boundaries = get_seq_cache_boundaries(len(variantCache.keys()), n_processes)
@@ -655,12 +668,31 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         for p in processes:
             p.join() # pauses the main thread until the processes are finished
         # Now that all the processes are finished, we can update the variantCache with the new variants
-        for key in variantCache.keys():
-            if key == "":
+        for seq in variantCache.keys():
+            if seq == "":
                 continue
-            variant_count = variantCache[key]
-            variantCache[key] = managerCache[key]
-            variantCache[key]['count'] = variant_count
+            variant_count = variantCache[seq]
+            N_TOT_READS += variant_count
+            variant = managerCache[seq]
+            variant['count'] = variant_count
+            if variant['best_match_score'] <= 0:
+                N_COMPUTED_NOTALN += 1
+                N_CACHED_NOTALN += (variant_count - 1)
+                # remove the unaligned reads from the cache
+                unaligned_reads.append(seq)
+            elif variant['best_match_score'] > 0:
+                variantCache[seq] = variant
+                N_COMPUTED_ALN += 1
+                N_CACHED_ALN += (variant_count - 1)
+                match_name = "variant_" + variant['best_match_name']
+                if READ_LENGTH == 0:
+                    READ_LENGTH = len(variant[match_name]['aln_seq'])
+                N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
+                N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
+                N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
+                N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
+                if variant[match_name]['irregular_ends']:
+                    N_READS_IRREGULAR_ENDS += variant_count
         del managerCache
     else:
         num_reads = len(variantCache.keys())
@@ -668,52 +700,30 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             if fastq_seq == "":
                 continue
             variant_count = variantCache[fastq_seq]
-            variantCache[fastq_seq] = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-            variantCache[fastq_seq]['count'] = variant_count
+            N_TOT_READS += variant_count
+            variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+            variant['count'] = variant_count
+            if variant['best_match_score'] <= 0:
+                N_COMPUTED_NOTALN += 1
+                N_CACHED_NOTALN += (variant_count - 1)
+                unaligned_reads.append(fastq_seq)
+            elif variant['best_match_score'] > 0:
+                variantCache[fastq_seq] = variant
+                N_COMPUTED_ALN += 1
+                N_CACHED_ALN += (variant_count - 1)
+                match_name = "variant_" + variant['best_match_name']
+                if READ_LENGTH == 0:
+                    READ_LENGTH = len(variant[match_name]['aln_seq'])
+                N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
+                N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
+                N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
+                N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
+                if variant[match_name]['irregular_ends']:
+                    N_READS_IRREGULAR_ENDS += variant_count
             if (index % 10000 == 0):
                 info("Processing Reads; %d Completed out of %d Unique Reads"%(index, num_reads))
-    
-    N_TOT_READS = 0
-    N_CACHED_ALN = 0 # read was found in cache
-    N_CACHED_NOTALN = 0 #read was found in 'not aligned' cache
-    N_COMPUTED_ALN = 0 # not in cache, aligned to at least 1 sequence with min cutoff
-    N_COMPUTED_NOTALN = 0 #not in cache, not aligned to any sequence with min cutoff
-
-    N_GLOBAL_SUBS = 0 #number of substitutions across all reads - indicator of sequencing quality
-    N_SUBS_OUTSIDE_WINDOW = 0
-    N_MODS_IN_WINDOW = 0 #number of modifications found inside the quantification window
-    N_MODS_OUTSIDE_WINDOW = 0 #number of modifications found outside the quantification window
-    N_READS_IRREGULAR_ENDS = 0 #number of reads with modifications at the 0 or -1 position
-    READ_LENGTH = 0
-
-    unaligned_reads = []
 
 
-    for seq in variantCache.keys():
-        if seq == "":
-            continue
-        variant = variantCache[seq]
-        variant_count = variant['count']
-        N_TOT_READS += variant_count
-        if variant['best_match_score'] <= 0:
-            N_COMPUTED_NOTALN += 1
-            N_CACHED_NOTALN += (variant_count - 1)
-            unaligned_reads.append(seq)
-        elif variant['best_match_score'] > 0:
-            variantCache[seq] = variant
-            N_COMPUTED_ALN += 1
-            N_CACHED_ALN += (variant_count - 1)
-            match_name = "variant_" + variant['best_match_name']
-            if READ_LENGTH == 0:
-                READ_LENGTH = len(variant[match_name]['aln_seq'])
-            N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
-            N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
-            N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
-            N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
-            # if variantCache[fastq_seq][match_name]['irregular_ends']:
-            #     N_READS_IRREGULAR_ENDS += 1
-            if variant[match_name]['irregular_ends']:
-                N_READS_IRREGULAR_ENDS += variant_count
     for seq in unaligned_reads:
         del variantCache[seq]
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
@@ -3251,6 +3261,9 @@ def main():
         ###iterate through variants
         for variant in variantCache:
             #skip variant if there were none observed
+            # check if variant is an int
+            if isinstance(variantCache[variant], int):
+                print(variant)
             variant_count = variantCache[variant]['count']
             if (variant_count == 0):
                 continue
