@@ -588,7 +588,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     #         '''%(point,usage[0],usage[1],
     #                 usage[2]/1024.0 )
     
-    tracemalloc.start()
+    # tracemalloc.start()
     
     # print(using("start"))
     # Start timing
@@ -733,18 +733,18 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     # End timing
     end_time = datetime.now()
     
-    # Calculate duration
     duration = end_time - start_time
-    descriptor = "6 gigs, max processes:"
+    descriptor = "OHara 77k unique reads, 20 processes"
     formatted_duration = str(duration)
 
     # Record the duration in a text file with a descriptor
-    with open("6_gig_timing_log.txt", "a") as file:
-        file.write(f"{descriptor}: {formatted_duration}\n")
+    with open("parallelized_stats.txt", "a") as file:
+        file.write(f"{descriptor}: {formatted_duration} with memory usage:\n")
+
 
     # print(using("end"))
         # displaying the memory
-    print("Main fastq thread used", tracemalloc.get_traced_memory())
+    # print("Main fastq thread used", tracemalloc.get_traced_memory())
 
     # stopping the library
     tracemalloc.stop()
