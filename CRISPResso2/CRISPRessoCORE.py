@@ -1756,7 +1756,6 @@ def to_numeric_ignore_columns(df, ignore_columns):
 
 
 def main():
-    print('CRISPResso 2 haha!')
     def print_stacktrace_if_debug():
         debug_flag = False
         if 'args' in vars() and 'debug' in args:
