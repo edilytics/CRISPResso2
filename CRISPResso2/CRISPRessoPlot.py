@@ -2896,6 +2896,7 @@ def plot_amino_acid_heatmap(
     ax_hm.yaxis.set_ticklabels(y_labels[::-1], rotation=True, va='center')
     ax_hm.xaxis.set_ticks([])
 
+    #TODO: make sure these are accurate
     if sgRNA_intervals and len(sgRNA_intervals) > 0:
         this_sgRNA_y_start = -1*num_sgRNA_rows
         this_sgRNA_y_height = num_sgRNA_rows - 0.3
