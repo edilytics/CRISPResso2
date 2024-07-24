@@ -575,7 +575,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
            -allelic varaints if two variants are known to exist
 
         """
-    start_time = datetime.now()
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
@@ -721,10 +720,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
             "READ_LENGTH": READ_LENGTH
             }
-
-    end_time = datetime.now()
-    print(end_time - start_time)
-
     return(aln_stats)
 
 
