@@ -1,0 +1,40 @@
+{
+  "message": "Parameter error, please check your input.
+
+ERROR: The specified file './PSB.fastq' cannot be opened.
+Available files in current directory:
+	CRISPRessoMeta.py
+	Dockerfile
+	tests
+	CRISPRessoCompare.py
+	MANIFEST.in
+	README.md
+	CRISPRessoAggregate.py
+	build.sh
+	setup.py
+	.dockerignore
+	.gitignore
+	CRISPRessoWGS.py
+	CRISPResso2
+	CRISPResso2.egg-info
+	CRISPResso.py
+	(Complete listing truncated)
+Available files in .:
+	CRISPRessoMeta.py
+	Dockerfile
+	tests
+	CRISPRessoCompare.py
+	MANIFEST.in
+	README.md
+	CRISPRessoAggregate.py
+	build.sh
+	setup.py
+	.dockerignore
+	.gitignore
+	CRISPRessoWGS.py
+	CRISPResso2
+	CRISPResso2.egg-info
+	CRISPResso.py
+	(Complete listing truncated)",
+  "percent_complete": 
+}

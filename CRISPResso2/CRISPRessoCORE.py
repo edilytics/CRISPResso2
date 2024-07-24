@@ -457,7 +457,7 @@ def get_variant_cache_boundaries(num_unique_sequences, n_processes):
     total_indices = sum(range(1, n_processes + 1))
 
     # This complex weighting scheme ensures that each subsequent process is responsible for generating more variants than the previous one
-    # This results processes spending less time waiting for the semaphore lock in the variant_generator_process function
+    # This results in processes spending less time waiting for the semaphore lock in the variant_generator_process function
     for i in range(1, n_processes):
         # Determine the weight for this particular process
         weight = i / total_indices
@@ -492,8 +492,6 @@ def variant_generator_process(seq_list, managerCache, lock, get_new_variant_obje
     new_variants = {}
     num_processed = 0
     for fastq_seq in seq_list:
-        if fastq_seq == "":
-            continue
         new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
         new_variants[fastq_seq] = new_variant
         num_processed += 1
@@ -577,6 +575,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
            -allelic varaints if two variants are known to exist
 
         """
+    start_time = datetime.now()
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
@@ -591,13 +590,13 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         fastq_handle=open(fastq_filename)
 
     # Reading through the fastq file and enriching variantCache as a dictionary with the following:
-        # Key: the DNA sequence from the fastq file
+        # Key: the unique DNA sequence from the fastq file
         # Value: an integer that represents how many times we've seen this specific read
     num_reads = 0
     fastq_id = fastq_handle.readline()
     while(fastq_id):
         if num_reads % 10000 == 0 and num_reads != 0:
-            info("Iterating over fastq file to identify reads; %d total reads."%(num_reads))
+            info("Iterating over fastq file to identify reads; %d reads identified."%(num_reads))
         #read through fastq in sets of 4
         fastq_seq = fastq_handle.readline().strip()
         fastq_plus = fastq_handle.readline().strip()
@@ -611,11 +610,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         fastq_id = fastq_handle.readline()
         num_reads += 1
 
-    num_keys = len(variantCache.keys())
-    num_unique_reads = num_keys - 1 # variantCache has an empty string '' key from the higher function that will throw off counts by one 
-
-    if (num_reads > 1000):
-            info("Finished reading fastq file; %d unique reads found of %d total reads found "%(num_unique_reads, num_reads))
+    num_unique_reads = len(variantCache.keys())
+    info("Finished reading fastq file; %d unique reads found of %d total reads found "%(num_unique_reads, num_reads))
 
     n_processes = 1 
     if args.n_processes == "max":
@@ -637,7 +633,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     unaligned_reads = []
 
     if n_processes > 1:
-        boundaries = get_variant_cache_boundaries(num_keys, n_processes)
+        boundaries = get_variant_cache_boundaries(num_unique_reads, n_processes)
 
         managerCache = Manager().dict() # Manager dictionaries are python multiprocessing objects that can be accessed across processes
         lock = Lock() # Semaphore lock that prevents race conditions on managerCache
@@ -648,7 +644,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         for i in range(n_processes):
             left_sublist_index = boundaries[i]
             right_sublist_index = boundaries[i+1]
-            process = Process(target=variant_generator_process, args=((list(variantCache.keys())[left_sublist_index:right_sublist_index]), managerCache, lock, get_new_variant_object,  args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
+            process = Process(target=variant_generator_process, args=((list(variantCache.keys())[left_sublist_index:right_sublist_index]), managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
             process.start()
             processes.append(process)
         for p in processes:
@@ -657,8 +653,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         info("Finished processing unique reads, now generating statistics...")
         # Now that all the processes are finished, we can update the variantCache with the new variants
         for index, seq  in enumerate(variantCache.keys()):
-            if seq == "":
-                continue
             variant_count = variantCache[seq]
             N_TOT_READS += variant_count
             variant = managerCache[seq]
@@ -686,8 +680,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         del managerCache
     else:
         for index, fastq_seq in enumerate(variantCache.keys()):
-            if fastq_seq == "":
-                continue
             variant_count = variantCache[fastq_seq]
             N_TOT_READS += variant_count
             variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
@@ -729,6 +721,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
             "READ_LENGTH": READ_LENGTH
             }
+
+    end_time = datetime.now()
+    print(end_time - start_time)
 
     return(aln_stats)
 
@@ -2609,10 +2604,7 @@ def main():
 
         ####INITIALIZE CACHE####
         variantCache = {}
-        #put empty sequence into cache
-        cache_fastq_seq = ''
-        variantCache[cache_fastq_seq] = {}
-        variantCache[cache_fastq_seq]['count'] = 0
+
 
         #operates on variantCache
         if args.bam_input:
@@ -2624,6 +2616,11 @@ def main():
             aln_stats = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args)
         else:
             aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args)
+
+        #put empty sequence into cache
+        cache_fastq_seq = ''
+        variantCache[cache_fastq_seq] = {}
+        variantCache[cache_fastq_seq]['count'] = 0
 
         info('Done!', {'percent_complete': 20})
 
