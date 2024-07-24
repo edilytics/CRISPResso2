@@ -654,6 +654,7 @@ ___________________________________
                                 'plot_path': plot_path,
                                 'title': modification_type,
                                 'div_id': heatmap_div_id,
+                                'amplicon_name': amplicon_name,
                             }
                             plot(
                                 CRISPRessoPlot.plot_allele_modification_heatmap,
@@ -687,6 +688,7 @@ ___________________________________
                                 'plot_path': plot_path,
                                 'title': modification_type,
                                 'div_id': line_div_id,
+                                'amplicon_name': amplicon_name,
                             }
                             plot(
                                 CRISPRessoPlot.plot_allele_modification_line,
