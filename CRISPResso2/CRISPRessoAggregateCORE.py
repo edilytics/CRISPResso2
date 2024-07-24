@@ -849,11 +849,17 @@ ___________________________________
                 report_filename = OUTPUT_DIRECTORY+'.html'
                 if (args.place_report_in_output_folder):
                     report_filename = _jp("CRISPResso2Aggregate_report.html")
-                CRISPRessoReport.make_aggregate_report(crispresso2_info, args.name,
-                                                       report_filename, OUTPUT_DIRECTORY,
-                                                       _ROOT, crispresso2_folders,
-                                                       crispresso2_folder_htmls,
-                                                       quilt_plots_to_show)
+                CRISPRessoReport.make_aggregate_report(
+                    crispresso2_info,
+                    args.name,
+                    report_filename,
+                    OUTPUT_DIRECTORY,
+                    _ROOT,
+                    crispresso2_folders,
+                    crispresso2_folder_htmls,
+                    logger,
+                    compact_plots_to_show=quilt_plots_to_show,
+                )
                 crispresso2_info['running_info']['report_location'] = report_filename
                 crispresso2_info['running_info']['report_filename'] = os.path.basename(report_filename)
         else: #no files successfully imported
