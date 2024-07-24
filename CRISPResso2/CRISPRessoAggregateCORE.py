@@ -518,6 +518,7 @@ ___________________________________
                                     'sgRNA_sequences': consensus_guides,
                                     'quantification_window_idxs': include_idxs,
                                     'group_column': 'Folder',
+                                    'custom_colors': None,
                                 }
                                 plot(
                                     CRISPRessoPlot.plot_nucleotide_quilt,
@@ -554,6 +555,7 @@ ___________________________________
                                     'sgRNA_sequences': consensus_guides,
                                     'quantification_window_idxs': include_idxs,
                                     'group_column': 'Folder',
+                                    'custom_colors': None,
                                 }
                                 plot(
                                     CRISPRessoPlot.plot_nucleotide_quilt,
@@ -594,6 +596,7 @@ ___________________________________
                                     'sgRNA_sequences': consensus_guides,
                                     'quantification_window_idxs': consensus_include_idxs,
                                     'group_column': 'Folder',
+                                    'custom_colors': None,
                                 }
                                 plot(
                                     CRISPRessoPlot.plot_nucleotide_quilt,
