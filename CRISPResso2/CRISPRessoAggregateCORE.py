@@ -515,6 +515,7 @@ ___________________________________
                                     'fig_filename_root': this_window_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': sub_sgRNA_intervals,
+                                    'sgRNA_sequences': consensus_guides,
                                     'quantification_window_idxs': include_idxs,
                                     'group_column': 'Folder',
                                 }
@@ -550,6 +551,7 @@ ___________________________________
                                     'fig_filename_root': this_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': consensus_sgRNA_intervals,
+                                    'sgRNA_sequences': consensus_guides,
                                     'quantification_window_idxs': include_idxs,
                                     'group_column': 'Folder',
                                 }
@@ -589,6 +591,7 @@ ___________________________________
                                     'fig_filename_root': this_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': consensus_sgRNA_intervals,
+                                    'sgRNA_sequences': consensus_guides,
                                     'quantification_window_idxs': consensus_include_idxs,
                                     'group_column': 'Folder',
                                 }
