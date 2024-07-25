@@ -228,7 +228,7 @@ ___________________________________
 
         if successfully_imported_count > 0:
 
-            crispresso2_folders = crispresso2_folder_infos.keys()
+            crispresso2_folders = list(sorted(crispresso2_folder_infos.keys()))
             crispresso2_folder_names = {}
             crispresso2_folder_htmls = {}#file_loc->html folder loc
             quilt_plots_to_show = {}  # name->{'href':path to report, 'img': png}
@@ -325,7 +325,7 @@ ___________________________________
                 consensus_sgRNA_intervals = []
                 guides_all_same = True
                 runs_with_this_amplicon = []
-                for crispresso2_folder in sorted(crispresso2_folders):
+                for crispresso2_folder in crispresso2_folders:
                     run_data = crispresso2_folder_infos[crispresso2_folder]
                     run_has_amplicon = False
                     run_amplicon_name = ''
