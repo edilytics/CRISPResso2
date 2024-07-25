@@ -41,6 +41,13 @@ class ResultsSlotsDict():
         'aln_seq',
         'aln_ref',
         'aln_strand',
+        'irregular_ends',
+        'insertions_outside_window',
+        'deletions_outside_window',
+        'substitutions_outside_window',
+        'total_mods',
+        'mods_in_window',
+        'mods_outside_window',
     )
 
     def __init__(self, **kwargs):
