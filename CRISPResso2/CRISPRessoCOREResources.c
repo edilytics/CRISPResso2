@@ -1219,7 +1219,7 @@ static CYTHON_INLINE float __PYX_NAN() {
 #include <stdio.h>
 
     /* Using NumPy API declarations from "numpy/__init__.cython-30.pxd" */
-
+    
 #include "numpy/arrayobject.h"
 #include "numpy/ndarrayobject.h"
 #include "numpy/ndarraytypes.h"
@@ -1510,7 +1510,7 @@ static const char *__pyx_f[] = {
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":730
  * # in Cython to enable them only on the right systems.
- *
+ * 
  * ctypedef npy_int8       int8_t             # <<<<<<<<<<<<<<
  * ctypedef npy_int16      int16_t
  * ctypedef npy_int32      int32_t
@@ -1518,7 +1518,7 @@ static const char *__pyx_f[] = {
 typedef npy_int8 __pyx_t_5numpy_int8_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":731
- *
+ * 
  * ctypedef npy_int8       int8_t
  * ctypedef npy_int16      int16_t             # <<<<<<<<<<<<<<
  * ctypedef npy_int32      int32_t
@@ -1546,7 +1546,7 @@ typedef npy_int64 __pyx_t_5numpy_int64_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":737
  * #ctypedef npy_int128     int128_t
- *
+ * 
  * ctypedef npy_uint8      uint8_t             # <<<<<<<<<<<<<<
  * ctypedef npy_uint16     uint16_t
  * ctypedef npy_uint32     uint32_t
@@ -1554,7 +1554,7 @@ typedef npy_int64 __pyx_t_5numpy_int64_t;
 typedef npy_uint8 __pyx_t_5numpy_uint8_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":738
- *
+ * 
  * ctypedef npy_uint8      uint8_t
  * ctypedef npy_uint16     uint16_t             # <<<<<<<<<<<<<<
  * ctypedef npy_uint32     uint32_t
@@ -1582,7 +1582,7 @@ typedef npy_uint64 __pyx_t_5numpy_uint64_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":744
  * #ctypedef npy_uint128    uint128_t
- *
+ * 
  * ctypedef npy_float32    float32_t             # <<<<<<<<<<<<<<
  * ctypedef npy_float64    float64_t
  * #ctypedef npy_float80    float80_t
@@ -1590,7 +1590,7 @@ typedef npy_uint64 __pyx_t_5numpy_uint64_t;
 typedef npy_float32 __pyx_t_5numpy_float32_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":745
- *
+ * 
  * ctypedef npy_float32    float32_t
  * ctypedef npy_float64    float64_t             # <<<<<<<<<<<<<<
  * #ctypedef npy_float80    float80_t
@@ -1603,7 +1603,7 @@ typedef npy_float64 __pyx_t_5numpy_float64_t;
  * # numpy.int corresponds to 'l' and numpy.long to 'q'
  * ctypedef npy_long       int_t             # <<<<<<<<<<<<<<
  * ctypedef npy_longlong   longlong_t
- *
+ * 
  */
 typedef npy_long __pyx_t_5numpy_int_t;
 
@@ -1611,50 +1611,50 @@ typedef npy_long __pyx_t_5numpy_int_t;
  * # numpy.int corresponds to 'l' and numpy.long to 'q'
  * ctypedef npy_long       int_t
  * ctypedef npy_longlong   longlong_t             # <<<<<<<<<<<<<<
- *
+ * 
  * ctypedef npy_ulong      uint_t
  */
 typedef npy_longlong __pyx_t_5numpy_longlong_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":757
  * ctypedef npy_longlong   longlong_t
- *
+ * 
  * ctypedef npy_ulong      uint_t             # <<<<<<<<<<<<<<
  * ctypedef npy_ulonglong  ulonglong_t
- *
+ * 
  */
 typedef npy_ulong __pyx_t_5numpy_uint_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":758
- *
+ * 
  * ctypedef npy_ulong      uint_t
  * ctypedef npy_ulonglong  ulonglong_t             # <<<<<<<<<<<<<<
- *
+ * 
  * ctypedef npy_intp       intp_t
  */
 typedef npy_ulonglong __pyx_t_5numpy_ulonglong_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":760
  * ctypedef npy_ulonglong  ulonglong_t
- *
+ * 
  * ctypedef npy_intp       intp_t             # <<<<<<<<<<<<<<
  * ctypedef npy_uintp      uintp_t
- *
+ * 
  */
 typedef npy_intp __pyx_t_5numpy_intp_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":761
- *
+ * 
  * ctypedef npy_intp       intp_t
  * ctypedef npy_uintp      uintp_t             # <<<<<<<<<<<<<<
- *
+ * 
  * ctypedef npy_double     float_t
  */
 typedef npy_uintp __pyx_t_5numpy_uintp_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":763
  * ctypedef npy_uintp      uintp_t
- *
+ * 
  * ctypedef npy_double     float_t             # <<<<<<<<<<<<<<
  * ctypedef npy_double     double_t
  * ctypedef npy_longdouble longdouble_t
@@ -1662,11 +1662,11 @@ typedef npy_uintp __pyx_t_5numpy_uintp_t;
 typedef npy_double __pyx_t_5numpy_float_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":764
- *
+ * 
  * ctypedef npy_double     float_t
  * ctypedef npy_double     double_t             # <<<<<<<<<<<<<<
  * ctypedef npy_longdouble longdouble_t
- *
+ * 
  */
 typedef npy_double __pyx_t_5numpy_double_t;
 
@@ -1674,7 +1674,7 @@ typedef npy_double __pyx_t_5numpy_double_t;
  * ctypedef npy_double     float_t
  * ctypedef npy_double     double_t
  * ctypedef npy_longdouble longdouble_t             # <<<<<<<<<<<<<<
- *
+ * 
  * ctypedef npy_cfloat      cfloat_t
  */
 typedef npy_longdouble __pyx_t_5numpy_longdouble_t;
@@ -1709,7 +1709,7 @@ static CYTHON_INLINE __pyx_t_double_complex __pyx_t_double_complex_from_parts(do
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":767
  * ctypedef npy_longdouble longdouble_t
- *
+ * 
  * ctypedef npy_cfloat      cfloat_t             # <<<<<<<<<<<<<<
  * ctypedef npy_cdouble     cdouble_t
  * ctypedef npy_clongdouble clongdouble_t
@@ -1717,11 +1717,11 @@ static CYTHON_INLINE __pyx_t_double_complex __pyx_t_double_complex_from_parts(do
 typedef npy_cfloat __pyx_t_5numpy_cfloat_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":768
- *
+ * 
  * ctypedef npy_cfloat      cfloat_t
  * ctypedef npy_cdouble     cdouble_t             # <<<<<<<<<<<<<<
  * ctypedef npy_clongdouble clongdouble_t
- *
+ * 
  */
 typedef npy_cdouble __pyx_t_5numpy_cdouble_t;
 
@@ -1729,16 +1729,16 @@ typedef npy_cdouble __pyx_t_5numpy_cdouble_t;
  * ctypedef npy_cfloat      cfloat_t
  * ctypedef npy_cdouble     cdouble_t
  * ctypedef npy_clongdouble clongdouble_t             # <<<<<<<<<<<<<<
- *
+ * 
  * ctypedef npy_cdouble     complex_t
  */
 typedef npy_clongdouble __pyx_t_5numpy_clongdouble_t;
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":771
  * ctypedef npy_clongdouble clongdouble_t
- *
+ * 
  * ctypedef npy_cdouble     complex_t             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline object PyArray_MultiIterNew1(a):
  */
 typedef npy_cdouble __pyx_t_5numpy_complex_t;
@@ -3361,7 +3361,7 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 /* #### Code section: module_code ### */
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":245
- *
+ * 
  *         @property
  *         cdef inline PyObject* base(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns a borrowed reference to the object owning the data/memory.
@@ -3375,14 +3375,14 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_7ndarray_4base_base(PyArrayObject 
  *             """Returns a borrowed reference to the object owning the data/memory.
  *             """
  *             return PyArray_BASE(self)             # <<<<<<<<<<<<<<
- *
+ * 
  *         @property
  */
   __pyx_r = PyArray_BASE(__pyx_v_self);
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":245
- *
+ * 
  *         @property
  *         cdef inline PyObject* base(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns a borrowed reference to the object owning the data/memory.
@@ -3395,7 +3395,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_7ndarray_4base_base(PyArrayObject 
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":251
- *
+ * 
  *         @property
  *         cdef inline dtype descr(self):             # <<<<<<<<<<<<<<
  *             """Returns an owned reference to the dtype of the array.
@@ -3412,7 +3412,7 @@ static CYTHON_INLINE PyArray_Descr *__pyx_f_5numpy_7ndarray_5descr_descr(PyArray
  *             """Returns an owned reference to the dtype of the array.
  *             """
  *             return <dtype>PyArray_DESCR(self)             # <<<<<<<<<<<<<<
- *
+ * 
  *         @property
  */
   __Pyx_XDECREF((PyObject *)__pyx_r);
@@ -3422,7 +3422,7 @@ static CYTHON_INLINE PyArray_Descr *__pyx_f_5numpy_7ndarray_5descr_descr(PyArray
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":251
- *
+ * 
  *         @property
  *         cdef inline dtype descr(self):             # <<<<<<<<<<<<<<
  *             """Returns an owned reference to the dtype of the array.
@@ -3437,7 +3437,7 @@ static CYTHON_INLINE PyArray_Descr *__pyx_f_5numpy_7ndarray_5descr_descr(PyArray
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":257
- *
+ * 
  *         @property
  *         cdef inline int ndim(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns the number of dimensions in the array.
@@ -3451,14 +3451,14 @@ static CYTHON_INLINE int __pyx_f_5numpy_7ndarray_4ndim_ndim(PyArrayObject *__pyx
  *             """Returns the number of dimensions in the array.
  *             """
  *             return PyArray_NDIM(self)             # <<<<<<<<<<<<<<
- *
+ * 
  *         @property
  */
   __pyx_r = PyArray_NDIM(__pyx_v_self);
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":257
- *
+ * 
  *         @property
  *         cdef inline int ndim(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns the number of dimensions in the array.
@@ -3471,7 +3471,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_7ndarray_4ndim_ndim(PyArrayObject *__pyx
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":263
- *
+ * 
  *         @property
  *         cdef inline npy_intp *shape(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns a pointer to the dimensions/shape of the array.
@@ -3485,14 +3485,14 @@ static CYTHON_INLINE npy_intp *__pyx_f_5numpy_7ndarray_5shape_shape(PyArrayObjec
  *             Can return NULL for 0-dimensional arrays.
  *             """
  *             return PyArray_DIMS(self)             # <<<<<<<<<<<<<<
- *
+ * 
  *         @property
  */
   __pyx_r = PyArray_DIMS(__pyx_v_self);
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":263
- *
+ * 
  *         @property
  *         cdef inline npy_intp *shape(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns a pointer to the dimensions/shape of the array.
@@ -3505,7 +3505,7 @@ static CYTHON_INLINE npy_intp *__pyx_f_5numpy_7ndarray_5shape_shape(PyArrayObjec
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":271
- *
+ * 
  *         @property
  *         cdef inline npy_intp *strides(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns a pointer to the strides of the array.
@@ -3519,14 +3519,14 @@ static CYTHON_INLINE npy_intp *__pyx_f_5numpy_7ndarray_7strides_strides(PyArrayO
  *             The number of elements matches the number of dimensions of the array (ndim).
  *             """
  *             return PyArray_STRIDES(self)             # <<<<<<<<<<<<<<
- *
+ * 
  *         @property
  */
   __pyx_r = PyArray_STRIDES(__pyx_v_self);
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":271
- *
+ * 
  *         @property
  *         cdef inline npy_intp *strides(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns a pointer to the strides of the array.
@@ -3539,7 +3539,7 @@ static CYTHON_INLINE npy_intp *__pyx_f_5numpy_7ndarray_7strides_strides(PyArrayO
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":278
- *
+ * 
  *         @property
  *         cdef inline npy_intp size(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns the total size (in number of elements) of the array.
@@ -3553,14 +3553,14 @@ static CYTHON_INLINE npy_intp __pyx_f_5numpy_7ndarray_4size_size(PyArrayObject *
  *             """Returns the total size (in number of elements) of the array.
  *             """
  *             return PyArray_SIZE(self)             # <<<<<<<<<<<<<<
- *
+ * 
  *         @property
  */
   __pyx_r = PyArray_SIZE(__pyx_v_self);
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":278
- *
+ * 
  *         @property
  *         cdef inline npy_intp size(self) nogil:             # <<<<<<<<<<<<<<
  *             """Returns the total size (in number of elements) of the array.
@@ -3573,7 +3573,7 @@ static CYTHON_INLINE npy_intp __pyx_f_5numpy_7ndarray_4size_size(PyArrayObject *
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":284
- *
+ * 
  *         @property
  *         cdef inline char* data(self) nogil:             # <<<<<<<<<<<<<<
  *             """The pointer to the data buffer as a char*.
@@ -3587,14 +3587,14 @@ static CYTHON_INLINE char *__pyx_f_5numpy_7ndarray_4data_data(PyArrayObject *__p
  *             of `PyArray_DATA()` instead, which returns a 'void*'.
  *             """
  *             return PyArray_BYTES(self)             # <<<<<<<<<<<<<<
- *
+ * 
  *     ctypedef unsigned char      npy_bool
  */
   __pyx_r = PyArray_BYTES(__pyx_v_self);
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":284
- *
+ * 
  *         @property
  *         cdef inline char* data(self) nogil:             # <<<<<<<<<<<<<<
  *             """The pointer to the data buffer as a char*.
@@ -3608,10 +3608,10 @@ static CYTHON_INLINE char *__pyx_f_5numpy_7ndarray_4data_data(PyArrayObject *__p
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":773
  * ctypedef npy_cdouble     complex_t
- *
+ * 
  * cdef inline object PyArray_MultiIterNew1(a):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(1, <void*>a)
- *
+ * 
  */
 
 static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__pyx_v_a) {
@@ -3624,10 +3624,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew1", 1);
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":774
- *
+ * 
  * cdef inline object PyArray_MultiIterNew1(a):
  *     return PyArray_MultiIterNew(1, <void*>a)             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline object PyArray_MultiIterNew2(a, b):
  */
   __Pyx_XDECREF(__pyx_r);
@@ -3639,10 +3639,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":773
  * ctypedef npy_cdouble     complex_t
- *
+ * 
  * cdef inline object PyArray_MultiIterNew1(a):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(1, <void*>a)
- *
+ * 
  */
 
   /* function exit code */
@@ -3658,10 +3658,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew1(PyObject *__
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":776
  *     return PyArray_MultiIterNew(1, <void*>a)
- *
+ * 
  * cdef inline object PyArray_MultiIterNew2(a, b):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)
- *
+ * 
  */
 
 static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__pyx_v_a, PyObject *__pyx_v_b) {
@@ -3674,10 +3674,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew2", 1);
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":777
- *
+ * 
  * cdef inline object PyArray_MultiIterNew2(a, b):
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):
  */
   __Pyx_XDECREF(__pyx_r);
@@ -3689,10 +3689,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":776
  *     return PyArray_MultiIterNew(1, <void*>a)
- *
+ * 
  * cdef inline object PyArray_MultiIterNew2(a, b):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)
- *
+ * 
  */
 
   /* function exit code */
@@ -3708,10 +3708,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew2(PyObject *__
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":779
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)
- *
+ * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)
- *
+ * 
  */
 
 static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__pyx_v_a, PyObject *__pyx_v_b, PyObject *__pyx_v_c) {
@@ -3724,10 +3724,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew3", 1);
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":780
- *
+ * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):
  */
   __Pyx_XDECREF(__pyx_r);
@@ -3739,10 +3739,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":779
  *     return PyArray_MultiIterNew(2, <void*>a, <void*>b)
- *
+ * 
  * cdef inline object PyArray_MultiIterNew3(a, b, c):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)
- *
+ * 
  */
 
   /* function exit code */
@@ -3758,10 +3758,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew3(PyObject *__
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":782
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)
- *
+ * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)
- *
+ * 
  */
 
 static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__pyx_v_a, PyObject *__pyx_v_b, PyObject *__pyx_v_c, PyObject *__pyx_v_d) {
@@ -3774,10 +3774,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew4", 1);
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":783
- *
+ * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):
  */
   __Pyx_XDECREF(__pyx_r);
@@ -3789,10 +3789,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":782
  *     return PyArray_MultiIterNew(3, <void*>a, <void*>b, <void*> c)
- *
+ * 
  * cdef inline object PyArray_MultiIterNew4(a, b, c, d):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)
- *
+ * 
  */
 
   /* function exit code */
@@ -3808,10 +3808,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew4(PyObject *__
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":785
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)
- *
+ * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)
- *
+ * 
  */
 
 static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__pyx_v_a, PyObject *__pyx_v_b, PyObject *__pyx_v_c, PyObject *__pyx_v_d, PyObject *__pyx_v_e) {
@@ -3824,10 +3824,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__
   __Pyx_RefNannySetupContext("PyArray_MultiIterNew5", 1);
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":786
- *
+ * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):
  */
   __Pyx_XDECREF(__pyx_r);
@@ -3839,10 +3839,10 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":785
  *     return PyArray_MultiIterNew(4, <void*>a, <void*>b, <void*>c, <void*> d)
- *
+ * 
  * cdef inline object PyArray_MultiIterNew5(a, b, c, d, e):             # <<<<<<<<<<<<<<
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)
- *
+ * 
  */
 
   /* function exit code */
@@ -3858,7 +3858,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyArray_MultiIterNew5(PyObject *__
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":788
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)
- *
+ * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):             # <<<<<<<<<<<<<<
  *     if PyDataType_HASSUBARRAY(d):
  *         return <tuple>d.subarray.shape
@@ -3871,7 +3871,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
   __Pyx_RefNannySetupContext("PyDataType_SHAPE", 1);
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":789
- *
+ * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):
  *     if PyDataType_HASSUBARRAY(d):             # <<<<<<<<<<<<<<
  *         return <tuple>d.subarray.shape
@@ -3893,7 +3893,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
     goto __pyx_L0;
 
     /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":789
- *
+ * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):
  *     if PyDataType_HASSUBARRAY(d):             # <<<<<<<<<<<<<<
  *         return <tuple>d.subarray.shape
@@ -3905,8 +3905,8 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
  *         return <tuple>d.subarray.shape
  *     else:
  *         return ()             # <<<<<<<<<<<<<<
- *
- *
+ * 
+ * 
  */
   /*else*/ {
     __Pyx_XDECREF(__pyx_r);
@@ -3917,7 +3917,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":788
  *     return PyArray_MultiIterNew(5, <void*>a, <void*>b, <void*>c, <void*> d, <void*> e)
- *
+ * 
  * cdef inline tuple PyDataType_SHAPE(dtype d):             # <<<<<<<<<<<<<<
  *     if PyDataType_HASSUBARRAY(d):
  *         return <tuple>d.subarray.shape
@@ -3932,7 +3932,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_PyDataType_SHAPE(PyArray_Descr *__
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":968
  *     int _import_umath() except -1
- *
+ * 
  * cdef inline void set_array_base(ndarray arr, object base):             # <<<<<<<<<<<<<<
  *     Py_INCREF(base) # important to do this before stealing the reference below!
  *     PyArray_SetBaseObject(arr, base)
@@ -3945,11 +3945,11 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
   int __pyx_clineno = 0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":969
- *
+ * 
  * cdef inline void set_array_base(ndarray arr, object base):
  *     Py_INCREF(base) # important to do this before stealing the reference below!             # <<<<<<<<<<<<<<
  *     PyArray_SetBaseObject(arr, base)
- *
+ * 
  */
   Py_INCREF(__pyx_v_base);
 
@@ -3957,14 +3957,14 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
  * cdef inline void set_array_base(ndarray arr, object base):
  *     Py_INCREF(base) # important to do this before stealing the reference below!
  *     PyArray_SetBaseObject(arr, base)             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline object get_array_base(ndarray arr):
  */
   __pyx_t_1 = PyArray_SetBaseObject(__pyx_v_arr, __pyx_v_base); if (unlikely(__pyx_t_1 == ((int)-1))) __PYX_ERR(1, 970, __pyx_L1_error)
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":968
  *     int _import_umath() except -1
- *
+ * 
  * cdef inline void set_array_base(ndarray arr, object base):             # <<<<<<<<<<<<<<
  *     Py_INCREF(base) # important to do this before stealing the reference below!
  *     PyArray_SetBaseObject(arr, base)
@@ -3979,7 +3979,7 @@ static CYTHON_INLINE void __pyx_f_5numpy_set_array_base(PyArrayObject *__pyx_v_a
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":972
  *     PyArray_SetBaseObject(arr, base)
- *
+ * 
  * cdef inline object get_array_base(ndarray arr):             # <<<<<<<<<<<<<<
  *     base = PyArray_BASE(arr)
  *     if base is NULL:
@@ -3993,7 +3993,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
   __Pyx_RefNannySetupContext("get_array_base", 1);
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":973
- *
+ * 
  * cdef inline object get_array_base(ndarray arr):
  *     base = PyArray_BASE(arr)             # <<<<<<<<<<<<<<
  *     if base is NULL:
@@ -4016,7 +4016,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
  *     if base is NULL:
  *         return None             # <<<<<<<<<<<<<<
  *     return <object>base
- *
+ * 
  */
     __Pyx_XDECREF(__pyx_r);
     __pyx_r = Py_None; __Pyx_INCREF(Py_None);
@@ -4035,7 +4035,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
  *     if base is NULL:
  *         return None
  *     return <object>base             # <<<<<<<<<<<<<<
- *
+ * 
  * # Versions of the import_* functions which are more suitable for
  */
   __Pyx_XDECREF(__pyx_r);
@@ -4045,7 +4045,7 @@ static CYTHON_INLINE PyObject *__pyx_f_5numpy_get_array_base(PyArrayObject *__py
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":972
  *     PyArray_SetBaseObject(arr, base)
- *
+ * 
  * cdef inline object get_array_base(ndarray arr):             # <<<<<<<<<<<<<<
  *     base = PyArray_BASE(arr)
  *     if base is NULL:
@@ -4126,7 +4126,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
  *         __pyx_import_array()
  *     except Exception:             # <<<<<<<<<<<<<<
  *         raise ImportError("numpy.core.multiarray failed to import")
- *
+ * 
  */
     __pyx_t_4 = __Pyx_PyErr_ExceptionMatches(((PyObject *)(&((PyTypeObject*)PyExc_Exception)[0])));
     if (__pyx_t_4) {
@@ -4140,7 +4140,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
  *         __pyx_import_array()
  *     except Exception:
  *         raise ImportError("numpy.core.multiarray failed to import")             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline int import_umath() except -1:
  */
       __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 984, __pyx_L5_except_error)
@@ -4192,7 +4192,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_array(void) {
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":986
  *         raise ImportError("numpy.core.multiarray failed to import")
- *
+ * 
  * cdef inline int import_umath() except -1:             # <<<<<<<<<<<<<<
  *     try:
  *         _import_umath()
@@ -4215,7 +4215,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
   __Pyx_RefNannySetupContext("import_umath", 1);
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":987
- *
+ * 
  * cdef inline int import_umath() except -1:
  *     try:             # <<<<<<<<<<<<<<
  *         _import_umath()
@@ -4240,7 +4240,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
       __pyx_t_4 = _import_umath(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 988, __pyx_L3_error)
 
       /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":987
- *
+ * 
  * cdef inline int import_umath() except -1:
  *     try:             # <<<<<<<<<<<<<<
  *         _import_umath()
@@ -4258,7 +4258,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
  *         _import_umath()
  *     except Exception:             # <<<<<<<<<<<<<<
  *         raise ImportError("numpy.core.umath failed to import")
- *
+ * 
  */
     __pyx_t_4 = __Pyx_PyErr_ExceptionMatches(((PyObject *)(&((PyTypeObject*)PyExc_Exception)[0])));
     if (__pyx_t_4) {
@@ -4272,7 +4272,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline int import_ufunc() except -1:
  */
       __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 990, __pyx_L5_except_error)
@@ -4284,7 +4284,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
     goto __pyx_L5_except_error;
 
     /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":987
- *
+ * 
  * cdef inline int import_umath() except -1:
  *     try:             # <<<<<<<<<<<<<<
  *         _import_umath()
@@ -4301,7 +4301,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":986
  *         raise ImportError("numpy.core.multiarray failed to import")
- *
+ * 
  * cdef inline int import_umath() except -1:             # <<<<<<<<<<<<<<
  *     try:
  *         _import_umath()
@@ -4324,7 +4324,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_umath(void) {
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":992
  *         raise ImportError("numpy.core.umath failed to import")
- *
+ * 
  * cdef inline int import_ufunc() except -1:             # <<<<<<<<<<<<<<
  *     try:
  *         _import_umath()
@@ -4347,7 +4347,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
   __Pyx_RefNannySetupContext("import_ufunc", 1);
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":993
- *
+ * 
  * cdef inline int import_ufunc() except -1:
  *     try:             # <<<<<<<<<<<<<<
  *         _import_umath()
@@ -4372,7 +4372,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
       __pyx_t_4 = _import_umath(); if (unlikely(__pyx_t_4 == ((int)-1))) __PYX_ERR(1, 994, __pyx_L3_error)
 
       /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":993
- *
+ * 
  * cdef inline int import_ufunc() except -1:
  *     try:             # <<<<<<<<<<<<<<
  *         _import_umath()
@@ -4390,7 +4390,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
  *         _import_umath()
  *     except Exception:             # <<<<<<<<<<<<<<
  *         raise ImportError("numpy.core.umath failed to import")
- *
+ * 
  */
     __pyx_t_4 = __Pyx_PyErr_ExceptionMatches(((PyObject *)(&((PyTypeObject*)PyExc_Exception)[0])));
     if (__pyx_t_4) {
@@ -4404,8 +4404,8 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
- *
- *
+ * 
+ * 
  */
       __pyx_t_8 = __Pyx_PyObject_Call(__pyx_builtin_ImportError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_8)) __PYX_ERR(1, 996, __pyx_L5_except_error)
       __Pyx_GOTREF(__pyx_t_8);
@@ -4416,7 +4416,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
     goto __pyx_L5_except_error;
 
     /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":993
- *
+ * 
  * cdef inline int import_ufunc() except -1:
  *     try:             # <<<<<<<<<<<<<<
  *         _import_umath()
@@ -4433,7 +4433,7 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":992
  *         raise ImportError("numpy.core.umath failed to import")
- *
+ * 
  * cdef inline int import_ufunc() except -1:             # <<<<<<<<<<<<<<
  *     try:
  *         _import_umath()
@@ -4455,8 +4455,8 @@ static CYTHON_INLINE int __pyx_f_5numpy_import_ufunc(void) {
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":999
- *
- *
+ * 
+ * 
  * cdef inline bint is_timedelta64_object(object obj):             # <<<<<<<<<<<<<<
  *     """
  *     Cython equivalent of `isinstance(obj, np.timedelta64)`
@@ -4469,15 +4469,15 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_timedelta64_object(PyObject *__pyx_v_
  *     bool
  *     """
  *     return PyObject_TypeCheck(obj, &PyTimedeltaArrType_Type)             # <<<<<<<<<<<<<<
- *
- *
+ * 
+ * 
  */
   __pyx_r = PyObject_TypeCheck(__pyx_v_obj, (&PyTimedeltaArrType_Type));
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":999
- *
- *
+ * 
+ * 
  * cdef inline bint is_timedelta64_object(object obj):             # <<<<<<<<<<<<<<
  *     """
  *     Cython equivalent of `isinstance(obj, np.timedelta64)`
@@ -4489,8 +4489,8 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_timedelta64_object(PyObject *__pyx_v_
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":1014
- *
- *
+ * 
+ * 
  * cdef inline bint is_datetime64_object(object obj):             # <<<<<<<<<<<<<<
  *     """
  *     Cython equivalent of `isinstance(obj, np.datetime64)`
@@ -4503,15 +4503,15 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_datetime64_object(PyObject *__pyx_v_o
  *     bool
  *     """
  *     return PyObject_TypeCheck(obj, &PyDatetimeArrType_Type)             # <<<<<<<<<<<<<<
- *
- *
+ * 
+ * 
  */
   __pyx_r = PyObject_TypeCheck(__pyx_v_obj, (&PyDatetimeArrType_Type));
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":1014
- *
- *
+ * 
+ * 
  * cdef inline bint is_datetime64_object(object obj):             # <<<<<<<<<<<<<<
  *     """
  *     Cython equivalent of `isinstance(obj, np.datetime64)`
@@ -4523,8 +4523,8 @@ static CYTHON_INLINE int __pyx_f_5numpy_is_datetime64_object(PyObject *__pyx_v_o
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":1029
- *
- *
+ * 
+ * 
  * cdef inline npy_datetime get_datetime64_value(object obj) nogil:             # <<<<<<<<<<<<<<
  *     """
  *     returns the int64 value underlying scalar numpy datetime64 object
@@ -4537,15 +4537,15 @@ static CYTHON_INLINE npy_datetime __pyx_f_5numpy_get_datetime64_value(PyObject *
  *     also needed.  That can be found using `get_datetime64_unit`.
  *     """
  *     return (<PyDatetimeScalarObject*>obj).obval             # <<<<<<<<<<<<<<
- *
- *
+ * 
+ * 
  */
   __pyx_r = ((PyDatetimeScalarObject *)__pyx_v_obj)->obval;
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":1029
- *
- *
+ * 
+ * 
  * cdef inline npy_datetime get_datetime64_value(object obj) nogil:             # <<<<<<<<<<<<<<
  *     """
  *     returns the int64 value underlying scalar numpy datetime64 object
@@ -4557,8 +4557,8 @@ static CYTHON_INLINE npy_datetime __pyx_f_5numpy_get_datetime64_value(PyObject *
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":1039
- *
- *
+ * 
+ * 
  * cdef inline npy_timedelta get_timedelta64_value(object obj) nogil:             # <<<<<<<<<<<<<<
  *     """
  *     returns the int64 value underlying scalar numpy timedelta64 object
@@ -4571,15 +4571,15 @@ static CYTHON_INLINE npy_timedelta __pyx_f_5numpy_get_timedelta64_value(PyObject
  *     returns the int64 value underlying scalar numpy timedelta64 object
  *     """
  *     return (<PyTimedeltaScalarObject*>obj).obval             # <<<<<<<<<<<<<<
- *
- *
+ * 
+ * 
  */
   __pyx_r = ((PyTimedeltaScalarObject *)__pyx_v_obj)->obval;
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":1039
- *
- *
+ * 
+ * 
  * cdef inline npy_timedelta get_timedelta64_value(object obj) nogil:             # <<<<<<<<<<<<<<
  *     """
  *     returns the int64 value underlying scalar numpy timedelta64 object
@@ -4591,8 +4591,8 @@ static CYTHON_INLINE npy_timedelta __pyx_f_5numpy_get_timedelta64_value(PyObject
 }
 
 /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":1046
- *
- *
+ * 
+ * 
  * cdef inline NPY_DATETIMEUNIT get_datetime64_unit(object obj) nogil:             # <<<<<<<<<<<<<<
  *     """
  *     returns the unit part of the dtype for a numpy datetime64 object.
@@ -4610,8 +4610,8 @@ static CYTHON_INLINE NPY_DATETIMEUNIT __pyx_f_5numpy_get_datetime64_unit(PyObjec
   goto __pyx_L0;
 
   /* "../../../mambaforge/envs/crispresso/lib/python3.10/site-packages/numpy/__init__.cython-30.pxd":1046
- *
- *
+ * 
+ * 
  * cdef inline NPY_DATETIMEUNIT get_datetime64_unit(object obj) nogil:             # <<<<<<<<<<<<<<
  *     """
  *     returns the unit part of the dtype for a numpy datetime64 object.
@@ -4624,14 +4624,14 @@ static CYTHON_INLINE NPY_DATETIMEUNIT __pyx_f_5numpy_get_datetime64_unit(PyObjec
 
 /* "CRISPResso2/CRISPRessoCOREResources.pyx":18
  * re_find_indels = re.compile("(-*-)")
- *
+ * 
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.nonecheck(False)
  * @cython.wraparound(False)
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_1find_indels_substitutions(PyObject *__pyx_self,
+static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_1find_indels_substitutions(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -4639,7 +4639,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
 #endif
 ); /*proto*/
 static PyMethodDef __pyx_mdef_11CRISPResso2_23CRISPRessoCOREResources_1find_indels_substitutions = {"find_indels_substitutions", (PyCFunction)(void*)(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_1find_indels_substitutions, __Pyx_METH_FASTCALL|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_1find_indels_substitutions(PyObject *__pyx_self,
+static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_1find_indels_substitutions(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -4845,7 +4845,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *     substitution_positions=[]
  *     all_substitution_values=[]             # <<<<<<<<<<<<<<
  *     substitution_values=[]
- *
+ * 
  */
   __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 35, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -4856,7 +4856,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *     substitution_positions=[]
  *     all_substitution_values=[]
  *     substitution_values=[]             # <<<<<<<<<<<<<<
- *
+ * 
  *     all_deletion_positions = []
  */
   __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 36, __pyx_L1_error)
@@ -4866,7 +4866,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":38
  *     substitution_values=[]
- *
+ * 
  *     all_deletion_positions = []             # <<<<<<<<<<<<<<
  *     all_deletion_coordinates = []
  *     deletion_positions = []
@@ -4877,7 +4877,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
   __pyx_t_1 = 0;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":39
- *
+ * 
  *     all_deletion_positions = []
  *     all_deletion_coordinates = []             # <<<<<<<<<<<<<<
  *     deletion_positions = []
@@ -4917,7 +4917,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *     deletion_coordinates = []
  *     deletion_sizes = []             # <<<<<<<<<<<<<<
  *     cdef int start_deletion = -1  # the -1 value indicates that there currently isn't a deletion
- *
+ * 
  */
   __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 42, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -4928,14 +4928,14 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *     deletion_coordinates = []
  *     deletion_sizes = []
  *     cdef int start_deletion = -1  # the -1 value indicates that there currently isn't a deletion             # <<<<<<<<<<<<<<
- *
+ * 
  *     all_insertion_positions = []
  */
   __pyx_v_start_deletion = -1;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":45
  *     cdef int start_deletion = -1  # the -1 value indicates that there currently isn't a deletion
- *
+ * 
  *     all_insertion_positions = []             # <<<<<<<<<<<<<<
  *     all_insertion_left_positions = []
  *     insertion_positions = []
@@ -4946,7 +4946,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
   __pyx_t_1 = 0;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":46
- *
+ * 
  *     all_insertion_positions = []
  *     all_insertion_left_positions = []             # <<<<<<<<<<<<<<
  *     insertion_positions = []
@@ -4986,7 +4986,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *     insertion_coordinates = []
  *     insertion_sizes = []             # <<<<<<<<<<<<<<
  *     cdef int start_insertion = -1  # the -1 value indicates that there currently isn't an insertion
- *
+ * 
  */
   __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 49, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -4997,14 +4997,14 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *     insertion_coordinates = []
  *     insertion_sizes = []
  *     cdef int start_insertion = -1  # the -1 value indicates that there currently isn't an insertion             # <<<<<<<<<<<<<<
- *
+ * 
  *     cdef size_t seq_len = len(ref_seq_al)
  */
   __pyx_v_start_insertion = -1;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":52
  *     cdef int start_insertion = -1  # the -1 value indicates that there currently isn't an insertion
- *
+ * 
  *     cdef size_t seq_len = len(ref_seq_al)             # <<<<<<<<<<<<<<
  *     include_indx_set = set(_include_indx)
  *     nucSet = set(['A', 'T', 'C', 'G', 'N'])
@@ -5013,7 +5013,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
   __pyx_v_seq_len = __pyx_t_2;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":53
- *
+ * 
  *     cdef size_t seq_len = len(ref_seq_al)
  *     include_indx_set = set(_include_indx)             # <<<<<<<<<<<<<<
  *     nucSet = set(['A', 'T', 'C', 'G', 'N'])
@@ -5514,7 +5514,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *             if idx > 0 and start_insertion == -1:  # this is the first index of an insertion
  *                 start_insertion = idx - 1             # <<<<<<<<<<<<<<
  *             current_insertion_size += 1
- *
+ * 
  */
         __pyx_v_start_insertion = (__pyx_v_idx - 1);
 
@@ -5531,7 +5531,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *             if idx > 0 and start_insertion == -1:  # this is the first index of an insertion
  *                 start_insertion = idx - 1
  *             current_insertion_size += 1             # <<<<<<<<<<<<<<
- *
+ * 
  *         if read_seq_al[idx_c] == '-' and start_deletion == -1:  # this is the first part of a deletion
  */
       __pyx_v_current_insertion_size = (__pyx_v_current_insertion_size + 1);
@@ -5540,7 +5540,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":88
  *             current_insertion_size += 1
- *
+ * 
  *         if read_seq_al[idx_c] == '-' and start_deletion == -1:  # this is the first part of a deletion             # <<<<<<<<<<<<<<
  *             if idx_c - 1 > 0:
  *                 start_deletion = ref_positions[idx_c]
@@ -5560,7 +5560,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
     if (__pyx_t_6) {
 
       /* "CRISPResso2/CRISPRessoCOREResources.pyx":89
- *
+ * 
  *         if read_seq_al[idx_c] == '-' and start_deletion == -1:  # this is the first part of a deletion
  *             if idx_c - 1 > 0:             # <<<<<<<<<<<<<<
  *                 start_deletion = ref_positions[idx_c]
@@ -5580,7 +5580,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
         __pyx_v_start_deletion = __pyx_t_11;
 
         /* "CRISPResso2/CRISPRessoCOREResources.pyx":89
- *
+ * 
  *         if read_seq_al[idx_c] == '-' and start_deletion == -1:  # this is the first part of a deletion
  *             if idx_c - 1 > 0:             # <<<<<<<<<<<<<<
  *                 start_deletion = ref_positions[idx_c]
@@ -5603,7 +5603,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
       /* "CRISPResso2/CRISPRessoCOREResources.pyx":88
  *             current_insertion_size += 1
- *
+ * 
  *         if read_seq_al[idx_c] == '-' and start_deletion == -1:  # this is the first part of a deletion             # <<<<<<<<<<<<<<
  *             if idx_c - 1 > 0:
  *                 start_deletion = ref_positions[idx_c]
@@ -5762,7 +5762,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *                 deletion_coordinates.append((start_deletion, end_deletion))
  *                 deletion_sizes.append(end_deletion - start_deletion)             # <<<<<<<<<<<<<<
  *             start_deletion = -1
- *
+ * 
  */
         __pyx_t_8 = __Pyx_PyInt_From_int(__pyx_v_start_deletion); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 100, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_8);
@@ -5785,7 +5785,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *                 deletion_coordinates.append((start_deletion, end_deletion))
  *                 deletion_sizes.append(end_deletion - start_deletion)
  *             start_deletion = -1             # <<<<<<<<<<<<<<
- *
+ * 
  *     if start_deletion != -1:
  */
       __pyx_v_start_deletion = -1;
@@ -5812,7 +5812,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":103
  *             start_deletion = -1
- *
+ * 
  *     if start_deletion != -1:             # <<<<<<<<<<<<<<
  *         end_deletion = ref_positions[seq_len - 1]
  *         all_deletion_positions.extend(range(start_deletion, end_deletion))
@@ -5821,7 +5821,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
   if (__pyx_t_6) {
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":104
- *
+ * 
  *     if start_deletion != -1:
  *         end_deletion = ref_positions[seq_len - 1]             # <<<<<<<<<<<<<<
  *         all_deletion_positions.extend(range(start_deletion, end_deletion))
@@ -5931,7 +5931,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *             deletion_positions.extend(range(start_deletion, end_deletion))
  *             deletion_coordinates.append((start_deletion, end_deletion))             # <<<<<<<<<<<<<<
  *             deletion_sizes.append(end_deletion - start_deletion)
- *
+ * 
  */
       __pyx_t_1 = __Pyx_PyInt_From_int(__pyx_v_start_deletion); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 109, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
@@ -5950,7 +5950,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *             deletion_positions.extend(range(start_deletion, end_deletion))
  *             deletion_coordinates.append((start_deletion, end_deletion))
  *             deletion_sizes.append(end_deletion - start_deletion)             # <<<<<<<<<<<<<<
- *
+ * 
  *     cdef size_t substitution_n = len(substitution_positions)
  */
       __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_start_deletion); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 110, __pyx_L1_error)
@@ -5972,7 +5972,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":103
  *             start_deletion = -1
- *
+ * 
  *     if start_deletion != -1:             # <<<<<<<<<<<<<<
  *         end_deletion = ref_positions[seq_len - 1]
  *         all_deletion_positions.extend(range(start_deletion, end_deletion))
@@ -5981,7 +5981,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":112
  *             deletion_sizes.append(end_deletion - start_deletion)
- *
+ * 
  *     cdef size_t substitution_n = len(substitution_positions)             # <<<<<<<<<<<<<<
  *     cdef size_t deletion_n = sum(deletion_sizes)
  *     cdef size_t insertion_n = sum(insertion_sizes)
@@ -5990,11 +5990,11 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
   __pyx_v_substitution_n = __pyx_t_2;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":113
- *
+ * 
  *     cdef size_t substitution_n = len(substitution_positions)
  *     cdef size_t deletion_n = sum(deletion_sizes)             # <<<<<<<<<<<<<<
  *     cdef size_t insertion_n = sum(insertion_sizes)
- *
+ * 
  */
   __pyx_t_1 = __Pyx_PyObject_CallOneArg(__pyx_builtin_sum, __pyx_v_deletion_sizes); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 113, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -6006,7 +6006,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *     cdef size_t substitution_n = len(substitution_positions)
  *     cdef size_t deletion_n = sum(deletion_sizes)
  *     cdef size_t insertion_n = sum(insertion_sizes)             # <<<<<<<<<<<<<<
- *
+ * 
  *     return {
  */
   __pyx_t_1 = __Pyx_PyObject_CallOneArg(__pyx_builtin_sum, __pyx_v_insertion_sizes); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 114, __pyx_L1_error)
@@ -6017,7 +6017,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":116
  *     cdef size_t insertion_n = sum(insertion_sizes)
- *
+ * 
  *     return {             # <<<<<<<<<<<<<<
  *         'all_insertion_positions': all_insertion_positions,
  *         'all_insertion_left_positions': all_insertion_left_positions,
@@ -6025,7 +6025,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
   __Pyx_XDECREF(__pyx_r);
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":117
- *
+ * 
  *     return {
  *         'all_insertion_positions': all_insertion_positions,             # <<<<<<<<<<<<<<
  *         'all_insertion_left_positions': all_insertion_left_positions,
@@ -6067,7 +6067,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *         'insertion_coordinates': insertion_coordinates,
  *         'insertion_sizes': insertion_sizes,             # <<<<<<<<<<<<<<
  *         'insertion_n': insertion_n,
- *
+ * 
  */
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_insertion_sizes, __pyx_v_insertion_sizes) < 0) __PYX_ERR(0, 117, __pyx_L1_error)
 
@@ -6075,7 +6075,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *         'insertion_coordinates': insertion_coordinates,
  *         'insertion_sizes': insertion_sizes,
  *         'insertion_n': insertion_n,             # <<<<<<<<<<<<<<
- *
+ * 
  *         'all_deletion_positions': all_deletion_positions,
  */
   __pyx_t_5 = __Pyx_PyInt_FromSize_t(__pyx_v_insertion_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 122, __pyx_L1_error)
@@ -6085,7 +6085,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":124
  *         'insertion_n': insertion_n,
- *
+ * 
  *         'all_deletion_positions': all_deletion_positions,             # <<<<<<<<<<<<<<
  *         'all_deletion_coordinates': all_deletion_coordinates,
  *         'deletion_positions': deletion_positions,
@@ -6093,7 +6093,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_all_deletion_positions, __pyx_v_all_deletion_positions) < 0) __PYX_ERR(0, 117, __pyx_L1_error)
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":125
- *
+ * 
  *         'all_deletion_positions': all_deletion_positions,
  *         'all_deletion_coordinates': all_deletion_coordinates,             # <<<<<<<<<<<<<<
  *         'deletion_positions': deletion_positions,
@@ -6124,7 +6124,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *         'deletion_coordinates': deletion_coordinates,
  *         'deletion_sizes': deletion_sizes,             # <<<<<<<<<<<<<<
  *         'deletion_n': deletion_n,
- *
+ * 
  */
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_deletion_sizes, __pyx_v_deletion_sizes) < 0) __PYX_ERR(0, 117, __pyx_L1_error)
 
@@ -6132,7 +6132,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  *         'deletion_coordinates': deletion_coordinates,
  *         'deletion_sizes': deletion_sizes,
  *         'deletion_n': deletion_n,             # <<<<<<<<<<<<<<
- *
+ * 
  *         'all_substitution_positions': all_substitution_positions,
  */
   __pyx_t_5 = __Pyx_PyInt_FromSize_t(__pyx_v_deletion_n); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 129, __pyx_L1_error)
@@ -6142,7 +6142,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":131
  *         'deletion_n': deletion_n,
- *
+ * 
  *         'all_substitution_positions': all_substitution_positions,             # <<<<<<<<<<<<<<
  *         'substitution_positions': substitution_positions,
  *         'all_substitution_values': np.array(all_substitution_values),
@@ -6150,7 +6150,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_all_substitution_positions, __pyx_v_all_substitution_positions) < 0) __PYX_ERR(0, 117, __pyx_L1_error)
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":132
- *
+ * 
  *         'all_substitution_positions': all_substitution_positions,
  *         'substitution_positions': substitution_positions,             # <<<<<<<<<<<<<<
  *         'all_substitution_values': np.array(all_substitution_values),
@@ -6258,7 +6258,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":18
  * re_find_indels = re.compile("(-*-)")
- *
+ * 
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.nonecheck(False)
  * @cython.wraparound(False)
@@ -6306,7 +6306,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_find_indels_su
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_3find_indels_substitutions_legacy(PyObject *__pyx_self,
+static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_3find_indels_substitutions_legacy(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -6314,7 +6314,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
 #endif
 ); /*proto*/
 static PyMethodDef __pyx_mdef_11CRISPResso2_23CRISPRessoCOREResources_3find_indels_substitutions_legacy = {"find_indels_substitutions_legacy", (PyCFunction)(void*)(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_3find_indels_substitutions_legacy, __Pyx_METH_FASTCALL|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_3find_indels_substitutions_legacy(PyObject *__pyx_self,
+static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_3find_indels_substitutions_legacy(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -6486,9 +6486,9 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":145
  * def find_indels_substitutions_legacy(read_seq_al, ref_seq_al, _include_indx):
- *
+ * 
  *     cdef char* sub_seq=''             # <<<<<<<<<<<<<<
- *
+ * 
  *     cdef int st
  */
   __pyx_v_sub_seq = ((char *)"");
@@ -6746,7 +6746,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *                 if idx in _include_indx:
  *                     substitution_positions.append(idx)             # <<<<<<<<<<<<<<
  *                     substitution_values.append(read_seq_al[idx_c])
- *
+ * 
  */
           __pyx_t_9 = __Pyx_PyInt_From_int(__pyx_v_idx); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 176, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_9);
@@ -6757,7 +6757,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *                 if idx in _include_indx:
  *                     substitution_positions.append(idx)
  *                     substitution_values.append(read_seq_al[idx_c])             # <<<<<<<<<<<<<<
- *
+ * 
  *             idx+=1
  */
           __pyx_t_9 = __Pyx_GetItemInt(__pyx_v_read_seq_al, __pyx_v_idx_c, int, 1, __Pyx_PyInt_From_int, 0, 0, 0); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 177, __pyx_L1_error)
@@ -6785,9 +6785,9 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
       /* "CRISPResso2/CRISPRessoCOREResources.pyx":179
  *                     substitution_values.append(read_seq_al[idx_c])
- *
+ * 
  *             idx+=1             # <<<<<<<<<<<<<<
- *
+ * 
  *         else:
  */
       __pyx_v_idx = (__pyx_v_idx + 1);
@@ -6803,7 +6803,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
     }
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":182
- *
+ * 
  *         else:
  *             if idx==0:             # <<<<<<<<<<<<<<
  *                 ref_positions.append(-1)
@@ -6823,7 +6823,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
         __pyx_t_7 = __Pyx_PyList_Append(__pyx_v_ref_positions, __pyx_int_neg_1); if (unlikely(__pyx_t_7 == ((int)-1))) __PYX_ERR(0, 183, __pyx_L1_error)
 
         /* "CRISPResso2/CRISPRessoCOREResources.pyx":182
- *
+ * 
  *         else:
  *             if idx==0:             # <<<<<<<<<<<<<<
  *                 ref_positions.append(-1)
@@ -6836,7 +6836,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *                 ref_positions.append(-1)
  *             else:
  *                 ref_positions.append(-idx)             # <<<<<<<<<<<<<<
- *
+ * 
  *     substitution_n = len(substitution_positions)
  */
       /*else*/ {
@@ -6861,16 +6861,16 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":187
  *                 ref_positions.append(-idx)
- *
+ * 
  *     substitution_n = len(substitution_positions)             # <<<<<<<<<<<<<<
- *
+ * 
  *     #the remainder of positions are with reference to the original reference sequence indexes we calculated above
  */
   __pyx_t_3 = __Pyx_PyList_GET_SIZE(__pyx_v_substitution_positions); if (unlikely(__pyx_t_3 == ((Py_ssize_t)-1))) __PYX_ERR(0, 187, __pyx_L1_error)
   __pyx_v_substitution_n = __pyx_t_3;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":190
- *
+ * 
  *     #the remainder of positions are with reference to the original reference sequence indexes we calculated above
  *     all_deletion_positions=[]             # <<<<<<<<<<<<<<
  *     deletion_positions=[]
@@ -6898,7 +6898,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *     deletion_positions=[]
  *     deletion_coordinates=[]             # <<<<<<<<<<<<<<
  *     deletion_sizes=[]
- *
+ * 
  */
   __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 192, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -6909,7 +6909,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *     deletion_positions=[]
  *     deletion_coordinates=[]
  *     deletion_sizes=[]             # <<<<<<<<<<<<<<
- *
+ * 
  *     all_insertion_positions=[]
  */
   __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 193, __pyx_L1_error)
@@ -6919,7 +6919,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":195
  *     deletion_sizes=[]
- *
+ * 
  *     all_insertion_positions=[]             # <<<<<<<<<<<<<<
  *     all_insertion_left_positions=[]
  *     insertion_positions=[]
@@ -6930,7 +6930,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
   __pyx_t_1 = 0;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":196
- *
+ * 
  *     all_insertion_positions=[]
  *     all_insertion_left_positions=[]             # <<<<<<<<<<<<<<
  *     insertion_positions=[]
@@ -6958,7 +6958,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *     insertion_positions=[]
  *     insertion_coordinates = []             # <<<<<<<<<<<<<<
  *     insertion_sizes=[]
- *
+ * 
  */
   __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 198, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
@@ -6969,7 +6969,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *     insertion_positions=[]
  *     insertion_coordinates = []
  *     insertion_sizes=[]             # <<<<<<<<<<<<<<
- *
+ * 
  *     include_indx_set = set(_include_indx)
  */
   __pyx_t_1 = PyList_New(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 199, __pyx_L1_error)
@@ -6979,7 +6979,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":201
  *     insertion_sizes=[]
- *
+ * 
  *     include_indx_set = set(_include_indx)             # <<<<<<<<<<<<<<
  *     for p in re_find_indels.finditer(read_seq_al):
  *         st,en=p.span()
@@ -6990,7 +6990,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
   __pyx_t_1 = 0;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":202
- *
+ * 
  *     include_indx_set = set(_include_indx)
  *     for p in re_find_indels.finditer(read_seq_al):             # <<<<<<<<<<<<<<
  *         st,en=p.span()
@@ -7120,11 +7120,11 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
       }
       #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
       if (likely(PyTuple_CheckExact(sequence))) {
-        __pyx_t_9 = PyTuple_GET_ITEM(sequence, 0);
-        __pyx_t_5 = PyTuple_GET_ITEM(sequence, 1);
+        __pyx_t_9 = PyTuple_GET_ITEM(sequence, 0); 
+        __pyx_t_5 = PyTuple_GET_ITEM(sequence, 1); 
       } else {
-        __pyx_t_9 = PyList_GET_ITEM(sequence, 0);
-        __pyx_t_5 = PyList_GET_ITEM(sequence, 1);
+        __pyx_t_9 = PyList_GET_ITEM(sequence, 0); 
+        __pyx_t_5 = PyList_GET_ITEM(sequence, 1); 
       }
       __Pyx_INCREF(__pyx_t_9);
       __Pyx_INCREF(__pyx_t_5);
@@ -7330,7 +7330,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *           deletion_positions.extend(range(ref_st,ref_en))
  *           deletion_coordinates.append((ref_st,ref_en))             # <<<<<<<<<<<<<<
  *           deletion_sizes.append(en-st)
- *
+ * 
  */
       __pyx_t_1 = PyTuple_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 214, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
@@ -7347,7 +7347,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *           deletion_positions.extend(range(ref_st,ref_en))
  *           deletion_coordinates.append((ref_st,ref_en))
  *           deletion_sizes.append(en-st)             # <<<<<<<<<<<<<<
- *
+ * 
  *     deletion_n = np.sum(deletion_sizes)
  */
       __pyx_t_1 = __Pyx_PyInt_From_int((__pyx_v_en - __pyx_v_st)); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 215, __pyx_L1_error)
@@ -7365,7 +7365,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
     }
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":202
- *
+ * 
  *     include_indx_set = set(_include_indx)
  *     for p in re_find_indels.finditer(read_seq_al):             # <<<<<<<<<<<<<<
  *         st,en=p.span()
@@ -7376,9 +7376,9 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":217
  *           deletion_sizes.append(en-st)
- *
+ * 
  *     deletion_n = np.sum(deletion_sizes)             # <<<<<<<<<<<<<<
- *
+ * 
  *     for p in re_find_indels.finditer(ref_seq_al):
  */
   __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 217, __pyx_L1_error)
@@ -7413,7 +7413,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":219
  *     deletion_n = np.sum(deletion_sizes)
- *
+ * 
  *     for p in re_find_indels.finditer(ref_seq_al):             # <<<<<<<<<<<<<<
  *         st,en=p.span()
  *         #sometimes insertions run off the end of the reference
@@ -7502,7 +7502,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
     __pyx_t_8 = 0;
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":220
- *
+ * 
  *     for p in re_find_indels.finditer(ref_seq_al):
  *         st,en=p.span()             # <<<<<<<<<<<<<<
  *         #sometimes insertions run off the end of the reference
@@ -7542,11 +7542,11 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
       }
       #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
       if (likely(PyTuple_CheckExact(sequence))) {
-        __pyx_t_5 = PyTuple_GET_ITEM(sequence, 0);
-        __pyx_t_9 = PyTuple_GET_ITEM(sequence, 1);
+        __pyx_t_5 = PyTuple_GET_ITEM(sequence, 0); 
+        __pyx_t_9 = PyTuple_GET_ITEM(sequence, 1); 
       } else {
-        __pyx_t_5 = PyList_GET_ITEM(sequence, 0);
-        __pyx_t_9 = PyList_GET_ITEM(sequence, 1);
+        __pyx_t_5 = PyList_GET_ITEM(sequence, 0); 
+        __pyx_t_9 = PyList_GET_ITEM(sequence, 1); 
       }
       __Pyx_INCREF(__pyx_t_5);
       __Pyx_INCREF(__pyx_t_9);
@@ -7647,7 +7647,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *           continue
  *         ref_st = ref_positions[st-1]             # <<<<<<<<<<<<<<
  *         ref_en = ref_positions[en]
- *
+ * 
  */
     __pyx_t_15 = (__pyx_v_st - 1);
     __pyx_t_8 = PyList_GET_ITEM(__pyx_v_ref_positions, __pyx_t_15);
@@ -7659,7 +7659,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *           continue
  *         ref_st = ref_positions[st-1]
  *         ref_en = ref_positions[en]             # <<<<<<<<<<<<<<
- *
+ * 
  *         all_insertion_left_positions.append(ref_st)
  */
     __pyx_t_8 = PyList_GET_ITEM(__pyx_v_ref_positions, __pyx_v_en);
@@ -7669,7 +7669,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":229
  *         ref_en = ref_positions[en]
- *
+ * 
  *         all_insertion_left_positions.append(ref_st)             # <<<<<<<<<<<<<<
  *         all_insertion_positions.append(ref_st)
  *         all_insertion_positions.append(ref_en)
@@ -7677,7 +7677,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
     __pyx_t_7 = __Pyx_PyList_Append(__pyx_v_all_insertion_left_positions, __pyx_v_ref_st); if (unlikely(__pyx_t_7 == ((int)-1))) __PYX_ERR(0, 229, __pyx_L1_error)
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":230
- *
+ * 
  *         all_insertion_left_positions.append(ref_st)
  *         all_insertion_positions.append(ref_st)             # <<<<<<<<<<<<<<
  *         all_insertion_positions.append(ref_en)
@@ -7744,7 +7744,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *           insertion_positions.append(ref_st)
  *           insertion_positions.append(ref_en)             # <<<<<<<<<<<<<<
  *           insertion_sizes.append(en-st)
- *
+ * 
  */
       __pyx_t_7 = __Pyx_PyList_Append(__pyx_v_insertion_positions, __pyx_v_ref_en); if (unlikely(__pyx_t_7 == ((int)-1))) __PYX_ERR(0, 235, __pyx_L1_error)
 
@@ -7752,7 +7752,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *           insertion_positions.append(ref_st)
  *           insertion_positions.append(ref_en)
  *           insertion_sizes.append(en-st)             # <<<<<<<<<<<<<<
- *
+ * 
  *     insertion_n = np.sum(insertion_sizes)
  */
       __pyx_t_8 = __Pyx_PyInt_From_int((__pyx_v_en - __pyx_v_st)); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 236, __pyx_L1_error)
@@ -7771,7 +7771,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":219
  *     deletion_n = np.sum(deletion_sizes)
- *
+ * 
  *     for p in re_find_indels.finditer(ref_seq_al):             # <<<<<<<<<<<<<<
  *         st,en=p.span()
  *         #sometimes insertions run off the end of the reference
@@ -7782,9 +7782,9 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":238
  *           insertion_sizes.append(en-st)
- *
+ * 
  *     insertion_n = np.sum(insertion_sizes)             # <<<<<<<<<<<<<<
- *
+ * 
  *     retDict = {
  */
   __Pyx_GetModuleGlobalName(__pyx_t_8, __pyx_n_s_np); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 238, __pyx_L1_error)
@@ -7818,7 +7818,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
   __pyx_t_1 = 0;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":241
- *
+ * 
  *     retDict = {
  *         'all_insertion_positions':all_insertion_positions,             # <<<<<<<<<<<<<<
  *         'all_insertion_left_positions':all_insertion_left_positions,
@@ -7869,7 +7869,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *         'insertion_sizes':insertion_sizes,
  *         'insertion_n':insertion_n,             # <<<<<<<<<<<<<<
  *         'all_deletion_positions':all_deletion_positions,
- *
+ * 
  */
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_insertion_n, __pyx_v_insertion_n) < 0) __PYX_ERR(0, 241, __pyx_L1_error)
 
@@ -7877,14 +7877,14 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *         'insertion_sizes':insertion_sizes,
  *         'insertion_n':insertion_n,
  *         'all_deletion_positions':all_deletion_positions,             # <<<<<<<<<<<<<<
- *
+ * 
  *         'deletion_positions':deletion_positions,
  */
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_all_deletion_positions, __pyx_v_all_deletion_positions) < 0) __PYX_ERR(0, 241, __pyx_L1_error)
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":249
  *         'all_deletion_positions':all_deletion_positions,
- *
+ * 
  *         'deletion_positions':deletion_positions,             # <<<<<<<<<<<<<<
  *         'deletion_coordinates':deletion_coordinates,
  *         'deletion_sizes':deletion_sizes,
@@ -7892,7 +7892,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_deletion_positions, __pyx_v_deletion_positions) < 0) __PYX_ERR(0, 241, __pyx_L1_error)
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":250
- *
+ * 
  *         'deletion_positions':deletion_positions,
  *         'deletion_coordinates':deletion_coordinates,             # <<<<<<<<<<<<<<
  *         'deletion_sizes':deletion_sizes,
@@ -7905,7 +7905,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *         'deletion_coordinates':deletion_coordinates,
  *         'deletion_sizes':deletion_sizes,             # <<<<<<<<<<<<<<
  *         'deletion_n':deletion_n,
- *
+ * 
  */
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_deletion_sizes, __pyx_v_deletion_sizes) < 0) __PYX_ERR(0, 241, __pyx_L1_error)
 
@@ -7913,14 +7913,14 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *         'deletion_coordinates':deletion_coordinates,
  *         'deletion_sizes':deletion_sizes,
  *         'deletion_n':deletion_n,             # <<<<<<<<<<<<<<
- *
+ * 
  *         'all_substitution_positions':all_substitution_positions,
  */
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_deletion_n, __pyx_v_deletion_n) < 0) __PYX_ERR(0, 241, __pyx_L1_error)
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":254
  *         'deletion_n':deletion_n,
- *
+ * 
  *         'all_substitution_positions':all_substitution_positions,             # <<<<<<<<<<<<<<
  *         'substitution_positions':substitution_positions,
  *         'all_substitution_values':np.array(all_substitution_values),
@@ -7928,7 +7928,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_u_all_substitution_positions, __pyx_v_all_substitution_positions) < 0) __PYX_ERR(0, 241, __pyx_L1_error)
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":255
- *
+ * 
  *         'all_substitution_positions':all_substitution_positions,
  *         'substitution_positions':substitution_positions,             # <<<<<<<<<<<<<<
  *         'all_substitution_values':np.array(all_substitution_values),
@@ -7978,7 +7978,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *         'all_substitution_values':np.array(all_substitution_values),
  *         'substitution_values':np.array(substitution_values),             # <<<<<<<<<<<<<<
  *         'substitution_n':substitution_n,
- *
+ * 
  */
   __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 257, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
@@ -8014,7 +8014,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *         'all_substitution_values':np.array(all_substitution_values),
  *         'substitution_values':np.array(substitution_values),
  *         'substitution_n':substitution_n,             # <<<<<<<<<<<<<<
- *
+ * 
  *         'ref_positions':ref_positions,
  */
   __pyx_t_9 = PyInt_FromSsize_t(__pyx_v_substitution_n); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 258, __pyx_L1_error)
@@ -8024,7 +8024,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":260
  *         'substitution_n':substitution_n,
- *
+ * 
  *         'ref_positions':ref_positions,             # <<<<<<<<<<<<<<
  *     }
  *     return retDict
@@ -8037,8 +8037,8 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
  *         'ref_positions':ref_positions,
  *     }
  *     return retDict             # <<<<<<<<<<<<<<
- *
- *
+ * 
+ * 
  */
   __Pyx_XDECREF(__pyx_r);
   __Pyx_INCREF(__pyx_v_retDict);
@@ -8093,15 +8093,15 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_2find_indels_s
 }
 
 /* "CRISPResso2/CRISPRessoCOREResources.pyx":265
- *
- *
+ * 
+ * 
  * def calculate_homology(a, b):             # <<<<<<<<<<<<<<
  *     cdef char *al = a
  *     cdef char *bl = b
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_5calculate_homology(PyObject *__pyx_self,
+static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_5calculate_homology(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -8109,7 +8109,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
 #endif
 ); /*proto*/
 static PyMethodDef __pyx_mdef_11CRISPResso2_23CRISPRessoCOREResources_5calculate_homology = {"calculate_homology", (PyCFunction)(void*)(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_5calculate_homology, __Pyx_METH_FASTCALL|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_5calculate_homology(PyObject *__pyx_self,
+static PyObject *__pyx_pw_11CRISPResso2_23CRISPRessoCOREResources_5calculate_homology(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -8231,7 +8231,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_4calculate_hom
   __Pyx_RefNannySetupContext("calculate_homology", 1);
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":266
- *
+ * 
  * def calculate_homology(a, b):
  *     cdef char *al = a             # <<<<<<<<<<<<<<
  *     cdef char *bl = b
@@ -8255,7 +8255,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_4calculate_hom
  *     cdef char *bl = b
  *     cdef size_t l = strlen(al)             # <<<<<<<<<<<<<<
  *     cdef float score = 0.0
- *
+ * 
  */
   __pyx_v_l = strlen(__pyx_v_al);
 
@@ -8263,14 +8263,14 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_4calculate_hom
  *     cdef char *bl = b
  *     cdef size_t l = strlen(al)
  *     cdef float score = 0.0             # <<<<<<<<<<<<<<
- *
+ * 
  *     for i in range(l):
  */
   __pyx_v_score = 0.0;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":271
  *     cdef float score = 0.0
- *
+ * 
  *     for i in range(l):             # <<<<<<<<<<<<<<
  *         if al[i] == bl[i]:
  *             score+=1
@@ -8281,7 +8281,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_4calculate_hom
     __pyx_v_i = __pyx_t_4;
 
     /* "CRISPResso2/CRISPRessoCOREResources.pyx":272
- *
+ * 
  *     for i in range(l):
  *         if al[i] == bl[i]:             # <<<<<<<<<<<<<<
  *             score+=1
@@ -8299,7 +8299,7 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_4calculate_hom
       __pyx_v_score = (__pyx_v_score + 1.0);
 
       /* "CRISPResso2/CRISPRessoCOREResources.pyx":272
- *
+ * 
  *     for i in range(l):
  *         if al[i] == bl[i]:             # <<<<<<<<<<<<<<
  *             score+=1
@@ -8325,8 +8325,8 @@ static PyObject *__pyx_pf_11CRISPResso2_23CRISPRessoCOREResources_4calculate_hom
   goto __pyx_L0;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":265
- *
- *
+ * 
+ * 
  * def calculate_homology(a, b):             # <<<<<<<<<<<<<<
  *     cdef char *al = a
  *     cdef char *bl = b
@@ -8485,7 +8485,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  *         __pyx_import_array()
  *     except Exception:
  *         raise ImportError("numpy.core.multiarray failed to import")             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline int import_umath() except -1:
  */
   __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_u_numpy_core_multiarray_failed_to); if (unlikely(!__pyx_tuple_)) __PYX_ERR(1, 984, __pyx_L1_error)
@@ -8496,7 +8496,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  *         _import_umath()
  *     except Exception:
  *         raise ImportError("numpy.core.umath failed to import")             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef inline int import_ufunc() except -1:
  */
   __pyx_tuple__2 = PyTuple_Pack(1, __pyx_kp_u_numpy_core_umath_failed_to_impor); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(1, 990, __pyx_L1_error)
@@ -8504,10 +8504,10 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__2);
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":16
- *
- *
+ * 
+ * 
  * re_find_indels = re.compile("(-*-)")             # <<<<<<<<<<<<<<
- *
+ * 
  * @cython.boundscheck(False)
  */
   __pyx_tuple__6 = PyTuple_Pack(1, __pyx_kp_u__5); if (unlikely(!__pyx_tuple__6)) __PYX_ERR(0, 16, __pyx_L1_error)
@@ -8516,7 +8516,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":18
  * re_find_indels = re.compile("(-*-)")
- *
+ * 
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.nonecheck(False)
  * @cython.wraparound(False)
@@ -8539,8 +8539,8 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_codeobj__10 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 33, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__9, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_CRISPResso2_CRISPRessoCOREResour, __pyx_n_s_find_indels_substitutions_legacy, 138, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__10)) __PYX_ERR(0, 138, __pyx_L1_error)
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":265
- *
- *
+ * 
+ * 
  * def calculate_homology(a, b):             # <<<<<<<<<<<<<<
  *     cdef char *al = a
  *     cdef char *bl = b
@@ -8645,7 +8645,7 @@ static int __Pyx_modinit_type_import_code(void) {
   /*--- Type import code ---*/
   __pyx_t_1 = PyImport_ImportModule(__Pyx_BUILTIN_MODULE_NAME); if (unlikely(!__pyx_t_1)) __PYX_ERR(2, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_ptype_7cpython_4type_type = __Pyx_ImportType_3_0_9(__pyx_t_1, __Pyx_BUILTIN_MODULE_NAME, "type",
+  __pyx_ptype_7cpython_4type_type = __Pyx_ImportType_3_0_9(__pyx_t_1, __Pyx_BUILTIN_MODULE_NAME, "type", 
   #if defined(PYPY_VERSION_NUM) && PYPY_VERSION_NUM < 0x050B0000
   sizeof(PyTypeObject), __PYX_GET_STRUCT_ALIGNMENT_3_0_9(PyTypeObject),
   #elif CYTHON_COMPILING_IN_LIMITED_API
@@ -8991,7 +8991,7 @@ if (!__Pyx_RefNanny) {
  * import numpy as np
  * cimport numpy as np
  * import re             # <<<<<<<<<<<<<<
- *
+ * 
  * cdef extern from "stdlib.h":
  */
   __pyx_t_2 = __Pyx_ImportDottedModule(__pyx_n_s_re, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 4, __pyx_L1_error)
@@ -9000,10 +9000,10 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":16
- *
- *
+ * 
+ * 
  * re_find_indels = re.compile("(-*-)")             # <<<<<<<<<<<<<<
- *
+ * 
  * @cython.boundscheck(False)
  */
   __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_re); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 16, __pyx_L1_error)
@@ -9019,7 +9019,7 @@ if (!__Pyx_RefNanny) {
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":18
  * re_find_indels = re.compile("(-*-)")
- *
+ * 
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.nonecheck(False)
  * @cython.wraparound(False)
@@ -9042,8 +9042,8 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "CRISPResso2/CRISPRessoCOREResources.pyx":265
- *
- *
+ * 
+ * 
  * def calculate_homology(a, b):             # <<<<<<<<<<<<<<
  *     cdef char *al = a
  *     cdef char *bl = b
