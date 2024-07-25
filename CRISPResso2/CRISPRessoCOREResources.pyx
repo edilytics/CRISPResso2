@@ -60,6 +60,7 @@ class ResultsSlotsDict():
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
+
 @cython.boundscheck(False)
 @cython.nonecheck(False)
 @cython.wraparound(False)
@@ -182,33 +183,10 @@ def find_indels_substitutions(read_seq_al, ref_seq_al, _include_indx):
         ref_positions=ref_positions,
     )
 
-    return {
-        'all_insertion_positions': all_insertion_positions,
-        'all_insertion_left_positions': all_insertion_left_positions,
-        'insertion_positions': insertion_positions,
-        'insertion_coordinates': insertion_coordinates,
-        'insertion_sizes': insertion_sizes,
-        'insertion_n': insertion_n,
 
-        'all_deletion_positions': all_deletion_positions,
-        'all_deletion_coordinates': all_deletion_coordinates,
-        'deletion_positions': deletion_positions,
-        'deletion_coordinates': deletion_coordinates,
-        'deletion_sizes': deletion_sizes,
-        'deletion_n': deletion_n,
-
-        'all_substitution_positions': all_substitution_positions,
-        'substitution_positions': substitution_positions,
-        'all_substitution_values': np.array(all_substitution_values),
-        'substitution_values': np.array(substitution_values),
-        'substitution_n': substitution_n,
-        'ref_positions': ref_positions,
-    }
 @cython.boundscheck(False)
 @cython.nonecheck(False)
 @cython.wraparound(False)
-
-
 def find_indels_substitutions_legacy(read_seq_al, ref_seq_al, _include_indx):
 
     cdef char* sub_seq=''
