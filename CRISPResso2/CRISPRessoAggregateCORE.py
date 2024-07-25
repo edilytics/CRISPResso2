@@ -788,7 +788,7 @@ ___________________________________
 
             header = 'Name\tUnmodified%\tModified%\tReads_total\tReads_aligned\tUnmodified\tModified\tDiscarded\tInsertions\tDeletions\tSubstitutions\tOnly Insertions\tOnly Deletions\tOnly Substitutions\tInsertions and Deletions\tInsertions and Substitutions\tDeletions and Substitutions\tInsertions Deletions and Substitutions'
             header_els = header.split("\t")
-            df_summary_quantification=pd.DataFrame(quantification_summary, columns=header_els)
+            df_summary_quantification=pd.DataFrame(quantification_summary, columns=header_els).sort_values(by='Name')
             samples_quantification_summary_filename = _jp('CRISPRessoAggregate_quantification_of_editing_frequency.txt') #this file has one line for each run (sum of all amplicons)
             df_summary_quantification.fillna('NA').to_csv(samples_quantification_summary_filename, sep='\t', index=None)
             crispresso2_info['results']['alignment_stats']['samples_quantification_summary_filename'] = os.path.basename(samples_quantification_summary_filename)
