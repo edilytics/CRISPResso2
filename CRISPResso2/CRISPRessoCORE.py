@@ -445,9 +445,16 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
 
 
 def get_variant_cache_boundaries(num_unique_sequences, n_processes):
-    """get_variant_cache_boundaries determines the boundaries for the number of unique sequences to be processed by each process
+    """Determines the boundaries for the number of unique sequences to be processed by each process
+    Parameters
+    ----------
+
         num_unique_sequences: the number of unique sequences to be processed
         n_processes: the number of processes to be used
+
+    Returns
+    ----------
+    boundaries: a list of n+1 integer indexes, where n is the number of processes.
     """
 
     boundaries = [0]
@@ -471,23 +478,28 @@ def get_variant_cache_boundaries(num_unique_sequences, n_processes):
     boundaries.append(num_unique_sequences)
     return boundaries
 
-def variant_generator_process(seq_list, managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
-    """variant_generator_process is the target of the multiprocessing.Process object
-        This function generates the new variants for a subset of the reads in the fastq file and stores them in the managerCache
-            seq_list: list of reads to process
-            managerCache: Manager().dict() object to store the new variants
-            lock: Lock object to ensure that only one process can update the managerCache at a time
-            get_new_variant_object: function to generate the new variant object
-            args: CRISPResso2 args
-            refs: dict with info for all refs
-            ref_names: list of ref names
-            aln_matrix: alignment matrix for needleman wunsch
-            pe_scaffold_dna_info: tuple of(
-            index of location in ref to find scaffold seq if it exists
-            shortest dna sequence to identify scaffold sequence
-            )
-            process_id: the id of the process to print out debug information
-        
+def variant_generator_process(seq_list, manager_cache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
+    """the target of the multiprocessing.Process object, generates the new variants for a subset of the reads in the fastq file and stores them in the manager_cache
+
+    Parameters
+    ----------
+        seq_list: list of reads to process
+        manager_cache: Manager().dict() object to store the new variants
+        lock: Lock object to ensure that only one process can update the manager_cache at a time
+        get_new_variant_object: function to generate the new variant object
+        args: CRISPResso2 args
+        refs: dict with info for all refs
+        ref_names: list of ref names
+        aln_matrix: alignment matrix for needleman wunsch
+        pe_scaffold_dna_info: tuple of(
+        index of location in ref to find scaffold seq if it exists
+        shortest dna sequence to identify scaffold sequence
+        )
+        process_id: the id of the process to print out debug information
+    Returns
+    ----------
+    Nothing
+    
     """
     new_variants = {}
     num_processed = 0
@@ -495,16 +507,18 @@ def variant_generator_process(seq_list, managerCache, lock, get_new_variant_obje
         new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
         new_variants[fastq_seq] = new_variant
         num_processed += 1
-        if num_processed % 1000 == 0:
+        if num_processed % 10000 == 0:
             info(f"Process {process_id + 1} has processed {num_processed} unique reads")
-    # Now store the new variants in the managerCache
+    # Now store the new variants in the manager_cache
     with lock:
-        managerCache.update(new_variants)
+        manager_cache.update(new_variants)
 
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
+    """Processes each of the reads contained in a fastq file, given a cache of pre-computed variants
 
-    """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
-        fastqIn: name of fastq (e.g. output of fastp)
+    Parameters
+    ----------
+        fastq_filename: name of fastq (e.g. output of fastp)
             This file can be gzipped or plain text
 
         variantCache: dict with keys: sequence
@@ -634,8 +648,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     if n_processes > 1:
         boundaries = get_variant_cache_boundaries(num_unique_reads, n_processes)
 
-        managerCache = Manager().dict() # Manager dictionaries are python multiprocessing objects that can be accessed across processes
-        lock = Lock() # Semaphore lock that prevents race conditions on managerCache
+        manager_cache = Manager().dict() # Manager dictionaries are python multiprocessing objects that can be accessed across processes
+        lock = Lock() # Semaphore lock that prevents race conditions on manager_cache
         processes = [] # list to hold the processes so we can wait for them to complete with join()
 
         info("Spinning up %d parallel processes to analyze unique reads..."%(n_processes))
@@ -643,7 +657,21 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         for i in range(n_processes):
             left_sublist_index = boundaries[i]
             right_sublist_index = boundaries[i+1]
-            process = Process(target=variant_generator_process, args=((list(variantCache.keys())[left_sublist_index:right_sublist_index]), managerCache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, i))
+            process = Process(
+                target=variant_generator_process, 
+                args=(
+                      (list(variantCache.keys())[left_sublist_index:right_sublist_index]), 
+                      manager_cache, 
+                      lock, 
+                      get_new_variant_object, 
+                      args, 
+                      refs, 
+                      ref_names, 
+                      aln_matrix, 
+                      pe_scaffold_dna_info, 
+                      i
+                    )
+            )
             process.start()
             processes.append(process)
         for p in processes:
@@ -654,7 +682,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
         for index, seq  in enumerate(variantCache.keys()):
             variant_count = variantCache[seq]
             N_TOT_READS += variant_count
-            variant = managerCache[seq]
+            variant = manager_cache[seq]
             variant['count'] = variant_count
             if variant['best_match_score'] <= 0:
                 N_COMPUTED_NOTALN += 1
@@ -676,7 +704,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                     N_READS_IRREGULAR_ENDS += variant_count
             if (index % 10000 == 0):
                 info("Processed statistics for %d of %d total unique reads"%(index, num_unique_reads))
-        del managerCache
+        del manager_cache
     else:
         for index, fastq_seq in enumerate(variantCache.keys()):
             variant_count = variantCache[fastq_seq]
@@ -701,7 +729,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 if variant[match_name]['irregular_ends']:
                     N_READS_IRREGULAR_ENDS += variant_count
             if (index % 10000 == 0):
-                info("Processing Reads; %d Completed out of %d Unique Reads"%(index, num_unique_reads))
+                info("Processing reads; %d completed out of %d unique reads"%(index, num_unique_reads))
 
     # This deletes non-aligned reads from variantCache
     for seq in unaligned_reads:
@@ -2834,9 +2862,6 @@ def main():
         ###iterate through variants
         for variant in variantCache:
             #skip variant if there were none observed
-            # check if variant is an int
-            if isinstance(variantCache[variant], int):
-                print(variant)
             variant_count = variantCache[variant]['count']
             if (variant_count == 0):
                 continue
