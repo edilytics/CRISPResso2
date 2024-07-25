@@ -325,7 +325,7 @@ ___________________________________
                 consensus_sgRNA_intervals = []
                 guides_all_same = True
                 runs_with_this_amplicon = []
-                for crispresso2_folder in crispresso2_folders:
+                for crispresso2_folder in sorted(crispresso2_folders):
                     run_data = crispresso2_folder_infos[crispresso2_folder]
                     run_has_amplicon = False
                     run_amplicon_name = ''
