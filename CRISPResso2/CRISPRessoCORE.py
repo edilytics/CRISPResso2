@@ -510,6 +510,55 @@ def variant_generator_process(seq_list, manager_cache, lock, get_new_variant_obj
     with lock:
         manager_cache.update(new_variants)
 
+class NumpyEncoder(json.JSONEncoder):
+    """ Custom encoder for numpy data types """
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()  # Convert ndarray to list
+        return json.JSONEncoder.default(self, obj)
+
+def variant_file_generator_process(seq_list, variant_file_path, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
+    """the target of the multiprocessing.Process object, generates the new variants for a subset of the reads in the fastq file and stores them in the manager_cache
+    Parameters
+    ----------
+        seq_list: list of reads to process
+        manager_cache: Manager().dict() object to store the new variants
+        lock: Lock object to ensure that only one process can update the manager_cache at a time
+        get_new_variant_object: function to generate the new variant object
+        args: CRISPResso2 args
+        refs: dict with info for all refs
+        ref_names: list of ref names
+        aln_matrix: alignment matrix for needleman wunsch
+        pe_scaffold_dna_info: tuple of(
+        index of location in ref to find scaffold seq if it exists
+        shortest dna sequence to identify scaffold sequence
+        )
+        process_id: the id of the process to print out debug information
+    Returns
+    ----------
+    Nothing
+    
+    """
+    variant_lines = ""
+    num_processed = 0
+    for fastq_seq in seq_list:
+        new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+        
+        # Convert the variant object to a string and replace newlines
+        new_variant_str = str(new_variant).replace('\n', '\\n')
+        
+        variant_lines += f"{fastq_seq}\t{new_variant_str}\n"
+        num_processed += 1
+        if num_processed % 10000 == 0:
+            info(f"Process {process_id + 1} has processed {num_processed} unique reads")
+    
+    with lock:
+        with open(variant_file_path, 'a') as file:
+            file.write(variant_lines)
+
+    print(f"Process {process_id + 1} has finished processing {num_processed} unique reads and wrote them to the file: {variant_file_path}")
+
+
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
     Parameters
@@ -642,6 +691,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     unaligned_reads = []
 
     if n_processes > 1:
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        temp_file_path = os.path.join(temp_dir, "variants_temp.tsv")
         boundaries = get_variant_cache_boundaries(num_unique_reads, n_processes)
 
         manager_cache = Manager().dict() # Manager dictionaries are python multiprocessing objects that can be accessed across processes
@@ -654,10 +706,10 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
             left_sublist_index = boundaries[i]
             right_sublist_index = boundaries[i+1]
             process = Process(
-                target=variant_generator_process, 
+                target=variant_file_generator_process, 
                 args=(
                       (list(variantCache.keys())[left_sublist_index:right_sublist_index]), 
-                      manager_cache, 
+                      temp_file_path, 
                       lock, 
                       get_new_variant_object, 
                       args, 
@@ -668,13 +720,66 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                       i
                     )
             )
+            # process = Process(
+            #     target=variant_generator_process, 
+            #     args=(
+            #           (list(variantCache.keys())[left_sublist_index:right_sublist_index]), 
+            #           manager_cache, 
+            #           lock, 
+            #           get_new_variant_object, 
+            #           args, 
+            #           refs, 
+            #           ref_names, 
+            #           aln_matrix, 
+            #           pe_scaffold_dna_info, 
+            #           i
+            #         )
+            # )
             process.start()
             processes.append(process)
         for p in processes:
             p.join() # pauses the main thread until the processes are finished
+        # Read over the temporary file and print the first 30 lines
 
+        with open(temp_file_path, 'r') as file:
+            # print the size of the file
+            file_size = os.path.getsize(temp_file_path)
+            print(file_size)
+            # for i in range(30):
+            #     print(file.readline())
         info("Finished processing unique reads, now generating statistics...")
         # Now that all the processes are finished, we can update the variantCache with the new variants
+        # loop over the tsv file and update the variantCache
+        with open(temp_file_path, 'r') as file:
+            print_int = 0
+            last_line = ""
+            for line in file:
+                 # Split each line into the fastq sequence and the variant string
+                try:
+                    fastq_seq, variant_str_encoded = line.strip().split('\t')
+                except:
+                    print("Couldn't split line")
+                    print(last_line)
+                    print(line)
+                    breakpoint()
+                # fastq_seq, variant_str_encoded = line.strip().split('\t')
+                
+                # Decode the encoded newline characters
+                variant_str = variant_str_encoded.replace('\\n', '\n')
+                
+                # Assuming the variant_str is a dictionary-like string, convert it back to a dictionary
+                # Here we use eval carefully, knowing the risks involved with eval and considering the data source is trusted
+                try:
+                    variant = eval(variant_str)
+                except SyntaxError:
+                    print("Error converting string back to dictionary")
+                    continue
+                if print_int <30 and variant['best_match_score'] <= 0:
+                    # print the line with tabs and newlines shown
+                    print_int += 1
+                    print("Successfully stripped values from aligned read")
+                last_line = line
+
         for index, seq  in enumerate(variantCache.keys()):
             variant_count = variantCache[seq]
             N_TOT_READS += variant_count
