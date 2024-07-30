@@ -476,6 +476,31 @@ def get_variant_cache_boundaries(num_unique_sequences, n_processes):
     boundaries.append(num_unique_sequences)
     return boundaries
 
+def get_variant_cache_equal_boundaries(num_unique_sequences, n_processes):
+    """Determines the boundaries for the number of unique sequences to be processed by each process
+    Parameters
+    ----------
+        num_unique_sequences: the number of unique sequences to be processed
+        n_processes: the number of processes to be used
+    Returns
+    ----------
+    boundaries: a list of n+1 integer indexes, where n is the number of processes.
+    """
+
+    boundaries = [0]
+    # Determine roughly equal segment size for each process
+    segment_size = num_unique_sequences // n_processes
+    remainder = num_unique_sequences % n_processes
+
+    # Calculate boundaries ensuring close to equal distribution
+    for i in range(1, n_processes + 1):
+        # Add remainder to the last segment
+        if i <= remainder:
+            boundaries.append(boundaries[-1] + segment_size + 1)
+        else:
+            boundaries.append(boundaries[-1] + segment_size)
+    return boundaries
+
 def variant_generator_process(seq_list, manager_cache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
     """the target of the multiprocessing.Process object, generates the new variants for a subset of the reads in the fastq file and stores them in the manager_cache
     Parameters
@@ -510,14 +535,7 @@ def variant_generator_process(seq_list, manager_cache, lock, get_new_variant_obj
     with lock:
         manager_cache.update(new_variants)
 
-class NumpyEncoder(json.JSONEncoder):
-    """ Custom encoder for numpy data types """
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()  # Convert ndarray to list
-        return json.JSONEncoder.default(self, obj)
-
-def variant_file_generator_process(seq_list, variant_file_path, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
+def variant_file_generator_process(seq_list, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id, variants_dir):
     """the target of the multiprocessing.Process object, generates the new variants for a subset of the reads in the fastq file and stores them in the manager_cache
     Parameters
     ----------
@@ -539,27 +557,43 @@ def variant_file_generator_process(seq_list, variant_file_path, lock, get_new_va
     Nothing
     
     """
+    def numpy_encoder(obj):
+        """ Custom encoding for numpy arrays and other non-serializable types """
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()  # Convert numpy arrays to lists
+        raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
+    variant_file_path = os.path.join(variants_dir, f"variants_{process_id}.tsv")
+
     variant_lines = ""
-    num_processed = 0
-    for fastq_seq in seq_list:
+    index = 0
+    aligned_shown = False
+    with open(variant_file_path, 'w') as file:
+        file.truncate()
+    for index, fastq_seq in enumerate(seq_list):
         new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+        # Convert the complex object to a JSON string
+        try:
+            json_string = json.dumps(new_variant, default=numpy_encoder, indent=None, separators=(',', ':'))
+            # json_string = json_string.replace('\n', '').replace('\r', '')
+        except TypeError as e:
+            error(e)    
         
-        # Convert the variant object to a string and replace newlines
-        new_variant_str = str(new_variant).replace('\n', '\\n')
-        
-        variant_lines += f"{fastq_seq}\t{new_variant_str}\n"
-        num_processed += 1
-        if num_processed % 10000 == 0:
-            info(f"Process {process_id + 1} has processed {num_processed} unique reads")
+        variant_lines += f"{fastq_seq}\t{json_string}\n"
+        index += 1
+        if index % 10000 == 0:
+            info(f"Process {process_id + 1} has processed {index} unique reads")
+            with open(variant_file_path, 'a') as file:
+                file.write(variant_lines)
+                variant_lines = ""
     
-    with lock:
-        with open(variant_file_path, 'a') as file:
-            file.write(variant_lines)
+    with open(variant_file_path, 'a') as file:
+        file.write(variant_lines)
 
-    print(f"Process {process_id + 1} has finished processing {num_processed} unique reads and wrote them to the file: {variant_file_path}")
+    info(f"Process {process_id + 1} has finished processing {index} unique reads")
 
 
-def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
+def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory):
     """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
     Parameters
     ----------
@@ -653,7 +687,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     num_reads = 0
     fastq_id = fastq_handle.readline()
     while(fastq_id):
-        if num_reads % 10000 == 0 and num_reads != 0:
+        if num_reads % 50000 == 0 and num_reads != 0:
             info("Iterating over fastq file to identify reads; %d reads identified."%(num_reads))
         #read through fastq in sets of 4
         fastq_seq = fastq_handle.readline().strip()
@@ -691,17 +725,17 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
     unaligned_reads = []
 
     if n_processes > 1:
-        import tempfile
-        temp_dir = tempfile.gettempdir()
-        temp_file_path = os.path.join(temp_dir, "variants_temp.tsv")
-        boundaries = get_variant_cache_boundaries(num_unique_reads, n_processes)
+        boundaries = get_variant_cache_equal_boundaries(num_unique_reads, n_processes)
 
-        manager_cache = Manager().dict() # Manager dictionaries are python multiprocessing objects that can be accessed across processes
+        # manager_cache = Manager().dict() # Manager dictionaries are python multiprocessing objects that can be accessed across processes
         lock = Lock() # Semaphore lock that prevents race conditions on manager_cache
         processes = [] # list to hold the processes so we can wait for them to complete with join()
 
         info("Spinning up %d parallel processes to analyze unique reads..."%(n_processes))
         # We create n_processes, sending each a weighted sublist of the sequences for variant generation
+        variants_dir = os.path.join(output_directory, "variants")
+        if not os.path.exists(variants_dir):
+            os.makedirs(variants_dir)  # Use makedirs to create the directory if it does not exist
         for i in range(n_processes):
             left_sublist_index = boundaries[i]
             right_sublist_index = boundaries[i+1]
@@ -709,7 +743,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 target=variant_file_generator_process, 
                 args=(
                       (list(variantCache.keys())[left_sublist_index:right_sublist_index]), 
-                      temp_file_path, 
                       lock, 
                       get_new_variant_object, 
                       args, 
@@ -717,94 +750,74 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                       ref_names, 
                       aln_matrix, 
                       pe_scaffold_dna_info, 
-                      i
+                      i,
+                      variants_dir
                     )
             )
-            # process = Process(
-            #     target=variant_generator_process, 
-            #     args=(
-            #           (list(variantCache.keys())[left_sublist_index:right_sublist_index]), 
-            #           manager_cache, 
-            #           lock, 
-            #           get_new_variant_object, 
-            #           args, 
-            #           refs, 
-            #           ref_names, 
-            #           aln_matrix, 
-            #           pe_scaffold_dna_info, 
-            #           i
-            #         )
-            # )
             process.start()
             processes.append(process)
         for p in processes:
             p.join() # pauses the main thread until the processes are finished
-        # Read over the temporary file and print the first 30 lines
-
-        with open(temp_file_path, 'r') as file:
-            # print the size of the file
-            file_size = os.path.getsize(temp_file_path)
-            print(file_size)
-            # for i in range(30):
-            #     print(file.readline())
         info("Finished processing unique reads, now generating statistics...")
-        # Now that all the processes are finished, we can update the variantCache with the new variants
-        # loop over the tsv file and update the variantCache
-        with open(temp_file_path, 'r') as file:
-            print_int = 0
-            last_line = ""
-            for line in file:
-                 # Split each line into the fastq sequence and the variant string
-                try:
-                    fastq_seq, variant_str_encoded = line.strip().split('\t')
-                except:
-                    print("Couldn't split line")
-                    print(last_line)
-                    print(line)
-                    breakpoint()
-                # Decode the encoded newline characters
-                variant_str = variant_str_encoded.replace('\\n', '\n')
-                
-                # Assuming the variant_str is a dictionary-like string, convert it back to a dictionary
-                # Here we use eval carefully, knowing the risks involved with eval and considering the data source is trusted
-                try:
-                    variant = eval(variant_str)
-                except SyntaxError:
-                    
-                    print("Error converting string back to dictionary")
-                    continue
-                if print_int <30 and variant['best_match_score'] <= 0:
-                    # print the line with tabs and newlines shown
-                    print_int += 1
-                    print("Successfully stripped values from aligned read")
-                last_line = line
+       
+        read_index = 0
+        if os.path.exists(variants_dir):
+            variant_file_list = []
+            for n_processes in range(n_processes):
+                variant_file_list.append(os.path.join(variants_dir, f"variants_{n_processes}.tsv"))
+            # List all files in the directory
+            for file_path in variant_file_list:
+                # file_path = os.path.join(variants_dir, filename)
+                # Ensure the file is a .tsv before processing
+                if file_path.endswith(".tsv"):
+                    try:
+                        with open(file_path, 'r') as file:
+                            for line in file:
+                                # Each line contains a sequence followed by a JSON string
+                                parts = line.strip().split('\t')
+                                if len(parts) == 2:
+                                    seq = parts[0]
+                                    json_data = parts[1]
 
-        for index, seq  in enumerate(variantCache.keys()):
-            variant_count = variantCache[seq]
-            N_TOT_READS += variant_count
-            variant = manager_cache[seq]
-            variant['count'] = variant_count
-            if variant['best_match_score'] <= 0:
-                N_COMPUTED_NOTALN += 1
-                N_CACHED_NOTALN += (variant_count - 1)
-                # remove the unaligned reads from the cache
-                unaligned_reads.append(seq)
-            elif variant['best_match_score'] > 0:
-                variantCache[seq] = variant
-                N_COMPUTED_ALN += 1
-                N_CACHED_ALN += (variant_count - 1)
-                match_name = "variant_" + variant['best_match_name']
-                if READ_LENGTH == 0:
-                    READ_LENGTH = len(variant[match_name]['aln_seq'])
-                N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
-                N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
-                N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
-                N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
-                if variant[match_name]['irregular_ends']:
-                    N_READS_IRREGULAR_ENDS += variant_count
-            if (index % 10000 == 0):
-                info("Processing reads; %d completed out of %d unique reads"%(index, num_unique_reads))
-        del manager_cache
+                                    try:
+                                        # Convert the JSON string back into a Python dictionary
+                                        variant_dict = json.loads(json_data)
+                                    except json.JSONDecodeError as e:
+                                        error(f"Error decoding JSON for sequence {seq}: {e}")
+                                else:
+                                    error(f"Error splitting line: {line}")
+                                variant_count = variantCache[seq]
+                                try:
+                                    N_TOT_READS += variant_count
+                                except:
+                                    error(f"Error adding to N_TOT_READS: {read_index}, {seq}, {file_path}")
+                                variant = variant_dict
+                                variant['count'] = variant_count
+                                if variant['best_match_score'] <= 0:
+                                    N_COMPUTED_NOTALN += 1
+                                    N_CACHED_NOTALN += (variant_count - 1)
+                                    # remove the unaligned reads from the cache
+                                    unaligned_reads.append(seq)
+                                elif variant['best_match_score'] > 0:
+                                    variantCache[seq] = variant
+                                    N_COMPUTED_ALN += 1
+                                    N_CACHED_ALN += (variant_count - 1)
+                                    match_name = "variant_" + variant['best_match_name']
+                                    if READ_LENGTH == 0:
+                                        READ_LENGTH = len(variant[match_name]['aln_seq'])
+                                    N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
+                                    N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
+                                    N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
+                                    N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
+                                    if variant[match_name]['irregular_ends']:
+                                        N_READS_IRREGULAR_ENDS += variant_count
+                                if (read_index % 50000 == 0):
+                                    info("Calculating statistics; %d completed out of %d unique reads"%(read_index, num_unique_reads))
+                                read_index += 1
+                            
+                    except FileNotFoundError:
+                        error(f"File not found: {file_path}")
+                files_to_remove.append(file_path)
     else:
         for index, fastq_seq in enumerate(variantCache.keys()):
             variant_count = variantCache[fastq_seq]
@@ -2738,7 +2751,7 @@ def main():
             bam_header += '@PG\tID:crispresso2\tPN:crispresso2\tVN:'+CRISPRessoShared.__version__+'\tCL:"'+crispresso_cmd_to_write+'"\n'
             aln_stats = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args)
         else:
-            aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args)
+            aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
 
         #put empty sequence into cache
         cache_fastq_seq = ''
