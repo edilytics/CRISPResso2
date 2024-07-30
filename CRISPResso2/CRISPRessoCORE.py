@@ -762,8 +762,6 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                     print(last_line)
                     print(line)
                     breakpoint()
-                # fastq_seq, variant_str_encoded = line.strip().split('\t')
-                
                 # Decode the encoded newline characters
                 variant_str = variant_str_encoded.replace('\\n', '\n')
                 
@@ -772,6 +770,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args):
                 try:
                     variant = eval(variant_str)
                 except SyntaxError:
+                    
                     print("Error converting string back to dictionary")
                     continue
                 if print_int <30 and variant['best_match_score'] <= 0:
