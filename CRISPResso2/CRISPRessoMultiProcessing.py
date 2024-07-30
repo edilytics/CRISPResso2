@@ -207,28 +207,38 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
     input_function: function to run on chunks of the array
         input_function should take in a smaller array of objects
     """
-    pool = mp.Pool(processes = n_processes)
-
-    #handle signals -- bug in python 2.7 (https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python)
-    original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
-    signal.signal(signal.SIGINT, original_sigint_handler)
-    try:
-        n = int(max(10, len(input_array)/n_processes)) #don't parallelize unless at least 10 tasks
-        input_chunks = [input_array[i * n:(i + 1) * n] for i in range((len(input_array) + n - 1) // n )]
-        r = pool.map_async(input_function, input_chunks)
-        results = r.get(60*60*60) # Without the timeout this blocking call ignores all signals.
-    except KeyboardInterrupt:
-        pool.terminate()
-        logging.warn('Caught SIGINT. Program Terminated')
-        raise Exception('CRISPResso2 Terminated')
-        exit (0)
-    except Exception as e:
-        print('CRISPResso2 failed')
-        raise e
+    print("RUNNING NON-PARALLEL VERSION!!!!!!!")
+    if n_processes == 1:
+        print("NON-PARALLEL IF BRANCH!!")
+        try:
+            results = input_function(input_array)
+        except Exception as e:
+            print('CRISPResso2 failed')
+            raise e
+        return results
     else:
-        pool.close()
-    pool.join()
-    return [y for x in results for y in x]
+        pool = mp.Pool(processes = n_processes)
+
+        #handle signals -- bug in python 2.7 (https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python)
+        original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGINT, original_sigint_handler)
+        try:
+            n = int(max(10, len(input_array)/n_processes)) #don't parallelize unless at least 10 tasks
+            input_chunks = [input_array[i * n:(i + 1) * n] for i in range((len(input_array) + n - 1) // n )]
+            r = pool.map_async(input_function, input_chunks)
+            results = r.get(60*60*60) # Without the timeout this blocking call ignores all signals.
+        except KeyboardInterrupt:
+            pool.terminate()
+            logging.warn('Caught SIGINT. Program Terminated')
+            raise Exception('CRISPResso2 Terminated')
+            exit (0)
+        except Exception as e:
+            print('CRISPResso2 failed')
+            raise e
+        else:
+            pool.close()
+        pool.join()
+        return [y for x in results for y in x]
 
 
 
