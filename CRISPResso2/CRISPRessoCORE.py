@@ -444,37 +444,6 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
 
 
 
-def get_variant_cache_boundaries(num_unique_sequences, n_processes):
-    """Determines the boundaries for the number of unique sequences to be processed by each process
-    Parameters
-    ----------
-        num_unique_sequences: the number of unique sequences to be processed
-        n_processes: the number of processes to be used
-    Returns
-    ----------
-    boundaries: a list of n+1 integer indexes, where n is the number of processes.
-    """
-
-    boundaries = [0]
-    # Accumulator to keep track of the current boundary position
-    current_boundary = 0
-    # Determine the total sum of indices to use it for weighted distribution
-    total_indices = sum(range(1, n_processes + 1))
-
-    # This complex weighting scheme ensures that each subsequent process is responsible for generating more variants than the previous one
-    # This results in processes spending less time waiting for the semaphore lock in the variant_generator_process function
-    for i in range(1, n_processes):
-        # Determine the weight for this particular process
-        weight = i / total_indices
-        # Calculate the next boundary
-        next_boundary = current_boundary + int(weight * num_unique_sequences)
-        # Append the calculated boundary to the list
-        boundaries.append(next_boundary)
-        # Update the current boundary
-        current_boundary = next_boundary
-    # Ensure the last boundary is exactly the total length of the seq_list
-    boundaries.append(num_unique_sequences)
-    return boundaries
 
 def get_variant_cache_equal_boundaries(num_unique_sequences, n_processes):
     """Determines the boundaries for the number of unique sequences to be processed by each process
@@ -501,39 +470,6 @@ def get_variant_cache_equal_boundaries(num_unique_sequences, n_processes):
             boundaries.append(boundaries[-1] + segment_size)
     return boundaries
 
-def variant_generator_process(seq_list, manager_cache, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id):
-    """the target of the multiprocessing.Process object, generates the new variants for a subset of the reads in the fastq file and stores them in the manager_cache
-    Parameters
-    ----------
-        seq_list: list of reads to process
-        manager_cache: Manager().dict() object to store the new variants
-        lock: Lock object to ensure that only one process can update the manager_cache at a time
-        get_new_variant_object: function to generate the new variant object
-        args: CRISPResso2 args
-        refs: dict with info for all refs
-        ref_names: list of ref names
-        aln_matrix: alignment matrix for needleman wunsch
-        pe_scaffold_dna_info: tuple of(
-        index of location in ref to find scaffold seq if it exists
-        shortest dna sequence to identify scaffold sequence
-        )
-        process_id: the id of the process to print out debug information
-    Returns
-    ----------
-    Nothing
-    
-    """
-    new_variants = {}
-    num_processed = 0
-    for fastq_seq in seq_list:
-        new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-        new_variants[fastq_seq] = new_variant
-        num_processed += 1
-        if num_processed % 10000 == 0:
-            info(f"Process {process_id + 1} has processed {num_processed} unique reads")
-    # Now store the new variants in the manager_cache
-    with lock:
-        manager_cache.update(new_variants)
 
 def variant_file_generator_process(seq_list, lock, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id, variants_dir):
     """the target of the multiprocessing.Process object, generates the new variants for a subset of the reads in the fastq file and stores them in the manager_cache
