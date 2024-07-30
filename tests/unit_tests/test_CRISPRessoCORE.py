@@ -197,19 +197,19 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_include_zero():
 # Testing parallelization functions
 def test_regular_input():
     # Test with typical input
-    assert CRISPRessoCORE.get_variant_cache_boundaries(100, 4) == [0, 10, 30, 60, 100]
+    assert CRISPRessoCORE.get_variant_cache_equal_boundaries(100, 4) == [0, 25, 50, 75, 100]
 
 def test_single_process():
     # Test with a single process
-    assert CRISPRessoCORE.get_variant_cache_boundaries(50, 1) == [0, 50]
+    assert CRISPRessoCORE.get_variant_cache_equal_boundaries(50, 1) == [0, 50]
 
 def test_zero_sequences():
     # Test with zero unique sequences
-    assert CRISPRessoCORE.get_variant_cache_boundaries(0, 3) == [0, 0, 0, 0]
+    assert CRISPRessoCORE.get_variant_cache_equal_boundaries(0, 3) == [0, 0, 0, 0]
 
 def test_large_numbers():
     # Test with large number of processes and sequences
-    boundaries = CRISPRessoCORE.get_variant_cache_boundaries(10000, 10)
+    boundaries = CRISPRessoCORE.get_variant_cache_equal_boundaries(10000, 10)
     assert len(boundaries) == 11  # Check that there are 11 boundaries
 
 
