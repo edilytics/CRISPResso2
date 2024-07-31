@@ -4629,8 +4629,7 @@ def main():
                 
             if refs[ref_name]['contains_coding_seq']:
                 for coding_seq in coding_seqs:
-
-                    fig_filename_root = _jp('9a.'+ref_plot_name+'amino_acid_table_around_'+sgRNA_label)
+                    fig_filename_root = _jp('9a.'+ref_plot_name+'amino_acid_table_around_'+coding_seq)
                     # df_alleles.to_csv('df_alleles.txt', sep='\t')
                     coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)  
                     df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
