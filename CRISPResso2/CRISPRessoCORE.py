@@ -4409,6 +4409,11 @@ def main():
             crispresso2_info['results']['refs'][ref_name]['plot_9_roots'] = []
             crispresso2_info['results']['refs'][ref_name]['plot_9_captions'] = []
             crispresso2_info['results']['refs'][ref_name]['plot_9_datas'] = []
+
+            crispresso2_info['results']['refs'][ref_name]['plot_9a_roots'] = []
+            crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'] = []
+            crispresso2_info['results']['refs'][ref_name]['plot_9a_datas'] = []
+            
             crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'] = []
 
             crispresso2_info['results']['refs'][ref_name]['plot_10d_roots'] = []
@@ -4621,6 +4626,46 @@ def main():
                         crispresso2_info['results']['refs'][ref_name]['plot_10g_captions'].append("Figure 10g: Non-reference base counts. For target nucleotides in the plotting window, this plot shows the number of non-reference (non-" + args.conversion_nuc_from + ") bases. The number of each target base is annotated on the reference sequence at the bottom of the plot.")
                         crispresso2_info['results']['refs'][ref_name]['plot_10g_datas'].append([('Nucleotide frequencies at ' + args.conversion_nuc_from +'s', os.path.basename(quant_window_sel_nuc_freq_filename))])
 
+                
+            if refs[ref_name]['contains_coding_seq']:
+                for coding_seq in coding_seqs:
+                    fig_filename_root = _jp('9a.'+ref_plot_name+'amino_acid_table_around_'+coding_seq)
+                    # df_alleles.to_csv('df_alleles.txt', sep='\t')
+                    coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)  
+                    df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
+                        df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
+                        refs[ref_name]['exon_positions'][0],
+                        len(coding_seq_amino_acids),
+                        os.path.join(_ROOT, "BLOSUM62"))
+
+                    amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1)// 3
+                                            
+                    plot_9a_input = {
+                        'reference_seq': coding_seq_amino_acids,
+                        'df_alleles': df_to_plot,
+                        'fig_filename_root': fig_filename_root,
+                        'custom_colors': custom_config["colors"],
+                        'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
+                        'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
+                        'SAVE_ALSO_PNG': save_png,
+                        'plot_cut_point': plot_cut_point,
+                        'sgRNA_intervals': new_sgRNA_intervals,
+                        'sgRNA_names': sgRNA_names,
+                        'sgRNA_mismatches': sgRNA_mismatches,
+                        'annotate_wildtype_allele': args.annotate_wildtype_allele,
+                        'cut_point': amino_acid_cut_point,
+                    }
+
+                    amino_acid_filename = _jp(ref_plot_name+'amino_acid_table_around_'+sgRNA_label+'.txt')
+                    
+                    debug('Plotting amino acids around cut for {0}'.format(ref_name))
+                    # plot(CRISPRessoPlot.plot_amino_acid_table, plot_9a_input)
+                    # breakpoint()
+                    CRISPRessoPlot.plot_amino_acid_table(**plot_9a_input)
+                    crispresso2_info['results']['refs'][ref_name]['plot_9a_roots'].append(os.path.basename(fig_filename_root))
+                    crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'].append(
+                        "Figure 9a: Visualization of the distribution of identified amino acids around the cleavage site for the " + sgRNA_legend + " based on the coding sequence (" + coding_seq+"). Amino acids are indicated by unique colors. The vertical dashed line indicates the predicted cleavage site.")
+                    crispresso2_info['results']['refs'][ref_name]['plot_9a_datas'].append([('Amino Acid table', os.path.basename(amino_acid_filename))])
             info('Done!')
 
             #END GUIDE SPECIFIC PLOTS
