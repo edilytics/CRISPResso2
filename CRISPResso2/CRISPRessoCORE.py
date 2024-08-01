@@ -2190,7 +2190,7 @@ def main():
 
                     #subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
                     this_exclude_idxs = sorted(list(set(refs[ref_name]['exclude_idxs'])))
-                    this_include_idxs = sorted(list(set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
+                    this_include_idxs = sorted(map(int, set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
 
                     refs[ref_name]['gap_incentive'] = this_gap_incentive
                     refs[ref_name]['sgRNA_cut_points'] = this_cut_points
@@ -2216,7 +2216,7 @@ def main():
 
                     #subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
                     this_exclude_idxs = sorted(list(set(refs[ref_name]['exclude_idxs'])))
-                    this_include_idxs = sorted(list(set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
+                    this_include_idxs = sorted(map(int, set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
                     refs[ref_name]['include_idxs'] = this_include_idxs
                     refs[ref_name]['exclude_idxs'] = this_exclude_idxs
 
@@ -3223,7 +3223,7 @@ def main():
                     str(refs[ref_name]['sequence']) + "\t" +
                     str(refs[ref_name]['sequence_length']) + "\t" +
                     str(refs[ref_name]['min_aln_score']) + "\t" +
-                    str(refs[ref_name]['gap_incentive']) + "\t" +
+                    str(refs[ref_name]['gap_incentive'].tolist()) + "\t" +
                     str(refs[ref_name]['sgRNA_cut_points']) + "\t" +
                     str(refs[ref_name]['sgRNA_plot_cut_points']) + "\t" +
                     str(refs[ref_name]['sgRNA_intervals']) + "\t" +
