@@ -207,9 +207,7 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
     input_function: function to run on chunks of the array
         input_function should take in a smaller array of objects
     """
-    print("RUNNING NON-PARALLEL VERSION!!!!!!!")
     if n_processes == 1:
-        print("NON-PARALLEL IF BRANCH!!")
         try:
             results = input_function(input_array)
         except Exception as e:
