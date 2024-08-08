@@ -10,6 +10,7 @@ import errno
 import gzip
 import json
 import sys
+import textwrap
 import importlib.util
 from pathlib import Path
 
@@ -134,8 +135,18 @@ def set_console_log_level(logger, level, debug=False):
             break
 
 
+class CustomHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
+    def _split_lines(self, text, width):
+        if text.startswith('R|'):
+            return list(map(
+                lambda x: textwrap.fill(x, width, subsequent_indent=' ' * 24),
+                text[2:].splitlines(),
+            ))
+        return argparse.HelpFormatter._split_lines(self, text, width)
+
+
 def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
-    parser = argparse.ArgumentParser(description=parser_title, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(description=parser_title, formatter_class=CustomHelpFormatter)
     parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
 
     # Getting the directory of the current script
@@ -771,13 +782,13 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
 
     view_cmd_1 = 'cat'
     if fastq_r1.endswith('.gz'):
-        view_cmd_1 = 'zcat'
+        view_cmd_1 = 'gunzip -c'
     file_generation_command = "%s %s | head -n %d " % (view_cmd_1, fastq_r1, number_of_reads_to_consider * 4)
 
     if fastq_r2:
         view_cmd_2 = 'cat'
         if fastq_r2.endswith('.gz'):
-            view_cmd_2 = 'zcat'
+            view_cmd_2 = 'gunzip -c'
         min_overlap_param = ""
         if min_paired_end_reads_overlap:
             min_overlap_param = "--overlap_len_require {0}".format(min_paired_end_reads_overlap)
@@ -1642,6 +1653,38 @@ def get_sgRNA_mismatch_vals(seq1, seq2, start_loc, end_loc, coords_l, coords_r, 
         seen_inds[this_last_mismatch_val] = 1
         last_mismatch_val = this_last_mismatch_val + 1
     return list(set(this_mismatches))
+
+
+def get_quant_window_ranges_from_include_idxs(include_idxs):
+    """Given a list of indexes, return the ranges that those indexes include.
+
+    Parameters
+    ----------
+    include_idxs: list
+       A list of indexes included in the quantification window, for example
+       `[20, 21, 22, 35, 36, 37]`.
+
+    Returns
+    -------
+    list
+       A list of tuples representing the ranges included in the quantification
+       window, for example `[(20, 22), (35, 37)]`. If there is a single index, it
+       will be reported as `[(20, 20)]`.
+    """
+    quant_ranges = []
+    if include_idxs is None or len(include_idxs) == 0:
+        return quant_ranges
+    start_idx = include_idxs[0]
+    last_idx = include_idxs[0]
+    for idx in include_idxs[1:]:
+        if idx == last_idx + 1:
+            last_idx = idx
+        else:
+            quant_ranges.append((start_idx, last_idx))
+            start_idx = idx
+            last_idx = idx
+    quant_ranges.append((start_idx, last_idx))
+    return quant_ranges
 
 
 ######
