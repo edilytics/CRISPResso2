@@ -553,7 +553,7 @@ def variant_file_generator_process_with_write_out(seq_list, get_new_variant_obje
             # Convert the complex object to a JSON string
             json_string = json.dumps(new_variant, default=numpy_encoder)
             variant_lines += f"{fastq_seq}\t{json_string}\n"
-            if index % 10000 == 0:
+            if index % 1000 == 0:
                 info(f"Process {process_id + 1} has processed {index} unique reads")
                 file.write(variant_lines)
                 variant_lines = ""
@@ -1009,7 +1009,7 @@ def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, 
     else:
         fastq_input_handle=open(fastq_input)
     
-    fastq_out_handle = open(fastq_output, 'wt')
+    fastq_out_handle = gzip.open(fastq_output, 'wt')
 
     fastq_id = fastq_input_handle.readline()
     while(fastq_id):
@@ -3882,7 +3882,7 @@ def main():
             ############
 
         if n_processes > 1:
-            process_pool = ProcessPoolExecutor(n_processes)
+            process_pool = ProcessPoolExecutor(2)
             process_futures = {}
         else:
             process_pool = None
@@ -3890,7 +3890,7 @@ def main():
 
         plot = partial(
             CRISPRessoMultiProcessing.run_plot,
-            num_processes=n_processes,
+            num_processes=2,
             process_pool=process_pool,
             process_futures=process_futures,
         )
