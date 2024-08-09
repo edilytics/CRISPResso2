@@ -256,7 +256,7 @@ def run_parallel_commands(commands_arr, n_processes=1, descriptor='CRISPResso2',
     else:
         for idx, command in enumerate(commands_arr):
             return_value = run_subprocess(command)
-            if ret != 0 and not continue_on_fail:
+            if return_value != 0 and not continue_on_fail:
                 raise Exception(f'{descriptor} #{idx} was failed')
         return
 
