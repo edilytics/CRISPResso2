@@ -177,7 +177,10 @@ def run_pandas_apply_parallel(input_df, input_function_chunk, n_processes=1):
     #shuffle the dataset to avoid finishing all the ones on top while leaving the ones on the bottom unfinished
     n_splits = min(n_processes, len(input_df))
     df_split = np.array_split(input_df.sample(frac=1), n_splits)
-    pool = mp.Pool(processes = n_splits)
+    if n_processes > 1:
+        pool = mp.Pool(processes = n_splits)
+    else:
+        return input_function_chunk(input_df)
 
     #handle signals -- bug in python 2.7 (https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python)
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -243,12 +246,19 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
 def run_subprocess(cmd):
     return sb.call(cmd, shell=True)
 
-def run_parallel_commands(commands_arr,n_processes=1,descriptor='CRISPResso2',continue_on_fail=False):
+def run_parallel_commands(commands_arr, n_processes=1, descriptor='CRISPResso2', continue_on_fail=False):
     """
     input: commands_arr: list of shell commands to run
     descriptor: string to print out to user describing run
     """
-    pool = mp.Pool(processes = n_processes)
+    if n_processes > 1:
+        pool = mp.Pool(processes = n_processes)
+    else:
+        for idx, command in enumerate(commands_arr):
+            return_value = run_subprocess(command)
+            if ret != 0 and not continue_on_fail:
+                raise Exception(f'{descriptor} #{idx} was failed')
+        return
 
     #handle signals -- bug in python 2.7 (https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python)
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -303,4 +313,3 @@ def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool)
     except Exception as e:
         logger.warn(f"Plot error {e}, skipping plot \n")
         logger.debug(traceback.format_exc())
-
