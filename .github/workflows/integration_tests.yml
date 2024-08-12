@@ -62,17 +62,17 @@ jobs:
       run: |
         make prime-editor test print
 
-    - name: BAM Input
+    - name: Run BAM Input
       if: success() || failure()
       run: |
         make bam test print
 
-    - name: BAM Output
+    - name: Run BAM Output
       if: success() || failure()
       run: |
         make bam-out test print
 
-    - name: BAM Genome Output
+    - name: Run BAM Genome Output
       if: success() || failure()
       run: |
         make bam-out-genome test print
