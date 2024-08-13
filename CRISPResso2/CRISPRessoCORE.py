@@ -1217,7 +1217,7 @@ def process_fastq_write_out_old(fastq_input, fastq_output, variantCache, ref_nam
                }
     return(aln_stats)
 
-def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, variantCache, ref_names, refs, args):
+def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, variantCache, ref_names, refs, args, files_to_remove, output_directory):
     """
     process_fastq_write_out processes each of the reads contained in a fastq input file, given a cache of pre-computed variants. All reads are read in, analyzed, and written to output with annotation
 
@@ -1238,29 +1238,13 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         refs: dictionary of sequences name>ref object
         args: crispresso2 args
     """
-
-    N_TOT_READS = 0
-    N_CACHED_ALN = 0  # read was found in cache
-    N_CACHED_NOTALN = 0  # read was found in 'not aligned' cache
-    N_COMPUTED_ALN = 0  # not in cache, aligned to at least 1 sequence with min cutoff
-    N_COMPUTED_NOTALN = 0  # not in cache, not aligned to any sequence with min cutoff
-
-    N_GLOBAL_SUBS = 0 #number of substitutions across all reads - indicator of sequencing quality
-    N_SUBS_OUTSIDE_WINDOW = 0
-    N_MODS_IN_WINDOW = 0 #number of modifications found inside the quantification window
-    N_MODS_OUTSIDE_WINDOW = 0 #number of modifications found outside the quantification window
-    N_READS_IRREGULAR_ENDS = 0 #number of reads with modifications at the 0 or -1 position
-    READ_LENGTH = 0
+    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
+    info("Reads processed, now annotating fastq_output file: %s"%(bam_output))
+ 
 
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
-
-    pe_scaffold_dna_info = (0, None)  # scaffold start loc, scaffold sequence
-    if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
-        pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
-    not_aln = {}  # cache for reads that don't align
-    not_aln[''] = ""  # add empty sequence to the not_aln in case the fastq has an extra newline at the end
 
     if fastq_input.endswith('.gz'):
         fastq_input_handle = gzip.open(fastq_input, 'rt')
@@ -1280,90 +1264,62 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         fastq_plus = fastq_input_handle.readline().strip()
         fastq_qual = fastq_input_handle.readline().strip()
 
-        if (N_TOT_READS % 10000 == 0):
-            info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
-
-        N_TOT_READS += 1
-
         # if the sequence has been seen and can't be aligned, skip it
         if fastq_seq in not_aln:
-            N_CACHED_NOTALN += 1
-            new_sam_entry = not_aln[fastq_seq][:]
-            new_sam_entry[0] = fastq_id
-            new_sam_entry[10] = fastq_qual
-            sam_out_handle.write("\t".join(new_sam_entry)+"\n")  # not_aln[fastq_seq] is alignment: NA
-        elif fastq_seq in variantCache:  # if the sequence is already associated with a variant in the variant cache, pull it out
-            N_CACHED_ALN += 1
-            variantCache[fastq_seq]['count'] += 1
-            match_name = "variant_" + variantCache[fastq_seq]['best_match_name']
-            N_GLOBAL_SUBS += variantCache[fastq_seq][match_name]['substitution_n'] + variantCache[fastq_seq][match_name]['substitutions_outside_window']
-            N_SUBS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['substitutions_outside_window']
-            N_MODS_IN_WINDOW += variantCache[fastq_seq][match_name]['mods_in_window']
-            N_MODS_OUTSIDE_WINDOW += variantCache[fastq_seq][match_name]['mods_outside_window']
-            if variantCache[fastq_seq][match_name]['irregular_ends']:
-                N_READS_IRREGULAR_ENDS += 1
-            new_sam_entry = variantCache[fastq_seq]['sam_entry'][:]
-            new_sam_entry[0] = fastq_id
-            new_sam_entry[10] = fastq_qual
+            new_sam_entry = [
+                fastq_id,  # read id
+                '4',             # flag = unmapped 0x4
+                '*',             # aln chr
+                '0',             # aln loc
+                '0',             # quality
+                '*',             # cigar
+                '*',             # next
+                '0',             # next
+                '0',             # tlen
+                fastq_seq,       # seq
+                fastq_qual       # qual
+            ]
+            crispresso_sam_optional_fields = "c2:Z:ALN=NA" +\
+                    " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
+                    " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
+            new_sam_entry.append(crispresso_sam_optional_fields)
+            not_aln[fastq_seq] = new_sam_entry
             sam_out_handle.write("\t".join(new_sam_entry)+"\n")  # write cached alignment with modified read id and qual
+            continue
 
-        # otherwise, create a new variant object, and put it in the cache
-        else:
-            new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-            if new_variant['best_match_score'] <= 0:
-                N_COMPUTED_NOTALN += 1
-                new_sam_entry = [
-                    fastq_id,  # read id
-                    '4',             # flag = unmapped 0x4
-                    '*',             # aln chr
-                    '0',             # aln loc
-                    '0',             # quality
-                    '*',             # cigar
-                    '*',             # next
-                    '0',             # next
-                    '0',             # tlen
-                    fastq_seq,       # seq
-                    fastq_qual       # qual
-                ]
-                crispresso_sam_optional_fields = "c2:Z:ALN=NA" +\
-                        " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
-                        " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
-                new_sam_entry.append(crispresso_sam_optional_fields)
-                not_aln[fastq_seq] = new_sam_entry
-                sam_out_handle.write("\t".join(new_sam_entry)+"\n")  # write cached alignment with modified read id and qual
-            else:
-                N_COMPUTED_ALN += 1
-                ins_inds = []
-                del_inds = []
-                sub_inds = []
-                edit_strings = []
+        if fastq_seq in variantCache:
+            new_variant = variantCache[fastq_seq]
+            ins_inds = []
+            del_inds = []
+            sub_inds = []
+            edit_strings = []
 
 #                for idx, best_match_name in enumerate(best_match_names):
-                for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
-                    payload = new_variant['variant_'+best_match_name]
+            for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                payload = new_variant['variant_'+best_match_name]
 
-                    del_inds.append([str(x[0][0])+"("+str(x[1])+")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
+                del_inds.append([str(x[0][0])+"("+str(x[1])+")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
 
-                    ins_vals = []
-                    for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes']):
-                        ins_start = payload['ref_positions'].index(ins_coord[0])
-                        ins_vals.append(payload['aln_seq'][ins_start+1:ins_start+1+ins_size])
-                    ins_inds.append([str(x[0][0])+"("+str(x[1])+"+"+x[2]+")" for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)])
+                ins_vals = []
+                for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes']):
+                    ins_start = payload['ref_positions'].index(ins_coord[0])
+                    ins_vals.append(payload['aln_seq'][ins_start+1:ins_start+1+ins_size])
+                ins_inds.append([str(x[0][0])+"("+str(x[1])+"+"+x[2]+")" for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)])
 
-                    sub_inds.append(payload['substitution_positions'])
-                    edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
+                sub_inds.append(payload['substitution_positions'])
+                edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
 
-                first_ref_name = new_variant['aln_ref_names'][0]
-                first_payload = new_variant['variant_' + first_ref_name]
-                exploded_cigar = ''.join([CRISPRessoShared.CIGAR_LOOKUP[x] for x in zip(first_payload['aln_seq'], first_payload['aln_ref'])])
-                sam_cigar_els = CRISPRessoShared.unexplode_cigar(exploded_cigar)
-                sam_cigar = ''.join(sam_cigar_els)
+            first_ref_name = new_variant['aln_ref_names'][0]
+            first_payload = new_variant['variant_' + first_ref_name]
+            exploded_cigar = ''.join([CRISPRessoShared.CIGAR_LOOKUP[x] for x in zip(first_payload['aln_seq'], first_payload['aln_ref'])])
+            sam_cigar_els = CRISPRessoShared.unexplode_cigar(exploded_cigar)
+            sam_cigar = ''.join(sam_cigar_els)
 
-                sam_flag = '0'
-                if first_payload['aln_strand'] == '-':
-                    sam_flag = '16'
+            sam_flag = '0'
+            if first_payload['aln_strand'] == '-':
+                sam_flag = '16'
 
-                this_aln_loc = refs[first_ref_name]['aln_start']
+            this_aln_loc = refs[first_ref_name]['aln_start']
 #                #if cigar starts with deletions
 #                if sam_cigar_els[0].endswith('D'):
 #                    num = int(sam_cigar_els[0][0:-1])
@@ -1371,58 +1327,47 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
 #                elif sam_cigar_els[0].endswith('I'):
 #                    num = int(sam_cigar_els[0][0:-1])
 #                    this_aln_loc -= num
-                seq_to_write = fastq_seq
-                qual_to_write = fastq_qual
-                cigar_to_write = sam_cigar
-                if refs[first_ref_name]['aln_strand'] == '-':
-                    if sam_flag == '16':
-                        sam_flag = '0'
-                    else:
-                        sam_flag = '16'
-                    cigar_to_write = ''.join(sam_cigar_els[::-1])
-                    seq_to_write = CRISPRessoShared.reverse_complement(fastq_seq)
-                    qual_to_write = fastq_qual[::-1]
+            seq_to_write = fastq_seq
+            qual_to_write = fastq_qual
+            cigar_to_write = sam_cigar
+            if refs[first_ref_name]['aln_strand'] == '-':
+                if sam_flag == '16':
+                    sam_flag = '0'
+                else:
+                    sam_flag = '16'
+                cigar_to_write = ''.join(sam_cigar_els[::-1])
+                seq_to_write = CRISPRessoShared.reverse_complement(fastq_seq)
+                qual_to_write = fastq_qual[::-1]
 
-                new_sam_entry = [
-                    fastq_id,                                   # read id
-                    sam_flag,                                   # flag = mapped
-                    refs[first_ref_name]['aln_chr'],            # aln chr
-                    str(this_aln_loc),                          # aln loc
-                    str(int(new_variant['best_match_score'])),  # quality
-                    cigar_to_write,                             # cigar
-                    '*',                                        # next
-                    '0',                                        # next
-                    '0',                                        # tlen
-                    seq_to_write,                               # seq
-                    qual_to_write                               # qual
-                ]
+            new_sam_entry = [
+                fastq_id,                                   # read id
+                sam_flag,                                   # flag = mapped
+                refs[first_ref_name]['aln_chr'],            # aln chr
+                str(this_aln_loc),                          # aln loc
+                str(int(new_variant['best_match_score'])),  # quality
+                cigar_to_write,                             # cigar
+                '*',                                        # next
+                '0',                                        # next
+                '0',                                        # tlen
+                seq_to_write,                               # seq
+                qual_to_write                               # qual
+            ]
 
-                crispresso_sam_optional_fields = "c2:Z:ALN="+("&".join(new_variant['aln_ref_names'])) +\
-                        " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
-                        " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
-                        " CLASS="+new_variant['class_name']+\
-                        " MODS="+("&".join(edit_strings))+\
-                        " DEL="+("&".join([';'.join(x) for x in del_inds])) +\
-                        " INS="+("&".join([';'.join(x) for x in ins_inds])) +\
-                        " SUB=" + ("&".join([';'.join([str(y) for y in x]) for x in sub_inds])) +\
-                        " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
-                        " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
+            crispresso_sam_optional_fields = "c2:Z:ALN="+("&".join(new_variant['aln_ref_names'])) +\
+                    " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
+                    " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
+                    " CLASS="+new_variant['class_name']+\
+                    " MODS="+("&".join(edit_strings))+\
+                    " DEL="+("&".join([';'.join(x) for x in del_inds])) +\
+                    " INS="+("&".join([';'.join(x) for x in ins_inds])) +\
+                    " SUB=" + ("&".join([';'.join([str(y) for y in x]) for x in sub_inds])) +\
+                    " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
+                    " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
 
-                new_sam_entry.append(crispresso_sam_optional_fields)
-                new_variant['sam_entry'] = new_sam_entry
+            new_sam_entry.append(crispresso_sam_optional_fields)
+            new_variant['sam_entry'] = new_sam_entry
 
-                sam_out_handle.write("\t".join(new_sam_entry)+"\n")  # write cached alignment with modified read id and qual
-
-                variantCache[fastq_seq] = new_variant
-                match_name = 'variant_' + new_variant['best_match_name']
-                if READ_LENGTH == 0:
-                    READ_LENGTH = len(new_variant[match_name]['aln_seq'])
-                N_GLOBAL_SUBS += new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window']
-                N_SUBS_OUTSIDE_WINDOW += new_variant[match_name]['substitutions_outside_window']
-                N_MODS_IN_WINDOW += new_variant[match_name]['mods_in_window']
-                N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
-                if new_variant[match_name]['irregular_ends']:
-                    N_READS_IRREGULAR_ENDS += 1
+            sam_out_handle.write("\t".join(new_sam_entry)+"\n")  # write cached alignment with modified read id and qual
 
         #last step of loop = read next line
         fastq_id = fastq_input_handle.readline().strip()[1:]
@@ -1438,20 +1383,9 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
     if not args.debug:
         os.remove(sam_out)
 
-    info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
-    aln_stats = {"N_TOT_READS" : N_TOT_READS,
-               "N_CACHED_ALN" : N_CACHED_ALN,
-               "N_CACHED_NOTALN" : N_CACHED_NOTALN,
-               "N_COMPUTED_ALN" : N_COMPUTED_ALN,
-               "N_COMPUTED_NOTALN" : N_COMPUTED_NOTALN,
-               "N_GLOBAL_SUBS": N_GLOBAL_SUBS,
-               "N_SUBS_OUTSIDE_WINDOW": N_SUBS_OUTSIDE_WINDOW,
-               "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
-               "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
-               "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
-               "READ_LENGTH": READ_LENGTH
-               }
+    info("Finished writing out to bam file: %s"%(bam_output))
     return(aln_stats)
+
 
 
 def normalize_name(name, fastq_r1, fastq_r2, bam_input):
@@ -2783,7 +2717,7 @@ def main():
             aln_stats = process_fastq_write_out(processed_output_filename, crispresso2_info['fastq_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.bam_output:
             bam_header += '@PG\tID:crispresso2\tPN:crispresso2\tVN:'+CRISPRessoShared.__version__+'\tCL:"'+crispresso_cmd_to_write+'"\n'
-            aln_stats = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args)
+            aln_stats = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         else:
             aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
 
@@ -3882,7 +3816,7 @@ def main():
             ############
 
         if n_processes > 1:
-            process_pool = ProcessPoolExecutor(2)
+            process_pool = ProcessPoolExecutor(n_processes)
             process_futures = {}
         else:
             process_pool = None
@@ -3890,7 +3824,7 @@ def main():
 
         plot = partial(
             CRISPRessoMultiProcessing.run_plot,
-            num_processes=2,
+            num_processes=n_processes,
             process_pool=process_pool,
             process_futures=process_futures,
         )
