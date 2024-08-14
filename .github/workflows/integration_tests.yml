@@ -43,12 +43,15 @@ jobs:
           path: /usr/share/miniconda/envs/test_env
           key: conda-${{ runner.os }}--${{ runner.arch }}--${{ steps.get-date.outputs.today }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
 
+<<<<<<< HEAD
       - name: Copy C2_tests repo
         uses: actions/checkout@v3
         with:
           repository: edilytics/CRISPResso2_tests
           ref: "trevor/fastq-testing"
           # ref: '<BRANCH-NAME>' # Use this to specify a branch other than master
+=======
+>>>>>>> cole/add-bam-tests
       - name: Update Conda Env
         run: |
           conda env update -n test_env -f .github/envs/test_env.yml
@@ -69,6 +72,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: edilytics/CRISPResso2_tests
+          ref: 'trevor/fastq-testing'
           # ref: '<BRANCH-NAME>' # update to specific branch
 
       - name: Run Basic
@@ -84,6 +88,21 @@ jobs:
         if: success() || failure()
         run: |
           make prime-editor test print
+
+      - name: Run BAM Input
+        if: success() || failure()
+        run: |
+          make bam test print
+
+      - name: Run BAM Output
+        if: success() || failure()
+        run: |
+          make bam-out test print
+
+      - name: Run BAM Genome Output
+        if: success() || failure()
+        run: |
+          make bam-out-genome test print
 
       - name: Run Batch
         if: success() || failure()
