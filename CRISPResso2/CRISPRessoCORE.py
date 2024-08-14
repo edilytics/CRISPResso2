@@ -891,7 +891,6 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             num_reads += 1
         num_unique_reads = len(variantCache.keys())
         info("Finished reading bam file; %d unique reads found of %d total reads found "%(num_unique_reads, num_reads))
-
         n_processes = 1 
         if args.n_processes == "max":
             n_processes = CRISPRessoMultiProcessing.get_max_processes()
@@ -910,8 +909,11 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
         N_READS_IRREGULAR_ENDS = 0 # number of reads with modifications at the 0 or -1 position
         READ_LENGTH = 0
         not_aln = {}  
+        print("n_processes: ", n_processes)
+        print(args.n_processes)
 
         if n_processes > 1 and num_unique_reads > n_processes:  
+            print("entered multiprocessing mode")
             boundaries = get_variant_cache_equal_boundaries(num_unique_reads, n_processes)
             processes = [] # list to hold the processes so we can wait for them to complete with join()
             variants_dir = output_directory
@@ -965,7 +967,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                             " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                                             " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
                                     sam_line_els.append(crispresso_sam_optional_fields)
-                                    not_aln[seq] = sam_line_els
+                                    not_aln[seq] = crispresso_sam_optional_fields
                                     # sam_out.write("\t".join(sam_line_els)+"\n")
                                 else:
                                     N_COMPUTED_ALN+=1
@@ -1028,6 +1030,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
         # Single process version
             for index, fastq_seq in enumerate(variantCache.keys()):
                 variant_count = variantCache[fastq_seq]
+                print(variant_count)
                 N_COMPUTED_ALN+=1
                 N_TOT_READS += variant_count
                 new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
@@ -1039,7 +1042,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                             " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                             " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
                     sam_line_els.append(crispresso_sam_optional_fields)
-                    not_aln[fastq_seq] = sam_line_els
+                    not_aln[fastq_seq] = crispresso_sam_optional_fields
                 else:
                     class_names = []
                     ins_inds = []
@@ -1072,16 +1075,12 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                             " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
                             " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
                     sam_line_els.append(crispresso_sam_optional_fields)
-
                     #cigar strings are in reference to the given amplicon, not to the genomic sequence to which this read is aligned..
                     #first_variant = new_variant['variant_'+new_variant['aln_ref_names'][0]]
                     #sam_cigar = ''.join(CRISPRessoShared.unexplode_cigar(''.join([CRISPRessoShared.CIGAR_LOOKUP[x] for x in zip(first_variant['aln_seq'],first_variant['aln_ref'])])))
                     #sam_line_els[5] = sam_cigar
                     #new_variant['sam_cigar'] = sam_cigar
                     new_variant['crispresso2_annotation'] = crispresso_sam_optional_fields
-
-                    # sam_out.write("\t".join(sam_line_els)+"\n")
-
                     variantCache[fastq_seq] = new_variant
 
                     match_name = 'variant_' + new_variant['best_match_name']
@@ -1114,36 +1113,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                 sam_line_els.append(variantCache[fastq_seq]['crispresso2_annotation'])
                 sam_out.write("\t".join(sam_line_els)+"\n")
 
-
-
-
-        # Read bam input file, and write to output file
-        if bam_chr_loc != "":
-            proc = sb.Popen(['samtools', 'view', bam_filename, bam_chr_loc], stdout=sb.PIPE, encoding='utf-8')
-        else:
-            proc = sb.Popen(['samtools', 'view', bam_filename], stdout=sb.PIPE, encoding='utf-8')
-        for sam_line in proc.stdout:
-            sam_line_els = sam_line.rstrip().split("\t")
-            fastq_seq = sam_line_els[9]
-
-            if fastq_seq in variantCache:
-                # if the read has already been seen, we increment its value by 1 to track number of copies
-                variantCache[fastq_seq] += 1
-            # If the sequence is not in the cache, we create it and set its value to 1
-            elif fastq_seq not in variantCache:
-                variantCache[fastq_seq] = 1
-            num_reads += 1
-
-        for seq in not_aln.keys():
-            del variantCache[seq]
-
-        output_sam = output_bam+".sam"
-        cmd = 'samtools view -Sb '+output_sam + '>'+output_bam + ' && samtools index ' + output_bam
-        bam_status=sb.call(cmd, shell=True)
-        if bam_status:
-                raise CRISPRessoShared.BadParameterException(
-                    'Bam creation failed. Command used: {0}'.format(cmd),
-                )
+        for fastq_seq in not_aln.keys():
+            del variantCache[fastq_seq]
 
         info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
         aln_stats = {"N_TOT_READS" : N_TOT_READS,
@@ -1158,6 +1129,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                 "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
                 "READ_LENGTH": READ_LENGTH
                 }
+        print(aln_stats)
         return(aln_stats)
 
 def process_bam_old(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, refs, args, files_to_remove, output_directory):
