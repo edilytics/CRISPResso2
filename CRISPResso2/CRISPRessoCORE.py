@@ -957,9 +957,11 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     seq = parts[0]
                                     json_data = parts[1]
                                     new_variant = json.loads(json_data)
-                                    variant_count = variantCache[seq]
                                 else:
                                     error(f"Error splitting line: {line}")
+                                variant_count = variantCache[seq]
+                                new_variant['count'] = variant_count
+                                N_TOT_READS += variant_count
                                 if new_variant['best_match_score'] <= 0:
                                     N_COMPUTED_NOTALN+=1
                                     N_CACHED_NOTALN += (variant_count - 1)
@@ -970,8 +972,6 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     not_aln[seq] = crispresso_sam_optional_fields
                                     # sam_out.write("\t".join(sam_line_els)+"\n")
                                 else:
-                                    N_COMPUTED_ALN+=1
-                                    N_CACHED_ALN += (variant_count - 1)
                                     class_names = []
                                     ins_inds = []
                                     del_inds = []
@@ -1012,7 +1012,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     new_variant['crispresso2_annotation'] = crispresso_sam_optional_fields
                                     variantCache[seq] = new_variant
                                     # sam_out.write("\t".join(sam_line_els)+"\n")
-
+                                    N_COMPUTED_ALN+=1
+                                    N_CACHED_ALN += (variant_count - 1)
                                     match_name = 'variant_' + new_variant['best_match_name']
                                     if READ_LENGTH == 0:
                                         READ_LENGTH = len(new_variant[match_name]['aln_seq'])
@@ -1028,10 +1029,11 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                 files_to_remove.append(file_path)
         else:
         # Single process version
-            for index, fastq_seq in enumerate(variantCache.keys()):
+            print(len(variantCache.keys()))
+            for idx, fastq_seq in enumerate(variantCache.keys()):
+                if idx > 210: 
+                    print(N_TOT_READS)
                 variant_count = variantCache[fastq_seq]
-                print(variant_count)
-                N_COMPUTED_ALN+=1
                 N_TOT_READS += variant_count
                 new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
                 new_variant['count'] = variant_count
@@ -1044,12 +1046,14 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                     sam_line_els.append(crispresso_sam_optional_fields)
                     not_aln[fastq_seq] = crispresso_sam_optional_fields
                 else:
+                    N_COMPUTED_ALN+=1
+                    N_CACHED_ALN += (variant_count - 1)
                     class_names = []
                     ins_inds = []
                     del_inds = []
                     sub_inds = []
                     edit_strings = []
-
+                    
     #               for idx, best_match_name in enumerate(best_match_names):
                     for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                         payload=new_variant['variant_'+best_match_name]
@@ -1092,8 +1096,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                     N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window'] * variant_count
                     if new_variant[match_name]['irregular_ends']:
                         N_READS_IRREGULAR_ENDS += variant_count
-            if (index % 10000 == 0 and index > 0):
-                info("Processing Reads; %d Completed out of %d Unique Reads"%(index, num_unique_reads))
+            if (idx % 10000 == 0 and idx > 0):
+                info("Processing Reads; %d Completed out of %d Unique Reads"%(idx, num_unique_reads))
 
 
         if bam_chr_loc != "":
@@ -1115,7 +1119,11 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
 
         for fastq_seq in not_aln.keys():
             del variantCache[fastq_seq]
-
+        print(N_TOT_READS)
+        # INFO  @ Tue, 13 Aug 2024 22:57:32:
+        #  Finished reads; N_TOT_READS: 237 N_COMPUTED_ALN: 214 N_CACHED_ALN: 22 N_COMPUTED_NOTALN: 1 N_CACHED_NOTALN: 0
+# INFO  @ Tue, 13 Aug 2024 22:59:30:
+#          Finished reads; N_TOT_READS: 215 N_COMPUTED_ALN: 214 N_CACHED_ALN: 22 N_COMPUTED_NOTALN: 1 N_CACHED_NOTALN: 0
         info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
         aln_stats = {"N_TOT_READS" : N_TOT_READS,
                 "N_CACHED_ALN" : N_CACHED_ALN,
