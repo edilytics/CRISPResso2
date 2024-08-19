@@ -29,7 +29,7 @@ from inspect import getmodule, stack
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
 
-__version__ = "2.3.1"
+__version__ = "2.3.2"
 
 
 ###EXCEPTIONS############################
@@ -114,8 +114,8 @@ class StatusHandler(logging.FileHandler):
 class LogStreamHandler(logging.StreamHandler):
     def __init__(self, stream=None):
         super().__init__(stream)
-        self.setFormatter(logging.Formatter(
-            '%(levelname)-5s @ %(asctime)s:\n\t %(message)s \n',
+        self.setFormatter(StatusFormatter(
+            '%(levelname)-5s @ %(asctime)s (%(percent_complete)s%% done):\n\t %(message)s \n',
             datefmt='%a, %d %b %Y %H:%M:%S',
         ))
         self.setLevel(logging.INFO)
@@ -782,13 +782,13 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
 
     view_cmd_1 = 'cat'
     if fastq_r1.endswith('.gz'):
-        view_cmd_1 = 'zcat'
+        view_cmd_1 = 'gunzip -c'
     file_generation_command = "%s %s | head -n %d " % (view_cmd_1, fastq_r1, number_of_reads_to_consider * 4)
 
     if fastq_r2:
         view_cmd_2 = 'cat'
         if fastq_r2.endswith('.gz'):
-            view_cmd_2 = 'zcat'
+            view_cmd_2 = 'gunzip -c'
         min_overlap_param = ""
         if min_paired_end_reads_overlap:
             min_overlap_param = "--overlap_len_require {0}".format(min_paired_end_reads_overlap)
