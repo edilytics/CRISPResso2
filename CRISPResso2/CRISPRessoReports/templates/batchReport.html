@@ -1,6 +1,8 @@
 {% extends "layout.html" %}
 {% block head %}
+{% if C2PRO_INSTALLED %}
 <script src="https://cdn.plot.ly/plotly-2.11.1.min.js"></script>
+{% endif %}
 <style>
 .nav-tabs.amp-header {
   border-bottom:none !important;
