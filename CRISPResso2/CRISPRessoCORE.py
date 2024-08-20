@@ -1457,6 +1457,9 @@ def main():
                     raise CRISPRessoShared.NTException('The coding sequence contains bad characters:%s' % ' '.join(wrong_nt))
 
                 coding_seqs.append(exon_seq)
+        
+        if len(coding_seqs) > 0:
+            crispresso2_info['running_info']['coding_seqs'] = coding_seqs
 
         ####SET REFERENCES TO COMPARE###
         ref_names = [] #ordered list of names
