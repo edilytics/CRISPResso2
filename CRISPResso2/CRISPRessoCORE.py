@@ -513,7 +513,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
                 variant_lines = ""
         file.write(variant_lines)
 
-    info(f"Process {process_id + 1} has finished processing {index} unique reads")
+    info(f"Process {process_id + 1} has finished processing {index} unique reads", {'percent_complete': 10})
 
 
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out=False):
@@ -682,7 +682,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
             processes.append(process)
         for p in processes:
             p.join() # pauses the main thread until the processes are finished
-        info("Finished processing unique reads, now generating statistics...")
+        info("Finished processing unique reads, now generating statistics...", {'percent_complete': 15})
         if os.path.exists(variants_dir):
             variant_file_list = []
             for n_processes in range(n_processes):
@@ -883,7 +883,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             for p in processes:
                 p.join() # pauses the main thread until the processes are finished
 
-            info("Finished processing unique reads, now generating statistics...")
+            info("Finished processing unique reads, now generating statistics...", {'percent_complete': 15})
             variant_file_list = []
             if os.path.exists(variants_dir):
                 for n_processes in range(n_processes):
