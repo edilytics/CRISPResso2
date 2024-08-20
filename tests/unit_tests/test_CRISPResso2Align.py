@@ -16,10 +16,31 @@ def test_global_align():
 
 def test_global_align_BLOSUM62():
     """General alignment tests."""
-    seq1, seq2, score = CRISPResso2Align.global_align('ATTA', 'ATTA', matrix=ALN_MATRIX, gap_incentive=np.array([0,0,0,0,0],dtype=int))
+    seq1, seq2, score = CRISPResso2Align.global_align('ATTA', 'ATTA', matrix=AA_MATRIX, gap_incentive=np.array([0,0,0,0,0],dtype=int))
     assert seq1 == 'ATTA'
     assert seq2 == 'ATTA'
     assert score == 100
+
+def test_global_align_gap_incentive_pos1_BLOSUM62():
+    """General alignment tests."""
+    seq1, seq2, score = CRISPResso2Align.global_align('ATTTA', 'ATTA', matrix=AA_MATRIX, gap_incentive=np.array([0,1,0,0,0],dtype=int))
+    assert seq1 == 'ATTTA'
+    assert seq2 == 'A-TTA'
+    assert round(score,3) == round(100*4/5.0,3)
+
+def test_global_align_gap_incentive_pos2_BLOSUM62():
+    """General alignment tests."""
+    seq1, seq2, score = CRISPResso2Align.global_align('ATTTA', 'ATTA', matrix=AA_MATRIX, gap_incentive=np.array([0,0,1,0,0],dtype=int))
+    assert seq1 == 'ATTTA'
+    assert seq2 == 'AT-TA'
+    assert round(score,3) == round(100*4/5.0,3)
+
+def test_global_align_gap_incentive_pos3_BLOSUM62():
+    """General alignment tests."""
+    seq1, seq2, score = CRISPResso2Align.global_align('ATTTA', 'ATTA', matrix=AA_MATRIX, gap_incentive=np.array([0,0,0,1,0],dtype=int))
+    assert seq1 == 'ATTTA'
+    assert seq2 == 'ATT-A'
+    assert round(score,3) == round(100*4/5.0,3)
 
 
 def test_global_align_gap_incentive_s1():
