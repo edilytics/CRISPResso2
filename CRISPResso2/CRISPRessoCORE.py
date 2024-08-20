@@ -508,7 +508,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
             json_string = json.dumps(new_variant, default=numpy_encoder)
             variant_lines += f"{fastq_seq}\t{json_string}\n"
             if index % 10000 == 0 and index != 0:
-                info(f"Process {process_id + 1} has processed {index} unique reads")
+                info(f"Process {process_id + 1} has processed {index} unique reads", {'percent_complete': 10})
                 file.write(variant_lines)
                 variant_lines = ""
         file.write(variant_lines)
