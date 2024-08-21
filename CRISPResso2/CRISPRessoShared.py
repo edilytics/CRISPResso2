@@ -1306,16 +1306,22 @@ def get_dataframe_around_cut_debug(df_alleles, cut_point, offset):
     df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
     return df_alleles_around_cut
 
-def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path):
+def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point):
     # cut_idx = row['ref_positions'].index(cut_point)
+    cut_idx = row['ref_positions'].index(amino_acid_cut_point)
     left_idx = row['ref_positions'].index(plot_left_idx)    
     aligned_seq = get_amino_acids_from_nucs(row['Aligned_Sequence'][left_idx::].replace('-', ''))
     reference_seq = get_amino_acids_from_nucs(row['Reference_Sequence'][left_idx::].replace('-', ''))
+    gap_incentive = np.zeros(len(reference_seq)+1, dtype=int)
+    try:
+        gap_incentive[cut_idx] = 1
+    except:
+        pass
     aligned_seq, reference_seq, score = CRISPResso2Align.global_align(
         aligned_seq, 
         reference_seq, 
-        CRISPResso2Align.read_matrix(matrix_path),
-        np.zeros(len(reference_seq)+1, dtype=int)
+        matrix=CRISPResso2Align.read_matrix(matrix_path),
+        gap_incentive=gap_incentive,
     )
     return (aligned_seq[:sequence_length],
             reference_seq[:sequence_length],
@@ -1326,15 +1332,11 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path):
             row['#Reads'], 
             row['%Reads'])
 
-def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_path, collapse_by_sequence=True):
+def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point, collapse_by_sequence=True):
     if df_alleles.shape[0] == 0:
         return df_alleles
-    ref1 = df_alleles['Reference_Sequence'].iloc[0]
-    ref1 = ref1.replace('-','')
-    # if (cut_point + plot_right + 1 > len(ref1)):
-    #     raise(BadParameterException('The plotting window cannot extend past the end of the amplicon. Amplicon length is ' + str(len(ref1)) + ' but plot extends to ' + str(cut_point+plot_right+1)))
 
-    df_alleles_around_cut=pd.DataFrame(list(df_alleles.apply(lambda row: get_amino_acid_row(row,plot_left_idx,sequence_length,matrix_path),axis=1).values),
+    df_alleles_around_cut=pd.DataFrame(list(df_alleles.apply(lambda row: get_amino_acid_row(row,plot_left_idx,sequence_length,matrix_path, amino_acid_cut_point),axis=1).values),
                     columns=['Aligned_Sequence','Reference_Sequence','Unedited','n_deleted','n_inserted','n_mutated','#Reads','%Reads'])
 
     df_alleles_around_cut=df_alleles_around_cut.groupby(['Aligned_Sequence','Reference_Sequence','Unedited','n_deleted','n_inserted','n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
