@@ -4631,17 +4631,16 @@ def main():
 
                 
             if refs[ref_name]['contains_coding_seq']:
-                for coding_seq in coding_seqs:
+                for i, coding_seq in enumerate(coding_seqs):
                     fig_filename_root = _jp('9a.'+ref_plot_name+'amino_acid_table_around_'+coding_seq)
-                    # df_alleles.to_csv('df_alleles.txt', sep='\t')
-                    coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)  
+                    coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
+                    amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1)// 3  
                     df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
                         df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
-                        refs[ref_name]['exon_positions'][0],
+                        refs[ref_name]['exon_intervals'][i][0], 
                         len(coding_seq_amino_acids),
-                        os.path.join(_ROOT, "BLOSUM62"))
-
-                    amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1)// 3
+                        os.path.join(_ROOT, "BLOSUM62"),
+                        amino_acid_cut_point)
                                             
                     plot_9a_input = {
                         'reference_seq': coding_seq_amino_acids,
@@ -4663,7 +4662,6 @@ def main():
                     
                     debug('Plotting amino acids around cut for {0}'.format(ref_name))
                     # plot(CRISPRessoPlot.plot_amino_acid_table, plot_9a_input)
-                    # breakpoint()
                     CRISPRessoPlot.plot_amino_acid_table(**plot_9a_input)
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_roots'].append(os.path.basename(fig_filename_root))
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'].append(
