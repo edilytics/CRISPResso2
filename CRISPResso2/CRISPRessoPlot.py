@@ -2871,22 +2871,22 @@ def plot_amino_acid_heatmap(
     sgRNA_rows = []
     num_sgRNA_rows = 0
 
-    if sgRNA_intervals and len(sgRNA_intervals) > 0:
-        sgRNA_rows = get_rows_for_sgRNA_annotation(sgRNA_intervals, plot_aa_len)
-        num_sgRNA_rows = max(sgRNA_rows) + 1
-        fig=plt.figure(figsize=(plot_aa_len*0.3, (N_ROWS+1 + num_sgRNA_rows)*0.6))
-        gs1 = gridspec.GridSpec(N_ROWS+2, N_COLUMNS)
-        gs2 = gridspec.GridSpec(N_ROWS+2, N_COLUMNS)
-        #ax_hm_ref heatmap for the reference
-        ax_hm_ref=plt.subplot(gs1[0:1,:])
-        ax_hm=plt.subplot(gs2[2:,:])
-    else:
-        fig=plt.figure(figsize=(plot_aa_len*0.3, (N_ROWS+1)*0.6))
-        gs1 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
-        gs2 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
-        #ax_hm_ref heatmap for the reference
-        ax_hm_ref=plt.subplot(gs1[0,:])
-        ax_hm=plt.subplot(gs2[1:,:])
+    # if False: # sgRNA_intervals and len(sgRNA_intervals) > 0:
+    #     sgRNA_rows = get_rows_for_sgRNA_annotation(sgRNA_intervals, plot_aa_len)
+    #     num_sgRNA_rows = max(sgRNA_rows) + 1
+    #     fig=plt.figure(figsize=(plot_aa_len*0.3, (N_ROWS+1 + num_sgRNA_rows)*0.6))
+    #     gs1 = gridspec.GridSpec(N_ROWS+2, N_COLUMNS)
+    #     gs2 = gridspec.GridSpec(N_ROWS+2, N_COLUMNS)
+    #     #ax_hm_ref heatmap for the reference
+    #     ax_hm_ref=plt.subplot(gs1[0:1,:])
+    #     ax_hm=plt.subplot(gs2[2:,:])
+    # else:
+    fig=plt.figure(figsize=(plot_aa_len*0.3, (N_ROWS+1)*0.6))
+    gs1 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
+    gs2 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
+    #ax_hm_ref heatmap for the reference
+    ax_hm_ref=plt.subplot(gs1[0,:])
+    ax_hm=plt.subplot(gs2[1:,:])
 
 
     custom_heatmap(ref_seq_hm, annot=ref_seq_annot_hm, annot_kws={'size':16}, cmap=cmap, fmt='s', ax=ax_hm_ref, vmin=0, vmax=len(cmap.colors), square=True)
@@ -2897,7 +2897,7 @@ def plot_amino_acid_heatmap(
     ax_hm.xaxis.set_ticks([])
 
     #TODO: make sure these are accurate
-    if sgRNA_intervals and len(sgRNA_intervals) > 0:
+    if False: # sgRNA_intervals and len(sgRNA_intervals) > 0:
         this_sgRNA_y_start = -1*num_sgRNA_rows
         this_sgRNA_y_height = num_sgRNA_rows - 0.3
         add_sgRNA_to_ax(ax_hm_ref, sgRNA_intervals, sgRNA_y_start=this_sgRNA_y_start, sgRNA_y_height=this_sgRNA_y_height, amp_len=plot_aa_len, font_size='small', clip_on=False, sgRNA_names=sgRNA_names, sgRNA_mismatches=sgRNA_mismatches, x_offset=0, label_at_zero=True, sgRNA_rows=sgRNA_rows)
