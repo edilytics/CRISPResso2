@@ -208,10 +208,6 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _root, logg
 
     j2_env = get_jinja_loader(_root, logger)
 
-    #    dest_dir = os.path.dirname(crispresso_report_file)
-    #    shutil.copy2(os.path.join(_root,'templates','CRISPResso_justcup.png'),dest_dir)
-    #    shutil.copy2(os.path.join(_root,'templates','favicon.ico'),dest_dir)
-
     with open(crispresso_report_file, 'w', encoding="utf-8") as outfile:
         outfile.write(render_template(
             'report.html', j2_env, report_data=report_data, C2PRO_INSTALLED=C2PRO_INSTALLED,
