@@ -2966,6 +2966,7 @@ def plot_amino_acid_heatmap(
     plt.close(fig)
 
 
+
 def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
     """
     Prepares a df of alleles for Plotting
