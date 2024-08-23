@@ -647,7 +647,6 @@
 function updateZoom(e) {
   /*prevent any other actions that may occur when moving over the image:*/
 //  e.preventDefault();
-
   var img = e.target.imgObj
   var view = e.target.viewObj
   var lens = e.target.lensObj
@@ -742,6 +741,7 @@ try {
 	{% endfor %}
 {% endif %}
 </script>
+
 
 {% if C2PRO_INSTALLED %}
 <script src="https://unpkg.com/d3@5"></script>
