@@ -474,7 +474,6 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
     Parameters
     ----------
         seq_list: list of reads to process
-        lock: Lock object to ensure that only one process can update the manager_cache at a time
         get_new_variant_object: function to generate the new variant object
         args: CRISPResso2 args
         refs: dict with info for all refs
@@ -795,6 +794,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
         ref_names: list of reference names
         refs: dictionary of sequences name>ref object
         args: crispresso2 args
+        files_to_remove: list of files to remove
+        output_directory: directory to store tsv files
     """
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
@@ -1153,6 +1154,8 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         ref_names: list of reference names
         refs: dictionary of sequences name>ref object
         args: crispresso2 args
+        files_to_remove: list of files to remove
+        output_directory: directory to write output tsv files to
     """
     aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
     info("Reads processed, now annotating fastq_output file: %s"%(bam_output))
