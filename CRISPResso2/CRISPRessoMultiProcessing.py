@@ -284,7 +284,7 @@ def run_parallel_commands(commands_arr, n_processes=1, descriptor='CRISPResso2',
     pool.join()
 
 
-def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool):
+def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool, halt_on_plot_fail):
     """Run a plot in parallel if num_processes > 1, otherwise in serial.
 
     Parameters
@@ -299,6 +299,8 @@ def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool)
         The list of futures that submitting the parallel job will return.
     process_pool: ProcessPoolExecutor or ThreadPoolExecutor
         The pool to submit the job to.
+    halt_on_plot_fail: bool
+        If True, an exception will be raised if the plot fails
 
     Returns
     -------
@@ -311,5 +313,8 @@ def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool)
         else:
             plot_func(**plot_args)
     except Exception as e:
+        if halt_on_plot_fail:
+            logger.critical(f"Plot error: {e}, halting execution \n")
+            raise e
         logger.warn(f"Plot error {e}, skipping plot \n")
         logger.debug(traceback.format_exc())

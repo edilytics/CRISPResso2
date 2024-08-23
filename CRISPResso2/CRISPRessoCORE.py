@@ -3604,6 +3604,7 @@ def main():
             num_processes=n_processes,
             process_pool=process_pool,
             process_futures=process_futures,
+            halt_on_plot_fail=args.halt_on_plot_fail,
         )
         ###############################################################################################################################################
         ### FIGURE 1: Alignment
