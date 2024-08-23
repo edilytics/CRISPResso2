@@ -463,7 +463,7 @@ def get_variant_cache_equal_boundaries(num_unique_sequences, n_processes):
     # Determine roughly equal segment size for each process
     segment_size = num_unique_sequences // n_processes
 
-    for i in range(n_processes - 1):    
+    for i in range(n_processes - 1):
         boundaries.append(boundaries[-1] + segment_size)
     boundaries.append(num_unique_sequences)
     return boundaries
@@ -489,7 +489,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
     Returns
     ----------
     Nothing
-    
+
     """
     def numpy_encoder(obj):
         """ Custom encoding for numpy arrays and other non-serializable types """
@@ -508,12 +508,12 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
             json_string = json.dumps(new_variant, default=numpy_encoder)
             variant_lines += f"{fastq_seq}\t{json_string}\n"
             if index % 10000 == 0 and index != 0:
-                info(f"Process {process_id + 1} has processed {index} unique reads")
+                info(f"Process {process_id + 1} has processed {index} unique reads", {'percent_complete': 10})
                 file.write(variant_lines)
                 variant_lines = ""
         file.write(variant_lines)
 
-    info(f"Process {process_id + 1} has finished processing {index} unique reads")
+    info(f"Process {process_id + 1} has finished processing {index} unique reads", {'percent_complete': 10})
 
 
 def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out=False):
@@ -602,7 +602,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
         not_aligned_variants = {}
 
 
-    
+
     if fastq_filename.endswith('.gz'):
         fastq_input_opener = lambda x: gzip.open(x, 'rt')
     else:
@@ -634,7 +634,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
         num_unique_reads = len(variantCache.keys())
         info("Finished reading fastq file; %d unique reads found of %d total reads found "%(num_unique_reads, num_reads))
 
-    n_processes = 1 
+    n_processes = 1
     if args.n_processes == "max":
         n_processes = CRISPRessoMultiProcessing.get_max_processes()
     elif args.n_processes.isdigit():
@@ -665,15 +665,15 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
             left_sublist_index = boundaries[i]
             right_sublist_index = boundaries[i+1]
             process = Process(
-                target=variant_file_generator_process, 
+                target=variant_file_generator_process,
                 args=(
-                      (list(variantCache.keys())[left_sublist_index:right_sublist_index]),  
-                      get_new_variant_object, 
-                      args, 
-                      refs, 
-                      ref_names, 
-                      aln_matrix, 
-                      pe_scaffold_dna_info, 
+                      (list(variantCache.keys())[left_sublist_index:right_sublist_index]),
+                      get_new_variant_object,
+                      args,
+                      refs,
+                      ref_names,
+                      aln_matrix,
+                      pe_scaffold_dna_info,
                       i,
                       variants_dir
                     )
@@ -682,7 +682,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
             processes.append(process)
         for p in processes:
             p.join() # pauses the main thread until the processes are finished
-        info("Finished processing unique reads, now generating statistics...")
+        info("Finished processing unique reads, now generating statistics...", {'percent_complete': 15})
         if os.path.exists(variants_dir):
             variant_file_list = []
             for n_processes in range(n_processes):
@@ -836,12 +836,12 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             num_reads += 1
         num_unique_reads = len(variantCache.keys())
         info("Finished reading bam file; %d unique reads found of %d total reads found "%(num_unique_reads, num_reads))
-        n_processes = 1 
+        n_processes = 1
         if args.n_processes == "max":
             n_processes = CRISPRessoMultiProcessing.get_max_processes()
         elif args.n_processes.isdigit():
-            n_processes = int(args.n_processes)        
-        
+            n_processes = int(args.n_processes)
+
         N_TOT_READS = 0
         N_CACHED_ALN = 0 # number of copies of all aligned reads
         N_CACHED_NOTALN = 0 # number of copies of all non-aligned reads
@@ -853,27 +853,27 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
         N_MODS_OUTSIDE_WINDOW = 0 # number of modifications found outside the quantification window
         N_READS_IRREGULAR_ENDS = 0 # number of reads with modifications at the 0 or -1 position
         READ_LENGTH = 0
-        not_aln = {}  
+        not_aln = {}
 
-        if n_processes > 1 and num_unique_reads > n_processes:  
+        if n_processes > 1 and num_unique_reads > n_processes:
             boundaries = get_variant_cache_equal_boundaries(num_unique_reads, n_processes)
             processes = [] # list to hold the processes so we can wait for them to complete with join()
             variants_dir = output_directory
-            
+
             info("Spinning up %d parallel processes to analyze unique reads..."%(n_processes))
             for i in range(n_processes):
                 left_sublist_index = boundaries[i]
                 right_sublist_index = boundaries[i+1]
                 process = Process(
-                    target=variant_file_generator_process, 
+                    target=variant_file_generator_process,
                     args=(
-                        (list(variantCache.keys())[left_sublist_index:right_sublist_index]),  
-                        get_new_variant_object, 
-                        args, 
-                        refs, 
-                        ref_names, 
-                        aln_matrix, 
-                        pe_scaffold_dna_info, 
+                        (list(variantCache.keys())[left_sublist_index:right_sublist_index]),
+                        get_new_variant_object,
+                        args,
+                        refs,
+                        ref_names,
+                        aln_matrix,
+                        pe_scaffold_dna_info,
                         i,
                         variants_dir
                         )
@@ -882,8 +882,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                 processes.append(process)
             for p in processes:
                 p.join() # pauses the main thread until the processes are finished
-                    
-            info("Finished processing unique reads, now generating statistics...")
+
+            info("Finished processing unique reads, now generating statistics...", {'percent_complete': 15})
             variant_file_list = []
             if os.path.exists(variants_dir):
                 for n_processes in range(n_processes):
@@ -967,7 +967,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
         # Single process version
             print(len(variantCache.keys()))
             for idx, fastq_seq in enumerate(variantCache.keys()):
-                if idx > 210: 
+                if idx > 210:
                     print(N_TOT_READS)
                 variant_count = variantCache[fastq_seq]
                 N_TOT_READS += variant_count
@@ -989,7 +989,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                     del_inds = []
                     sub_inds = []
                     edit_strings = []
-                    
+
     #               for idx, best_match_name in enumerate(best_match_names):
                     for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                         payload=new_variant['variant_'+best_match_name]
@@ -1035,11 +1035,11 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             new_proc = sb.Popen(['samtools', 'view', bam_filename, bam_chr_loc], stdout=sb.PIPE, encoding='utf-8')
         else:
             new_proc = sb.Popen(['samtools', 'view', bam_filename], stdout=sb.PIPE, encoding='utf-8')
-        
+
         for sam_line in new_proc.stdout:
             sam_line_els = sam_line.rstrip().split("\t")
             fastq_seq = sam_line_els[9]
-            if fastq_seq in not_aln: 
+            if fastq_seq in not_aln:
                 sam_line_els.append(not_aln[fastq_seq]) #Crispresso2 alignment: NA
                 sam_out.write("\t".join(sam_line_els)+"\n")
             elif fastq_seq in variantCache:
@@ -1064,7 +1064,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
     return(aln_stats)
 
 def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, refs, args, files_to_remove, output_directory):
-  
+
     aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
     info("Reads processed, now annotating fastq_output file: %s"%(fastq_output))
 
@@ -1156,7 +1156,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
     """
     aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
     info("Reads processed, now annotating fastq_output file: %s"%(bam_output))
- 
+
 
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
