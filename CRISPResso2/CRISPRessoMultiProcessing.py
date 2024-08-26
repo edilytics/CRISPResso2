@@ -314,7 +314,7 @@ def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool,
             plot_func(**plot_args)
     except Exception as e:
         if halt_on_plot_fail:
-            logger.critical(f"Plot error: {e}, halting execution \n")
+            logger.critical(f"Plot error, halting execution \n")
             raise e
         logger.warn(f"Plot error {e}, skipping plot \n")
         logger.debug(traceback.format_exc())
