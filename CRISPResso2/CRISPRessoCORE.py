@@ -500,7 +500,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
 
     variant_lines = ""
     with open(variant_file_path, 'w') as file:
-        file.truncate()
+        file.truncate() # Ensures tsv file is empty before writing to it
         for index, fastq_seq in enumerate(seq_list):
             new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
             # Convert the complex object to a JSON string
@@ -786,6 +786,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
 def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, refs, args, files_to_remove, output_directory):
     """
     process_bam processes each of the reads contained in a bam file, given a cache of pre-computed variants
+    like process_fastq, it also spins up parallel processes to analyze unique reads if more than one has been specified
         bam_filename: name of bam (e.g. output of bowtie2)
         bam_chr_loc: positions in the input bam to read from
         output_bam: name out bam to write to (includes crispresso alignment info)
@@ -965,11 +966,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                         raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso2")
                 files_to_remove.append(file_path)
         else:
-        # Single process version
-            print(len(variantCache.keys()))
+        # Single process mode
             for idx, fastq_seq in enumerate(variantCache.keys()):
-                if idx > 210:
-                    print(N_TOT_READS)
                 variant_count = variantCache[fastq_seq]
                 N_TOT_READS += variant_count
                 new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
@@ -991,7 +989,6 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                     sub_inds = []
                     edit_strings = []
 
-    #               for idx, best_match_name in enumerate(best_match_names):
                     for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                         payload=new_variant['variant_'+best_match_name]
 
@@ -1031,7 +1028,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                 info("Processing Reads; %d Completed out of %d Unique Reads"%(idx, num_unique_reads))
 
 
-        # Now that we've enriched variantCache with the unique reads, we read through the bam file again to write to the output file
+        # Now that we've enriched variantCache with the unique reads, we read through the bam file again to write variants to the output file
         if bam_chr_loc != "":
             new_proc = sb.Popen(['samtools', 'view', bam_filename, bam_chr_loc], stdout=sb.PIPE, encoding='utf-8')
         else:
@@ -1171,7 +1168,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         fastq_input_opener = open
 
     sam_out = bam_output+".sam"
-    # sam_out_handle = open(sam_out, 'wt')
+
     with open(sam_out, 'wt') as sam_out_handle, fastq_input_opener(fastq_input) as fastq_input_handle:
         # write sam output header
         sam_out_handle.write(bam_header)
@@ -1213,7 +1210,6 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
                 sub_inds = []
                 edit_strings = []
 
-    #                for idx, best_match_name in enumerate(best_match_names):
                 for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                     payload = new_variant['variant_'+best_match_name]
 
@@ -1239,13 +1235,13 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
                     sam_flag = '16'
 
                 this_aln_loc = refs[first_ref_name]['aln_start']
-    #                #if cigar starts with deletions
-    #                if sam_cigar_els[0].endswith('D'):
-    #                    num = int(sam_cigar_els[0][0:-1])
-    #                    this_aln_loc += num
-    #                elif sam_cigar_els[0].endswith('I'):
-    #                    num = int(sam_cigar_els[0][0:-1])
-    #                    this_aln_loc -= num
+#                #if cigar starts with deletions
+#                if sam_cigar_els[0].endswith('D'):
+#                    num = int(sam_cigar_els[0][0:-1])
+#                    this_aln_loc += num
+#                elif sam_cigar_els[0].endswith('I'):
+#                    num = int(sam_cigar_els[0][0:-1])
+#                    this_aln_loc -= num
                 seq_to_write = fastq_seq
                 qual_to_write = fastq_qual
                 cigar_to_write = sam_cigar
@@ -1363,6 +1359,7 @@ def to_numeric_ignore_columns(df, ignore_columns):
 
 
 def main():
+
     def print_stacktrace_if_debug():
         debug_flag = False
         if 'args' in vars() and 'debug' in args:
@@ -2625,7 +2622,6 @@ def main():
 
         ####INITIALIZE CACHE####
         variantCache = {}
-
 
         #operates on variantCache
         if args.bam_input:
