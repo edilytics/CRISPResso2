@@ -728,10 +728,13 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                                 if (index % 50000 == 0 and index > 0):
                                     info("Calculating statistics; %d completed out of %d unique reads"%(index, num_unique_reads))
                     except FileNotFoundError:
-                        raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso2")
+                        raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso")
                 files_to_remove.append(file_path)
         else:
-            raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find output folder, try deleting output folder and rerunning CRISPResso2")
+            raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find output folder, try deleting output folder and rerunning CRISPResso")
+
+        if N_COMPUTED_ALN + N_COMPUTED_NOTALN != num_unique_reads:
+            raise CRISPRessoShared.OutputFolderIncompleteException(f"Number of unique reads processed by parallel processes does not match the number of unique reads found in the fastq file. Try rerunning CRISPResso.")
     else:
         for index, fastq_seq in enumerate(variantCache.keys()):
             variant_count = variantCache[fastq_seq]
@@ -963,8 +966,10 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                         N_READS_IRREGULAR_ENDS += variant_count
 
                     except FileNotFoundError:
-                        raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso2")
+                        raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso")
                 files_to_remove.append(file_path)
+            if N_COMPUTED_ALN + N_COMPUTED_NOTALN != num_unique_reads:
+                raise CRISPRessoShared.OutputFolderIncompleteException(f"Number of unique reads processed by parallel processes does not match the number of unique reads found in the bam file. Try rerunning CRISPResso.")
         else:
         # Single process mode
             for idx, fastq_seq in enumerate(variantCache.keys()):
