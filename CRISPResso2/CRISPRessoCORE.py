@@ -140,7 +140,7 @@ def get_avg_read_length_fastq(fastq_filename):
 
 def get_n_reads_fastq(fastq_filename):
     p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '' ) +"cat < \"%s\" | wc -l" % fastq_filename, shell=True, stdout=sb.PIPE)
-    return int(float(p.communicate()[0])/4.0)
+    return round(float(p.communicate()[0]) / 4.0)
 
 def get_n_reads_bam(bam_filename,bam_chr_loc=""):
     cmd = "samtools view -c " + bam_filename + " " + bam_chr_loc
