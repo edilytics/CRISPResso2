@@ -133,13 +133,14 @@ def check_program(binary_name, download_url=None, version_flag=None, version_reg
 check_fastp = lambda: check_program('fastp', download_url='http://opengene.org/fastp/fastp', version_flag='--version', version_regex=r'fastp (\d+)\.(\d+)\.(\d+)', version=(0, 19, 8))
 
 def get_avg_read_length_fastq(fastq_filename):
-     cmd=('z' if fastq_filename.endswith('.gz') else '' ) +('cat < \"%s\"' % fastq_filename)+\
-                  r''' | awk 'BN {n=0;s=0;} NR%4 == 2 {s+=length($0);n++;} END { printf("%d\n",s/n)}' '''
+     cmd = 'gunzip -c' if fastq_filename.endswith('.gz') else 'cat' + \
+        ' < \"%s\"' % fastq_filename + \
+        r''' | awk 'BN {n=0;s=0;} NR%4 == 2 {s+=length($0);n++;} END { printf("%d\n",s/n)}' '''
      p = sb.Popen(cmd, shell=True, stdout=sb.PIPE)
      return int(p.communicate()[0].strip())
 
 def get_n_reads_fastq(fastq_filename):
-    p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '' ) +"cat < \"%s\" | wc -l" % fastq_filename, shell=True, stdout=sb.PIPE)
+    p = sb.Popen('gunzip -c' if fastq_filename.endswith('.gz') else 'cat' + ' < "%s" | wc -l' % fastq_filename, shell=True, stdout=sb.PIPE)
     return round(float(p.communicate()[0]) / 4.0)
 
 def get_n_reads_bam(bam_filename,bam_chr_loc=""):
