@@ -722,6 +722,12 @@ def get_command_output(command):
             break
 
 
+def get_n_reads_fastq(fastq_filename):
+    """Count the number of reads from fastq_filename."""
+    p = sb.Popen('gunzip -c' if fastq_filename.endswith('.gz') else 'cat' + ' < "%s" | wc -l' % fastq_filename, shell=True, stdout=sb.PIPE)
+    return round(float(p.communicate()[0]) / 4.0)
+
+
 def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, split_interleaved_input=False, debug=False):
     """
     Get the most frequent amplicon from a fastq file (or after merging a r1 and r2 fastq file).

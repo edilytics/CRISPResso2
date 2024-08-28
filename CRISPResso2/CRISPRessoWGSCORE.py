@@ -203,10 +203,6 @@ def write_trimmed_fastq(in_bam_filename, bpstart, bpend, out_fastq_filename):
 pd=check_library('pandas')
 np=check_library('numpy')
 
-def get_n_reads_fastq(fastq_filename):
-     p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '' ) +"cat < %s | wc -l" % fastq_filename, shell=True, stdout=sb.PIPE)
-     n_reads = int(float(p.communicate()[0])/4.0)
-     return n_reads
 
 def extract_reads(row):
     if row.sequence:
