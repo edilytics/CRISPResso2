@@ -724,7 +724,7 @@ def get_command_output(command):
 
 def get_n_reads_fastq(fastq_filename):
     """Count the number of reads from fastq_filename."""
-    p = sb.Popen('gunzip -c' if fastq_filename.endswith('.gz') else 'cat' + ' < "%s" | wc -l' % fastq_filename, shell=True, stdout=sb.PIPE)
+    p = sb.Popen('zcat' if fastq_filename.endswith('.gz') else 'cat' + ' < "%s" | wc -l' % fastq_filename, shell=True, stdout=sb.PIPE)
     return round(float(p.communicate()[0]) / 4.0)
 
 
