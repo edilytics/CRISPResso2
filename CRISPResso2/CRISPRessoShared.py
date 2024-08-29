@@ -285,7 +285,6 @@ def capitalize_sequence(x):
 def slugify(value):
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
     value = re.sub(rb'[\s\'*"/\\\[\]:;|,<>?]', b'_', value).strip()
-    value = re.sub(rb'_{2,}', b'_', value)
 
     return value.decode('utf-8')
 
