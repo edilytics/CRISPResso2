@@ -3378,8 +3378,8 @@ def main():
                     str(refs[ref_name]['exon_intervals']) + "\t" +
                     str(refs[ref_name]['exon_len_mods']) + "\t" +
                     str(refs[ref_name]['splicing_positions']) + "\t" +
-                    str(refs[ref_name]['include_idxs']) + "\t" +
-                    str(refs[ref_name]['exclude_idxs']) + "\t" +
+                    str(refs[ref_name]['include_idxs'].tolist()) + "\t" +
+                    str(refs[ref_name]['exclude_idxs'].tolist()) + "\t" +
                     str(refs[ref_name]['idx_cloned_from']) + "\n")
                 ref_info_file.write(refString)
             ref_info_file.close()
