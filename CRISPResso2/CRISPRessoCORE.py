@@ -3360,6 +3360,10 @@ def main():
             ref_info_file.write(refString)
             np.set_printoptions(linewidth=1000**1000) #no line breaks
             for ref_name in ref_names:
+                if isinstance(refs[ref_name]['include_idxs'], np.ndarray):
+                    refs[ref_name]['include_idxs'] = refs[ref_name]['include_idxs'].tolist()
+                if isinstance(refs[ref_name]['exclude_idxs'], np.ndarray):
+                    refs[ref_name]['exclude_idxs'] = refs[ref_name]['exclude_idxs'].tolist()
                 refString = ( refs[ref_name]['name'] + "\t" +
                     str(refs[ref_name]['sequence']) + "\t" +
                     str(refs[ref_name]['sequence_length']) + "\t" +
