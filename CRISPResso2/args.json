@@ -95,14 +95,14 @@
             "keys": ["--flexiguide_gap_open_penalty"],
             "help": "",
             "type": "int",
-            "default": -50,
+            "default": -20,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "flexiguide_gap_extend_penalty": {
             "keys": ["--flexiguide_gap_extend_penalty"],
             "help": "",
             "type": "int",
-            "default": -50,
+            "default": -2,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "discard_guide_positions_overhanging_amplicon_edge": {
