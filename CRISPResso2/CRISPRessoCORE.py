@@ -5174,6 +5174,10 @@ def main():
         print_stacktrace_if_debug()
         error('Filtering error, please check your input.\n\nERROR: %s' % e)
         sys.exit(13)
+    except CRISPRessoShared.PlotException as e:
+        print_stacktrace_if_debug()
+        error(e)
+        sys.exit(14)
     except Exception as e:
         print_stacktrace_if_debug()
         error('Unexpected error, please check your input.\n\nERROR: %s' % e)

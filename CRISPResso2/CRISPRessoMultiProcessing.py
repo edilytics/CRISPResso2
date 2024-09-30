@@ -16,6 +16,9 @@ import numpy as np
 import pandas as pd
 import traceback
 
+from CRISPResso2.CRISPRessoShared import PlotException
+
+
 def get_max_processes():
     return mp.cpu_count()
 
@@ -315,6 +318,6 @@ def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool,
     except Exception as e:
         if halt_on_plot_fail:
             logger.critical(f"Plot error, halting execution \n")
-            raise e
+            raise PlotException(f'There was an error generating plot {plot_func.__name__}.')
         logger.warn(f"Plot error {e}, skipping plot \n")
         logger.debug(traceback.format_exc())
