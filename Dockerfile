@@ -3,8 +3,9 @@
 ############################################################
 
 #FROM continuumio/miniconda3
-FROM mambaorg/micromamba:0.13.1
+FROM mambaorg/micromamba:1.5.0
 
+USER root
 # File Author / Maintainer
 MAINTAINER Kendell Clement
 RUN apt-get update && apt-get install gcc g++ bowtie2 samtools libsys-hostname-long-perl \
@@ -14,8 +15,8 @@ RUN apt-get update && apt-get install gcc g++ bowtie2 samtools libsys-hostname-l
   && rm -rf /var/lib/apt/lists/* \
   && rm -rf /usr/share/man/* \
   && rm -rf /usr/share/doc/* \
-  && conda install -c defaults -c conda-forge -c bioconda -y -n base --debug fastp numpy cython jinja2 tbb=2020.2 pyparsing=2.3.1 scipy matplotlib-base pandas plotly\
-  && conda clean --all --yes
+  && micromamba install -c defaults -c conda-forge -c bioconda -y -n base --debug fastp "numpy<2" cython jinja2 tbb=2020.2 pyparsing=2.3.1 scipy matplotlib-base pandas plotly\
+  && micromamba clean --all --yes
 
 #install ms fonts
 RUN echo "deb http://httpredir.debian.org/debian buster main contrib" > /etc/apt/sources.list \
@@ -33,6 +34,8 @@ RUN echo "deb http://httpredir.debian.org/debian buster main contrib" > /etc/apt
 # install crispresso
 COPY . /CRISPResso2
 WORKDIR /CRISPResso2
+
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
 RUN python setup.py install \
   && CRISPResso -h \
   && CRISPRessoBatch -h \
@@ -40,5 +43,6 @@ RUN python setup.py install \
   && CRISPRessoWGS -h \
   && CRISPRessoCompare -h
 
+USER $MAMBA_USER
 
-ENTRYPOINT ["python","/CRISPResso2/CRISPResso2_router.py"]
+ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "python","/CRISPResso2/CRISPResso2_router.py"]
