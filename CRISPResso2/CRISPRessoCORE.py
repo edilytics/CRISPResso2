@@ -1434,6 +1434,11 @@ def main():
 
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_status.json')))
 
+        if C2PRO_INSTALLED:
+            debug(f'CRISPRessoPro v{CRISPRessoProVersion} installed', {'percent_complete': 0.5})
+        else:
+            debug(f'CRISPRessoPro not installed', {'percent_complete': 0.5})
+
         aln_matrix_loc = os.path.join(_ROOT, "EDNAFULL")
         CRISPRessoShared.check_file(aln_matrix_loc)
         aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
@@ -1978,10 +1983,6 @@ def main():
 
         #now that we're done with adding possible guides and amplicons, go through each amplicon and compute quantification windows
         info('Computing quantification windows', {'percent_complete': 2})
-        if C2PRO_INSTALLED:
-            info(f'CRISPRessoPro v{CRISPRessoProVersion} installed', {'percent_complete': 3})
-        else:
-            info(f'CRISPRessoPro not installed', {'percent_complete': 3})
 
         found_guide_seq = [False]*len(guides)
         found_coding_seq = [False]*len(coding_seqs)
@@ -2021,14 +2022,14 @@ def main():
                     #for all amps in forward and reverse complement amps:
                     for amp_seq in [this_seq, CRISPRessoShared.reverse_complement(this_seq)]:
                         ref_incentive = np.zeros(len(amp_seq)+1, dtype=int)
-                        s1, s2, score=CRISPResso2Align.global_align(guide, amp_seq, matrix=aln_matrix, gap_incentive=ref_incentive, gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
+                        s1, s2, score=CRISPResso2Align.global_align(guide, amp_seq, matrix=aln_matrix, gap_incentive=ref_incentive, gap_open=args.flexiguide_gap_open_penalty, gap_extend=args.flexiguide_gap_extend_penalty)
                         potential_guide = s1.strip("-")
                         if abs(len(potential_guide) - len(guide)) < 2: #if length of putative guide is off by less than 2, keep it (allows 1 gap)
                             loc = s1.find(potential_guide)
                             potential_ref = amp_seq[loc:loc+len(potential_guide)]
                             #realign to test for number of mismatches
                             ref_incentive = np.zeros(len(potential_ref)+1, dtype=int)
-                            sub_s1, sub_s2, sub_score=CRISPResso2Align.global_align(guide, potential_ref, matrix=aln_matrix, gap_incentive=ref_incentive, gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
+                            sub_s1, sub_s2, sub_score=CRISPResso2Align.global_align(guide, potential_ref, matrix=aln_matrix, gap_incentive=ref_incentive, gap_open=args.flexiguide_gap_open_penalty, gap_extend=args.flexiguide_gap_extend_penalty)
                             mismatches = []
                             for i in range(len(sub_s1)):
                                 if sub_s1[i] != sub_s2[i]:
@@ -3749,6 +3750,7 @@ def main():
             num_processes=n_processes,
             process_pool=process_pool,
             process_futures=process_futures,
+            halt_on_plot_fail=args.halt_on_plot_fail,
         )
         ###############################################################################################################################################
         ### FIGURE 1: Alignment
@@ -5177,6 +5179,10 @@ def main():
         print_stacktrace_if_debug()
         error('Filtering error, please check your input.\n\nERROR: %s' % e)
         sys.exit(13)
+    except CRISPRessoShared.PlotException as e:
+        print_stacktrace_if_debug()
+        error(e)
+        sys.exit(14)
     except Exception as e:
         print_stacktrace_if_debug()
         error('Unexpected error, please check your input.\n\nERROR: %s' % e)
