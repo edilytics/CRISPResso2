@@ -13,9 +13,8 @@ import re
 import traceback
 import json
 from CRISPResso2 import CRISPRessoShared
-from CRISPResso2 import CRISPRessoPlot
 from CRISPResso2 import CRISPRessoMultiProcessing
-from CRISPResso2 import CRISPRessoReport
+from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
 
 import logging
@@ -87,7 +86,7 @@ def main():
         '''
         print(CRISPRessoShared.get_crispresso_header(description, meta_string))
 
-        parser = CRISPRessoShared.getCRISPRessoArgParser(parser_title = 'CRISPRessoMeta Parameters')
+        parser = CRISPRessoShared.getCRISPRessoArgParser("Meta", parser_title = 'CRISPRessoMeta Parameters')
 
         #batch specific params
         parser.add_argument('--metadata', type=str, help='Metadata file according to NIST specification', required=True)
@@ -96,11 +95,16 @@ def main():
 
         args = parser.parse_args()
 
+        if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
+            from CRISPResso2 import CRISPRessoPlot
+        else:
+            from CRISPRessoPro import plot as CRISPRessoPlot
+
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
         debug_flag = args.debug
 
-        crispresso_options = CRISPRessoShared.get_crispresso_options()
+        crispresso_options = CRISPRessoShared.get_core_crispresso_options()
         options_to_ignore = {'name', 'output_folder'}
         crispresso_options_for_meta = list(crispresso_options-options_to_ignore)
 
@@ -123,7 +127,7 @@ def main():
         print('table:')
         print(meta_params)
         #rename column "a" to "amplicon_seq", etc
-        meta_params.rename(index=str, columns=CRISPRessoShared.get_crispresso_options_lookup(), inplace=True)
+        meta_params.rename(index=str, columns=CRISPRessoShared.get_crispresso_options_lookup("Core"), inplace=True)
         meta_count = meta_params.shape[0]
         meta_params.index = range(meta_count)
 
@@ -196,7 +200,7 @@ def main():
                     if 'discard_guide_positions_overhanging_amplicon_edge' in row:
                         discard_guide_positions_overhanging_amplicon_edge = row.discard_guide_positions_overhanging_amplicon_edge
 
-                    (this_sgRNA_sequences, this_sgRNA_intervals, this_sgRNA_cut_points, this_sgRNA_plot_cut_points, this_sgRNA_plot_idxs, this_sgRNA_names, this_include_idxs,
+                    (this_sgRNA_sequences, this_sgRNA_intervals, this_sgRNA_cut_points, this_sgRNA_plot_cut_points, this_sgRNA_plot_idxs, this_sgRNA_mismatches, this_sgRNA_names, this_sgRNA_include_idxs, this_include_idxs,
                         this_exclude_idxs) = CRISPRessoShared.get_amplicon_info_for_guides(curr_amplicon_seq, guides, guide_mismatches, guide_names, guide_qw_centers,
                         guide_qw_sizes, row.quantification_window_coordinates, row.exclude_bp_from_left, row.exclude_bp_from_right, row.plot_window_size, guide_plot_cut_points, discard_guide_positions_overhanging_amplicon_edge)
                     for guide_seq in this_sgRNA_sequences:
@@ -229,7 +233,7 @@ def main():
 
         log_filename=_jp('CRISPRessoMeta_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
-        logger.addHandler(CRISPRessoShared.StatusHandler(_jp('CRISPRessoMeta_status.txt')))
+        logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoMeta_status.json')))
 
         with open(log_filename, 'w+') as outfile:
             outfile.write('[Command used]:\n%s\n\n[Execution log]:\n' % ' '.join(sys.argv))
@@ -354,7 +358,7 @@ def main():
                 report_name = _jp("CRISPResso2Meta_report.html")
             else:
                 report_name = OUTPUT_DIRECTORY+'.html'
-            CRISPRessoReport.make_meta_report_from_folder(report_name, crispresso2_info, OUTPUT_DIRECTORY, _ROOT)
+            CRISPRessoReport.make_meta_report_from_folder(report_name, crispresso2_info, OUTPUT_DIRECTORY, _ROOT, logger)
             crispresso2_info['running_info']['report_location'] = report_name
             crispresso2_info['running_info']['report_filename'] = os.path.basename(report_name)
 
