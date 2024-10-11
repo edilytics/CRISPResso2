@@ -145,11 +145,6 @@ def get_read_length_from_cigar(cigar_string):
             result += int(length)
     return result
 
-def get_n_reads_fastq(fastq_filename):
-     p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '' ) +"cat < %s | wc -l" % fastq_filename, shell=True, stdout=sb.PIPE)
-     n_reads = int(float(p.communicate()[0])/4.0)
-     return n_reads
-
 def get_n_reads_bam(bam_filename):
     p = sb.Popen("samtools view -c %s" % bam_filename, shell=True, stdout=sb.PIPE)
     return int(p.communicate()[0])
@@ -611,10 +606,10 @@ def main():
                 N_READS_INPUT = get_n_reads_bam(args.aligned_pooled_bam)
                 N_READS_AFTER_PREPROCESSING = N_READS_INPUT
             else:
-                N_READS_INPUT = get_n_reads_fastq(args.fastq_r1)
+                N_READS_INPUT = CRISPRessoShared.get_n_reads_fastq(args.fastq_r1)
                 if args.split_interleaved_input:
                     N_READS_INPUT /= 2
-                N_READS_AFTER_PREPROCESSING = get_n_reads_fastq(processed_output_filename)
+                N_READS_AFTER_PREPROCESSING = CRISPRessoShared.get_n_reads_fastq(processed_output_filename)
 
             crispresso2_info['running_info']['finished_steps']['count_input_reads'] = (N_READS_INPUT, N_READS_AFTER_PREPROCESSING)
             CRISPRessoShared.write_crispresso_info(
@@ -854,7 +849,7 @@ def main():
             n_reads_aligned_amplicons=[]
             crispresso_cmds = []
             for idx, row in df_template.iterrows():
-                this_n_reads = get_n_reads_fastq(row['Demultiplexed_fastq.gz_filename'])
+                this_n_reads = CRISPRessoShared.get_n_reads_fastq(row['Demultiplexed_fastq.gz_filename'])
                 n_reads_aligned_amplicons.append(this_n_reads)
                 info('\n Processing:%s with %d reads'%(idx,this_n_reads))
                 this_amp_seq = row['amplicon_seq']
@@ -1554,8 +1549,8 @@ def main():
 
         #if many reads weren't aligned, print those out for the user
         if RUNNING_MODE != 'ONLY_GENOME':
-            #N_READS_INPUT=get_n_reads_fastq(args.fastq_r1)
-            #N_READS_AFTER_PREPROCESSING=get_n_reads_fastq(processed_output_filename)
+            #N_READS_INPUT=CRISPRessoShared.get_n_reads_fastq(args.fastq_r1)
+            #N_READS_AFTER_PREPROCESSING=CRISPRessoShared.get_n_reads_fastq(processed_output_filename)
             tot_reads_aligned = df_summary_quantification['Reads_aligned'].fillna(0).sum()
             tot_reads = df_summary_quantification['Reads_total'].sum()
 
