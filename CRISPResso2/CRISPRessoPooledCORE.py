@@ -1127,7 +1127,7 @@ def main():
                     END{ \
                         if (fastq_filename!="NA") {if (num_records < __MIN_READS__){\
                             record_log_str = record_log_str chr_id"\t"bpstart"\t"bpend"\t"num_records"\tNA\n"} \
-                    else{printf("%s",fastq_records)>fastq_filename;close(fastq_filename); system("gzip -f "fastq_filename); record_log_str = record_log_str chr_id"\t"bpstart"\t"bpend"\t"num_records"\t"fastq_filename".gz\n"} \
+                    else{print(fastq_records)>fastq_filename;close(fastq_filename); system("gzip -f "fastq_filename); record_log_str = record_log_str chr_id"\t"bpstart"\t"bpend"\t"num_records"\t"fastq_filename".gz\n"} \
                         }\
                         print record_log_str > "__DEMUX_CHR_LOGFILENAME__" \
                     }' '''
