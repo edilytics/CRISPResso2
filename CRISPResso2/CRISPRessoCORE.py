@@ -2360,7 +2360,7 @@ def main():
                         )
 
                     #subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
-                    this_exclude_idxs = sorted(list(set(refs[ref_name]['exclude_idxs'])))
+                    this_exclude_idxs = sorted(map(int, set(refs[ref_name]['exclude_idxs'])))
                     this_include_idxs = sorted(map(int, set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
                     refs[ref_name]['include_idxs'] = this_include_idxs
                     refs[ref_name]['exclude_idxs'] = this_exclude_idxs
