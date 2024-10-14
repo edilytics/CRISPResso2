@@ -2860,7 +2860,7 @@ def plot_amino_acid_heatmap(
     if isinstance(custom_colors['amino_acid_scheme'], str):
         amino_acid_colors = get_amino_acid_colors(custom_colors['amino_acid_scheme'])
     elif isinstance(custom_colors['amino_acid_scheme'], dict):
-        amino_acid_colors = custom_colors['amino_acid_scheme']
+        amino_acid_colors = get_amino_acid_colors(custom_colors['amino_acid_scheme'])
 
     cmap = colors_mpl.ListedColormap(amino_acid_colors)
 
