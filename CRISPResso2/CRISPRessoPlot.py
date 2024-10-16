@@ -168,7 +168,7 @@ def get_amino_acid_color_dict(scheme='clustal'):
                 'W': '#D2691E',  # Chocolate
                 'Y': '#9ACD32',  # YellowGreen
                 '': '#FFFFFF',   # White (Empty)
-                '-': '#FFFFFF',  # White (Gap)
+                '-': '#B0B0B0',  # Grey
             }
     
 def get_amino_acid_colors(scheme):
