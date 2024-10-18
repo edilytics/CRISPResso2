@@ -63,73 +63,74 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: edilytics/CRISPResso2_tests
+          ref: 'cole/implement-nox'
           # ref: '<BRANCH-NAME>' # update to specific branch
 
       - name: Run Basic
         run: |
-          make basic test print
+          nox -s basic -- test print
 
       - name: Run Params
         if: success() || failure()
         run: |
-          make params test print
+          nox -s params -- test print
 
       - name: Run Prime Editor
         if: success() || failure()
         run: |
-          make prime-editor test print
+          nox -s prime-editor -- test print
 
       - name: Run BAM Input
         if: success() || failure()
         run: |
-          make bam test print
+          nox -s bam -- test print
 
       - name: Run BAM Output
         if: success() || failure()
         run: |
-          make bam-out test print
+          nox -s bam-out -- test print
 
       - name: Run BAM Genome Output
         if: success() || failure()
         run: |
-          make bam-out-genome test print
+          nox -s bam-out-genome -- test print
 
       - name: Run Batch
         if: success() || failure()
         run: |
-          make batch test print
+          nox -s batch -- test print
 
       - name: Run Pooled
         if: success() || failure()
         run: |
-          make pooled test print
+          nox -s pooled -- test print
 
       - name: Run Pooled Mixed Mode
         if: success() || failure()
         run: |
-          make pooled-mixed-mode test print
+          nox -s pooled-mixed-mode -- test print
 
       - name: Run Pooled Mixed Mode Demux
         if: success() || failure()
         run: |
-          make pooled-mixed-mode-genome-demux test print
+          nox -s pooled-mixed-mode-genome-demux -- test print
 
       - name: Run Pooled Paired Sim
         if: success() || failure()
         run: |
-          make pooled-paired-sim test print
+          nox -s pooled-paired-sim -- test print
 
       - name: Run WGS
         if: success() || failure()
         run: |
-          make wgs test print
+          nox -s wgs -- test print
 
       - name: Run Compare
         if: success() || failure()
         run: |
-          make compare test print
+          nox -s compare -- test print
 
       - name: Run Aggregate
         if: success() || failure()
         run: |
-          make aggregate test print
+          nox -s aggregate -- test print
