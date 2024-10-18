@@ -66,6 +66,10 @@ jobs:
           ref: 'cole/implement-nox'
           # ref: '<BRANCH-NAME>' # update to specific branch
 
+      - name: Create Nox Conda Envs
+        run: |
+          nox -s conda_env
+
       - name: Run Basic
         run: |
           nox -s basic -- test print
