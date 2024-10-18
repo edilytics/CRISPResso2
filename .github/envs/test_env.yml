@@ -11,6 +11,7 @@ dependencies:
   - jinja2
   - tbb=2020.2
   - pyparsing=2.3.1
+  - pyyaml
   - scipy
   - matplotlib=3.8.4
   - nox
