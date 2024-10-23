@@ -4815,11 +4815,11 @@ def main():
                     amino_acid_filename = _jp(ref_plot_name+'amino_acid_table_for_'+coding_seq+'.txt')
                     df_to_plot.to_csv(amino_acid_filename, sep='\t', header=True, index=True)
                     
-                    debug('Plotting amino acids around cut for {0}'.format(ref_name))
+                    debug('Plotting amino acids for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_amino_acid_table, plot_9a_input)
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_roots'].append(os.path.basename(fig_filename_root))
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'].append(
-                        "Figure 9a: Visualization of the distribution of identified amino acids around the cleavage site for the " + sgRNA_legend + " based on the coding sequence (" + coding_seq+"). The vertical dashed line indicates the predicted cleavage site.")
+                        "Figure 9a: Visualization of the distribution of identified amino acids based on the coding sequence (" + coding_seq+"). The vertical dashed line indicates the predicted cleavage site.")
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_datas'].append([('Amino Acid table', os.path.basename(amino_acid_filename))])
             info('Done!')
 
