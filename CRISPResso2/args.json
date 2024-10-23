@@ -255,6 +255,13 @@
             "default": "None",
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
+        "samtools_exclude_flags": {
+          "keys": ["--samtools_exclude_flags"],
+          "help": "Exclude reads with any of the specified flags set in the SAM/BAM file. Default is 4 (read unmapped).",
+          "type": "str",
+          "default": "4",
+          "tools": ["Pooled", "WGS"]
+        },
         "stringent_flash_merging": {
             "keys": ["--stringent_flash_merging"],
             "help": "DEPRECATED in v2.3.0",
