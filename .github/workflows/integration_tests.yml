@@ -87,7 +87,7 @@ jobs:
       - name: Run BAM Input
         if: success() || failure()
         run: |
-          nox -s bam -- test print
+          nox -s bam-single -- test print
 
       - name: Run BAM Output
         if: success() || failure()
