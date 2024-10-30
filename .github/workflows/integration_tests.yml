@@ -51,7 +51,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
+          sudo apt-get install -y gcc g++
           conda list
 
       - name: Create directory for files
