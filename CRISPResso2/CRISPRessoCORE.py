@@ -494,6 +494,8 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
         """ Custom encoding for numpy arrays and other non-serializable types """
         if isinstance(obj, np.ndarray):
             return obj.tolist()  # Convert numpy arrays to lists
+        if isinstance(obj, CRISPRessoCOREResources.ResultsSlotsDict):
+            return {key: obj[key] for key in obj.__slots__}
         raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
     variant_file_path = os.path.join(variants_dir, f"variants_{process_id}.tsv")
