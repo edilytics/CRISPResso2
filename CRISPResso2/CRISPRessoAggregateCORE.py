@@ -77,10 +77,6 @@ ___________________________________
         parser.add_argument('--use_matplotlib', action='store_true',
                         help='Use matplotlib for plotting instead of plotly/d3 when CRISPRessoPro is installed')
 
-        # CRISPRessoPro params
-        parser.add_argument('--use_matplotlib', action='store_true',
-                        help='Use matplotlib for plotting instead of plotly/d3 when CRISPRessoPro is installed')
-
         args = parser.parse_args()
 
         if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
