@@ -5,7 +5,7 @@ channels:
   - defaults
 dependencies:
   - pip
-  - fastp
+  - fastp=0.23.4
   - numpy<2
   - cython
   - jinja2
