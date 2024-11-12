@@ -82,6 +82,7 @@ jobs:
       - name: Create Nox Conda Envs
         run: |
           nox -s conda_env
+        if: steps.cache-nox-env.outputs.cache-hit != 'true'
 
       - name: Run Basic
         run: |
