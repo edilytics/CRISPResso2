@@ -70,6 +70,15 @@ jobs:
           ref: 'cole/implement-nox'
           # ref: '<BRANCH-NAME>' # update to specific branch
 
+      - name: Cache Nox Conda Envs
+        id: cache-nox-env
+        uses: actions/cache@v3
+        env:
+          CACHE_NUMBER:0
+        with:
+          path: .nox
+          key: nox-conda-${{ runner.os }}--${{ runner.arch }}--${{ steps.get-date-outputs.today }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('noxfile.py') }}
+
       - name: Create Nox Conda Envs
         run: |
           nox -s conda_env
