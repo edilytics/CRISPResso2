@@ -256,11 +256,18 @@
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
         "samtools_exclude_flags": {
-          "keys": ["--samtools_exclude_flags"],
-          "help": "Exclude reads with any of the specified flags set in the SAM/BAM file. Default is 4 (read unmapped).",
-          "type": "str",
-          "default": "4",
-          "tools": ["Pooled", "WGS"]
+            "keys": ["--samtools_exclude_flags"],
+            "help": "Exclude reads with any of the specified flags set in the SAM/BAM file. Default is 4 (read unmapped).",
+            "type": "str",
+            "default": "4",
+            "tools": ["Pooled", "WGS"]
+        },
+        "samtools_exclude_flags_core": {
+            "keys": ["--samtools_exclude_flags"],
+            "help": "Exclude reads with any of the specified flags set in the SAM/BAM file. Default is 0 (no reads filtered).",
+            "type": "str",
+            "default": "0",
+            "tools": ["Core"]
         },
         "stringent_flash_merging": {
             "keys": ["--stringent_flash_merging"],
