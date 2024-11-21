@@ -161,7 +161,8 @@ def calculate_aligned_samtools_exclude_flags(samtools_exclude_flags):
     by filtering 0x900 (not primary alignment and supplementary alignment)
     and also including any other user specified filters.
     """
-    return hex(0x900 + int(samtools_exclude_flags))
+    samtools_exclude_flags = int(samtools_exclude_flags, base=16)
+    return hex(0x900 | samtools_exclude_flags)
 
 def get_n_aligned_bam(bam_filename, samtools_exclude_flags):
     p = sb.Popen(f"samtools view -F {calculate_aligned_samtools_exclude_flags(samtools_exclude_flags)} -c {bam_filename}", shell=True, stdout=sb.PIPE)
