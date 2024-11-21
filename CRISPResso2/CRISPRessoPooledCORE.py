@@ -645,10 +645,10 @@ def main():
             with open(args.amplicons_file, 'r') as amplicons_fin:
 
                 head_line = amplicons_fin.readline().strip()
-                if head_line == "":
-                    raise CRISPRessoShared.BadParameterException('Cannot parse header from amplicon file ' + args.amplicons_file)
-                while head_line[0] == "#":  # read past comments
+                while head_line and head_line[0] == "#":  # read past comments
                     head_line = amplicons_fin.readline()
+                if not head_line:
+                    raise CRISPRessoShared.BadParameterException('Cannot parse header from amplicon file ' + args.amplicons_file)
                 header_els = head_line.split('\t')
 
             head_lookup = CRISPRessoShared.get_crispresso_options_lookup("Core")  # dict of qwc -> quantification_window_coordinates
@@ -1045,7 +1045,7 @@ def main():
             if can_finish_incomplete_run and 'genome_demultiplexing' in crispresso2_info['running_info']['finished_steps'] and os.path.isfile(REPORT_ALL_DEPTH):
                 info('Using previously-computed demultiplexing of genomic reads')
                 df_all_demux = pd.read_csv(REPORT_ALL_DEPTH, sep='\t')
-                df_all_demux['loc'] = df_all_demux['chr_id']+' ' + df_all_demux['start'].apply(str) + ' '+df_all_demux['end'].apply(str)
+                df_all_demux['loc'] = df_all_demux['chr_id'].apply(str) + ' ' + df_all_demux['start'].apply(str) + ' '+df_all_demux['end'].apply(str)
                 df_all_demux.set_index(['loc'], inplace=True)
             else:
                 #REDISCOVER LOCATIONS and DEMULTIPLEX READS
