@@ -1560,8 +1560,6 @@ def main():
 
         #if many reads weren't aligned, print those out for the user
         if RUNNING_MODE != 'ONLY_GENOME':
-            #N_READS_INPUT=CRISPRessoShared.get_n_reads_fastq(args.fastq_r1)
-            #N_READS_AFTER_PREPROCESSING=CRISPRessoShared.get_n_reads_fastq(processed_output_filename)
             tot_reads_aligned = df_summary_quantification['Reads_aligned'].fillna(0).sum()
             tot_reads = df_summary_quantification['Reads_total'].sum()
 
