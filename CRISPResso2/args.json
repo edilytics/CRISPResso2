@@ -257,14 +257,14 @@
         },
         "samtools_exclude_flags": {
             "keys": ["--samtools_exclude_flags"],
-            "help": "Exclude reads with any of the specified flags set in the SAM/BAM file. Default is 4 (read unmapped).",
+          "help": "Exclude reads with any of the specified flags set in the SAM/BAM file. Flags can be specified in either base 16 (hex) or base 10. Default is 4 (read unmapped).",
             "type": "str",
             "default": "4",
             "tools": ["Pooled", "WGS"]
         },
         "samtools_exclude_flags_core": {
             "keys": ["--samtools_exclude_flags"],
-            "help": "Exclude reads with any of the specified flags set in the SAM/BAM file. Default is 0 (no reads filtered).",
+            "help": "Exclude reads with any of the specified flags set in the SAM/BAM file. Flags can be specified in either base 16 (hex) or base 10. Default is 0 (no reads filtered).",
             "type": "str",
             "default": "0",
             "tools": ["Core"]
