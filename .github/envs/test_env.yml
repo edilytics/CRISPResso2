@@ -5,14 +5,7 @@ channels:
   - defaults
 dependencies:
   - pip
-  - fastp
-  - numpy<2
-  - cython
-  - jinja2
-  - tbb=2020.2
-  - pyparsing=2.3.1
-  - scipy
-  - matplotlib=3.8.4
-  - pandas>2
+  - pyyaml
+  - nox
   - pip:
     - ydiff

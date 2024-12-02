@@ -6,6 +6,10 @@ on:
   pull_request:
     types: [opened, reopened]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,7 +17,7 @@ jobs:
       run:
         shell: bash -l {0}
     env:
-      CRISPRESSO2_DIR: ${GITHUB_WORKSPACE}/../CRISPResso2_copy
+      CRISPRESSO2_DIR: ../CRISPResso2_copy
 
     strategy:
       fail-fast: false
@@ -51,7 +55,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc g++ bowtie2 samtools libsys-hostname-long-perl
+          sudo apt-get install -y gcc g++
           conda list
 
       - name: Create directory for files
@@ -63,73 +67,88 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: edilytics/CRISPResso2_tests
+          ref: 'cole/implement-nox'
           # ref: '<BRANCH-NAME>' # update to specific branch
+
+      - name: Cache Nox Conda Envs
+        id: cache-nox-env
+        uses: actions/cache@v3
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: .nox
+          key: nox-conda-${{ runner.os }}--${{ runner.arch }}--${{ steps.get-date-outputs.today }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('noxfile.py') }}
+
+      - name: Create Nox Conda Envs
+        run: |
+          nox -s conda_env
+        if: steps.cache-nox-env.outputs.cache-hit != 'true'
 
       - name: Run Basic
         run: |
-          make basic test print
+          nox -s basic -- test print
 
       - name: Run Params
         if: success() || failure()
         run: |
-          make params test print
+          nox -s params -- test print
 
       - name: Run Prime Editor
         if: success() || failure()
         run: |
-          make prime-editor test print
+          nox -s prime-editor -- test print
 
       - name: Run BAM Input
         if: success() || failure()
         run: |
-          make bam test print
+          nox -s bam-single -- test print
 
       - name: Run BAM Output
         if: success() || failure()
         run: |
-          make bam-out test print
+          nox -s bam-out -- test print
 
       - name: Run BAM Genome Output
         if: success() || failure()
         run: |
-          make bam-out-genome test print
+          nox -s bam-out-genome -- test print
 
       - name: Run Batch
         if: success() || failure()
         run: |
-          make batch test print
+          nox -s batch -- test print
 
       - name: Run Pooled
         if: success() || failure()
         run: |
-          make pooled test print
+          nox -s pooled -- test print
 
       - name: Run Pooled Mixed Mode
         if: success() || failure()
         run: |
-          make pooled-mixed-mode test print
+          nox -s pooled-mixed-mode -- test print
 
       - name: Run Pooled Mixed Mode Demux
         if: success() || failure()
         run: |
-          make pooled-mixed-mode-genome-demux test print
+          nox -s pooled-mixed-mode-genome-demux -- test print
 
       - name: Run Pooled Paired Sim
         if: success() || failure()
         run: |
-          make pooled-paired-sim test print
+          nox -s pooled-paired-sim -- test print
 
       - name: Run WGS
         if: success() || failure()
         run: |
-          make wgs test print
+          nox -s wgs -- test print
 
       - name: Run Compare
         if: success() || failure()
         run: |
-          make compare test print
+          nox -s compare -- test print
 
       - name: Run Aggregate
         if: success() || failure()
         run: |
-          make aggregate test print
+          nox -s aggregate -- test print
