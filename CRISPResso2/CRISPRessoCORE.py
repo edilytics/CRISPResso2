@@ -819,9 +819,9 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
         crispresso_cmd_to_write = ' '.join(sys.argv)
         sam_out.write('@PG\tID:crispresso2\tPN:crispresso2\tVN:'+CRISPRessoShared.__version__+'\tCL:"'+crispresso_cmd_to_write+'"\n')
         if bam_chr_loc != "":
-            proc = sb.Popen(['samtools', 'view', bam_filename, bam_chr_loc], stdout=sb.PIPE, encoding='utf-8')
+            proc = sb.Popen(['samtools', 'view', '-F', args.samtools_exclude_flags, bam_filename, bam_chr_loc], stdout=sb.PIPE, encoding='utf-8')
         else:
-            proc = sb.Popen(['samtools', 'view', bam_filename], stdout=sb.PIPE, encoding='utf-8')
+            proc = sb.Popen(['samtools', 'view', '-F', args.samtools_exclude_flags, bam_filename], stdout=sb.PIPE, encoding='utf-8')
         num_reads = 0
 
         # Reading through the bam file and enriching variantCache as a dictionary with the following:
@@ -2335,7 +2335,7 @@ def main():
 
                     #subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
                     this_exclude_idxs = sorted(list(set(refs[ref_name]['exclude_idxs'])))
-                    this_include_idxs = sorted(list(set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
+                    this_include_idxs = sorted(map(int, set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
 
                     refs[ref_name]['gap_incentive'] = this_gap_incentive
                     refs[ref_name]['sgRNA_cut_points'] = this_cut_points
@@ -2360,8 +2360,8 @@ def main():
                         )
 
                     #subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
-                    this_exclude_idxs = sorted(list(set(refs[ref_name]['exclude_idxs'])))
-                    this_include_idxs = sorted(list(set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
+                    this_exclude_idxs = sorted(map(int, set(refs[ref_name]['exclude_idxs'])))
+                    this_include_idxs = sorted(map(int, set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
                     refs[ref_name]['include_idxs'] = this_include_idxs
                     refs[ref_name]['exclude_idxs'] = this_exclude_idxs
 
@@ -3361,11 +3361,15 @@ def main():
             ref_info_file.write(refString)
             np.set_printoptions(linewidth=1000**1000) #no line breaks
             for ref_name in ref_names:
+                if isinstance(refs[ref_name]['include_idxs'], np.ndarray):
+                    refs[ref_name]['include_idxs'] = refs[ref_name]['include_idxs'].tolist()
+                if isinstance(refs[ref_name]['exclude_idxs'], np.ndarray):
+                    refs[ref_name]['exclude_idxs'] = refs[ref_name]['exclude_idxs'].tolist()
                 refString = ( refs[ref_name]['name'] + "\t" +
                     str(refs[ref_name]['sequence']) + "\t" +
                     str(refs[ref_name]['sequence_length']) + "\t" +
                     str(refs[ref_name]['min_aln_score']) + "\t" +
-                    str(refs[ref_name]['gap_incentive']) + "\t" +
+                    str(refs[ref_name]['gap_incentive'].tolist()) + "\t" +
                     str(refs[ref_name]['sgRNA_cut_points']) + "\t" +
                     str(refs[ref_name]['sgRNA_plot_cut_points']) + "\t" +
                     str(refs[ref_name]['sgRNA_intervals']) + "\t" +
