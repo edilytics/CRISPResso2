@@ -586,7 +586,6 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
 def get_n_reads_fastq(fastq_filename):
     if not os.path.exists(fastq_filename) or os.path.getsize(fastq_filename) == 0:
         return 0
-
     p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '' ) +"cat < %s | grep -c ." % fastq_filename, shell=True, stdout=sb.PIPE)
     n_reads = int(float(p.communicate()[0])/4.0)
     return n_reads
