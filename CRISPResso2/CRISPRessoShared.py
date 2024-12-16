@@ -1206,6 +1206,50 @@ def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_
     return output_filename_r1, output_filename_r2
 
 
+def get_base_edit_row_around_cut(row, cut_point, offset, conversion_nuc_from):
+
+    cut_idx = row['ref_positions'].index(cut_point)
+    include_inds = [i for i,c in enumerate(row['Reference_Sequence']) if c == conversion_nuc_from]
+
+    filtered_aligned_seq = ''.join([row['Aligned_Sequence'][i] for i in include_inds])
+    filtered_ref_seq = ''.join([row['Reference_Sequence'][i] for i in include_inds])
+
+    return (
+        filtered_aligned_seq, # row['Aligned_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1],
+        filtered_ref_seq, # row['Reference_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1],
+        row['Read_Status'] == 'UNMODIFIED', 
+        row['n_deleted'], 
+        row['n_inserted'], 
+        row['n_mutated'], 
+        row['#Reads'], 
+        row['%Reads']
+        )
+
+
+def get_base_edit_dataframe_around_cut(df_alleles, cut_point, offset, conversion_nuc_inds, collapse_by_sequence=True):
+    if df_alleles.shape[0] == 0:
+        return df_alleles
+    ref1 = df_alleles['Reference_Sequence'].iloc[0]
+    ref1 = ref1.replace('-', '')
+    if (cut_point + offset + 1 > len(ref1)):
+        raise (BadParameterException(
+            'The plotting window cannot extend past the end of the amplicon. Amplicon length is ' + str(
+                len(ref1)) + ' but plot extends to ' + str(cut_point + offset + 1)))
+
+    df_alleles_around_cut = pd.DataFrame(
+        list(df_alleles.apply(lambda row: get_base_edit_row_around_cut(row, cut_point, offset, conversion_nuc_inds), axis=1).values),
+        columns=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated', '#Reads',
+                 '%Reads'])
+
+    df_alleles_around_cut = df_alleles_around_cut.groupby(
+        ['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted',
+         'n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
+
+    df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
+    df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
+    breakpoint()
+    return df_alleles_around_cut
+
 ######
 # allele modification functions
 ######
