@@ -200,6 +200,7 @@ def amino_acids_to_numbers(seq):
 
 
 
+
 def hex_to_rgb(value):
     value = value.lstrip('#')
     lv = len(value)
@@ -2782,6 +2783,7 @@ def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
     annot=[]
     y_labels=[]
     insertion_dict=defaultdict(list)
+    silent_edit_dict=defaultdict(list)
     per_element_annot_kws=[]
     is_reference=[]
 
@@ -2793,6 +2795,8 @@ def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
 
         X.append(amino_acids_to_numbers(idx))
         annot.append(list(idx))
+
+        silent_edit_dict[idx_row] = row['silent_edit_inds']
 
         has_indels = False
         for p in re_find_indels.finditer(row['Reference_Sequence']):
@@ -2809,7 +2813,7 @@ def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
 
 
         idxs_sub= [i_sub for i_sub in range(len(idx)) if \
-                   (row['Reference_Sequence'][i_sub]!=idx[i_sub]) and \
+                   (row['Reference_Sequence'][i_sub]!=idx[i_sub].upper()) and \
                    (row['Reference_Sequence'][i_sub]!='-') and\
                    (idx[i_sub]!='-')]
         to_append=np.array([{}]*len(idx), dtype=object)
@@ -2820,7 +2824,7 @@ def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
         X[i] = x + amino_acids_to_numbers([''] * (len(reference_seq) - len(a)))
         annot[i] = a + [''] * (len(reference_seq) - len(a))
 
-    return X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference, reference_seq
+    return X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, is_reference, reference_seq
 
 def plot_amino_acid_heatmap(
         reference_seq_amino_acids,
@@ -2829,6 +2833,7 @@ def plot_amino_acid_heatmap(
         annot,
         y_labels,
         insertion_dict,
+        silent_edit_dict,
         per_element_annot_kws,
         custom_colors,
         SAVE_ALSO_PNG=False,
@@ -2926,6 +2931,11 @@ def plot_amino_acid_heatmap(
     for idx, lss in insertion_dict.items():
         for ls in lss:
             ax_hm.add_patch(patches.Rectangle((ls[0], N_ROWS-idx-1), ls[1]-ls[0], 1, linewidth=3, edgecolor='r', fill=False))
+
+    # create boxes for silent edits
+    for idx, edit_inds in silent_edit_dict.items():
+        for edit_ind in edit_inds:
+            ax_hm.add_patch(patches.Rectangle((edit_ind, N_ROWS-idx-1), 1, 1, linewidth=3, edgecolor='g', fill=False))
 
     #cut point vertical line
     if plot_cut_point:
@@ -3784,13 +3794,13 @@ def plot_amino_acid_table(reference_seq,df_alleles,fig_filename_root,custom_colo
     custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
     annotate_wildtype_allele: string to add to the end of the wildtype allele (e.g. ** or '')
     """
-    X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference, ref_sequence_amino_acids = prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY)
+    X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, is_reference, ref_sequence_amino_acids = prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY)
     if annotate_wildtype_allele != '':
         for ix, is_ref in enumerate(is_reference):
             if is_ref:
                 y_labels[ix] += annotate_wildtype_allele
 
-    plot_amino_acid_heatmap(ref_sequence_amino_acids, fig_filename_root, X, annot, y_labels, insertion_dict, per_element_annot_kws, custom_colors, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, amino_acid_cut_point)
+    plot_amino_acid_heatmap(ref_sequence_amino_acids, fig_filename_root, X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, custom_colors, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, amino_acid_cut_point)
 
 
 def plot_unmod_mod_pcts(fig_filename_root,df_summary_quantification,save_png,cutoff=None,max_samples_to_include_unprocessed=20,**kwargs):
