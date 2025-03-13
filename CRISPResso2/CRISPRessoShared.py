@@ -347,6 +347,16 @@ CODON_TO_AMINO_ACID_SINGLE_CHAR = {
     'GGT': 'G', 'GGC': 'G', 'GGA': 'G', 'GGG': 'G'
 }
 
+
+def get_amino_acids_and_codons(seq):
+    """ Given a nucleotide sequence, return the amino acid sequence and the codons."""
+    amino_acids = []
+    while len(seq) > 2:
+        codon, seq = seq[:3], seq[3:]
+        amino_acids.append((CODON_TO_AMINO_ACID_SINGLE_CHAR[codon], codon))
+    return amino_acids
+
+
 def get_amino_acids_from_nucs(seq):
     """ Given a nucleotide sequence, return the amino acid sequence."""
     amino_acids = []
@@ -357,6 +367,38 @@ def get_amino_acids_from_nucs(seq):
         else:
             amino_acids.append(CODON_TO_AMINO_ACID_SINGLE_CHAR[codon])
     return ''.join(amino_acids)
+
+
+
+def insert_indels(seq, seq_codons):
+    indel_inds = []
+    for i, c in enumerate(seq):
+        if c == '-':
+            indel_inds.append(i)
+    
+    for i in indel_inds:
+        seq_codons.insert(i, ('-', '---'))
+    
+    return seq_codons
+
+def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
+    silent_edit_inds = []
+
+    ref_codons = insert_indels(ref_seq, ref_codons)
+    seq_codons = insert_indels(seq, seq_codons)
+    
+    for i, ((r, r_codon), (s, s_codon)) in enumerate(zip(ref_codons, seq_codons)):
+        if r == '-' or s == '-':
+            continue
+        if r != s:
+            continue
+        if r_codon != s_codon:
+            silent_edit_inds.append((i, r.lower()))
+    seq_list = list(seq)
+    for i, char in silent_edit_inds:
+        seq_list[i] = char
+
+    return ''.join(seq_list)
 
 
 def unexplode_cigar(exploded_cigar_string):
@@ -1318,8 +1360,11 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
     # cut_idx = row['ref_positions'].index(cut_point)
     cut_idx = row['ref_positions'].index(amino_acid_cut_point)
     left_idx = row['ref_positions'].index(plot_left_idx)    
-    aligned_seq = get_amino_acids_from_nucs(row['Aligned_Sequence'][left_idx::].replace('-', ''))
-    reference_seq = get_amino_acids_from_nucs(row['Reference_Sequence'][left_idx::].replace('-', ''))
+    seq_acids_and_codons = get_amino_acids_and_codons(row['Aligned_Sequence'][left_idx::].replace('-', ''))
+    ref_acids_and_codons = get_amino_acids_and_codons(row['Reference_Sequence'][left_idx::].replace('-', ''))
+    aligned_seq = ''.join(tup[0] for tup in seq_acids_and_codons)
+    reference_seq = ''.join(tup[0] for tup in ref_acids_and_codons)
+    
     gap_incentive = np.zeros(len(reference_seq)+1, dtype=int)
     try:
         gap_incentive[cut_idx] = 1
@@ -1331,6 +1376,23 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
         matrix=CRISPResso2Align.read_matrix(matrix_path),
         gap_incentive=gap_incentive,
     )
+
+    aa_ref_positions = CRISPRessoCOREResources.find_indels_substitutions(
+        aligned_seq, reference_seq, range(len(reference_seq))
+    )
+
+    # aligned_seq = get_silent_edits(
+    # silent_edit_inds = get_silent_edits(
+    aligned_seq = get_silent_edits(
+        reference_seq,
+        ref_acids_and_codons,
+        aligned_seq,
+        seq_acids_and_codons,
+        )
+    
+    # row['silent_edit_inds'] = silent_edit_inds
+    
+
     return (aligned_seq[:sequence_length],
             reference_seq[:sequence_length],
             row['Read_Status']=='UNMODIFIED',
@@ -1338,7 +1400,7 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
             row['n_inserted'],
             row['n_mutated'],
             row['#Reads'], 
-            row['%Reads'])
+            row['%Reads'],)
 
 def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point, collapse_by_sequence=True):
     if df_alleles.shape[0] == 0:
@@ -1351,6 +1413,24 @@ def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_
 
     df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
     df_alleles_around_cut['Unedited']=df_alleles_around_cut['Unedited']>0
+
+    # df_alleles_around_cut['silent_edit_inds'] = pd.Series(dtype='object')
+    edits_series = pd.Series(dtype='object')
+    row_ind = 0
+    for idx, row in df_alleles_around_cut.iterrows():
+        silent_edit_inds = []
+        for i, c in enumerate(idx):
+            if c.islower():
+                silent_edit_inds.append(i)
+        # df_alleles_around_cut.loc[idx]['silent_edit_inds'] = silent_edit_inds
+        edits_series[row_ind] = silent_edit_inds
+        row_ind += 1
+
+    edits_series.index = df_alleles_around_cut.index
+    df_alleles_around_cut['silent_edit_inds'] = edits_series
+    
+    df_alleles_around_cut.index = df_alleles_around_cut.index.str.upper()
+
     return df_alleles_around_cut
 
 
