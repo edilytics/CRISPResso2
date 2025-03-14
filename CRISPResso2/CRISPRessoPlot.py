@@ -2956,12 +2956,14 @@ def plot_amino_acid_heatmap(
     proxies = [matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='black',
                     mec='none', marker=r'$\mathbf{{{}}}$'.format('bold'), ms=18),
                matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='none',
+                    mec='g', marker='s', ms=8, markeredgewidth=2.5),
+               matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='none',
                     mec='r', marker='s', ms=8, markeredgewidth=2.5),
               matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='none',
                     mec='black', marker='_', ms=2,),
               matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='none',
                     mec='black', marker=r'*', ms=4, markeredgewidth=2.5),]
-    descriptions=['Substitutions', 'Insertions', 'Deletions', 'Stop Codons']
+    descriptions=['Substitutions', 'Silent Edits', 'Insertions', 'Deletions', 'Stop Codons']
 
     if plot_cut_point:
         proxies.append(
