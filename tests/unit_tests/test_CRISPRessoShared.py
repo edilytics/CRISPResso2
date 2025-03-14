@@ -98,3 +98,13 @@ def test_get_quant_window_ranges_from_include_idxs_single_gap():
 def test_get_quant_window_ranges_from_include_idxs_multiple_gaps():
     include_idxs = [50, 51, 52, 53, 55, 56, 57, 58, 60]
     assert CRISPRessoShared.get_quant_window_ranges_from_include_idxs(include_idxs) == [(50, 53), (55, 58), (60, 60)]
+
+
+def test_get_silent_edits():
+    ref_seq = 'AGS'
+    seq = 'AGS'
+    ref_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT')]
+    seq_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGC')]
+    
+    silent_edits = CRISPRessoShared.get_silent_edits(ref_seq, ref_codons, seq, seq_codons)
+    assert silent_edits == 'AGs'
