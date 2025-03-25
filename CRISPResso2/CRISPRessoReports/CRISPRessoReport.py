@@ -94,6 +94,7 @@ def add_fig_if_exists(fig, fig_name, fig_root, fig_title, fig_caption, fig_data,
         amplicon_figs[figname] is set to that file
         """
     # fullpath=os.path.join(crispresso_folder,fig_root+'.png')
+
     pngfullpath = os.path.join(crispresso_folder, fig_root + '.png')
     htmlfullpath = os.path.join(crispresso_folder, fig_root + '.html')
     jsonfullpath = os.path.join(crispresso_folder, f'plot_{fig_root}.json')
@@ -146,7 +147,7 @@ def assemble_figs(run_data, crispresso_folder):
         amplicon_figures = {'names': [], 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}}
 
         for fig in ['2a', '3a', '3b', '4a', '4b', '4c', '4d', '4e', '4f', '4g', '5', '6', '7', '8', '10a', '10b', '10c',
-                    '11a']:
+                    '10i', '11a']:
             fig_name = 'plot_' + fig
             if fig_name + '_root' in run_data['results']['refs'][amplicon_name]:
                 add_fig_if_exists(fig, fig_name, run_data['results']['refs'][amplicon_name][fig_name + '_root'],
