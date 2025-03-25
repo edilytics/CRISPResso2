@@ -19,6 +19,7 @@ from copy import deepcopy
 import re
 from matplotlib import colors as colors_mpl
 import seaborn as sns
+import upsetplot
 
 from CRISPResso2 import CRISPRessoShared
 
@@ -31,6 +32,7 @@ def setMatplotlibDefaults():
     matplotlib.rcParams["font.sans-serif"] = ["Arial", "Liberation Sans", "Bitstream Vera Sans"]
     matplotlib.rcParams["font.family"] = "sans-serif"
     matplotlib.rcParams['axes.facecolor'] = 'white'
+    # matplotlib.rcParams['axes.autolimit_mode'] = 'round_numbers'
     sns.set(style='white', font_scale=2.2)
     plt.ioff()
 
@@ -3936,3 +3938,30 @@ def plot_quantification_positions(
         )
 
     plt.close(fig)
+
+
+def plot_combination_upset(fig_root, ref_name, bp_changes_arr, binary_allele_counts):
+    header_arr = []
+    for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_changes_arr):
+        header_arr.append(str(ref_ind) + ':' + ref_base + '->' + mod_base)
+    header_arr.append('has_indel')
+    header_arr.append('cat_counts')
+
+    df_by_combination_items = []
+    for ref_comb in binary_allele_counts:
+        arr_for_upset = ref_comb.split("\t")
+        for i in range(len(arr_for_upset)-1): # don't check the last column (has indel)
+            arr_for_upset[i] = arr_for_upset[i] == 'T'
+        arr_for_upset[len(arr_for_upset)-1] = arr_for_upset[len(arr_for_upset)-1] == 'True'
+
+        arr_for_upset.append(binary_allele_counts[ref_comb])
+        df_by_combination_items.append(arr_for_upset)
+
+    df_by_combination = pd.DataFrame(df_by_combination_items, columns=header_arr)
+    df_by_combination.set_index(header_arr[:-1], inplace=True)
+    # fig = plt.figure()
+    # ax_dict = upsetplot.UpSet(df_by_combination.cat_counts, element_size=None, show_counts=True, sort_categories_by='-input').plot(fig=fig)
+    ax_dict = upsetplot.UpSet(df_by_combination.cat_counts, element_size=None, show_counts=True, sort_categories_by='-input').plot()
+    plt.suptitle(ref_name + ' read counts with no indels', )
+    plt.savefig(fig_root + '.png', bbox_inches='tight')
+    plt.close()

@@ -1247,7 +1247,6 @@ def get_base_edit_dataframe_around_cut(df_alleles, cut_point, offset, conversion
 
     df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
     df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
-    breakpoint()
     return df_alleles_around_cut
 
 ######
