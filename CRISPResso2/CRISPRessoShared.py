@@ -1454,15 +1454,9 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
     if this_sgRNA_cut_points and plot_window_size > 0:
         for cut_p in this_sgRNA_cut_points:
             if cut_p - window_around_cut + 1 < 0:
-            #     raise BadParameterException(
-            #         'Offset around cut would extend to the left of the amplicon. Please decrease plot_window_size parameter. Cut point: ' + str(
-            #             cut_p) + ' window: ' + str(window_around_cut) + ' reference: ' + str(ref_seq_length))
                 logging.warning('Offset around cut would extend to the left of the amplicon. Window will be truncated.')
                 window_around_cut = cut_p + 1
             if cut_p + window_around_cut > ref_seq_length - 1:
-                # raise BadParameterException(
-                #     'Offset around cut would be greater than reference sequence length. Please decrease plot_window_size parameter. Cut point: ' + str(
-                #         cut_p) + ' window: ' + str(window_around_cut) + ' reference: ' + str(ref_seq_length))
                 logging.warning('Offset around cut would be greater than reference sequence length. Window will be truncated.')
                 window_around_cut = ref_seq_length - cut_p - 1
             st = max(0, cut_p - window_around_cut + 1)
