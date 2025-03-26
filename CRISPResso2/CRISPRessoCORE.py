@@ -4624,8 +4624,7 @@ def main():
                         new_sgRNA_intervals += [(int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1)]
                         if int_start <= cut_point and cut_point <= int_end:
                             new_cut_point = cut_point - new_sel_cols_start - 1
-
-                    
+         
                     prepped_df_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws, is_reference = CRISPRessoPlot.prep_alleles_table(
                         df_to_plot,
                         ref_seq_around_cut,
