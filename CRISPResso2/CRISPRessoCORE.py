@@ -4890,9 +4890,10 @@ def main():
                         'bp_changes_arr': bp_changes_arr,
                         'binary_allele_counts': counts_dict['binary_allele_counts'],
                     }
+                    
                     CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
                     crispresso2_info['results']['refs'][ref_name]['plot_10i_root'] = os.path.basename(fig_root_10i)
-                    crispresso2_info['results']['refs'][ref_name]['plot_10i_caption'] = f"Figure 10i: Upset plot of base editing changes in the quantification window for amplicon: {ref_name}"
+                    crispresso2_info['results']['refs'][ref_name]['plot_10i_caption'] = f"Figure 10i: Upset plot of base editing changes for amplicon: {ref_name}"
                     crispresso2_info['results']['refs'][ref_name]['plot_10i_data'] = [('Binary Allele Counts', '10i.' + ref_name + '.binary_allele_counts.txt')]
 
 
