@@ -4,8 +4,10 @@
         {% set width = '40%' %}
     {%- elif fig_name in ['plot_10b', 'plot_10c'] -%}
         {% set width = '35%' %}
-    {%- elif fig_name in ['plot_10a', 'plot_10i'] -%}
+    {%- elif fig_name in ['plot_10a'] -%}
         {% set width = '70%' %}
+    {%- elif fig_name in ['plot_10i'] -%}
+        {% set width = '50%' %}
     {%- else -%}
         {% set width = '100%' %}
     {%- endif -%}
