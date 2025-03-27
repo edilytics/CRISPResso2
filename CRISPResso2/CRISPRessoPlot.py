@@ -3956,14 +3956,14 @@ def plot_combination_upset(fig_root, ref_name, bp_changes_arr, binary_allele_cou
 
         arr_for_upset.append(binary_allele_counts[ref_comb])
         df_by_combination_items.append(arr_for_upset)
-
+    for i, col in enumerate(header_arr):
+        if col in ['has_indel', 'cat_counts']:
+            continue
+        if len(col) > 8:
+            header_arr[i] = col[:8] + '...'
     df_by_combination = pd.DataFrame(df_by_combination_items, columns=header_arr)
     df_by_combination.set_index(header_arr[:-1], inplace=True)
-    # fig = plt.figure()
-    # ax_dict = upsetplot.UpSet(df_by_combination.cat_counts, element_size=None, show_counts=True, sort_categories_by='-input').plot(fig=fig)
-    ax_dict = upsetplot.UpSet(df_by_combination.cat_counts, element_size=None, show_counts=True, sort_categories_by='-input').plot()
-    # upsetplot.plot(df_by_combination.cat_counts, fig=fig, element_size=None, show_counts=True, sort_categories_by='-input')
-    # plt.suptitle(ref_name + ' read counts with no indels', )
-    plt.savefig(fig_root + '.png', bbox_inches='tight')
-    plt.savefig(fig_root + '.pdf', bbox_inches='tight')
+    ax_dict = upsetplot.UpSet(df_by_combination.cat_counts, element_size=40, show_counts=True, sort_categories_by='-input').plot()
+    plt.savefig(fig_root + '.png')
+    plt.savefig(fig_root + '.pdf')
     plt.close()
