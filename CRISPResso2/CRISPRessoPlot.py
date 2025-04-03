@@ -350,6 +350,10 @@ def plot_indel_size_distribution(
     y_label_values = np.round(
         np.linspace(0, min(100, max(ax.get_yticks())), 6),
     )
+    # Ensure the maximum value is included
+    max_y = min(100, max(ax.get_yticks()))
+    if y_label_values[-1] < max_y:
+        y_label_values[-1] = max_y
     ax.set_yticks(y_label_values)
     ax.set_yticklabels([
         '%.1f%% (%.0f)' % (pct, pct / 100 * n_this_category)
@@ -430,6 +434,10 @@ def plot_frequency_deletions_insertions(
     y_label_values= np.round(
         np.linspace(0, min(counts_total, max(ax.get_yticks())), 6),
     )
+    # Ensure the maximum value is included
+    max_y = min(counts_total, max(ax.get_yticks()))
+    if y_label_values[-1] < max_y:
+        y_label_values[-1] = max_y
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(
         [
@@ -633,7 +641,12 @@ def plot_amplicon_modifications(
     )
     y_label_values = np.arange(0, 1, 1.0 / 6.0)
     if y_max > 0:
-        y_label_values = np.arange(0, y_max, y_max / 6.0)
+        # Create 6 evenly spaced ticks from 0 to y_max (inclusive)
+        num_ticks = 6
+        y_label_values = np.linspace(0, y_max, num_ticks)
+        # Ensure the maximum value is included
+        if y_label_values[-1] < y_max:
+            y_label_values[-1] = y_max
     if num_refs == 1:
         ax.set_ylabel('Sequences: % Total ( no. )')
         ax.set_yticks(y_label_values)
@@ -1248,7 +1261,12 @@ def plot_global_modifications_reference(
     )
     y_label_values = np.arange(0, 1, 1.0 / 6.0)
     if y_max > 0:
-        y_label_values = np.arange(0, y_max, y_max / 6.0).astype(int)
+        # Create 6 evenly spaced ticks from 0 to y_max (inclusive)
+        num_ticks = 6
+        y_label_values = np.linspace(0, y_max, num_ticks).astype(int)
+        # Ensure the maximum value is included
+        if y_label_values[-1] < y_max:
+            y_label_values[-1] = int(y_max)
 
     ax.set_ylabel('Sequences: % Total ( no. )')
     ax.set_yticks(y_label_values)
@@ -1478,6 +1496,10 @@ def plot_frameshift_frequency(
     y_label_values = np.round(
         np.linspace(0, min(100, max(ax1.get_yticks())), 6),
     )
+    # Ensure the maximum value is included
+    max_y = min(100, max(ax1.get_yticks()))
+    if y_label_values[-1] < max_y:
+        y_label_values[-1] = max_y
     ax1.set_yticks(y_label_values)
     ax1.set_yticklabels(
         [
@@ -1517,6 +1539,10 @@ def plot_frameshift_frequency(
     y_label_values = np.round(
         np.linspace(0, min(100, max(ax2.get_yticks())), 6),
     )
+    # Ensure the maximum value is included
+    max_y = min(100, max(ax2.get_yticks()))
+    if y_label_values[-1] < max_y:
+        y_label_values[-1] = max_y
     ax2.set_yticks(y_label_values)
     ax2.set_yticklabels(
         [
@@ -1653,6 +1679,10 @@ def plot_global_frameshift_in_frame_mutations(
     y_label_values = np.round(np.linspace(
         0, min(100, max(ax2.get_yticks())), 6,
     ))
+    # Ensure the maximum value is included
+    max_y = min(100, max(ax2.get_yticks()))
+    if y_label_values[-1] < max_y:
+        y_label_values[-1] = max_y
     ax2.set_yticks(y_label_values)
     ax2.set_yticklabels(
         [
@@ -2257,6 +2287,10 @@ def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution
     lgd = ax.legend(handles=legend_patches, labels=legend_labels, loc='upper center', bbox_to_anchor=(0.3, -0.15), ncol=2, fancybox=True, shadow=True)
 
     y_label_values= np.round(np.linspace(0, max(y_max, min(max(tots), max(ax.get_yticks()))), 6))# np.arange(0,y_max,y_max/6.0)
+    # Ensure the maximum value is included
+    max_y = max(y_max, min(max(tots), max(ax.get_yticks())))
+    if y_label_values[-1] < max_y:
+        y_label_values[-1] = max_y
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(
         [
