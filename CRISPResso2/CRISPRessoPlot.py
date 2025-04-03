@@ -1639,6 +1639,10 @@ def plot_global_frameshift_in_frame_mutations(
     y_label_values = np.round(np.linspace(
         0, min(100, max(ax1.get_yticks())), 6),
     )
+    # Ensure the maximum value is included
+    max_y = min(100, max(ax1.get_yticks()))
+    if y_label_values[-1] < max_y:
+        y_label_values[-1] = max_y
     ax1.set_yticks(y_label_values)
     ax1.set_yticklabels(
         [
