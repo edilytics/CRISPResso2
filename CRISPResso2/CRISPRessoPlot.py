@@ -975,7 +975,8 @@ def plot_quantification_window_locations(
     )
     y_label_values = np.arange(0, 1, 1.0 / 6.0)
     if y_max > 0:
-        y_label_values = np.arange(0, y_max, y_max / 6.0).astype(int)
+        y_label_values = np.linspace(0, y_max, 6).astype(int)
+        y_label_values[-1] = y_max
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(
         [
