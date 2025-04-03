@@ -795,7 +795,12 @@ def plot_modification_frequency(
     )
     y_label_values = np.arange(0, 1, 1.0 / 6.0)
     if y_max > 0:
-        y_label_values = np.arange(0, y_max, y_max / 6.0)
+        # Create 6 evenly spaced ticks from 0 to y_max (inclusive)
+        num_ticks = 6
+        y_label_values = np.linspace(0, y_max, num_ticks)
+        # Ensure the maximum value is included
+        if y_label_values[-1] < y_max:
+            y_label_values[-1] = y_max
     ax.set_xticks(np.arange(
         0,
         ref_len,
