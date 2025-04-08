@@ -205,7 +205,18 @@ def get_refpos_values(ref_aln_seq, read_aln_seq):
             ref_pos += 1
     return refpos_dict
 
-def get_upset_plot_data(df_alleles, bp_changes_arr, consider_indels_outside_of_guide, wt_ref_name):
+
+def get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include):
+    # discover positions and bases that are different between reference and target
+    bp_changes_arr = []
+    for idx in ref_positions_to_include:
+        ref_base = ref_seq[idx]
+        if ref_changes_dict[idx] != ref_base:
+            bp_changes_arr.append((idx, ref_base, ref_changes_dict[idx]))
+    return bp_changes_arr
+
+
+def get_upset_plot_counts(df_alleles, bp_changes_arr, consider_indels_outside_of_guide, wt_ref_name):
     # set up counters
     binary_allele_counts = defaultdict(int) # e.g. T,T,X,T > 100 where each item is a string of the base at each position in bp_changes_arr, and 'X' is nontarget
     category_allele_counts = defaultdict(int) # e.g. T,T,R,T > 100 where each item is a string of the base at each position in bp_changes_arr, and 'T' is Target, 'R' is Reference, 'D' is Deletion, 'I' is insertion, and 'N' is anything else
@@ -335,9 +346,9 @@ def get_upset_plot_data(df_alleles, bp_changes_arr, consider_indels_outside_of_g
         }
 
 
-def get_base_edit_sequences(refs, wt_ref_name, df_alleles, target_ref_skip_allele_count):
+def get_base_edit_target_sequence(ref_seq, wt_ref_name, df_alleles, target_ref_skip_allele_count):
 
-    ref_seq = refs[wt_ref_name]['sequence']
+    # ref_seq = refs[wt_ref_name]['sequence']
 
     target_seq = ""
     seen_nonref_allele_count = 0
@@ -352,7 +363,7 @@ def get_base_edit_sequences(refs, wt_ref_name, df_alleles, target_ref_skip_allel
     if target_seq == "":
         raise Exception('Target reference sequence not found in allele table (all reads were equal to the reference sequence)')
 
-    return ref_seq, target_seq 
+    return target_seq 
 
 
 def write_base_edit_counts(ref_name, counts_dict, bp_changes_arr, _jp):
@@ -4807,7 +4818,8 @@ def main():
             if args.base_editor_output and not args.crispresso1_mode and not args.suppress_plots:
 
                 wt_ref_name = ref_name
-                ref_seq, target_seq = get_base_edit_sequences(refs, wt_ref_name, df_alleles, args.target_ref_skip_allele_count)
+                ref_seq = refs[wt_ref_name]['sequence']
+                target_seq = get_base_edit_target_sequence(ref_seq, wt_ref_name, df_alleles, args.target_ref_skip_allele_count)
 
                 if args.consider_indels_outside_of_guide:
                     if not crispresso2_info['running_info']['args'].write_detailed_allele_table:
@@ -4826,8 +4838,8 @@ def main():
                         raise Exception('Alignment matrix file not found at ' + aln_matrix_loc)
                     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
 
-                # aln_target_seq, aln_ref_seq, aln_score = CRISPResso2Align.global_align(
-                output = CRISPResso2Align.global_align(
+                # TODO: Not sure if we need to be running this again here... shouldn't this be stored somewhere in refs or df_alleles?
+                aln_target_seq, aln_ref_seq, aln_score = CRISPResso2Align.global_align(
                     target_seq,
                     ref_seq,
                     matrix=aln_matrix,
@@ -4836,7 +4848,8 @@ def main():
                     gap_extend=aln_gap_extend_arg)
                 
 
-                aln_target_seq, aln_ref_seq, aln_score = output
+                if ref_name == 'HDR':
+                    breakpoint()
                 
                 debug('Aligned target:    ' + aln_target_seq)
                 debug('Aligned reference: ' + aln_ref_seq)
@@ -4847,17 +4860,11 @@ def main():
                 else:
                     ref_positions_to_include = refs[wt_ref_name]['include_idxs']
 
-                # discover positions and bases that are different between reference and target
                 ref_changes_dict = get_refpos_values(aln_ref_seq, aln_target_seq)
-                bp_changes_arr = []
-                for idx in ref_positions_to_include:
-                    ref_base = ref_seq[idx]
-                    if ref_changes_dict[idx] != ref_base:
-                        bp_changes_arr.append((idx, ref_base, ref_changes_dict[idx]))
+                bp_changes_arr = get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include)
 
                 debug('Found ' + str(len(bp_changes_arr)) + ' base changes: ' + str(bp_changes_arr))
-
-                counts_dict = get_upset_plot_data(df_alleles, bp_changes_arr, args.consider_indels_outside_of_guide, wt_ref_name)
+                counts_dict = get_upset_plot_counts(df_alleles, bp_changes_arr, args.consider_indels_outside_of_guide, wt_ref_name)
 
                 #TODO: do we need to write these files?
                 write_base_edit_counts(ref_name, counts_dict, bp_changes_arr, _jp)
