@@ -348,8 +348,6 @@ def get_upset_plot_counts(df_alleles, bp_changes_arr, consider_indels_outside_of
 
 def get_base_edit_target_sequence(ref_seq, wt_ref_name, df_alleles, target_ref_skip_allele_count):
 
-    # ref_seq = refs[wt_ref_name]['sequence']
-
     target_seq = ""
     seen_nonref_allele_count = 0
     for idx, allele in df_alleles.iterrows():
@@ -361,9 +359,9 @@ def get_base_edit_target_sequence(ref_seq, wt_ref_name, df_alleles, target_ref_s
                 logger.debug('Skipping allele ' + str(idx) + ' with sequence ' + allele.Aligned_Sequence)
             seen_nonref_allele_count += 1
     if target_seq == "":
-        raise Exception('Target reference sequence not found in allele table (all reads were equal to the reference sequence)')
+        warn('Target reference sequence not found in allele table (all reads were equal to the reference sequence)')
 
-    return target_seq 
+    return target_seq
 
 
 def write_base_edit_counts(ref_name, counts_dict, bp_changes_arr, _jp):
@@ -4821,68 +4819,70 @@ def main():
                 ref_seq = refs[wt_ref_name]['sequence']
                 target_seq = get_base_edit_target_sequence(ref_seq, wt_ref_name, df_alleles, args.target_ref_skip_allele_count)
 
-                if args.consider_indels_outside_of_guide:
-                    if not crispresso2_info['running_info']['args'].write_detailed_allele_table:
-                        raise Exception('To use parameter --consider_indels_outside_of_guide, CRISPResso run must be run with the parameter --write_detailed_allele_table')
-                
-                # create reference/target read alignment
-                aln_gap_incentive = refs[wt_ref_name]['gap_incentive']
-                aln_gap_open_arg = args.needleman_wunsch_gap_open
-                aln_gap_extend_arg = args.needleman_wunsch_gap_extend
+                if target_seq:
 
-                aln_matrix_loc = args.needleman_wunsch_aln_matrix_loc
-                if aln_matrix_loc == 'EDNAFULL':
-                    aln_matrix = CRISPResso2Align.make_matrix()
-                else:
-                    if not os.path.exists(aln_matrix_loc):
-                        raise Exception('Alignment matrix file not found at ' + aln_matrix_loc)
-                    aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
-
-                # TODO: Not sure if we need to be running this again here... shouldn't this be stored somewhere in refs or df_alleles?
-                aln_target_seq, aln_ref_seq, aln_score = CRISPResso2Align.global_align(
-                    target_seq,
-                    ref_seq,
-                    matrix=aln_matrix,
-                    gap_incentive=aln_gap_incentive,
-                    gap_open=aln_gap_open_arg,
-                    gap_extend=aln_gap_extend_arg)
-                
-                debug('Aligned target:    ' + aln_target_seq)
-                debug('Aligned reference: ' + aln_ref_seq)
-
-                # get indices of reference sequence to include in analysis
-                if args.consider_changes_outside_of_guide:
-                    ref_positions_to_include = [x for x in range(len(ref_seq))]
-                else:
-                    ref_positions_to_include = refs[wt_ref_name]['include_idxs']
-
-                ref_changes_dict = get_refpos_values(aln_ref_seq, aln_target_seq)
-                bp_changes_arr = get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include)
-
-                debug('Found ' + str(len(bp_changes_arr)) + ' base changes: ' + str(bp_changes_arr))
-                counts_dict = get_upset_plot_counts(df_alleles, bp_changes_arr, args.consider_indels_outside_of_guide, wt_ref_name)
-
-                #TODO: do we need to write these files?
-                write_base_edit_counts(ref_name, counts_dict, bp_changes_arr, _jp)
-
-                debug('Read ' + str(counts_dict['total_alleles']) + ' alleles with ' + str(counts_dict['total_alleles_reads']) + ' reads')
-                debug('Got ' + str(counts_dict['total_alleles_on_ref']) + ' alleles on reference "' + wt_ref_name + '" with ' + str(counts_dict['total_alleles_reads_on_ref']) + ' reads')
-
-                
-                if len(bp_changes_arr) > 0:
-
-                    fig_root_10i = _jp(f'10i.Base_editing_{wt_ref_name}_upset_plot.by_amplicon_combination.no_indels')
-                    plot_10i_input = {
-                        'fig_root': fig_root_10i,
-                        'ref_name': ref_name,
-                        'bp_changes_arr': bp_changes_arr,
-                        'binary_allele_counts': counts_dict['binary_allele_counts'],
-                    }
+                    if args.consider_indels_outside_of_guide:
+                        if not crispresso2_info['running_info']['args'].write_detailed_allele_table:
+                            raise Exception('To use parameter --consider_indels_outside_of_guide, CRISPResso run must be run with the parameter --write_detailed_allele_table')
                     
-                    CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
-                    crispresso2_info['results']['refs'][ref_name]['plot_10i_root'] = os.path.basename(fig_root_10i)
-                    crispresso2_info['results']['refs'][ref_name]['plot_10i_caption'] = f"Figure 10i: Upset plot of base editing changes for amplicon: {ref_name}"
-                    crispresso2_info['results']['refs'][ref_name]['plot_10i_data'] = [('Binary Allele Counts', '10i.' + ref_name + '.binary_allele_counts.txt')]
+                    # create reference/target read alignment
+                    aln_gap_incentive = refs[wt_ref_name]['gap_incentive']
+                    aln_gap_open_arg = args.needleman_wunsch_gap_open
+                    aln_gap_extend_arg = args.needleman_wunsch_gap_extend
+
+                    aln_matrix_loc = args.needleman_wunsch_aln_matrix_loc
+                    if aln_matrix_loc == 'EDNAFULL':
+                        aln_matrix = CRISPResso2Align.make_matrix()
+                    else:
+                        if not os.path.exists(aln_matrix_loc):
+                            raise Exception('Alignment matrix file not found at ' + aln_matrix_loc)
+                        aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
+
+                    # TODO: Not sure if we need to be running this again here... shouldn't this be stored somewhere in refs or df_alleles?
+                    aln_target_seq, aln_ref_seq, aln_score = CRISPResso2Align.global_align(
+                        target_seq,
+                        ref_seq,
+                        matrix=aln_matrix,
+                        gap_incentive=aln_gap_incentive,
+                        gap_open=aln_gap_open_arg,
+                        gap_extend=aln_gap_extend_arg)
+                    
+                    debug('Aligned target:    ' + aln_target_seq)
+                    debug('Aligned reference: ' + aln_ref_seq)
+
+                    # get indices of reference sequence to include in analysis
+                    if args.consider_changes_outside_of_guide:
+                        ref_positions_to_include = [x for x in range(len(ref_seq))]
+                    else:
+                        ref_positions_to_include = refs[wt_ref_name]['include_idxs']
+
+                    ref_changes_dict = get_refpos_values(aln_ref_seq, aln_target_seq)
+                    bp_changes_arr = get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include)
+
+                    debug('Found ' + str(len(bp_changes_arr)) + ' base changes: ' + str(bp_changes_arr))
+                    counts_dict = get_upset_plot_counts(df_alleles, bp_changes_arr, args.consider_indels_outside_of_guide, wt_ref_name)
+
+                    #TODO: do we need to write these files?
+                    write_base_edit_counts(ref_name, counts_dict, bp_changes_arr, _jp)
+
+                    debug('Read ' + str(counts_dict['total_alleles']) + ' alleles with ' + str(counts_dict['total_alleles_reads']) + ' reads')
+                    debug('Got ' + str(counts_dict['total_alleles_on_ref']) + ' alleles on reference "' + wt_ref_name + '" with ' + str(counts_dict['total_alleles_reads_on_ref']) + ' reads')
+
+                    
+                    if len(bp_changes_arr) > 0:
+
+                        fig_root_10i = _jp(f'10i.Base_editing_{wt_ref_name}_upset_plot.by_amplicon_combination.no_indels')
+                        plot_10i_input = {
+                            'fig_root': fig_root_10i,
+                            'ref_name': ref_name,
+                            'bp_changes_arr': bp_changes_arr,
+                            'binary_allele_counts': counts_dict['binary_allele_counts'],
+                        }
+                        
+                        CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
+                        crispresso2_info['results']['refs'][ref_name]['plot_10i_root'] = os.path.basename(fig_root_10i)
+                        crispresso2_info['results']['refs'][ref_name]['plot_10i_caption'] = f"Figure 10i: Upset plot of base editing changes for amplicon: {ref_name}"
+                        crispresso2_info['results']['refs'][ref_name]['plot_10i_data'] = [('Binary Allele Counts', '10i.' + ref_name + '.binary_allele_counts.txt')]
 
 
             for sgRNA_ind, sgRNA_seq in enumerate(sgRNA_sequences):
