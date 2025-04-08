@@ -4847,10 +4847,6 @@ def main():
                     gap_open=aln_gap_open_arg,
                     gap_extend=aln_gap_extend_arg)
                 
-
-                if ref_name == 'HDR':
-                    breakpoint()
-                
                 debug('Aligned target:    ' + aln_target_seq)
                 debug('Aligned reference: ' + aln_ref_seq)
 
