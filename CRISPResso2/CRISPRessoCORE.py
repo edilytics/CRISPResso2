@@ -274,7 +274,6 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
     returns:
      variant payload
     """
-
     aln_scores = []
     best_match_score = -1
     best_match_s1s = []
@@ -537,6 +536,7 @@ def get_consensus_alignment_from_pairs(
             qual_ind_r2 += 1
             aln_ind_r2 += 1
             continue
+
         if r1_in_range and aln_seq_r1[aln_ind_r1] == '-' and r2_in_range and aln_seq_r2[aln_ind_r2] == '-':
             if aln_ref_r1[aln_ind_r1] != aln_ref_r2[aln_ind_r2]:
                 print(f'{aln_ref_r1[aln_ind_r1] = } {aln_ref_r2[aln_ind_r2] = }')
@@ -561,7 +561,7 @@ def get_consensus_alignment_from_pairs(
             if nucs_diff:
                 caching_is_ok = False
             final_aln += this_nuc
-            final_ref += aln_ref_r1[aln_ind_r1] # TODO check this
+            final_ref += aln_ref_r1[aln_ind_r1]
             qual_ind_r1 += 1
             qual_ind_r2 += 1
         elif r1_in_range:
@@ -766,7 +766,7 @@ def get_variant_cache_equal_boundaries(num_unique_sequences, n_processes):
     return boundaries
 
 
-def variant_file_generator_process(seq_list, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id, variants_dir):
+def variant_file_generator_process(seq_list, get_new_variant_object, args, refs, ref_names, aln_matrix, pe_scaffold_dna_info, process_id, variants_dir, quals_list=None):
     """the target of the multiprocessing.Process object, generates the new variants for a subset of the reads in the fastq file and stores them in tsv files
     Parameters
     ----------
@@ -801,7 +801,12 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
     with open(variant_file_path, 'w') as file:
         file.truncate() # Ensures tsv file is empty before writing to it
         for index, fastq_seq in enumerate(seq_list):
-            new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+            if args.crispresso_merge: # If using CRISPResso to merge the passed in function is get_new_variant_object_from_paired
+                fastq1_seq, fastq2_seq = fastq_seq.split('+')
+                fastq1_qual, fastq2_qual = quals_list[index].split('+')
+                new_variant = get_new_variant_object(args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+            else:
+                new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
             # Convert the complex object to a JSON string
             json_string = json.dumps(new_variant, default=custom_encoder)
             variant_lines += f"{fastq_seq}\t{json_string}\n"
@@ -814,7 +819,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
     info(f"Process {process_id + 1} has finished processing {index} unique reads", {'percent_complete': 10})
 
 
-def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_names, refs, args, fastq_write_out=False):
+def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out=False):
     """Processes paired reads by aligning each read to the reference sequence
         This method avoids the use of flash to merge paired-end reads
 
@@ -828,10 +833,17 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         """
 
     N_TOT_READS = 0
-    N_CACHED_ALN = 0 # read was found in cache
-    N_CACHED_NOTALN = 0 #read was found in 'not aligned' cache
-    N_COMPUTED_ALN = 0 # not in cache, aligned to at least 1 sequence with min cutoff
-    N_COMPUTED_NOTALN = 0 #not in cache, not aligned to any sequence with min cutoff
+    N_CACHED_ALN = 0 # number of copies of all aligned reads
+    N_CACHED_NOTALN = 0 # number of copies of all non-aligned reads
+    N_COMPUTED_ALN = 0 # number of unique reads aligned to at least 1 sequence with min cutoff
+    N_COMPUTED_NOTALN = 0 # number of unique reads not aligned to any sequence with min cutoff
+    N_GLOBAL_SUBS = 0 # number of substitutions across all reads - indicator of sequencing quality
+    N_SUBS_OUTSIDE_WINDOW = 0
+    N_MODS_IN_WINDOW = 0 # number of modifications found inside the quantification window
+    N_MODS_OUTSIDE_WINDOW = 0 # number of modifications found outside the quantification window
+    N_READS_IRREGULAR_ENDS = 0 # number of reads with modifications at the 0 or -1 position
+    READ_LENGTH = 0
+    unaligned_reads = []
 
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
@@ -841,85 +853,313 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
     if args.prime_editing_pegRNA_scaffold_seq != "":
         pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
-    not_aln = {} #cache for reads that don't align
 
     if fastq1_filename.endswith('.gz'):
-        fastq1_handle = gzip.open(fastq1_filename, 'rt')
+        fastq1_file = gzip.open(fastq1_filename, 'rt')
     else:
-        fastq1_handle=open(fastq1_filename)
+        fastq1_file=open(fastq1_filename)
 
     if fastq2_filename.endswith('.gz'):
-        fastq2_handle = gzip.open(fastq2_filename, 'rt')
+        fastq2_file = gzip.open(fastq2_filename, 'rt')
     else:
-        fastq2_handle=open(fastq2_filename)
-
-    while(fastq1_handle.readline()):
+        fastq2_file=open(fastq2_filename)
+    # Reading through the fastq file and enriching variantCache as a dictionary with the following:
+        # Key: the unique DNA sequence from the fastq file
+        # Value: an integer that represents how many times we've seen this specific read
+    
+    num_reads = 0
+    fastq1_id = fastq1_file.readline()
+    fastq2_id = fastq2_file.readline()
+    while(fastq1_id and fastq2_id):
+        if num_reads % 50000 == 0 and num_reads != 0:
+            info("Iterating over fastq file to identify reads; %d reads identified."%(num_reads))
         #read through fastq in sets of 4
-        fastq1_seq = fastq1_handle.readline().strip()
-        fastq1_plus = fastq1_handle.readline()
-        fastq1_qual = fastq1_handle.readline().strip()
+        fastq1_seq = fastq1_file.readline().strip()
+        fastq1_plus = fastq1_file.readline()
+        fastq1_qual = fastq1_file.readline().strip()
 
-        fastq2_id = fastq2_handle.readline()
-        fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_handle.readline().strip())
-        fastq2_plus = fastq2_handle.readline()
-        fastq2_qual = fastq2_handle.readline().strip()[::-1]
+        fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_file.readline().strip())
+        fastq2_plus = fastq2_file.readline()
+        fastq2_qual = fastq2_file.readline().strip()[::-1]
+        fastq_read_key = fastq1_seq + '+' + fastq2_seq
+        fastq_quals = fastq1_qual + '+' + fastq2_qual
+        if fastq_read_key in variantCache:
+            # if the read has already been seen, we increment its value by 1 to track number of copies
+            variantCache[fastq_read_key][0] += 1
+        # If the sequence is not in the cache, we create it and set its value to 1
+        elif fastq_read_key not in variantCache:
+            variantCache[fastq_read_key] = [1, fastq_quals]
+        fastq1_id = fastq1_file.readline()
+        fastq2_id = fastq2_file.readline()
+        num_reads += 1
 
-        if (N_TOT_READS % 10000 == 0):
-            info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
+    if fastq1_id is not None or fastq2_id is not None:
+        error("The two fastq files are not the same length. Please check your input files.")
 
-        N_TOT_READS+=1
+    fastq1_file.close()
+    fastq2_file.close()
 
-        #if the sequence has been seen and can't be aligned, skip it
-        #cache the sequence of both r1 and r2 sequences as lookup_fastq_seq
-        lookup_fastq_seq = fastq1_seq + "+" + fastq2_seq
-        if lookup_fastq_seq in not_aln:
-            N_CACHED_NOTALN += 1
-            continue
-        # if the sequence is already associated with a variant in the variant cache, pull it out
-        if lookup_fastq_seq in variantCache:
-            N_CACHED_ALN += 1
-            variantCache[lookup_fastq_seq]['count'] += 1
+    num_unique_reads = len(variantCache.keys())
+    info("Finished reading fastq files; %d unique reads found of %d total reads found "%(num_unique_reads, num_reads))
 
-        # otherwise, create a new variant object, and put it in the cache
+    n_processes = 1
+    if args.n_processes == "max":
+        n_processes = CRISPRessoMultiProcessing.get_max_processes()
+    elif args.n_processes.isdigit():
+        n_processes = int(args.n_processes)
+
+    if n_processes > 1:
+        boundaries = get_variant_cache_equal_boundaries(num_unique_reads, n_processes)
+        processes = [] # list to hold the processes so we can wait for them to complete with join()
+
+        info("Spinning up %d parallel processes to analyze unique reads..."%(n_processes))
+        # We create n_processes, sending each a weighted sublist of the sequences for variant generation
+        variants_dir = output_directory
+        for i in range(n_processes):
+            left_sublist_index = boundaries[i]
+            right_sublist_index = boundaries[i+1]
+            seq_list = list(variantCache.keys())[left_sublist_index:right_sublist_index]
+            qual_list = []
+            for seq in seq_list:
+                qual_list.append(variantCache[seq][1])
+            process = Process(
+                target=variant_file_generator_process,
+                args=(
+                      seq_list,
+                      get_new_variant_object_from_paired,
+                      args,
+                      refs,
+                      ref_names,
+                      aln_matrix,
+                      pe_scaffold_dna_info,
+                      i,
+                      variants_dir,
+                      qual_list,
+                    )
+            )
+            process.start()
+            processes.append(process)
+        for p in processes:
+            p.join() # pauses the main thread until the processes are finished
+        info("Finished merging and aligning paired reads, now generating statistics...", {'percent_complete': 15})
+        
+        re_aln = {} #cache for reads that have discrepancies and need to be processed individually
+        not_aln = {} #cache for reads that don't align
+        if os.path.exists(variants_dir):
+            variant_file_list = []
+            for n_processes in range(n_processes):
+                variant_file_list.append(os.path.join(variants_dir, f"variants_{n_processes}.tsv"))
+            # List all files in the directory
+            for file_path in variant_file_list:
+                # Ensure the file is a .tsv before processing
+                if file_path.endswith(".tsv"):
+                    try:
+                        with open(file_path, 'r') as file:
+                            for index, line in enumerate(file):
+                                # Each line contains a sequence followed by a JSON string
+                                parts = line.strip().split('\t')
+                                if len(parts) == 2:
+                                    seq = parts[0]
+                                    json_data = parts[1]
+                                    variant_dict = json.loads(json_data)
+                                    if variantCache[seq] > 1 and not variant_dict["is_caching_ok"]:
+                                        re_aln[seq] = variant_dict
+                                        del variantCache[seq]
+                                        continue
+                                else:
+                                    error(f"Error splitting line: {line}")
+                                variant_count = variantCache[seq]
+                                N_TOT_READS += variant_count
+                                variant = variant_dict
+                                variant['count'] = variant_count
+                                variantCache[seq] = variant
+                                if variant['best_match_score'] <= 0:
+                                    N_COMPUTED_NOTALN += 1
+                                    N_CACHED_NOTALN += (variant_count - 1)
+                                    if fastq_write_out:
+                                        not_aln[seq] = variant
+                                    # remove the unaligned reads from the cache
+                                    unaligned_reads.append(seq)
+                                elif variant['best_match_score'] > 0:
+                                    variantCache[seq] = variant
+                                    N_COMPUTED_ALN += 1
+                                    N_CACHED_ALN += (variant_count - 1)
+                                    match_name = "variant_" + variant['best_match_name']
+                                    if READ_LENGTH == 0:
+                                        READ_LENGTH = len(variant[match_name]['aln_seq'])
+                                    N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
+                                    N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
+                                    N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
+                                    N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
+                                    if variant[match_name]['irregular_ends']:
+                                        N_READS_IRREGULAR_ENDS += variant_count
+                                if (index % 50000 == 0 and index > 0):
+                                    info("Calculating statistics; %d completed out of %d unique reads"%(index, num_unique_reads))
+                    except FileNotFoundError:
+                        raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso")
+                files_to_remove.append(file_path)
         else:
-            new_variant = get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-            # Edge case where merged alignments are different because of differences in base quality that prefer t
-            #    R1                  R1
-            # ------A--         --G----------           ----A----
-            #qual   HI            Lo
-            # ------A--         --G----------  =>       ----G----
-            #qual   Lo            Hi
-            # but we wouldn't be able to see which alignment outcome would be produces without aligning every single read (no caching?)
-            # Solutions:
-            # 1) (bad) align everything (no cache)
-            # 2) get_new_variant_object_from_paired returns a bool if it had to choose between two bases based on quality - meaning that we couldn't cache future alignements?
+            raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find output folder, try deleting output folder and rerunning CRISPResso")
 
-            # if we shouldn't cache it, change the lookup from the R1 + R2 seqs to "R1 R2 num" where num makes the key unique
-            #TODO: Remove this line if not necessary
-            new_variant['id'] = fastq2_id.split(" ")[0]
-            if not new_variant['caching_is_ok']:
-                inc_counter = 0
-                orig_lookup_fastq_seq = lookup_fastq_seq
-                while lookup_fastq_seq in not_aln or lookup_fastq_seq in variantCache:
-                    lookup_fastq_seq = orig_lookup_fastq_seq + " " + str(inc_counter)
-                    inc_counter += 1
-            if new_variant['best_match_score'] <= 0:
-                N_COMPUTED_NOTALN += 1
-                not_aln[lookup_fastq_seq] = 1
+        for seq in unaligned_reads:
+            del variantCache[seq]
+        
+        for key, variant in variantCache.items():
+            if '+' in key or '&' in key:
+                variantCache[variant['aln_seq']] = variantCache.pop(key)
+
+        if fastq1_filename.endswith('.gz'):
+            fastq1_file = gzip.open(fastq1_filename, 'rt')
+        else:
+            fastq1_file=open(fastq1_filename)
+
+        if fastq2_filename.endswith('.gz'):
+            fastq2_file = gzip.open(fastq2_filename, 'rt')
+        else:
+            fastq2_file=open(fastq2_filename)
+
+        fastq1_id = fastq1_file.readline()
+        fastq2_id = fastq2_file.readline()
+        while(fastq1_id and fastq2_id):
+            #read through fastq in sets of 4
+            fastq1_seq = fastq1_file.readline().strip()
+            fastq1_plus = fastq1_file.readline()
+            fastq1_qual = fastq1_file.readline().strip()
+
+            fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_file.readline().strip())
+            fastq2_plus = fastq2_file.readline()
+            fastq2_qual = fastq2_file.readline().strip()[::-1]
+            fastq_read_key = fastq1_seq + '+' + fastq2_seq
+            if fastq_read_key in re_aln:
+                variant = get_new_variant_object(args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+                # Add to variant cache
+                if variant['aln_seq'] in variantCache:
+                    variantCache[variant['aln_seq']]['count'] += 1
+                    N_TOT_READS += 1
+                    N_CACHED_ALN += 1 # TODO: Maybe computed?
+                    match_name = "variant_" + variant['best_match_name']
+                    if READ_LENGTH == 0:
+                        READ_LENGTH = len(variant[match_name]['aln_seq'])
+                    N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window'])
+                    N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
+                    N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
+                    N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
+                    if variant[match_name]['irregular_ends']:
+                        N_READS_IRREGULAR_ENDS += 1
+                else:
+                    N_TOT_READS += 1
+                    if variant['best_match_score'] <= 0:
+                        if variant['aln_seq'] in not_aln:
+                            N_CACHED_NOTALN += 1
+                        else:
+                            N_COMPUTED_NOTALN += 1
+                            if fastq_write_out:
+                                not_aln[seq] = variant
+                    elif variant['best_match_score'] > 0:
+                        variantCache[seq] = variant
+                        N_COMPUTED_ALN += 1
+                        match_name = "variant_" + variant['best_match_name']
+                        if READ_LENGTH == 0:
+                            READ_LENGTH = len(variant[match_name]['aln_seq'])
+                        N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window'])
+                        N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
+                        N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
+                        N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
+                        if variant[match_name]['irregular_ends']:
+                            N_READS_IRREGULAR_ENDS += 1
+            fastq1_id = fastq1_file.readline()
+            fastq2_id = fastq2_file.readline()
+
+        if fastq1_id is not None or fastq2_id is not None:
+            error("The two fastq files are not the same length. Please check your input files.")
+
+        fastq1_file.close()
+        fastq2_file.close()
+
+    else:
+        if fastq1_filename.endswith('.gz'):
+            fastq1_handle = gzip.open(fastq1_filename, 'rt')
+        else:
+            fastq1_handle=open(fastq1_filename)
+
+        if fastq2_filename.endswith('.gz'):
+            fastq2_handle = gzip.open(fastq2_filename, 'rt')
+        else:
+            fastq2_handle=open(fastq2_filename)
+
+        while(fastq1_handle.readline()):
+            #read through fastq in sets of 4
+            fastq1_seq = fastq1_handle.readline().strip()
+            fastq1_plus = fastq1_handle.readline()
+            fastq1_qual = fastq1_handle.readline().strip()
+
+            fastq2_id = fastq2_handle.readline()
+            fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_handle.readline().strip())
+            fastq2_plus = fastq2_handle.readline()
+            fastq2_qual = fastq2_handle.readline().strip()[::-1]
+
+            if (N_TOT_READS % 10000 == 0):
+                info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
+
+            N_TOT_READS+=1
+
+            #if the sequence has been seen and can't be aligned, skip it
+            #cache the sequence of both r1 and r2 sequences as lookup_fastq_seq
+            lookup_fastq_seq = fastq1_seq + "+" + fastq2_seq
+            if lookup_fastq_seq in not_aln:
+                N_CACHED_NOTALN += 1
+                continue
+            # if the sequence is already associated with a variant in the variant cache, pull it out
+            if lookup_fastq_seq in variantCache:
+                N_CACHED_ALN += 1
+                variantCache[lookup_fastq_seq]['count'] += 1
+
+            # otherwise, create a new variant object, and put it in the cache
             else:
-                N_COMPUTED_ALN += 1
-                variantCache[lookup_fastq_seq] = new_variant
+                new_variant = get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+                # Edge case where merged alignments are different because of differences in base quality that prefer t
+                #    R1                  R1
+                # ------A--         --G----------           ----A----
+                #qual   HI            Lo
+                # ------A--         --G----------  =>       ----G----
+                #qual   Lo            Hi
+                # but we wouldn't be able to see which alignment outcome would be produces without aligning every single read (no caching?)
+                # Solutions:
+                # 1) (bad) align everything (no cache)
+                # 2) get_new_variant_object_from_paired returns a bool if it had to choose between two bases based on quality - meaning that we couldn't cache future alignements?
 
-    fastq1_handle.close()
-    fastq2_handle.close()
+                # if we shouldn't cache it, change the lookup from the R1 + R2 seqs to "R1 R2 num" where num makes the key unique
+                #TODO: Remove this line if not necessary
+                new_variant['id'] = fastq2_id.split(" ")[0]
+                if not new_variant['caching_is_ok']:
+                    inc_counter = 0
+                    orig_lookup_fastq_seq = lookup_fastq_seq
+                    while lookup_fastq_seq in not_aln or lookup_fastq_seq in variantCache:
+                        lookup_fastq_seq = orig_lookup_fastq_seq + " " + str(inc_counter)
+                        inc_counter += 1
+                if new_variant['best_match_score'] <= 0:
+                    N_COMPUTED_NOTALN += 1
+                    not_aln[lookup_fastq_seq] = 1
+                else:
+                    N_COMPUTED_ALN += 1
+                    variantCache[lookup_fastq_seq] = new_variant
+
+        fastq1_handle.close()
+        fastq2_handle.close()
 
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
     aln_stats = {"N_TOT_READS" : N_TOT_READS,
-               "N_CACHED_ALN" : N_CACHED_ALN,
-               "N_CACHED_NOTALN" : N_CACHED_NOTALN,
-               "N_COMPUTED_ALN" : N_COMPUTED_ALN,
-               "N_COMPUTED_NOTALN" : N_COMPUTED_NOTALN
-               }
+        "N_CACHED_ALN" : N_CACHED_ALN,
+        "N_CACHED_NOTALN" : N_CACHED_NOTALN,
+        "N_COMPUTED_ALN" : N_COMPUTED_ALN,
+        "N_COMPUTED_NOTALN" : N_COMPUTED_NOTALN,
+        "N_GLOBAL_SUBS": N_GLOBAL_SUBS,
+        "N_SUBS_OUTSIDE_WINDOW": N_SUBS_OUTSIDE_WINDOW,
+        "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
+        "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
+        "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
+        "READ_LENGTH": READ_LENGTH
+        }
     if fastq_write_out:
         return aln_stats, not_aln
     return(aln_stats)
