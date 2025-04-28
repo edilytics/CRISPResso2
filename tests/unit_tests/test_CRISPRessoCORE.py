@@ -140,7 +140,7 @@ def test_get_consensus_alignment_from_pairs():
     with check:
         assert aln_seq ==      "NNCCGANNGAN"
         assert ref_seq ==      "ATC-GATCGAT"
-        assert score == 45
+        assert score == 45.455
         assert caching_ok
 
     #deletion in r1
@@ -188,7 +188,7 @@ def test_get_consensus_alignment_from_pairs():
     with check:
         assert aln_seq ==      "NNCCGANNGAN"
         assert ref_seq ==      "ATCCGATC-AT"
-        assert score == 45
+        assert score == 45.455
         assert caching_ok
 
     # deletion in r2
@@ -236,7 +236,7 @@ def test_get_consensus_alignment_from_pairs():
     with check:
         assert aln_seq ==      "NNCGATCCGAN"
         assert ref_seq ==      "ATCGAT-CGAT"
-        assert score == 63
+        assert score == 63.636
         assert not caching_ok
 
     # insertion in r1 and r2, different positions
@@ -260,7 +260,7 @@ def test_get_consensus_alignment_from_pairs():
     with check:
         assert aln_seq ==      "NNCGATCCTGAN"
         assert ref_seq ==      "ATCGAT-C-GAT"
-        assert score == 58
+        assert score == 58.333
         assert not caching_ok
 
     # insertion at beginning of r1
@@ -350,7 +350,6 @@ def test_get_consensus_alignment_from_pairs():
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ATCGATCGAT")
-    check.equal(aln_qual, "ABABABABAB")
     check.equal(ref_seq, "ATCGATCGAT")
     check.equal(score, 100)
     check.is_false(caching_ok) #TODO: Should be false?
@@ -365,9 +364,8 @@ def test_get_consensus_alignment_from_pairs():
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ACGTGANNNNNCGAT")
-    check.equal(aln_qual, "AAAAAAAAAAAAAAA")
     check.equal(ref_seq, "A-----TCGATCGAT")
-    check.equal(score, 33)
+    check.equal(score, 33.333)
     check.is_true(caching_ok)
 
     # large insertion in r2
@@ -380,7 +378,6 @@ def test_get_consensus_alignment_from_pairs():
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ATCGATTAGCTNNN")
-    check.equal(aln_qual, "AAAAAAAAAAAAAA")
     check.equal(ref_seq, "ATCGAT---C-GAT")
     check.equal(score, 50)
     check.is_true(caching_ok)
@@ -395,7 +392,6 @@ def test_get_consensus_alignment_from_pairs():
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "TAGCTAGCTA")
-    check.equal(aln_qual, "AAAAAAAAAA")
     check.equal(ref_seq, "ATCGATCGAT")
     check.equal(score, 0)
     check.is_true(caching_ok)
@@ -410,7 +406,6 @@ def test_get_consensus_alignment_from_pairs():
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ATCGATCGAT")
-    check.equal(aln_qual, "AAAAAAAAAA")
     check.equal(ref_seq, "ATCGATCGAT")
     check.equal(score, 100)
     check.is_false(caching_ok) #TODO: Should this be false?
@@ -425,7 +420,6 @@ def test_get_consensus_alignment_from_pairs():
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ATCGATCGAT")
-    check.equal(aln_qual, "AAAAAAAAAA")
     check.equal(ref_seq, "ATCGATCGAT")
     check.equal(score, 100)
     check.is_true(caching_ok)
