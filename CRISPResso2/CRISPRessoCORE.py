@@ -18,6 +18,7 @@ import sys
 import subprocess as sb
 import traceback
 import zipfile
+import time
 
 from collections import Counter
 from copy import deepcopy
@@ -425,7 +426,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
 
     return new_variant
 
-# STUFF
+
 def get_greater_qual_nuc(nuc1, qual1, nuc2, qual2, is_best_aln_r1):
     """
     Gets the base with the higher quality if nuc1 != nuc2, otherwise the base with the higher alignment score if qual1 == qual2
@@ -444,13 +445,13 @@ def get_greater_qual_nuc(nuc1, qual1, nuc2, qual2, is_best_aln_r1):
     nucs_diff: whether the nucleotides were different
     """
     if nuc1 == nuc2:
-        return nuc1, False
+        return nuc1, False, qual1 if ord(qual1) >= ord(qual2) else qual2
     elif ord(qual1) == ord(qual2):
-        return nuc1 if is_best_aln_r1 else nuc2, True
+        return nuc1 if is_best_aln_r1 else nuc2, True, qual2
     elif ord(qual1) > ord(qual2):
-        return nuc1, True
+        return nuc1, True, qual1
     else:
-        return nuc2, True
+        return nuc2, True, qual2
 
 def get_consensus_alignment_from_pairs(
     aln_seq_r1,
@@ -461,6 +462,7 @@ def get_consensus_alignment_from_pairs(
     aln_ref_r2,
     score_r2,
     qual_r2,
+    aln_matrix,
 ):
     """
     Creates a consensus alignment from alignments of two paired-end reads
@@ -483,7 +485,6 @@ def get_consensus_alignment_from_pairs(
                    If the merged alignment had to choose between R1 or R2 bases at a position based on quality, the merged alignment can't be cached
                    because R1/R2 pair with the same sequence may have different qualities resulting in different alignments
     """
-
     # three sets of indices
     aln_ind_r1 = 0  # indexes in r1 aln_seq_r1 (including gaps)
     aln_ind_r2 = 0
@@ -498,6 +499,7 @@ def get_consensus_alignment_from_pairs(
 
     final_aln = ""
     final_ref = ""
+    final_qual = ""
 
     is_best_aln_r1 = score_r1 >= score_r2
 
@@ -508,7 +510,7 @@ def get_consensus_alignment_from_pairs(
         r1_in_range = aln_ind_r1 < len(aln_ref_r1)
         r2_in_range = aln_ind_r2 < len(aln_ref_r2)
         if r1_in_range and aln_ref_r1[aln_ind_r1] == '-' and r2_in_range and aln_ref_r2[aln_ind_r2] == '-':
-            this_nuc, nucs_diff = get_greater_qual_nuc(
+            this_nuc, nucs_diff, this_qual = get_greater_qual_nuc(
                 aln_seq_r1[aln_ind_r1],
                 qual_r1[qual_ind_r1],
                 aln_seq_r2[aln_ind_r2],
@@ -519,6 +521,7 @@ def get_consensus_alignment_from_pairs(
                 caching_is_ok = False
             final_aln += this_nuc
             final_ref += '-'
+            final_qual += this_qual
             qual_ind_r1 += 1
             qual_ind_r2 += 1
             aln_ind_r1 += 1
@@ -527,12 +530,14 @@ def get_consensus_alignment_from_pairs(
         elif r1_in_range and aln_ref_r1[aln_ind_r1] == '-':
             final_aln += aln_seq_r1[aln_ind_r1]
             final_ref += '-'
+            final_qual += qual_r1[qual_ind_r1]
             qual_ind_r1 += 1
             aln_ind_r1 += 1
             continue
         elif r2_in_range and aln_ref_r2[aln_ind_r2] == '-':
             final_aln += aln_seq_r2[aln_ind_r2]
             final_ref += '-'
+            final_qual += qual_r2[qual_ind_r2]
             qual_ind_r2 += 1
             aln_ind_r2 += 1
             continue
@@ -545,13 +550,15 @@ def get_consensus_alignment_from_pairs(
         elif r1_in_range and aln_seq_r1[aln_ind_r1] == '-' and r2_in_range and aln_seq_r2[aln_ind_r2] != '-':
             final_aln += aln_seq_r2[aln_ind_r2]
             final_ref += aln_ref_r2[aln_ind_r2]
+            final_qual += qual_r2[qual_ind_r2]
             qual_ind_r2 += 1
         elif r1_in_range and aln_seq_r1[aln_ind_r1] != '-' and r2_in_range and aln_seq_r2[aln_ind_r2] == '-':
             final_aln += aln_seq_r1[aln_ind_r1]
             final_ref += aln_ref_r1[aln_ind_r1]
+            final_qual += qual_r1[qual_ind_r1]
             qual_ind_r1 += 1
         elif r1_in_range and r2_in_range:
-            this_nuc, nucs_diff = get_greater_qual_nuc(
+            this_nuc, nucs_diff, this_qual = get_greater_qual_nuc(
                 aln_seq_r1[aln_ind_r1],
                 qual_r1[qual_ind_r1],
                 aln_seq_r2[aln_ind_r2],
@@ -562,32 +569,46 @@ def get_consensus_alignment_from_pairs(
                 caching_is_ok = False
             final_aln += this_nuc
             final_ref += aln_ref_r1[aln_ind_r1]
+            final_qual += this_qual
             qual_ind_r1 += 1
             qual_ind_r2 += 1
         elif r1_in_range:
             if aln_seq_r1[aln_ind_r1] == '-' and ind_start_r1 <= aln_ind_r1 <= ind_stop_r1:
                 final_aln += 'N'
+                final_qual += qual_r1[qual_ind_r1]
             else:
                 final_aln += aln_seq_r1[aln_ind_r1]
+                final_qual += qual_r1[qual_ind_r1]
             final_ref += aln_ref_r1[aln_ind_r1]
             qual_ind_r1 += 1
         elif r2_in_range:
             if aln_seq_r2[aln_ind_r2] == '-' and ind_start_r2 <= aln_ind_r2 <= ind_stop_r2:
                 final_aln += 'N'
+                final_qual += qual_r2[qual_ind_r2]
             else:
                 final_aln += aln_seq_r2[aln_ind_r2]
+                final_qual += qual_r2[qual_ind_r2]
             final_ref += aln_ref_r2[aln_ind_r2]
             qual_ind_r2 += 1
 
         aln_ind_r1 += 1
         aln_ind_r2 += 1
 
+    while final_ref[0] == '-':
+        final_ref = final_ref[1:]
+        final_aln = final_aln[1:]
+        final_qual = final_qual[1:]
+    while final_ref[-1] == '-':
+        final_ref = final_ref[:-1]
+        final_aln = final_aln[:-1]
+        final_qual = final_qual[:-1]
+
     final_homology_score = 0
     for i in range(len(final_ref)):
         if final_ref[i] == final_aln[i]:
             final_homology_score += 1
 
-    return final_aln, final_ref, int(100 * final_homology_score / float(len(final_ref))), caching_is_ok
+    return final_aln, final_qual, final_ref, round(float(100 * final_homology_score / float(len(final_ref))), 3), caching_is_ok
 
 
 def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual, refs, ref_names, aln_matrix, pe_scaffold_dna_info):
@@ -633,34 +654,36 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
         if found_forward_count > args.aln_seed_min and found_reverse_count == 0:
             r1_fws1, r1_fws2, r1_fwscore = CRISPResso2Align.global_align(fastq1_seq, refs[ref_name]['sequence'], matrix=aln_matrix, gap_incentive=refs[ref_name]['gap_incentive'], gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
             r2_fws1, r2_fws2, r2_fwscore = CRISPResso2Align.global_align(fastq2_seq, refs[ref_name]['sequence'], matrix=aln_matrix, gap_incentive=refs[ref_name]['gap_incentive'], gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
-            s1, s2, score, caching_is_ok = get_consensus_alignment_from_pairs(r1_fws1, r1_fws2, r1_fwscore, fastq1_qual, r2_fws1, r2_fws2, r2_fwscore, fastq2_qual)
+            s1, qual, s2, score, caching_is_ok = get_consensus_alignment_from_pairs(r1_fws1, r1_fws2, r1_fwscore, fastq1_qual, r2_fws1, r2_fws2, r2_fwscore, fastq2_qual, aln_matrix)
         elif found_forward_count == 0 and found_reverse_count > args.aln_seed_min:
             r1_rvs1, r1_rvs2, r1_rvscore = CRISPResso2Align.global_align(CRISPRessoShared.reverse_complement(fastq1_seq), refs[ref_name]['sequence'], matrix=aln_matrix, gap_incentive=refs[ref_name]['gap_incentive'], gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
             r2_rvs1, r2_rvs2, r2_rvscore = CRISPResso2Align.global_align(CRISPRessoShared.reverse_complement(fastq2_seq), refs[ref_name]['sequence'], matrix=aln_matrix, gap_incentive=refs[ref_name]['gap_incentive'], gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
-            rvs1, rvs2, rvscore, caching_is_ok = get_consensus_alignment_from_pairs(r1_rvs1, r1_rvs2, r1_rvscore, fastq1_qual, r2_rvs1, r2_rvs2, r2_rvscore, fastq2_qual)
+            rvs1, rvqual, rvs2, rvscore, caching_is_ok = get_consensus_alignment_from_pairs(r1_rvs1, r1_rvs2, r1_rvscore, fastq1_qual, r2_rvs1, r2_rvs2, r2_rvscore, fastq2_qual, aln_matrix)
             s1 = rvs1
+            qual = rvqual
             s2 = rvs2
             score = rvscore
         else:
             r1_fws1, r1_fws2, r1_fwscore = CRISPResso2Align.global_align(fastq1_seq, refs[ref_name]['sequence'], matrix=aln_matrix, gap_incentive=refs[ref_name]['gap_incentive'], gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
             r2_fws1, r2_fws2, r2_fwscore = CRISPResso2Align.global_align(fastq2_seq, refs[ref_name]['sequence'], matrix=aln_matrix, gap_incentive=refs[ref_name]['gap_incentive'], gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
-            fws1, fws2, fwscore, caching_is_ok = get_consensus_alignment_from_pairs(r1_fws1, r1_fws2, r1_fwscore, fastq1_qual, r2_fws1, r2_fws2, r2_fwscore, fastq2_qual)
+            fws1, fwqual, fws2, fwscore, caching_is_ok = get_consensus_alignment_from_pairs(r1_fws1, r1_fws2, r1_fwscore, fastq1_qual, r2_fws1, r2_fws2, r2_fwscore, fastq2_qual, aln_matrix)
             r1_rvs1, r1_rvs2, r1_rvscore = CRISPResso2Align.global_align(CRISPRessoShared.reverse_complement(fastq1_seq), refs[ref_name]['sequence'], matrix=aln_matrix, gap_incentive=refs[ref_name]['gap_incentive'], gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
             r2_rvs1, r2_rvs2, r2_rvscore = CRISPResso2Align.global_align(CRISPRessoShared.reverse_complement(fastq2_seq), refs[ref_name]['sequence'], matrix=aln_matrix, gap_incentive=refs[ref_name]['gap_incentive'], gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend,)
-            rvs1, rvs2, rvscore, caching_is_ok = get_consensus_alignment_from_pairs(r1_rvs1, r1_rvs2, r1_rvscore, fastq1_qual, r2_rvs1, r2_rvs2, r2_rvscore, fastq2_qual)
+            rvs1, rvqual, rvs2, rvscore, caching_is_ok = get_consensus_alignment_from_pairs(r1_rvs1, r1_rvs2, r1_rvscore, fastq1_qual, r2_rvs1, r2_rvs2, r2_rvscore, fastq2_qual, aln_matrix)
 
             s1 = fws1
+            qual = fwqual
             s2 = fws2
             score = fwscore
             if (rvscore > fwscore):
                 s1 = rvs1
+                qual = rvqual
                 s2 = rvs2
                 score = rvscore
 
 #                print "for " + ref_name + " got fws1: " + str(fws1) + " and fws2: " + str(fws2) + " score: " +str(fwscore)
         aln_scores.append(score)
-        ref_aln_details.append((ref_name, s1, s2, score))
-
+        ref_aln_details.append((ref_name, s1, s2, score, qual))
         #reads are matched to the reference to which they best align. The 'min_aln_score' is calculated using only the changes in 'include_idxs'
         if score > best_match_score and score > refs[ref_name]['min_aln_score']:
             best_match_score = score
@@ -701,6 +724,23 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
             elif not args.ignore_substitutions and payload['substitution_n'] > 0:
                 is_modified = True
 
+            payload['irregular_ends'] = False
+            if best_match_s1s[idx][0] == '-' or best_match_s2s[idx][0] == '-' or best_match_s1s[idx][0] != best_match_s2s[idx][0]:
+                payload['irregular_ends'] = True
+            elif best_match_s1s[idx][-1] == '-' or best_match_s2s[idx][-1] == '-' or best_match_s1s[idx][-1] != best_match_s2s[idx][-1]:
+                payload['irregular_ends'] = True
+
+            #Insertions out of quantification window
+            payload['insertions_outside_window'] = (len(payload['all_insertion_positions'])/2) - (len(payload['insertion_positions'])/2)
+            #Deletions out of quantification window
+            payload['deletions_outside_window'] = len(payload['all_deletion_coordinates']) - len(payload['deletion_coordinates'])
+            #Substitutions out of quantification window
+            payload['substitutions_outside_window'] = len(payload['all_substitution_positions']) - len(payload['substitution_positions'])
+            #Sums
+            payload['total_mods'] = (len(payload['all_insertion_positions'])/2) + len(payload['all_deletion_positions']) + len(payload['all_substitution_positions'])
+            payload['mods_in_window'] = payload['substitution_n'] + payload['deletion_n'] + payload['insertion_n']
+            payload['mods_outside_window'] = payload['total_mods'] - payload['mods_in_window']
+
             if is_modified:
                 class_names.append(best_match_name+"_MODIFIED")
                 payload['classification'] = 'MODIFIED'
@@ -725,7 +765,11 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
         return new_variant #return new variant with best match score of 0, but include the scores of insufficient alignments
 
     #handle ambiguous alignments
-    if len(best_match_names) > 1 and not args.expand_ambiguous_alignments: #got 'Ambiguous' -- don't count toward total (e.g. indels at each position for the ref)
+    if len(best_match_names) > 1:
+        if args.assign_ambiguous_alignments_to_first_reference: #if ambiguous, and this flag is set, just assign to the first amplicon
+            new_variant['class_name'] = class_names[0]
+            new_variant['aln_ref_names'] = [best_match_names[0]]
+        elif not args.expand_ambiguous_alignments: #got 'Ambiguous' -- don't count toward total (e.g. indels at each position for the ref)
             new_variant['class_name'] = 'AMBIGUOUS'
 
     #search for prime editing scaffold
@@ -792,7 +836,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         if isinstance(obj, CRISPRessoCOREResources.ResultsSlotsDict):
-            return {key: obj[key] for key in obj.__slots__}
+            return {key: getattr(obj, key) for key in getattr(obj, '__slots__', []) if hasattr(obj, key)}
         raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
     variant_file_path = os.path.join(variants_dir, f"variants_{process_id}.tsv")
@@ -803,7 +847,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
         for index, fastq_seq in enumerate(seq_list):
             if args.crispresso_merge: # If using CRISPResso to merge the passed in function is get_new_variant_object_from_paired
                 fastq1_seq, fastq2_seq = fastq_seq.split('+')
-                fastq1_qual, fastq2_qual = quals_list[index].split('+')
+                fastq1_qual, fastq2_qual = quals_list[index].split(' ')
                 new_variant = get_new_variant_object(args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
             else:
                 new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
@@ -819,7 +863,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
     info(f"Process {process_id + 1} has finished processing {index} unique reads", {'percent_complete': 10})
 
 
-def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out=False):
+def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out=False, fastq_write_out_file=None):
     """Processes paired reads by aligning each read to the reference sequence
         This method avoids the use of flash to merge paired-end reads
 
@@ -853,62 +897,65 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
     if args.prime_editing_pegRNA_scaffold_seq != "":
         pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
-
-    if fastq1_filename.endswith('.gz'):
-        fastq1_file = gzip.open(fastq1_filename, 'rt')
-    else:
-        fastq1_file=open(fastq1_filename)
-
-    if fastq2_filename.endswith('.gz'):
-        fastq2_file = gzip.open(fastq2_filename, 'rt')
-    else:
-        fastq2_file=open(fastq2_filename)
-    # Reading through the fastq file and enriching variantCache as a dictionary with the following:
-        # Key: the unique DNA sequence from the fastq file
-        # Value: an integer that represents how many times we've seen this specific read
-    
-    num_reads = 0
-    fastq1_id = fastq1_file.readline()
-    fastq2_id = fastq2_file.readline()
-    while(fastq1_id and fastq2_id):
-        if num_reads % 50000 == 0 and num_reads != 0:
-            info("Iterating over fastq file to identify reads; %d reads identified."%(num_reads))
-        #read through fastq in sets of 4
-        fastq1_seq = fastq1_file.readline().strip()
-        fastq1_plus = fastq1_file.readline()
-        fastq1_qual = fastq1_file.readline().strip()
-
-        fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_file.readline().strip())
-        fastq2_plus = fastq2_file.readline()
-        fastq2_qual = fastq2_file.readline().strip()[::-1]
-        fastq_read_key = fastq1_seq + '+' + fastq2_seq
-        fastq_quals = fastq1_qual + '+' + fastq2_qual
-        if fastq_read_key in variantCache:
-            # if the read has already been seen, we increment its value by 1 to track number of copies
-            variantCache[fastq_read_key][0] += 1
-        # If the sequence is not in the cache, we create it and set its value to 1
-        elif fastq_read_key not in variantCache:
-            variantCache[fastq_read_key] = [1, fastq_quals]
-        fastq1_id = fastq1_file.readline()
-        fastq2_id = fastq2_file.readline()
-        num_reads += 1
-
-    if fastq1_id is not None or fastq2_id is not None:
-        error("The two fastq files are not the same length. Please check your input files.")
-
-    fastq1_file.close()
-    fastq2_file.close()
-
-    num_unique_reads = len(variantCache.keys())
-    info("Finished reading fastq files; %d unique reads found of %d total reads found "%(num_unique_reads, num_reads))
-
     n_processes = 1
     if args.n_processes == "max":
         n_processes = CRISPRessoMultiProcessing.get_max_processes()
     elif args.n_processes.isdigit():
         n_processes = int(args.n_processes)
 
+    if n_processes > 1 and fastq_write_out:
+        n_processes = 1
+        info("The number of processes is set to 1 because fastq write out is enabled.")
+
     if n_processes > 1:
+        if fastq1_filename.endswith('.gz'):
+            fastq1_file = gzip.open(fastq1_filename, 'rt')
+        else:
+            fastq1_file=open(fastq1_filename)
+
+        if fastq2_filename.endswith('.gz'):
+            fastq2_file = gzip.open(fastq2_filename, 'rt')
+        else:
+            fastq2_file=open(fastq2_filename)
+        # Reading through the fastq file and enriching variantCache as a dictionary with the following:
+            # Key: the unique DNA sequence from the fastq file
+            # Value: an integer that represents how many times we've seen this specific read
+        
+        num_reads = 0
+        fastq1_id = fastq1_file.readline()
+        fastq2_id = fastq2_file.readline()
+        while(fastq1_id and fastq2_id):
+            if num_reads % 50000 == 0 and num_reads != 0:
+                info("Iterating over fastq file to identify reads; %d reads identified."%(num_reads))
+            #read through fastq in sets of 4
+            fastq1_seq = fastq1_file.readline().strip()
+            fastq1_plus = fastq1_file.readline()
+            fastq1_qual = fastq1_file.readline().strip()
+
+            fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_file.readline().strip())
+            fastq2_plus = fastq2_file.readline()
+            fastq2_qual = fastq2_file.readline().strip()[::-1]
+            fastq_read_key = fastq1_seq + '+' + fastq2_seq
+            fastq_quals = fastq1_qual + ' ' + fastq2_qual
+            if fastq_read_key in variantCache:
+                # if the read has already been seen, we increment its value by 1 to track number of copies
+                variantCache[fastq_read_key][0] += 1
+            # If the sequence is not in the cache, we create it and set its value to 1
+            elif fastq_read_key not in variantCache:
+                variantCache[fastq_read_key] = [1, fastq_quals]
+            fastq1_id = fastq1_file.readline()
+            fastq2_id = fastq2_file.readline()
+            num_reads += 1
+
+        if fastq1_id is not None or fastq2_id is not None:
+            error("The two fastq files are not the same length. Please check your input files.")
+
+        fastq1_file.close()
+        fastq2_file.close()
+
+        num_unique_reads = len(variantCache.keys())
+        info("Finished reading fastq files; %d unique reads found of %d total reads found "%(num_unique_reads, num_reads))
+
         boundaries = get_variant_cache_equal_boundaries(num_unique_reads, n_processes)
         processes = [] # list to hold the processes so we can wait for them to complete with join()
 
@@ -941,7 +988,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
             processes.append(process)
         for p in processes:
             p.join() # pauses the main thread until the processes are finished
-        info("Finished merging and aligning paired reads, now generating statistics...", {'percent_complete': 15})
+        info("Merging and aligning non processable reads.", {'percent_complete': 12})
         
         re_aln = {} #cache for reads that have discrepancies and need to be processed individually
         not_aln = {} #cache for reads that don't align
@@ -958,21 +1005,21 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                             for index, line in enumerate(file):
                                 # Each line contains a sequence followed by a JSON string
                                 parts = line.strip().split('\t')
+                                variant_dict = {}
                                 if len(parts) == 2:
                                     seq = parts[0]
                                     json_data = parts[1]
                                     variant_dict = json.loads(json_data)
-                                    if variantCache[seq] > 1 and not variant_dict["is_caching_ok"]:
+                                    if variantCache[seq][0] > 1 and not variant_dict["caching_is_ok"]:
                                         re_aln[seq] = variant_dict
                                         del variantCache[seq]
                                         continue
                                 else:
                                     error(f"Error splitting line: {line}")
-                                variant_count = variantCache[seq]
+                                variant_count = variantCache[seq][0]
                                 N_TOT_READS += variant_count
                                 variant = variant_dict
                                 variant['count'] = variant_count
-                                variantCache[seq] = variant
                                 if variant['best_match_score'] <= 0:
                                     N_COMPUTED_NOTALN += 1
                                     N_CACHED_NOTALN += (variant_count - 1)
@@ -984,91 +1031,105 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                     variantCache[seq] = variant
                                     N_COMPUTED_ALN += 1
                                     N_CACHED_ALN += (variant_count - 1)
-                                    match_name = "variant_" + variant['best_match_name']
-                                    if READ_LENGTH == 0:
-                                        READ_LENGTH = len(variant[match_name]['aln_seq'])
-                                    N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
-                                    N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
-                                    N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
-                                    N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
-                                    if variant[match_name]['irregular_ends']:
-                                        N_READS_IRREGULAR_ENDS += variant_count
+                                    if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:
+                                        for name in variant['aln_ref_names']:
+                                            match_name = "variant_" + name
+                                            if READ_LENGTH == 0:
+                                                READ_LENGTH = len(variant[match_name]['aln_seq'])
+                                            N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
+                                            N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
+                                            N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
+                                            N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
+                                            if variant[match_name]['irregular_ends']:
+                                                N_READS_IRREGULAR_ENDS += variant_count
                                 if (index % 50000 == 0 and index > 0):
                                     info("Calculating statistics; %d completed out of %d unique reads"%(index, num_unique_reads))
                     except FileNotFoundError:
                         raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso")
                 files_to_remove.append(file_path)
+            info("Finished merging and aligning paired reads, now generating statistics...", {'percent_complete': 15})
         else:
             raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find output folder, try deleting output folder and rerunning CRISPResso")
 
         for seq in unaligned_reads:
             del variantCache[seq]
-        
-        for key, variant in variantCache.items():
-            if '+' in key or '&' in key:
-                variantCache[variant['aln_seq']] = variantCache.pop(key)
 
-        if fastq1_filename.endswith('.gz'):
-            fastq1_file = gzip.open(fastq1_filename, 'rt')
-        else:
-            fastq1_file=open(fastq1_filename)
-
-        if fastq2_filename.endswith('.gz'):
-            fastq2_file = gzip.open(fastq2_filename, 'rt')
-        else:
-            fastq2_file=open(fastq2_filename)
-
-        fastq1_id = fastq1_file.readline()
-        fastq2_id = fastq2_file.readline()
-        while(fastq1_id and fastq2_id):
-            #read through fastq in sets of 4
-            fastq1_seq = fastq1_file.readline().strip()
-            fastq1_plus = fastq1_file.readline()
-            fastq1_qual = fastq1_file.readline().strip()
-
-            fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_file.readline().strip())
-            fastq2_plus = fastq2_file.readline()
-            fastq2_qual = fastq2_file.readline().strip()[::-1]
-            fastq_read_key = fastq1_seq + '+' + fastq2_seq
-            if fastq_read_key in re_aln:
-                variant = get_new_variant_object(args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
-                # Add to variant cache
-                if variant['aln_seq'] in variantCache:
-                    variantCache[variant['aln_seq']]['count'] += 1
-                    N_TOT_READS += 1
-                    N_CACHED_ALN += 1 # TODO: Maybe computed?
-                    match_name = "variant_" + variant['best_match_name']
-                    if READ_LENGTH == 0:
-                        READ_LENGTH = len(variant[match_name]['aln_seq'])
-                    N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window'])
-                    N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
-                    N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
-                    N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
-                    if variant[match_name]['irregular_ends']:
-                        N_READS_IRREGULAR_ENDS += 1
+        for key in list(variantCache.keys()):
+            if '+' in key:
+                variant = variantCache[key]
+                new_key = variant["variant_" + variant['aln_ref_names'][0]]['aln_seq']
+                if new_key in variantCache.keys():
+                    variantCache[new_key]['count'] += variant['count']
+                    variantCache.pop(key)
                 else:
-                    N_TOT_READS += 1
-                    if variant['best_match_score'] <= 0:
-                        if variant['aln_seq'] in not_aln:
-                            N_CACHED_NOTALN += 1
-                        else:
-                            N_COMPUTED_NOTALN += 1
-                            if fastq_write_out:
-                                not_aln[seq] = variant
-                    elif variant['best_match_score'] > 0:
-                        variantCache[seq] = variant
-                        N_COMPUTED_ALN += 1
-                        match_name = "variant_" + variant['best_match_name']
-                        if READ_LENGTH == 0:
-                            READ_LENGTH = len(variant[match_name]['aln_seq'])
-                        N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window'])
-                        N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
-                        N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
-                        N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
-                        if variant[match_name]['irregular_ends']:
-                            N_READS_IRREGULAR_ENDS += 1
+                    variantCache[new_key] = variant
+                    variantCache.pop(key)
+
+        if len(re_aln.keys()) > 0:
+            if fastq1_filename.endswith('.gz'):
+                fastq1_file = gzip.open(fastq1_filename, 'rt')
+            else:
+                fastq1_file=open(fastq1_filename)
+
+            if fastq2_filename.endswith('.gz'):
+                fastq2_file = gzip.open(fastq2_filename, 'rt')
+            else:
+                fastq2_file=open(fastq2_filename)
+
             fastq1_id = fastq1_file.readline()
             fastq2_id = fastq2_file.readline()
+            while(fastq1_id and fastq2_id):
+                #read through fastq in sets of 4
+                fastq1_seq = fastq1_file.readline().strip()
+                fastq1_plus = fastq1_file.readline()
+                fastq1_qual = fastq1_file.readline().strip()
+
+                fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_file.readline().strip())
+                fastq2_plus = fastq2_file.readline()
+                fastq2_qual = fastq2_file.readline().strip()[::-1]
+                fastq_read_key = fastq1_seq + '+' + fastq2_seq
+                if fastq_read_key in re_aln:
+                    variant = get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
+                    if variant['best_match_score'] <= 0:
+                        N_TOT_READS += 1
+                        N_COMPUTED_NOTALN += 1
+                        if fastq_write_out:
+                            not_aln[variant['ref_aln_details'][0]] = variant
+                    else:
+                        match_name = "variant_" + variant['aln_ref_names'][0]
+                        if variant[match_name]['aln_seq'] in variantCache:
+                            variantCache[variant[match_name]['aln_seq']]['count'] += 1
+                            N_TOT_READS += 1
+                            N_COMPUTED_ALN += 1
+                            if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:
+                                for name in variant['aln_ref_names']:
+                                    match_name = "variant_" + name
+                                    if READ_LENGTH == 0:
+                                        READ_LENGTH = len(variant[match_name]['aln_seq'])
+                                    N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window'])
+                                    N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
+                                    N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
+                                    N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
+                                    if variant[match_name]['irregular_ends']:
+                                        N_READS_IRREGULAR_ENDS += 1
+                        else:
+                            N_TOT_READS += 1
+                            N_COMPUTED_ALN += 1
+                            variantCache[variant[match_name]['aln_seq']] = variant
+                            if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:                   
+                                for name in variant['aln_ref_names']:
+                                    match_name = "variant_" + name
+                                    if READ_LENGTH == 0:
+                                        READ_LENGTH = len(variant[match_name]['aln_seq'])
+                                    N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window'])
+                                    N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window']
+                                    N_MODS_IN_WINDOW += variant[match_name]['mods_in_window']
+                                    N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window']
+                                    if variant[match_name]['irregular_ends']:
+                                        N_READS_IRREGULAR_ENDS += 1
+
+                fastq1_id = fastq1_file.readline()
+                fastq2_id = fastq2_file.readline()
 
         if fastq1_id is not None or fastq2_id is not None:
             error("The two fastq files are not the same length. Please check your input files.")
@@ -1087,13 +1148,20 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         else:
             fastq2_handle=open(fastq2_filename)
 
-        while(fastq1_handle.readline()):
+        if fastq_write_out:
+            fastq_write_out_handle = open(fastq_write_out_file, 'w')
+
+        not_aln = {} #cache for reads that don't align
+        while(True):
             #read through fastq in sets of 4
+            fastq1_id = fastq1_handle.readline().strip()
+            if not fastq1_id:
+                break
             fastq1_seq = fastq1_handle.readline().strip()
             fastq1_plus = fastq1_handle.readline()
             fastq1_qual = fastq1_handle.readline().strip()
 
-            fastq2_id = fastq2_handle.readline()
+            fastq2_id = fastq2_handle.readline().strip()
             fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_handle.readline().strip())
             fastq2_plus = fastq2_handle.readline()
             fastq2_qual = fastq2_handle.readline().strip()[::-1]
@@ -1102,17 +1170,56 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                 info("Processing reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
 
             N_TOT_READS+=1
-
             #if the sequence has been seen and can't be aligned, skip it
             #cache the sequence of both r1 and r2 sequences as lookup_fastq_seq
             lookup_fastq_seq = fastq1_seq + "+" + fastq2_seq
             if lookup_fastq_seq in not_aln:
                 N_CACHED_NOTALN += 1
+                if fastq_write_out:
+                    crispresso2_annotation = " ALN=NA" +\
+                        " ALN_SCORES=" + ('&'.join([str(x) for x in not_aln[lookup_fastq_seq]['aln_scores']])) +\
+                        " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in not_aln[lookup_fastq_seq]['ref_aln_details']]))
+                    fastq_write_out_handle.write(f'{fastq1_id.strip()}\n{not_aln[lookup_fastq_seq]['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{not_aln[lookup_fastq_seq]['ref_aln_details'][0][4]}\n')
                 continue
             # if the sequence is already associated with a variant in the variant cache, pull it out
             if lookup_fastq_seq in variantCache:
                 N_CACHED_ALN += 1
                 variantCache[lookup_fastq_seq]['count'] += 1
+                if fastq_write_out:
+                    new_variant = variantCache[lookup_fastq_seq]
+
+                    ins_inds = []
+                    del_inds = []
+                    sub_inds = []
+                    edit_strings = []
+
+                    for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                        payload=new_variant['variant_'+best_match_name]
+
+                        del_inds.append([str(x[0][0])+"("+str(x[1])+")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
+
+                        ins_vals = []
+                        for ins_coord,ins_size in zip(payload['insertion_coordinates'],payload['insertion_sizes']):
+                            ins_start = payload['ref_positions'].index(ins_coord[0])
+                            ins_vals.append(payload['aln_seq'][ins_start+1:ins_start+1+ins_size])
+                        ins_inds.append([str(x[0][0])+"("+str(x[1])+"+"+x[2]+")" for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)])
+
+                        sub_inds.append(payload['substitution_positions'])
+                        edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
+
+                    if fastq_write_out:
+                        crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
+                                " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
+                                " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
+                                " CLASS="+new_variant['class_name']+\
+                                " MODS="+("&".join(edit_strings))+\
+                                " DEL="+("&".join([';'.join(x) for x in del_inds])) +\
+                                " INS="+("&".join([';'.join(x) for x in ins_inds])) +\
+                                " SUB=" + ("&".join([';'.join([str(y) for y in x]) for x in sub_inds])) +\
+                                " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
+                                " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
+                        new_variant['crispresso2_annotation'] = crispresso2_annotation
+                        fastq_write_out_handle.write(f'{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n')
 
             # otherwise, create a new variant object, and put it in the cache
             else:
@@ -1129,23 +1236,102 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                 # 2) get_new_variant_object_from_paired returns a bool if it had to choose between two bases based on quality - meaning that we couldn't cache future alignements?
 
                 # if we shouldn't cache it, change the lookup from the R1 + R2 seqs to "R1 R2 num" where num makes the key unique
-                #TODO: Remove this line if not necessary
-                new_variant['id'] = fastq2_id.split(" ")[0]
-                if not new_variant['caching_is_ok']:
-                    inc_counter = 0
-                    orig_lookup_fastq_seq = lookup_fastq_seq
-                    while lookup_fastq_seq in not_aln or lookup_fastq_seq in variantCache:
-                        lookup_fastq_seq = orig_lookup_fastq_seq + " " + str(inc_counter)
-                        inc_counter += 1
-                if new_variant['best_match_score'] <= 0:
-                    N_COMPUTED_NOTALN += 1
-                    not_aln[lookup_fastq_seq] = 1
-                else:
+                if new_variant['best_match_score'] > 0:
                     N_COMPUTED_ALN += 1
-                    variantCache[lookup_fastq_seq] = new_variant
+                    ins_inds = []
+                    del_inds = []
+                    sub_inds = []
+                    edit_strings = []
+
+                    for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                        payload=new_variant['variant_'+best_match_name]
+
+                        del_inds.append([str(x[0][0])+"("+str(x[1])+")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
+
+                        ins_vals = []
+                        for ins_coord,ins_size in zip(payload['insertion_coordinates'],payload['insertion_sizes']):
+                            ins_start = payload['ref_positions'].index(ins_coord[0])
+                            ins_vals.append(payload['aln_seq'][ins_start+1:ins_start+1+ins_size])
+                        ins_inds.append([str(x[0][0])+"("+str(x[1])+"+"+x[2]+")" for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)])
+
+                        sub_inds.append(payload['substitution_positions'])
+                        edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
+                    
+                    if fastq_write_out:
+                        crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
+                                " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
+                                " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
+                                " CLASS="+new_variant['class_name']+\
+                                " MODS="+("&".join(edit_strings))+\
+                                " DEL="+("&".join([';'.join(x) for x in del_inds])) +\
+                                " INS="+("&".join([';'.join(x) for x in ins_inds])) +\
+                                " SUB=" + ("&".join([';'.join([str(y) for y in x]) for x in sub_inds])) +\
+                                " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
+                                " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
+                        new_variant['crispresso2_annotation'] = crispresso2_annotation
+                        fastq_write_out_handle.write(f'{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n')
+
+                    if new_variant['caching_is_ok']:
+                        variantCache[lookup_fastq_seq] = new_variant
+                    else:
+                        if len(new_variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:                   
+                            for name in new_variant['aln_ref_names']:
+                                match_name = "variant_" + name
+                                if READ_LENGTH == 0:
+                                    READ_LENGTH = len(new_variant[match_name]['aln_seq'])
+                                N_GLOBAL_SUBS += (new_variant[match_name]['substitution_n'] + new_variant[match_name]['substitutions_outside_window'])
+                                N_SUBS_OUTSIDE_WINDOW += new_variant[match_name]['substitutions_outside_window']
+                                N_MODS_IN_WINDOW += new_variant[match_name]['mods_in_window']
+                                N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window']
+                                if new_variant[match_name]['irregular_ends']:
+                                    N_READS_IRREGULAR_ENDS += 1
+                        alignment_key = new_variant['variant_' + new_variant['aln_ref_names'][0]]['aln_seq']
+                        if alignment_key in variantCache:
+                            variantCache[alignment_key]['count'] += 1
+                        else:
+                            variantCache[alignment_key] = new_variant
+                else:
+                    N_COMPUTED_NOTALN += 1
+                    if fastq_write_out:
+                        crispresso2_annotation = " ALN=NA" +\
+                            " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
+                            " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
+                        fastq_write_out_handle.write(f'{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n')
+                    if new_variant['caching_is_ok']:
+                        not_aln[lookup_fastq_seq] = new_variant
+                    else:
+                        alignment_key = new_variant['ref_aln_details'][0][2]
+                        if alignment_key in not_aln:
+                            not_aln[alignment_key]['count'] += 1
+                        else:
+                            not_aln[alignment_key] = new_variant
 
         fastq1_handle.close()
         fastq2_handle.close()
+        if fastq_write_out:
+            fastq_write_out_handle.close()
+
+        for key in list(variantCache.keys()):
+            if '+' in key:
+                variant = variantCache[key]
+                alignment_key = variant["variant_" + variant['aln_ref_names'][0]]['aln_seq']
+                if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:                   
+                    for name in variant['aln_ref_names']:
+                        match_name = "variant_" + name
+                        if READ_LENGTH == 0:
+                            READ_LENGTH = len(variant[match_name]['aln_seq'])
+                        N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant['count']
+                        N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant['count']
+                        N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant['count']
+                        N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant['count']
+                        if variant[match_name]['irregular_ends']:
+                            N_READS_IRREGULAR_ENDS += variant['count']
+                if alignment_key in variantCache.keys():
+                    variantCache[alignment_key]['count'] += variant['count']
+                    variantCache.pop(key)
+                else:
+                    variantCache[alignment_key] = variant
+                    variantCache.pop(key)
 
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
     aln_stats = {"N_TOT_READS" : N_TOT_READS,
@@ -1160,8 +1346,6 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
         "READ_LENGTH": READ_LENGTH
         }
-    if fastq_write_out:
-        return aln_stats, not_aln
     return(aln_stats)
 
 
@@ -1366,15 +1550,17 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                                     variantCache[seq] = variant
                                     N_COMPUTED_ALN += 1
                                     N_CACHED_ALN += (variant_count - 1)
-                                    match_name = "variant_" + variant['best_match_name']
-                                    if READ_LENGTH == 0:
-                                        READ_LENGTH = len(variant[match_name]['aln_seq'])
-                                    N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
-                                    N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
-                                    N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
-                                    N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
-                                    if variant[match_name]['irregular_ends']:
-                                        N_READS_IRREGULAR_ENDS += variant_count
+                                    if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:
+                                        for name in variant['aln_ref_names']:
+                                            match_name = "variant_" + name
+                                            if READ_LENGTH == 0:
+                                                READ_LENGTH = len(variant[match_name]['aln_seq'])
+                                            N_GLOBAL_SUBS += (variant[match_name]['substitution_n'] + variant[match_name]['substitutions_outside_window']) * variant_count
+                                            N_SUBS_OUTSIDE_WINDOW += variant[match_name]['substitutions_outside_window'] * variant_count
+                                            N_MODS_IN_WINDOW += variant[match_name]['mods_in_window'] * variant_count
+                                            N_MODS_OUTSIDE_WINDOW += variant[match_name]['mods_outside_window'] * variant_count
+                                            if variant[match_name]['irregular_ends']:
+                                                N_READS_IRREGULAR_ENDS += variant_count
                                 if (index % 50000 == 0 and index > 0):
                                     info("Calculating statistics; %d completed out of %d unique reads"%(index, num_unique_reads))
                     except FileNotFoundError:
@@ -1716,12 +1902,10 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             }
     return(aln_stats)
 
+
 def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, refs, args, files_to_remove, output_directory):
 
-    if args.crispresso_merge:
-        aln_stats, not_aln = process_paired_fastq(args.fastq_r1, args.fastq_r2, variantCache, ref_names, refs, args, True)
-    else:
-        aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
+    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
     info("Reads processed, now annotating fastq_output file: %s"%(fastq_output))
 
     if fastq_input.endswith('.gz'):
@@ -3175,12 +3359,12 @@ def main():
 
             processed_output_filename = output_forward_filename
 
-        elif args.fastq_r1 != '' and args.fastq_r2 != '':#paired end reads
+        elif args.fastq_r1 != '' and args.fastq_r2 != '':#paired end reads     
+            not_combined_1_filename = _jp('out.notCombined_1.fastq.gz')
+            not_combined_2_filename = _jp('out.notCombined_2.fastq.gz')
+            check_fastp()
             if not args.crispresso_merge:
                 processed_output_filename = _jp('out.extendedFrags.fastq.gz')
-                not_combined_1_filename = _jp('out.notCombined_1.fastq.gz')
-                not_combined_2_filename = _jp('out.notCombined_2.fastq.gz')
-                check_fastp()
                 info('Processing sequences with fastp...')
                 if not args.trim_sequences:
                     args.fastp_options_string += ' --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering'
@@ -3237,6 +3421,29 @@ def main():
                         info('Wrote force-merged reads to ' + new_merged_filename)
 
                 info('Done!', {'percent_complete': 7})
+            else:
+                info('Processing sequences with fastp...')
+                if not args.trim_sequences:
+                    args.fastp_options_string += ' --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering'
+                else:
+                    args.fastp_options_string += ' --detect_adapter_for_pe'
+
+                fastp_cmd = '{command} -i {r1} -I {r2} --out1 {unpaired1} --out2 {unpaired2} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
+                    command=args.fastp_command,
+                    r1=args.fastq_r1,
+                    r2=args.fastq_r2,
+                    unpaired1=not_combined_1_filename,
+                    unpaired2=not_combined_2_filename,
+                    min_overlap=args.min_paired_end_reads_overlap,
+                    num_threads=n_processes,
+                    json_report=_jp('fastp_report.json'),
+                    html_report=_jp('fastp_report.html'),
+                    options=args.fastp_options_string,
+                    log=log_filename,
+                )
+                fastp_status = sb.call(fastp_cmd, shell=True)
+                if fastp_status:
+                    raise CRISPRessoShared.FastpException('Fastp failed to run, please check the log file.')
         else: # single end reads with no trimming
             processed_output_filename = args.fastq_r1
 
@@ -3267,7 +3474,7 @@ def main():
 
         #count reads
         N_READS_AFTER_PREPROCESSING = 0
-        if args.bam_input:
+        if args.bam_input or args.crispresso_merge:
             N_READS_AFTER_PREPROCESSING = N_READS_INPUT
         else:
             N_READS_AFTER_PREPROCESSING=CRISPRessoShared.get_n_reads_fastq(processed_output_filename)
@@ -3282,13 +3489,13 @@ def main():
         #operates on variantCache
         if args.bam_input:
             aln_stats = process_bam(args.bam_input, args.bam_chr_loc, crispresso2_info['bam_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
-        elif args.fastq_output:
+        elif args.fastq_output and not args.crispresso_merge:
             aln_stats = process_fastq_write_out(processed_output_filename, crispresso2_info['fastq_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.bam_output:
             bam_header += '@PG\tID:crispresso2\tPN:crispresso2\tVN:'+CRISPRessoShared.__version__+'\tCL:"'+crispresso_cmd_to_write+'"\n'
             aln_stats = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.crispresso_merge:
-            aln_stats = process_paired_fastq(args.fastq_r1, args.fastq_r2, variantCache, ref_names, refs, args)
+            aln_stats = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY, args.fastq_output, crispresso2_info['fastq_output'])
         else:
             aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
 
