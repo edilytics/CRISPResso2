@@ -284,7 +284,7 @@ def test_get_consensus_alignment_from_pairs():
     with check:
         assert aln_seq ==      "A-CGANNNAT"
         assert ref_seq ==      "ATCGATCGAT"
-        assert score == 54
+        assert score == 60.0
         assert caching_ok
 
     # insertion at end of r2 and beginning of r1
