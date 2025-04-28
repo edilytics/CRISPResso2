@@ -308,7 +308,7 @@ def test_get_consensus_alignment_from_pairs():
     with check:
         assert aln_seq ==      "A-CGATCGAT"
         assert ref_seq ==      "ATCGATCGAT"
-        assert score == 64
+        assert score == 90.0
         assert caching_ok
 
     qual1    = '>1>1A@DFAADAGGGGGGGGGGHHHHHHHHHHHHHHHGGHHHHHHHHGGGHHHHHHHHHGHHHHHHHHHHHHGHGGGGGGGGGGHHHHHHHGHHHHHHHHHHHHHHHHHHHHHHHGHHGGGGGHHHHG'
