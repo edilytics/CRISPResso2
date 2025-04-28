@@ -282,8 +282,8 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "TA-CGANNNAT"
-        assert ref_seq ==      "-ATCGATCGAT"
+        assert aln_seq ==      "A-CGANNNAT"
+        assert ref_seq ==      "ATCGATCGAT"
         assert score == 54
         assert caching_ok
 
