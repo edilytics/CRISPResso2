@@ -462,7 +462,6 @@ def get_consensus_alignment_from_pairs(
     aln_ref_r2,
     score_r2,
     qual_r2,
-    aln_matrix,
 ):
     """
     Creates a consensus alignment from alignments of two paired-end reads
