@@ -862,7 +862,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
     info(f"Process {process_id + 1} has finished processing {index} unique reads", {'percent_complete': 10})
 
 
-def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out=False, fastq_write_out_file=None):
+def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out_file=None):
     """Processes paired reads by aligning each read to the reference sequence
         This method avoids the use of flash to merge paired-end reads
 
@@ -902,7 +902,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
     elif args.n_processes.isdigit():
         n_processes = int(args.n_processes)
 
-    if n_processes > 1 and fastq_write_out:
+    if n_processes > 1 and args.fastq_output:
         n_processes = 1
         info("The number of processes is set to 1 because fastq write out is enabled.")
 
@@ -1022,8 +1022,6 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                 if variant['best_match_score'] <= 0:
                                     N_COMPUTED_NOTALN += 1
                                     N_CACHED_NOTALN += (variant_count - 1)
-                                    if fastq_write_out:
-                                        not_aln[seq] = variant
                                     # remove the unaligned reads from the cache
                                     unaligned_reads.append(seq)
                                 elif variant['best_match_score'] > 0:
@@ -1092,8 +1090,6 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                     if variant['best_match_score'] <= 0:
                         N_TOT_READS += 1
                         N_COMPUTED_NOTALN += 1
-                        if fastq_write_out:
-                            not_aln[variant['ref_aln_details'][0]] = variant
                     else:
                         match_name = "variant_" + variant['aln_ref_names'][0]
                         if variant[match_name]['aln_seq'] in variantCache:
@@ -1147,7 +1143,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         else:
             fastq2_handle=open(fastq2_filename)
 
-        if fastq_write_out:
+        if args.fastq_output:
             fastq_write_out_handle = open(fastq_write_out_file, 'w')
 
         not_aln = {} #cache for reads that don't align
@@ -1174,7 +1170,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
             lookup_fastq_seq = fastq1_seq + "+" + fastq2_seq
             if lookup_fastq_seq in not_aln:
                 N_CACHED_NOTALN += 1
-                if fastq_write_out:
+                if args.fastq_output:
                     crispresso2_annotation = " ALN=NA" +\
                         " ALN_SCORES=" + ('&'.join([str(x) for x in not_aln[lookup_fastq_seq]['aln_scores']])) +\
                         " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in not_aln[lookup_fastq_seq]['ref_aln_details']]))
@@ -1184,7 +1180,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
             if lookup_fastq_seq in variantCache:
                 N_CACHED_ALN += 1
                 variantCache[lookup_fastq_seq]['count'] += 1
-                if fastq_write_out:
+                if args.fastq_output:
                     new_variant = variantCache[lookup_fastq_seq]
 
                     ins_inds = []
@@ -1206,7 +1202,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                         sub_inds.append(payload['substitution_positions'])
                         edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
 
-                    if fastq_write_out:
+                    if args.fastq_output:
                         crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
                                 " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                                 " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
@@ -1256,7 +1252,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                         sub_inds.append(payload['substitution_positions'])
                         edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
                     
-                    if fastq_write_out:
+                    if args.fastq_output:
                         crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
                                 " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                                 " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
@@ -1291,7 +1287,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                             variantCache[alignment_key] = new_variant
                 else:
                     N_COMPUTED_NOTALN += 1
-                    if fastq_write_out:
+                    if args.fastq_output:
                         crispresso2_annotation = " ALN=NA" +\
                             " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                             " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
@@ -1307,7 +1303,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
 
         fastq1_handle.close()
         fastq2_handle.close()
-        if fastq_write_out:
+        if args.fastq_output:
             fastq_write_out_handle.close()
 
         for key in list(variantCache.keys()):
@@ -3494,7 +3490,10 @@ def main():
             bam_header += '@PG\tID:crispresso2\tPN:crispresso2\tVN:'+CRISPRessoShared.__version__+'\tCL:"'+crispresso_cmd_to_write+'"\n'
             aln_stats = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.crispresso_merge:
-            aln_stats = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY, args.fastq_output, crispresso2_info['fastq_output'])
+            if args.fastq_output:
+                aln_stats = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY, crispresso2_info['fastq_output'])
+            else:
+                aln_stats = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         else:
             aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
 
