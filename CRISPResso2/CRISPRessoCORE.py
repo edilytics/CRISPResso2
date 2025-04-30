@@ -1174,7 +1174,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                     crispresso2_annotation = " ALN=NA" +\
                         " ALN_SCORES=" + ('&'.join([str(x) for x in not_aln[lookup_fastq_seq]['aln_scores']])) +\
                         " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in not_aln[lookup_fastq_seq]['ref_aln_details']]))
-                    fastq_write_out_handle.write(f'{fastq1_id.strip()}\n{not_aln[lookup_fastq_seq]['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{not_aln[lookup_fastq_seq]['ref_aln_details'][0][4]}\n')
+                    fastq_write_out_handle.write(f"{fastq1_id.strip()}\n{not_aln[lookup_fastq_seq]['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{not_aln[lookup_fastq_seq]['ref_aln_details'][0][4]}\n")
                 continue
             # if the sequence is already associated with a variant in the variant cache, pull it out
             if lookup_fastq_seq in variantCache:
@@ -1214,7 +1214,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                 " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
                                 " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
                         new_variant['crispresso2_annotation'] = crispresso2_annotation
-                        fastq_write_out_handle.write(f'{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n')
+                        fastq_write_out_handle.write(f"{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n")
 
             # otherwise, create a new variant object, and put it in the cache
             else:
@@ -1264,7 +1264,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                 " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
                                 " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
                         new_variant['crispresso2_annotation'] = crispresso2_annotation
-                        fastq_write_out_handle.write(f'{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n')
+                        fastq_write_out_handle.write(f"{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n")
 
                     if new_variant['caching_is_ok']:
                         variantCache[lookup_fastq_seq] = new_variant
@@ -1291,7 +1291,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                         crispresso2_annotation = " ALN=NA" +\
                             " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                             " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
-                        fastq_write_out_handle.write(f'{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n')
+                        fastq_write_out_handle.write(f"{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n")
                     if new_variant['caching_is_ok']:
                         not_aln[lookup_fastq_seq] = new_variant
                     else:
