@@ -880,6 +880,19 @@
             "help": "Halt execution if a plot fails to generate",
             "action": "store_true",
             "tools": ["Core", "Batch", "Pooled", "WGS", "Compare"]
+        },
+        "vcf_output": {
+            "keys": ["--vcf_output"],
+            "help": "Generate a vcf file from variant data",
+            "action": "store_true",
+            "tools": ["Core", "Batch", "Pooled", "WGS", "Compare"]
+        },
+        "amplicon_coordinates": {
+            "keys": ["--amplicon_coordinates"],
+            "help": "CSV chromosome and positions of the leftmost base of the amplicon sequence(s) in the reference genome. This is used to generate the VCF file. Ex: '19:14039,18:430', where 19 is the CHROM and 14039 is the position of the leftmost base pair on the amplicon. The order should match the order of the amplicons and their names.",
+            "type": "str",
+            "default": "",
+            "tools": ["Core"]
         }
     },
     "Sections": {
