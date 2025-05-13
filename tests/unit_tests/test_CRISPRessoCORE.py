@@ -1,5 +1,7 @@
 """Unit tests for CRISPResso2CORE."""
 import pytest
+import pandas as pd
+
 
 from CRISPResso2 import CRISPRessoCORE, CRISPRessoShared
 
@@ -265,7 +267,156 @@ def test_irregular_sublist_generation():
     assert [s for sublist in sublists for s in sublist] == mock_variant_cache
 
 
+def _make_df_alleles():
+    """Construct a mock df_alleles DataFrame covering sub, del, ins edits."""
+    ref_seq = "ATGCGTACGATCGTACGTAGCTAGCTAGCGTAGCTAGCTA"  # 40 bp
+    ref_positions = list(range(len(ref_seq)))
 
+    rows = []
+
+    # ───────────── Unmodified allele (skipped by build_alt_map) ──────────────
+    rows.append({
+        "#Reads": 2,
+        "Aligned_Sequence": ref_seq,
+        "Reference_Sequence": ref_seq,
+        "n_inserted": 0,
+        "n_deleted": 0,
+        "n_mutated": 0,
+        "Reference_Name": "Reference",
+        "ref_positions": ref_positions,
+        "insertion_coordinates": [],
+        "deletion_coordinates": [],
+        "substitution_positions": [],
+    })
+
+    # ───────────── Single‑nucleotide substitution at index 9 (A→G) ──────────
+    sub_seq = ref_seq[:9] + "G" + ref_seq[10:]
+    rows.append({
+        "#Reads": 1,
+        "Aligned_Sequence": sub_seq,
+        "Reference_Sequence": ref_seq,
+        "n_inserted": 0,
+        "n_deleted": 0,
+        "n_mutated": 1,
+        "Reference_Name": "Reference",
+        "ref_positions": ref_positions,
+        "insertion_coordinates": [],
+        "deletion_coordinates": [],
+        "substitution_positions": [9],
+    })
+
+    # ───────────── 1‑bp deletion removing G at index 19 ─────────────────────
+    del_seq = ref_seq[:19] + ref_seq[20:]
+    rows.append({
+        "#Reads": 1,
+        "Aligned_Sequence": del_seq,
+        "Reference_Sequence": ref_seq,
+        "n_inserted": 0,
+        "n_deleted": 1,
+        "n_mutated": 0,
+        "Reference_Name": "Reference",
+        "ref_positions": ref_positions,
+        "insertion_coordinates": [],
+        "deletion_coordinates": [(19, 20)],  # [start, end] (0‑based, end exclusive)
+        "substitution_positions": [],
+    })
+
+    # ───────────── 2‑bp insertion "GG" after index 30 (between 30 and 31) ──
+    ins_seq = ref_seq[:31] + "GG" + ref_seq[31:]
+    rows.append({
+        "#Reads": 1,
+        "Aligned_Sequence": ins_seq,
+        "Reference_Sequence": ref_seq,
+        "n_inserted": 2,
+        "n_deleted": 0,
+        "n_mutated": 0,
+        "Reference_Name": "Reference",
+        "ref_positions": ref_positions,
+        "insertion_coordinates": [(31, 33)],  # slice storing inserted sequence
+        "deletion_coordinates": [],
+        "substitution_positions": [],
+    })
+#    # ───────────── 10‑bp deletion removing G... at index 19 ─────────────────────
+#     del_seq = ref_seq[:19] + ref_seq[29:]
+#     rows.append({
+#         "#Reads": 1,
+#         "Aligned_Sequence": del_seq,
+#         "Reference_Sequence": ref_seq,
+#         "n_inserted": 0,
+#         "n_deleted": 1,
+#         "n_mutated": 0,
+#         "Reference_Name": "Reference",
+#         "ref_positions": ref_positions,
+#         "insertion_coordinates": [],
+#         "deletion_coordinates": [(19, 29)],  # [start, end] (0‑based, end exclusive)
+#         "substitution_positions": [],
+#     })
+
+    return pd.DataFrame(rows)
+
+
+def _normalize_alt_map(alt_map):
+    """Sort alt_seqs so order does not affect equality checks."""
+    norm = {}
+    for key, val in alt_map.items():
+        norm[key] = {
+            "ref_seq": val["ref_seq"],
+            "alt_seqs": sorted(val["alt_seqs"], key=lambda t: (t[0], t[1])),
+        }
+    return norm
+
+
+def test_build_alt_map():
+    df_alleles = _make_df_alleles()
+
+    # Chromosome 1, reference starts at genomic coordinate 1
+    amplicon_positions = {"Reference": (1, 1)}
+
+    alt_map = CRISPRessoCORE.build_alt_map(df_alleles, amplicon_positions)
+
+    expected_alt_map = {
+        # SNP at 1 + 9 = 10
+        "chr1pos10": {
+            "ref_seq": "A",  # reference base
+            "alt_seqs": [["sub", "G", 1]],
+        },
+        # 1‑bp deletion at 1 + 19 = 20
+        "chr1pos20": {
+            "ref_seq": "AG",  # flanking + deleted base (A|G)
+            "alt_seqs": [["delete", "C", 1]],  # content is not used beyond length
+        },
+        # 2‑bp insertion after index 30 -> coordinate 32
+        "chr1pos32": {
+            "ref_seq": "G",  # base before insertion
+            "alt_seqs": [["insert", "GG", 1]],
+        },
+    }
+    if _normalize_alt_map(alt_map) != _normalize_alt_map(expected_alt_map):
+        print(_normalize_alt_map(alt_map))
+        print(_normalize_alt_map(expected_alt_map))
+    assert _normalize_alt_map(alt_map) == _normalize_alt_map(expected_alt_map)
+
+
+def test_write_vcf_from_alt_map():
+    df_alleles = _make_df_alleles()
+    amplicon_positions = {"Reference": (1, 1)}
+
+    alt_map = CRISPRessoCORE.build_alt_map(df_alleles, amplicon_positions)
+    num_reads = df_alleles["#Reads"].sum()
+
+    vcf_text = CRISPRessoCORE.vcf_text_from_alt_map(alt_map, num_reads, ["Reference"])
+
+    expected_vcf = (
+        "##fileformat=VCFv4.5\n"
+        "##source=CRISPResso2\n"
+        "##INFO=<ID=AF,Number=A,Type=Float,Description=\"Allele Frequency\">\n"
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tReference\n"
+        "1\t10\t.\tA\tG\t.\tPASS\tAF=0.200\n"
+        "1\t20\t.\tAG\tA\t.\tPASS\tAF=0.200\n"
+        "1\t32\t.\tG\tGGG\t.\tPASS\tAF=0.200\n"
+    )
+
+    assert vcf_text == expected_vcf
     
 if __name__ == "__main__":
 # execute only if run as a script
