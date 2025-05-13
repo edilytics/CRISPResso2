@@ -239,7 +239,7 @@
             "keys": ["--crispresso_merge"],
             "help": "If selected with paired end reads, the reads will be merged using the CRISPResso aligner.",
             "action": "store_true",
-            "tools": ["Core", "Batch", "Pooled", "WGS"]
+            "tools": ["Core"]
         },
         "fastp_options_string": {
             "keys": ["--fastp_options_string"],
