@@ -9,7 +9,7 @@ def calc_score(seq, ref):
     for seq_i, ref_i in zip(seq, ref):
         if seq_i == ref_i:
             score += 1
-    return int(100 * score / float(len(seq)))
+    return (score / float(len(seq))) * 100.0
 
 
 def test_get_consensus_alignment_from_pairs():

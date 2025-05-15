@@ -18,7 +18,6 @@ import sys
 import subprocess as sb
 import traceback
 import zipfile
-import time
 
 from collections import Counter
 from copy import deepcopy
@@ -428,21 +427,19 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
 
 
 def get_greater_qual_nuc(nuc1, qual1, nuc2, qual2, is_best_aln_r1):
-    """
-    Gets the base with the higher quality if nuc1 != nuc2, otherwise the base with the higher alignment score if qual1 == qual2
-
-    params:
-    nuc1: nucleotide 1
-    qual1: quality of nuc1 in phred score
-    nuc2: nucleotide 2
-    qual2: quality of nuc2 in phred score
-    is_best_aln_r1: a Boolean, if True read1 has an alignment score that is >=
-        the alignment score for read2
-
-    returns
-    nuc: the nucleotide with the greater quality if nuc1 != nuc2, or alignment
-        score if qual1 == qual2
-    nucs_diff: whether the nucleotides were different
+    """Get the nucleotide with the greater quality score.
+    Parameters
+    ----------
+    nuc1: The nucleotide from read 1
+    qual1: The quality score of the nucleotide from read 1
+    nuc2: The nucleotide from read 2
+    qual2: The quality score of the nucleotide from read 2
+    is_best_aln_r1: Whether the alignment of read 1 is better than read 2
+    Returns
+    -------
+    nuc1 or nuc2: The nucleotide with the greater quality score
+    bool: Whether a decision was made based on quality
+    qual: The quality score of the nucleotide with the greater quality score
     """
     if nuc1 == nuc2:
         return nuc1, False, qual1 if ord(qual1) >= ord(qual2) else qual2
@@ -464,25 +461,24 @@ def get_consensus_alignment_from_pairs(
     qual_r2,
 ):
     """
-    Creates a consensus alignment from alignments of two paired-end reads
-
-    params:
-    aln_seq_r1: read alignment of r1
-    aln_ref_r1: ref alignment of r1
-    score_r1: alignment score of r1
-    qual_r1: quality scores of bases in r1
-    aln_seq_r2: read alignment of r2
-    aln_ref_r2: ref alignment of r2
-    score_r2: alignment score of r2
-    qual_r2: quality scores of bases in r2
-
-    returns:
-    aln_seq: consensus read alignment
-    ref_seq: consensus ref alignment
-    score: alignment homology score
-    caching_is_ok: boolean whether this merged alignment can be cached based on unmerged R1/R2 sequences
-                   If the merged alignment had to choose between R1 or R2 bases at a position based on quality, the merged alignment can't be cached
-                   because R1/R2 pair with the same sequence may have different qualities resulting in different alignments
+    Gets the consensus alignment from two aligned sequences.
+    Parameters
+    ----------
+    aln_seq_r1: The aligned sequence of read 1
+    aln_ref_r1: The aligned reference sequence of read 1
+    score_r1: The alignment score of read 1
+    qual_r1: The quality of read 1
+    aln_seq_r2: The aligned sequence of read 2
+    aln_ref_r2: The aligned reference sequence of read 2
+    score_r2: The alignment score of read 2
+    qual_r2: The quality of read 2
+    Returns
+    -------
+    final_aln: The final aligned sequence
+    final_qual: The final quality of the aligned sequence
+    final_ref: The final reference sequence
+    final_homology_score: The final homology score
+    caching_is_ok: Whether the alignment can be cached
     """
     # three sets of indices
     aln_ind_r1 = 0  # indexes in r1 aln_seq_r1 (including gaps)
@@ -613,23 +609,24 @@ def get_consensus_alignment_from_pairs(
 def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual, refs, ref_names, aln_matrix, pe_scaffold_dna_info):
     """
     Gets the payload object for a read that hasn't been seen in the cache yet
-    This operates for paired-end reads by aligning the reads, then if there is a discrepancy at any position, the value from the higher-quality read is used
-    params:
-     args: CRISPResso2 args
-     fastq1_seq: r1 read sequence to align
-     fastq2_seq: r2 read sequence to align
-     fastq1_qual: r1 read quality
-     fastq2_qual: r2 read quality
-     refs: dict with info for all refs
-     ref_names: list of ref names
-     aln_matrix: alignment matrix for needleman wunsch
-     pe_scaffold_dna_info: for prime-editing tuple of(
-         index of location in ref to find scaffold seq if it exists
-         shortest dna sequence to identify scaffold sequence
-         )
-
-    returns:
-     variant payload
+    Parameters
+    ----------
+    args: CRISPResso2 args
+    fastq1_seq: read sequence to align and merge with fastq2_seq
+    fastq2_seq: read sequence to align and merge with fastq1_seq
+    fastq1_qual: read quality to align
+    fastq2_qual: read quality to align
+    refs: dict with info for all refs
+    ref_names: list of ref names
+    aln_matrix: alignment matrix for needleman wunsch
+    pe_scaffold_dna_info: for prime-editing tuple of(
+        index of location in ref to find scaffold seq if it exists
+        shortest dna sequence to identify scaffold sequence
+        )
+    Returns
+    -------
+    new_variant: dict
+        The payload object for the read that hasn't been seen in the cache yet
     """
 
     aln_scores = []
@@ -695,7 +692,7 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
             best_match_names.append(ref_name)
 
     if best_match_score > 0:
-        new_variant = {}
+        new_variant = CRISPRessoShared.ResultsSlotsDict
         new_variant['count'] = 1
         new_variant['aln_ref_names'] = best_match_names
         new_variant['aln_scores'] = aln_scores
@@ -755,7 +752,7 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
         new_variant['class_name'] = "&".join(class_names)
 
     else:
-        new_variant = {}
+        new_variant = CRISPRessoShared.ResultsSlotsDict
         new_variant['count'] = 1
         new_variant['aln_scores'] = aln_scores
         new_variant['ref_aln_details'] = ref_aln_details
@@ -825,6 +822,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
         )
         process_id: the id of the process to print out debug information
         variants_dir: the directory to store the tsv files
+        quals_list: list of quality scores for the reads
     Returns
     ----------
     Nothing
@@ -863,17 +861,23 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
 
 
 def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out_file=None):
-    """Processes paired reads by aligning each read to the reference sequence
-        This method avoids the use of flash to merge paired-end reads
-
-        fastq1_filename: input fastq read 1 file
-        fastq2_filename: input fastq read 2 file
-
-        variantCache: dict with keys: sequence dict with keys (described in process_fastq)
+    """
+    Processes the paired-end fastq files and generates the new variants for each read
+    Parameters
+    ----------
+        fastq1_filename: the name of the first fastq file
+        fastq2_filename: the name of the second fastq file
+        variantCache: a dictionary of the reads and their counts
         ref_names: list of reference names
-        refs: dictionary of sequences name>ref object
-        args: crispresso2 args
-        """
+        refs: dict with info for all refs
+        args: CRISPResso2 args
+        files_to_remove: list of files to remove after processing
+        output_directory: the directory to store the tsv files
+        fastq_write_out_file: the file to write the fastq files to
+    Returns
+    ----------
+        aln_stats: dictionary of alignment statistics
+    """
 
     N_TOT_READS = 0
     N_CACHED_ALN = 0 # number of copies of all aligned reads
@@ -1014,7 +1018,9 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                         del variantCache[seq]
                                         continue
                                 else:
-                                    error(f"Error splitting line: {line}")
+                                    if args.debug:
+                                        error(f"Could not parse variant from line: {line}")
+                                    error(f"Could not parse variant from file")
                                 variant_count = variantCache[seq][0]
                                 N_TOT_READS += variant_count
                                 variant = variant_dict
@@ -1150,13 +1156,15 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         while(True):
             #read through fastq in sets of 4
             fastq1_id = fastq1_handle.readline().strip()
-            if not fastq1_id:
+            fastq2_id = fastq2_handle.readline().strip()
+            if not fastq1_id and not fastq2_id:
                 break
+            elif not fastq1_id or not fastq2_id:
+                error("The two fastq files are not the same length. Please check your input files.")
             fastq1_seq = fastq1_handle.readline().strip()
             fastq1_plus = fastq1_handle.readline()
             fastq1_qual = fastq1_handle.readline().strip()
 
-            fastq2_id = fastq2_handle.readline().strip()
             fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_handle.readline().strip())
             fastq2_plus = fastq2_handle.readline()
             fastq2_qual = fastq2_handle.readline().strip()[::-1]
@@ -1202,19 +1210,18 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                         sub_inds.append(payload['substitution_positions'])
                         edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
 
-                    if args.fastq_output:
-                        crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
-                                " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
-                                " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
-                                " CLASS="+new_variant['class_name']+\
-                                " MODS="+("&".join(edit_strings))+\
-                                " DEL="+("&".join([';'.join(x) for x in del_inds])) +\
-                                " INS="+("&".join([';'.join(x) for x in ins_inds])) +\
-                                " SUB=" + ("&".join([';'.join([str(y) for y in x]) for x in sub_inds])) +\
-                                " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
-                                " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
-                        new_variant['crispresso2_annotation'] = crispresso2_annotation
-                        fastq_write_out_handle.write(f"{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n")
+                    crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
+                            " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
+                            " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
+                            " CLASS="+new_variant['class_name']+\
+                            " MODS="+("&".join(edit_strings))+\
+                            " DEL="+("&".join([';'.join(x) for x in del_inds])) +\
+                            " INS="+("&".join([';'.join(x) for x in ins_inds])) +\
+                            " SUB=" + ("&".join([';'.join([str(y) for y in x]) for x in sub_inds])) +\
+                            " ALN_REF=" + ('&'.join([new_variant['variant_'+name]['aln_ref'] for name in new_variant['aln_ref_names']])) +\
+                            " ALN_SEQ=" + ('&'.join([new_variant['variant_'+name]['aln_seq'] for name in new_variant['aln_ref_names']]))
+                    new_variant['crispresso2_annotation'] = crispresso2_annotation
+                    fastq_write_out_handle.write(f"{fastq1_id.strip()}\n{new_variant['ref_aln_details'][0][1].replace('-', '')}\n+{crispresso2_annotation}\n{new_variant['ref_aln_details'][0][4]}\n")
 
             # otherwise, create a new variant object, and put it in the cache
             else:
@@ -1233,26 +1240,27 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                 # if we shouldn't cache it, change the lookup from the R1 + R2 seqs to "R1 R2 num" where num makes the key unique
                 if new_variant['best_match_score'] > 0:
                     N_COMPUTED_ALN += 1
-                    ins_inds = []
-                    del_inds = []
-                    sub_inds = []
-                    edit_strings = []
-
-                    for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
-                        payload=new_variant['variant_'+best_match_name]
-
-                        del_inds.append([str(x[0][0])+"("+str(x[1])+")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
-
-                        ins_vals = []
-                        for ins_coord,ins_size in zip(payload['insertion_coordinates'],payload['insertion_sizes']):
-                            ins_start = payload['ref_positions'].index(ins_coord[0])
-                            ins_vals.append(payload['aln_seq'][ins_start+1:ins_start+1+ins_size])
-                        ins_inds.append([str(x[0][0])+"("+str(x[1])+"+"+x[2]+")" for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)])
-
-                        sub_inds.append(payload['substitution_positions'])
-                        edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
-                    
                     if args.fastq_output:
+                        ins_inds = []
+                        del_inds = []
+                        sub_inds = []
+                        edit_strings = []
+
+                        for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                            payload=new_variant['variant_'+best_match_name]
+
+                            del_inds.append([str(x[0][0])+"("+str(x[1])+")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
+
+                            ins_vals = []
+                            for ins_coord,ins_size in zip(payload['insertion_coordinates'],payload['insertion_sizes']):
+                                ins_start = payload['ref_positions'].index(ins_coord[0])
+                                ins_vals.append(payload['aln_seq'][ins_start+1:ins_start+1+ins_size])
+                            ins_inds.append([str(x[0][0])+"("+str(x[1])+"+"+x[2]+")" for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)])
+
+                            sub_inds.append(payload['substitution_positions'])
+                            edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
+                    
+
                         crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
                                 " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                                 " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']])) +\
@@ -1529,7 +1537,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                                     json_data = parts[1]
                                     variant_dict = json.loads(json_data)
                                 else:
-                                    error(f"Error splitting line: {line}")
+                                    if args.debug:
+                                        error(f"Could not parse variant from line: {line}")
+                                    error(f"Could not parse variant from file")
                                 variant_count = variantCache[seq]
                                 N_TOT_READS += variant_count
                                 variant = variant_dict
@@ -1737,7 +1747,9 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     json_data = parts[1]
                                     new_variant = json.loads(json_data)
                                 else:
-                                    error(f"Error splitting line: {line}")
+                                    if args.debug:
+                                        error(f"Could not parse variant from line: {line}")
+                                    error(f"Could not parse variant from file")
                                 variant_count = variantCache[seq]
                                 new_variant['count'] = variant_count
                                 N_TOT_READS += variant_count

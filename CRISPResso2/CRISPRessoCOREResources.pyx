@@ -48,6 +48,7 @@ class ResultsSlotsDict():
         'total_mods',
         'mods_in_window',
         'mods_outside_window',
+        'caching_is_ok',
     )
 
     def __init__(self, **kwargs):
