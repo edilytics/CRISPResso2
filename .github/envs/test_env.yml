@@ -6,7 +6,7 @@ channels:
 dependencies:
   - pip
   - fastp
-  - numpy<2
+  - numpy
   - cython
   - jinja2
   - tbb=2020.2
