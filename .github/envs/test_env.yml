@@ -7,7 +7,7 @@ dependencies:
   - pip
   - fastp
   - numpy<2
-  - cython=3.0.12
+  - cython
   - jinja2
   - tbb=2020.2
   - pyparsing=2.3.1

@@ -38,7 +38,7 @@ jobs:
 
     - name: Install CRISPResso
       run: |
-        PIP_NO_BUILD_ISOLATION=1 pip install --no-deps --no-binary :all: -e .
+        pip install -e .
 
     - name: Run Pytest
       run: |
