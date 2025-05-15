@@ -48,7 +48,6 @@ class ResultsSlotsDict():
         'total_mods',
         'mods_in_window',
         'mods_outside_window',
-        'caching_is_ok',
     )
 
     def __init__(self, **kwargs):
@@ -60,6 +59,10 @@ class ResultsSlotsDict():
 
     def __setitem__(self, key, value):
         setattr(self, key, value)
+
+    @property
+    def __dict__(self):
+        return {key: getattr(self, key) for key in self.__slots__ if hasattr(self, key)}
 
 
 @cython.boundscheck(False)

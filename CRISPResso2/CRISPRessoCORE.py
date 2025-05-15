@@ -27,6 +27,7 @@ from functools import partial
 from multiprocessing import Process
 
 from CRISPResso2 import CRISPRessoCOREResources
+from CRISPResso2.CRISPRessoCOREResources import ResultsSlotsDict
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2 import CRISPRessoShared
 
@@ -692,7 +693,7 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
             best_match_names.append(ref_name)
 
     if best_match_score > 0:
-        new_variant = CRISPRessoShared.ResultsSlotsDict
+        new_variant = {}
         new_variant['count'] = 1
         new_variant['aln_ref_names'] = best_match_names
         new_variant['aln_scores'] = aln_scores
@@ -752,7 +753,7 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
         new_variant['class_name'] = "&".join(class_names)
 
     else:
-        new_variant = CRISPRessoShared.ResultsSlotsDict
+        new_variant = {}
         new_variant['count'] = 1
         new_variant['aln_scores'] = aln_scores
         new_variant['ref_aln_details'] = ref_aln_details
@@ -828,14 +829,6 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
     Nothing
 
     """
-    def custom_encoder(obj):
-        """ Custom encoding for non-serializable types """
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, CRISPRessoCOREResources.ResultsSlotsDict):
-            return {key: getattr(obj, key) for key in getattr(obj, '__slots__', []) if hasattr(obj, key)}
-        raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
-
     variant_file_path = os.path.join(variants_dir, f"variants_{process_id}.tsv")
 
     variant_lines = ""
@@ -849,7 +842,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
             else:
                 new_variant = get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info)
             # Convert the complex object to a JSON string
-            json_string = json.dumps(new_variant, default=custom_encoder)
+            json_string = json.dumps(new_variant, cls=CRISPRessoShared.CRISPRessoJSONEncoder)
             variant_lines += f"{fastq_seq}\t{json_string}\n"
             if index % 10000 == 0 and index != 0:
                 info(f"Process {process_id + 1} has processed {index} unique reads", {'percent_complete': 10})
@@ -1012,7 +1005,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                 if len(parts) == 2:
                                     seq = parts[0]
                                     json_data = parts[1]
-                                    variant_dict = json.loads(json_data)
+                                    variant_dict = json.loads(json_data, cls=CRISPRessoShared.CRISPRessoJSONDecoder)
                                     if variantCache[seq][0] > 1 and not variant_dict["caching_is_ok"]:
                                         re_aln[seq] = variant_dict
                                         del variantCache[seq]
@@ -1535,7 +1528,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                                 if len(parts) == 2:
                                     seq = parts[0]
                                     json_data = parts[1]
-                                    variant_dict = json.loads(json_data)
+                                    variant_dict = json.loads(json_data, cls=CRISPRessoShared.CRISPRessoJSONDecoder)
                                 else:
                                     if args.debug:
                                         error(f"Could not parse variant from line: {line}")
@@ -1745,7 +1738,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                 if len(parts) == 2:
                                     seq = parts[0]
                                     json_data = parts[1]
-                                    new_variant = json.loads(json_data)
+                                    new_variant = json.loads(json_data, cls=CRISPRessoShared.CRISPRessoJSONDecoder)
                                 else:
                                     if args.debug:
                                         error(f"Could not parse variant from line: {line}")
