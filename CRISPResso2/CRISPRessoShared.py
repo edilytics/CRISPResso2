@@ -27,7 +27,6 @@ from inspect import getmodule, stack
 
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
-from CRISPResso2.CRISPRessoCOREResources import ResultsSlotsDict
 
 __version__ = "2.3.2"
 
@@ -565,7 +564,7 @@ def check_output_folder(output_folder):
 # Thanks https://gist.github.com/simonw/7000493 for this idea
 class CRISPRessoJSONEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, ResultsSlotsDict):
+        if isinstance(obj, CRISPRessoCOREResources.ResultsSlotsDict):
             return {
                 '_type': 'ResultsSlotsDict',
                 'value': obj.__dict__,
