@@ -334,11 +334,6 @@ def test_get_consensus_alignment_from_pairs():
         assert score == 86.667
         assert not caching_ok
 
-    # aln_seq, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
-    # check.equal(aln_seq, "TA-CGANNNAT")
-    # check.equal(ref_seq, "-ATCGATCGAT")
-    # check.equal(score, 54) #double check this score... should be 6/11
-    # # check.is_true(caching_ok) # check this
 
     # alternating qualities
     qual1                = "BABABABABA"
