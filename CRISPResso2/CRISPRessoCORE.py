@@ -25,6 +25,7 @@ from concurrent.futures import ProcessPoolExecutor, wait
 from datetime import datetime
 from functools import partial
 from multiprocessing import Process
+from contextlib import nullcontext
 
 from CRISPResso2 import CRISPRessoCOREResources
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
@@ -138,14 +139,14 @@ def get_n_reads_bam(bam_filename,bam_chr_loc=""):
 
 
 def build_alt_map(df_alleles, amplicon_positions):
-    """Iterate over *df_alleles* and construct *alt_map*.
+    """Iterate over df_alleles and construct alt_map.
 
     Parameters
     ----------
     df_alleles : pandas.DataFrame
         Alignment/edit information per allele.
     amplicon_positions : dict
-        Mapping of amplicon name ➜ (chrom, genomic left‑most coordinate).
+        Mapping of amplicon name ➜ (chrom, left‑most coordinate).
 
     Returns
     -------
@@ -178,12 +179,12 @@ def build_alt_map(df_alleles, amplicon_positions):
         # ─────────────────────── DELETIONS ────────────────────────
         for del_coords in df_allele["deletion_coordinates"]:
             left_index = pos + del_coords[0]
-            map_key = f"chr{chrom}pos{left_index}"
+            map_key = (chrom, left_index)
 
             ref_idx_left = df_allele["ref_positions"].index(del_coords[0])
             ref_idx_right = df_allele["ref_positions"].index(del_coords[1])
 
-            del_seq = df_allele["Aligned_Sequence"][ref_idx_left:ref_idx_right]
+            del_seq = df_allele["Reference_Sequence"][ref_idx_left:ref_idx_right]
             del_len = ref_idx_right - ref_idx_left
             reads = df_allele["#Reads"]
 
@@ -210,7 +211,7 @@ def build_alt_map(df_alleles, amplicon_positions):
         # ─────────────────────── INSERTIONS ───────────────────────
         for insertion_coords in df_allele["insertion_coordinates"]:
             left_index = pos + insertion_coords[0]
-            map_key = f"chr{chrom}pos{left_index}"
+            map_key = (chrom, left_index)
 
             ref_idx = df_allele["ref_positions"].index(insertion_coords[0] - 1)
             ins_seq = df_allele["Aligned_Sequence"][insertion_coords[0] : insertion_coords[1]]
@@ -234,7 +235,7 @@ def build_alt_map(df_alleles, amplicon_positions):
         # ──────────────────── SUBSTITUTIONS ──────────────────────
         for sub_pos in df_allele["substitution_positions"]:
             left_index = pos + sub_pos
-            map_key = f"chr{chrom}pos{left_index}"
+            map_key = (chrom, left_index)
 
             ref_idx = df_allele["ref_positions"].index(sub_pos)
             sub_base = df_allele["Aligned_Sequence"][sub_pos]
@@ -258,7 +259,7 @@ def build_alt_map(df_alleles, amplicon_positions):
     return alt_map
 
 
-def vcf_text_from_alt_map(alt_map, num_reads, ref_names):
+def vcf_text_from_alt_map(alt_map, num_reads, ref_names, vcf_file_path=None):
     """Return a single string containing the entire VCF contents."""
     lines = []
     lines.append("##fileformat=VCFv4.5")
@@ -267,34 +268,44 @@ def vcf_text_from_alt_map(alt_map, num_reads, ref_names):
     header_cols = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" + "\t".join(ref_names)
     lines.append(header_cols)
 
-    for key, value in alt_map.items():
-        chrom = int(key.split("pos")[0].replace("chr", ""))
-        pos = int(key.split("pos")[1])
-        ref_seq = value["ref_seq"]
+    with (open(vcf_file_path, "w") if vcf_file_path else nullcontext()) as vcf_file:
+        if vcf_file_path:
+            vcf_file.write("\n".join(lines) + "\n")
 
-        alt_parts = []
-        af_parts = []
+        for key, value in alt_map.items():
+            chrom = key[0]
+            pos = key[1]
+            ref_seq = value["ref_seq"]
 
-        for edit_type, alt_seq, reads in value["alt_seqs"]:
-            if edit_type == "insert":
-                temp_seq = ref_seq[0] + alt_seq
-            elif edit_type == "delete":
-                temp_seq = ref_seq[:-len(alt_seq)]
-            elif edit_type == "sub":
-                temp_seq = alt_seq
+            alt_parts = []
+            af_parts = []
+
+            for edit_type, alt_seq, reads in value["alt_seqs"]:
+                if edit_type == "insert":
+                    temp_seq = ref_seq[0] + alt_seq
+                elif edit_type == "delete":
+                    temp_seq = ref_seq[:-len(alt_seq)]
+                elif edit_type == "sub":
+                    temp_seq = alt_seq
+                else:
+                    raise CRISPRessoShared.BadParameterException("Invalid edit type in alt_map.")
+
+                if temp_seq not in alt_parts:
+                    alt_parts.append(temp_seq)
+                    af_parts.append(f"{reads / num_reads:.3f}")
+
+            alt_string = ",".join(alt_parts)
+            af_string = ",".join(af_parts)
+
+            if vcf_file_path:
+                vcf_file.write(
+                    f"{chrom}\t{pos}\t.\t{ref_seq}\t{alt_string}\t.\tPASS\tAF={af_string}\n"
+                )
             else:
-                raise CRISPRessoShared.BadParameterException("Invalid edit type in alt_map.")
+                lines.append(f"{chrom}\t{pos}\t.\t{ref_seq}\t{alt_string}\t.\tPASS\tAF={af_string}")
 
-            if temp_seq not in alt_parts:
-                alt_parts.append(temp_seq)
-                af_parts.append(f"{reads / num_reads:.3f}")
-
-        alt_string = ",".join(alt_parts)
-        af_string = ",".join(af_parts)
-
-        lines.append(f"{chrom}\t{pos}\t.\t{ref_seq}\t{alt_string}\t.\tPASS\tAF={af_string}")
-
-    return "\n".join(lines) + "\n"
+    if not vcf_file_path:
+        return "\n".join(lines) + "\n"
 
 
 def write_vcf_file(df_alleles, ref_names, crispresso2_info, args, output_dir):
@@ -308,10 +319,7 @@ def write_vcf_file(df_alleles, ref_names, crispresso2_info, args, output_dir):
         amplicon_positions = {}
         for i, coord in enumerate(all_coords):
             chrom_str, pos_str = coord.strip().split(':')
-            chrom_str = chrom_str.replace('chr', '')
-            if not chrom_str.isdigit() or not pos_str.isdigit():
-                raise CRISPRessoShared.BadParameterException('Invalid format for --amplicon_coordinates.')
-            chrom = int(chrom_str)
+            chrom = chrom_str
             pos = int(pos_str)
             key = amplicon_names[i] if i < len(amplicon_names) else f"Amplicon{i+1-len(amplicon_names)}"
             amplicon_positions[key] = (chrom, pos)
@@ -322,12 +330,8 @@ def write_vcf_file(df_alleles, ref_names, crispresso2_info, args, output_dir):
     crispresso2_info['amplicon_coordinate'] = pos
 
     alt_map = build_alt_map(df_alleles, amplicon_positions)
-    vcf_text = vcf_text_from_alt_map(alt_map, num_reads, ref_names)
-
-    with open(vcf_path, 'w') as fh:
-        fh.write(vcf_text)
-
-    return vcf_path
+    vcf_text_from_alt_map(alt_map, num_reads, ref_names, vcf_path)
+    
 
   
 pd=check_library('pandas')
@@ -3584,6 +3588,8 @@ def main():
             for ref_name in ref_names:
                 qwc_indexes[ref_name] = refs[ref_name]['include_idxs']
             write_vcf_file(df_alleles, ref_names, crispresso2_info, args, OUTPUT_DIRECTORY)
+        # write the allele frequency table
+        df_alleles.to_csv(_jp('Alleles_frequency_table.csv'), sep='\t', header=True, index=None)
 
         #write alleles table
         #crispresso1Cols = ["Aligned_Sequence","Reference_Sequence","NHEJ","UNMODIFIED","HDR","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
