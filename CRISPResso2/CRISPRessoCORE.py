@@ -213,8 +213,11 @@ def build_alt_map(df_alleles, amplicon_positions):
             left_index = pos + insertion_coords[0]
             map_key = (chrom, left_index)
 
-            ref_idx = df_allele["ref_positions"].index(insertion_coords[0] - 1)
-            ins_seq = df_allele["Aligned_Sequence"][insertion_coords[0] : insertion_coords[1]]
+            ref_idx = df_allele["ref_positions"].index(insertion_coords[0])
+            # print("ins")
+            # print(insertion_coords)
+            # print(df_allele)
+            ins_seq = df_allele["Aligned_Sequence"][insertion_coords[1] : (insertion_coords[1] + df_allele["insertion_sizes"][0])]
             reads = df_allele["#Reads"]
 
             if map_key in alt_map:
@@ -228,7 +231,7 @@ def build_alt_map(df_alleles, amplicon_positions):
                     alt_map[map_key]["alt_seqs"].append(["insert", ins_seq, reads])
             else:
                 alt_map[map_key] = {
-                    "ref_seq": df_allele["Reference_Sequence"][ref_idx - 1],
+                    "ref_seq": df_allele["Reference_Sequence"][ref_idx],
                     "alt_seqs": [["insert", ins_seq, reads]],
                 }
 
@@ -255,7 +258,8 @@ def build_alt_map(df_alleles, amplicon_positions):
                     "ref_seq": df_allele["Reference_Sequence"][ref_idx],
                     "alt_seqs": [["sub", sub_base, reads]],
                 }
-
+    print("Alt map:")
+    print(alt_map)
     return alt_map
 
 
@@ -273,6 +277,10 @@ def vcf_text_from_alt_map(alt_map, num_reads, ref_names, vcf_file_path=None):
             vcf_file.write("\n".join(lines) + "\n")
 
         for key, value in alt_map.items():
+            print("Key:")
+            print(key)
+            print("Value:")
+            print(value)
             chrom = key[0]
             pos = key[1]
             ref_seq = value["ref_seq"]
@@ -284,7 +292,8 @@ def vcf_text_from_alt_map(alt_map, num_reads, ref_names, vcf_file_path=None):
                 if edit_type == "insert":
                     temp_seq = ref_seq[0] + alt_seq
                 elif edit_type == "delete":
-                    temp_seq = ref_seq[:-len(alt_seq)]
+                    del_len  = len(alt_seq)
+                    temp_seq = ref_seq[0] + ref_seq[del_len + 1 :]
                 elif edit_type == "sub":
                     temp_seq = alt_seq
                 else:

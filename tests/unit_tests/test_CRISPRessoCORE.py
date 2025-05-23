@@ -413,10 +413,17 @@ def test_write_vcf_from_alt_map():
         "##source=CRISPResso2\n"
         "##INFO=<ID=AF,Number=A,Type=Float,Description=\"Allele Frequency\">\n"
         "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tReference\n"
-        "1\t10\t.\tA\tG\t.\tPASS\tAF=0.200\n"
-        "1\t20\t.\tAGCTAGCTAGC\tA\t.\tPASS\tAF=0.200\n"
-        "1\t32\t.\tG\tGGG\t.\tPASS\tAF=0.200\n"
+        "1\t10\t.\tA\tG\t.\tPASS\tAF=0.167\n"
+        "1\t20\t.\tAGCTAGCTAGC\tACTAGCTAGC,A\t.\tPASS\tAF=0.167,0.167\n"
+        "1\t32\t.\tG\tGGG\t.\tPASS\tAF=0.167\n"
     )
+
+    if vcf_text != expected_vcf:
+        print("vcf_text:")
+        print(vcf_text)
+        print("expected_vcf_text:")
+        print(expected_vcf)
+
 
     assert vcf_text == expected_vcf
     
