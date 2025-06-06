@@ -72,6 +72,7 @@ def get_nuc_color(nuc, alpha):
 
         return (charSum, (1-charSum), (2*charSum*(1-charSum)))
 
+
 def get_color_lookup(nucs, alpha, custom_colors=None):
     if custom_colors is None:
         colorLookup = {}
@@ -94,6 +95,18 @@ def hex_to_rgb(value):
     value = value.lstrip('#')
     lv = len(value)
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
+
+
+def get_y_label_values(y_max, round=False, num_ticks=6):
+    """Get y label values that are evenly spaced."""
+    y_label_values = np.arange(0, 1, 1.0 / 6.0)
+    if y_max > 0:
+        y_label_values = np.linspace(0, y_max, num_ticks).astype(int)
+        y_label_values[-1] = int(y_max)
+        if round:
+            y_label_values = np.round(y_label_values)
+    return y_label_values
+
 
 def plot_nucleotide_quilt(nuc_pct_df,mod_pct_df,fig_filename_root, custom_colors, save_also_png=False,sgRNA_intervals=None,min_text_pct=0.5,max_text_pct=0.95,quantification_window_idxs=None,sgRNA_names=None,sgRNA_mismatches=None,shade_unchanged=True,group_column='Batch', **kwargs):
     """
@@ -347,9 +360,8 @@ def plot_indel_size_distribution(
     ax.set_xlim([xmin, xmax])
     ax.set_title(title)
     ax.set_ylabel('Sequences % (no.)')
-    y_label_values = np.round(
-        np.linspace(0, min(100, max(ax.get_yticks())), 6),
-    )
+    max_y = min(100, max(ax.get_yticks()))
+    y_label_values = get_y_label_values(max_y, round=True)
     ax.set_yticks(y_label_values)
     ax.set_yticklabels([
         '%.1f%% (%.0f)' % (pct, pct / 100 * n_this_category)
@@ -427,9 +439,8 @@ def plot_frequency_deletions_insertions(
         lgd.legend_handles[1].set_height(6)
 
     ax.set_xlim([-1, xmax_ins])
-    y_label_values= np.round(
-        np.linspace(0, min(counts_total, max(ax.get_yticks())), 6),
-    )
+    max_y = min(counts_total, max(ax.get_yticks()))
+    y_label_values = get_y_label_values(max_y, round=True)
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(
         [
@@ -466,9 +477,8 @@ def plot_frequency_deletions_insertions(
         lgd.legend_handles[1].set_height(6)
 
     ax.set_xlim([-1 * xmax_del, 1])
-    y_label_values = np.round(
-        np.linspace(0, min(counts_total, max(ax.get_yticks())), 6),
-    )
+    y_max = min(counts_total, max(ax.get_yticks()))
+    y_label_values = get_y_label_values(y_max, round=True)
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(
         [
@@ -505,9 +515,8 @@ def plot_frequency_deletions_insertions(
         lgd.legend_handles[1].set_height(6)
 
     ax.set_xlim([-1, xmax_mut])
-    y_label_values= np.round(
-        np.linspace(0, min(counts_total, max(ax.get_yticks())), 6),
-    )
+    y_max = min(counts_total, max(ax.get_yticks()))
+    y_label_values = get_y_label_values(y_max, round=True)
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(
         [
@@ -631,9 +640,7 @@ def plot_amplicon_modifications(
         fancybox=True,
         shadow=True,
     )
-    y_label_values = np.arange(0, 1, 1.0 / 6.0)
-    if y_max > 0:
-        y_label_values = np.arange(0, y_max, y_max / 6.0)
+    y_label_values = get_y_label_values(y_max, round=True)
     if num_refs == 1:
         ax.set_ylabel('Sequences: % Total ( no. )')
         ax.set_yticks(y_label_values)
@@ -793,9 +800,7 @@ def plot_modification_frequency(
         fancybox=True,
         shadow=True,
     )
-    y_label_values = np.arange(0, 1, 1.0 / 6.0)
-    if y_max > 0:
-        y_label_values = np.arange(0, y_max, y_max / 6.0)
+    y_label_values = get_y_label_values(y_max)
     ax.set_xticks(np.arange(
         0,
         ref_len,
@@ -958,9 +963,7 @@ def plot_quantification_window_locations(
         fancybox=True,
         shadow=True,
     )
-    y_label_values = np.arange(0, 1, 1.0 / 6.0)
-    if y_max > 0:
-        y_label_values = np.arange(0, y_max, y_max / 6.0).astype(int)
+    y_label_values = get_y_label_values(y_max)
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(
         [
@@ -1244,10 +1247,7 @@ def plot_global_modifications_reference(
         fancybox=True,
         shadow=True,
     )
-    y_label_values = np.arange(0, 1, 1.0 / 6.0)
-    if y_max > 0:
-        y_label_values = np.arange(0, y_max, y_max / 6.0).astype(int)
-
+    y_label_values = get_y_label_values(y_max)
     ax.set_ylabel('Sequences: % Total ( no. )')
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(
@@ -1473,9 +1473,7 @@ def plot_frameshift_frequency(
     ax1.tick_params(axis='both', which='major', labelsize=24)
     ax1.tick_params(axis='both', which='minor', labelsize=24)
     ax1.set_ylabel('Sequences % (no.)')
-    y_label_values = np.round(
-        np.linspace(0, min(100, max(ax1.get_yticks())), 6),
-    )
+    y_label_values = get_y_label_values(max_y, round=True)
     ax1.set_yticks(y_label_values)
     ax1.set_yticklabels(
         [
@@ -1512,9 +1510,8 @@ def plot_frameshift_frequency(
     )
     ax2.set_title(plot_titles['if'])
     ax2.set_ylabel('Sequences % (no.)')
-    y_label_values = np.round(
-        np.linspace(0, min(100, max(ax2.get_yticks())), 6),
-    )
+    max_y = min(100, max(ax2.get_yticks()))
+    y_label_values = get_y_label_values(max_y, round=True)
     ax2.set_yticks(y_label_values)
     ax2.set_yticklabels(
         [
@@ -1608,9 +1605,8 @@ def plot_global_frameshift_in_frame_mutations(
     ax1.tick_params(axis='both', which='minor', labelsize=24)
     ax1.tick_params(left=True, bottom=True)
     ax1.set_ylabel('Sequences % (no.)')
-    y_label_values = np.round(np.linspace(
-        0, min(100, max(ax1.get_yticks())), 6),
-    )
+    y_max = min(100, max(ax1.get_yticks()))
+    y_label_values = get_y_label_values(y_max, round=True)
     ax1.set_yticks(y_label_values)
     ax1.set_yticklabels(
         [
@@ -1648,9 +1644,8 @@ def plot_global_frameshift_in_frame_mutations(
     )
     ax2.set_title('Global In-frame profile')
     ax2.set_ylabel('Sequences % (no.)')
-    y_label_values = np.round(np.linspace(
-        0, min(100, max(ax2.get_yticks())), 6,
-    ))
+    y_max = min(100, max(ax2.get_yticks()))
+    y_label_values = get_y_label_values(y_max, round=True)
     ax2.set_yticks(y_label_values)
     ax2.set_yticklabels(
         [
@@ -2254,7 +2249,8 @@ def plot_subs_across_ref(ref_len, ref_seq, ref_name, ref_count, all_substitution
 #    lgd=ax.legend(legend_patches,legend_labels,ncol=1)
     lgd = ax.legend(handles=legend_patches, labels=legend_labels, loc='upper center', bbox_to_anchor=(0.3, -0.15), ncol=2, fancybox=True, shadow=True)
 
-    y_label_values= np.round(np.linspace(0, max(y_max, min(max(tots), max(ax.get_yticks()))), 6))# np.arange(0,y_max,y_max/6.0)
+    max_y = max(y_max, min(max(tots), max(ax.get_yticks())))
+    y_label_values = get_y_label_values(max_y, round=True)
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(
         [
@@ -3575,7 +3571,8 @@ def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
     ax.set_xticks(np.arange(len(sizes)))
     ax.set_xticklabels(labels)
     ax.set_ylabel('Sequences % (no.)')
-    y_label_values = np.round(np.linspace(0, max(N_READS_INPUT, max(ax.get_yticks())), 6))
+    y_max = max(N_READS_INPUT, max(ax.get_yticks()))
+    y_label_values = get_y_label_values(y_max, round=True)
 
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(['%.1f%% (%.0f)' % (100*cnt/N_READS_INPUT, cnt) for cnt in y_label_values])
@@ -3670,7 +3667,8 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
     ax.set_xticklabels(labels)
     ax.set_xticklabels([X.replace("&", " & ").replace("_UNMODIFIED", " UNMODIFIED").replace("_MODIFIED", " MODIFIED") for X in labels])
     ax.set_ylabel('Sequences % (no.)')
-    y_label_values = np.round(np.linspace(0, min(100, max(ax.get_yticks())), 6))
+    y_max = min(100, max(ax.get_yticks()))
+    y_label_values = get_y_label_values(y_max, round=True)
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(['%.1f%% (%.0f)' % (pct, pct/100*N_TOTAL) for pct in y_label_values])
     #if too many barplots, flip the labels
