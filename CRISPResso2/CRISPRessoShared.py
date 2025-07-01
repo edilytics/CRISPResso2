@@ -10,8 +10,6 @@ import errno
 import gzip
 import importlib.metadata
 import importlib.util
-import importlib.metadata
-from pathlib import Path
 
 import io
 import json
@@ -109,7 +107,7 @@ class StatusFormatter(logging.Formatter):
             record.percent_complete = self.last_percent_complete
         else:
             record.percent_complete = 0.0
-        record.json_message = record.getMessage().replace('\\', r'\\').replace('\n', r'\n').replace('"', r'\"')
+        record.json_message = record.getMessage().replace('\\', r'\\').replace('\n', r'\n').replace('"', r'\"').replace("_", r"\_")
         return super().format(record)
 
 
@@ -239,7 +237,6 @@ def get_crispresso_options_lookup(tool):
 def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, paramInd=None, set_default_params=False, tool='Core'):
     """
     Updates a given command (cmd) by setting parameter options with new values in option_values.
-
     Parameters
     ----------
     cmd : str
@@ -320,9 +317,6 @@ def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, 
                 new_cmd += ' --%s %s' % (action.dest, val)
 
     return new_cmd
-
-
-
 
 
 def propagate_crispresso_options(cmd, options, params, paramInd=None):
