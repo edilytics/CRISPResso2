@@ -5714,6 +5714,7 @@ def main():
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'].append(
                         "Figure 9a: Visualization of the distribution of identified amino acids based on the coding sequence (" + coding_seq+"). The vertical dashed line indicates the predicted cleavage site.")
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_datas'].append([('Amino Acid table', os.path.basename(amino_acid_filename))])
+                    
             info('Done!')
 
             #END GUIDE SPECIFIC PLOTS
