@@ -179,7 +179,6 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
     }
 
     for key, value in args_dict.items():
-        # print(key, value)
         tools = value.get('tools', [])  # Default to empty list if 'tools' is not found
         if tool in tools:
             action = value.get('action')  # Use None as default if 'action' is not found
@@ -236,7 +235,6 @@ def get_crispresso_options_lookup(tool):
 def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, paramInd=None, set_default_params=False, tool='Core'):
     """
     Updates a given command (cmd) by setting parameter options with new values in option_values.
-
     Parameters
     ----------
     cmd : str
@@ -604,7 +602,6 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
 def get_n_reads_fastq(fastq_filename):
     if not os.path.exists(fastq_filename) or os.path.getsize(fastq_filename) == 0:
         return 0
-
     p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '' ) +"cat < %s | grep -c ." % fastq_filename, shell=True, stdout=sb.PIPE)
     n_reads = int(float(p.communicate()[0])/4.0)
     return n_reads
@@ -1334,6 +1331,45 @@ def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_
 
     return output_filename_r1, output_filename_r2
 
+
+def get_base_edit_row_around_cut(row, cut_point, offset, conversion_nuc_from):
+
+    cut_idx = row['ref_positions'].index(cut_point)
+    include_inds = [i for i,c in enumerate(row['Reference_Sequence']) if c == conversion_nuc_from]
+
+    filtered_aligned_seq = ''.join([row['Aligned_Sequence'][i] for i in include_inds])
+    filtered_ref_seq = ''.join([row['Reference_Sequence'][i] for i in include_inds])
+
+    return (
+        filtered_aligned_seq, # row['Aligned_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1],
+        filtered_ref_seq, # row['Reference_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1],
+        row['Read_Status'] == 'UNMODIFIED', 
+        row['n_deleted'], 
+        row['n_inserted'], 
+        row['n_mutated'], 
+        row['#Reads'], 
+        row['%Reads']
+        )
+
+
+def get_base_edit_dataframe_around_cut(df_alleles, cut_point, offset, conversion_nuc_inds, collapse_by_sequence=True):
+    if df_alleles.shape[0] == 0:
+        return df_alleles
+    ref1 = df_alleles['Reference_Sequence'].iloc[0]
+    ref1 = ref1.replace('-','')
+
+    df_alleles_around_cut = pd.DataFrame(
+        list(df_alleles.apply(lambda row: get_base_edit_row_around_cut(row, cut_point, offset, conversion_nuc_inds), axis=1).values),
+        columns=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated', '#Reads',
+                 '%Reads'])
+
+    df_alleles_around_cut = df_alleles_around_cut.groupby(
+        ['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted',
+         'n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
+
+    df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
+    df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
+    return df_alleles_around_cut
 
 ######
 # allele modification functions

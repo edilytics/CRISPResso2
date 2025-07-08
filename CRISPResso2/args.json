@@ -895,6 +895,25 @@
             "help": "Halt execution if a plot fails to generate",
             "action": "store_true",
             "tools": ["Core", "Batch", "Pooled", "WGS", "Compare"]
+        },
+        "consider_changes_outside_of_guide": {
+            "keys": ["--consider_changes_outside_of_guide"],
+            "help": "Consider changes outside of the guide region. If this flag is not set, only reads with changes in the quantification window are considered for analysis.",
+            "action": "store_true",
+            "tools": ["Core"]
+        },
+        "consider_indels_outside_of_guide": {
+            "keys": ["--consider_indels_outside_of_guide"],
+            "help": "Consider indels outside of the guide region. If this flag is not set, only reads with indels in the quantification window are considered \"Indel\" reads.",
+            "action": "store_true",
+            "tools": ["Core"]
+        },
+        "target_ref_skip_allele_count": {
+            "keys": ["--target_ref_skip_allele_count"],
+            "help": "Number of alleles in the allele table to skip before assigning target reference sequence. This is useful when the most-frequent allele is not the target allele.",
+            "type": "int",
+            "default": 0,
+            "tools": ["Core"]
         }
     },
     "Sections": {
