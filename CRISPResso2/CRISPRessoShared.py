@@ -235,6 +235,7 @@ def get_crispresso_options_lookup(tool):
 def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, paramInd=None, set_default_params=False, tool='Core'):
     """
     Updates a given command (cmd) by setting parameter options with new values in option_values.
+
     Parameters
     ----------
     cmd : str
@@ -1343,11 +1344,11 @@ def get_base_edit_row_around_cut(row, cut_point, offset, conversion_nuc_from):
     return (
         filtered_aligned_seq, # row['Aligned_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1],
         filtered_ref_seq, # row['Reference_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1],
-        row['Read_Status'] == 'UNMODIFIED', 
-        row['n_deleted'], 
-        row['n_inserted'], 
-        row['n_mutated'], 
-        row['#Reads'], 
+        row['Read_Status'] == 'UNMODIFIED',
+        row['n_deleted'],
+        row['n_inserted'],
+        row['n_mutated'],
+        row['#Reads'],
         row['%Reads']
         )
 
