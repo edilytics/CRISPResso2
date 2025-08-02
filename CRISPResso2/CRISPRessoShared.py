@@ -236,6 +236,7 @@ def get_crispresso_options_lookup(tool):
 def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, paramInd=None, set_default_params=False, tool='Core'):
     """
     Updates a given command (cmd) by setting parameter options with new values in option_values.
+
     Parameters
     ----------
     cmd : str
@@ -441,14 +442,14 @@ CODON_TO_AMINO_ACID_SINGLE_CHAR = {
     'TCT': 'S', 'TCC': 'S', 'TCA': 'S', 'TCG': 'S',
     'TAT': 'Y', 'TAC': 'Y', 'TAA': '*', 'TAG': '*',
     'TGT': 'C', 'TGC': 'C', 'TGA': '*', 'TGG': 'W',
-    'CTT': 'L', 'CTC': 'L', 'CTA': 'L', 'CTG': 'L', 
+    'CTT': 'L', 'CTC': 'L', 'CTA': 'L', 'CTG': 'L',
     'CCT': 'P', 'CCC': 'P', 'CCA': 'P', 'CCG': 'P',
     'CAT': 'H', 'CAC': 'H', 'CAA': 'Q', 'CAG': 'Q',
     'CGT': 'R', 'CGC': 'R', 'CGA': 'R', 'CGG': 'R',
     'ATT': 'I', 'ATC': 'I', 'ATA': 'I', 'ATG': 'M',
     'ACT': 'T', 'ACC': 'T', 'ACA': 'T', 'ACG': 'T',
     'AAT': 'N', 'AAC': 'N', 'AAA': 'K', 'AAG': 'K',
-    'AGT': 'S', 'AGC': 'S', 'AGA': 'R', 'AGG': 'R', 
+    'AGT': 'S', 'AGC': 'S', 'AGA': 'R', 'AGG': 'R',
     'GTT': 'V', 'GTC': 'V', 'GTA': 'V', 'GTG': 'V',
     'GCT': 'A', 'GCC': 'A', 'GCA': 'A', 'GCG': 'A',
     'GAT': 'D', 'GAC': 'D', 'GAA': 'E', 'GAG': 'E',
@@ -483,10 +484,10 @@ def insert_indels(seq, seq_codons):
     for i, c in enumerate(seq):
         if c == '-':
             indel_inds.append(i)
-    
+
     for i in indel_inds:
         seq_codons.insert(i, ('-', '---'))
-    
+
     return seq_codons
 
 def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
@@ -494,7 +495,7 @@ def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
 
     ref_codons = insert_indels(ref_seq, ref_codons)
     seq_codons = insert_indels(seq, seq_codons)
-    
+
     for i, ((r, r_codon), (s, s_codon)) in enumerate(zip(ref_codons, seq_codons)):
         if r == '-' or s == '-':
             continue
@@ -1475,20 +1476,20 @@ def get_dataframe_around_cut_debug(df_alleles, cut_point, offset):
 def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point):
     # cut_idx = row['ref_positions'].index(cut_point)
     cut_idx = row['ref_positions'].index(amino_acid_cut_point)
-    left_idx = row['ref_positions'].index(plot_left_idx)    
+    left_idx = row['ref_positions'].index(plot_left_idx)
     seq_acids_and_codons = get_amino_acids_and_codons(row['Aligned_Sequence'][left_idx::].replace('-', ''))
     ref_acids_and_codons = get_amino_acids_and_codons(row['Reference_Sequence'][left_idx::].replace('-', ''))
     aligned_seq = ''.join(tup[0] for tup in seq_acids_and_codons)
     reference_seq = ''.join(tup[0] for tup in ref_acids_and_codons)
-    
+
     gap_incentive = np.zeros(len(reference_seq)+1, dtype=int)
     try:
         gap_incentive[cut_idx] = 1
     except:
         pass
     aligned_seq, reference_seq, score = CRISPResso2Align.global_align(
-        aligned_seq, 
-        reference_seq, 
+        aligned_seq,
+        reference_seq,
         matrix=CRISPResso2Align.read_matrix(matrix_path),
         gap_incentive=gap_incentive,
     )
@@ -1505,9 +1506,9 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
         aligned_seq,
         seq_acids_and_codons,
         )
-    
+
     # row['silent_edit_inds'] = silent_edit_inds
-    
+
 
     return (aligned_seq[:sequence_length],
             reference_seq[:sequence_length],
@@ -1515,7 +1516,7 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
             row['n_deleted'],
             row['n_inserted'],
             row['n_mutated'],
-            row['#Reads'], 
+            row['#Reads'],
             row['%Reads'],)
 
 def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point, collapse_by_sequence=True):
@@ -1544,7 +1545,7 @@ def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_
 
     edits_series.index = df_alleles_around_cut.index
     df_alleles_around_cut['silent_edit_inds'] = edits_series
-    
+
     df_alleles_around_cut.index = df_alleles_around_cut.index.str.upper()
 
     return df_alleles_around_cut
