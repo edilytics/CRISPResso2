@@ -143,7 +143,7 @@ def get_amino_acid_color_dict(scheme='clustal'):
             '': '#FFFFFF',   # White
             '-': '#FFFFFF',  # White
         }
-    
+
     if scheme == 'unique':
         return {
                 '*': '#FF0000',  # Red (stop codon or wildcard)
@@ -170,7 +170,7 @@ def get_amino_acid_color_dict(scheme='clustal'):
                 '': '#FFFFFF',   # White (Empty)
                 '-': '#B0B0B0',  # Grey
             }
-    
+
 def get_amino_acid_colors(scheme):
 
     # this will preserve the order of the amino acids
@@ -207,7 +207,7 @@ def hex_to_rgb(value):
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
 
 def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom_colors=None, save_also_png=False,
-                          min_text_pct=0.5, max_text_pct=0.95, quantification_window_idxs=None, 
+                          min_text_pct=0.5, max_text_pct=0.95, quantification_window_idxs=None,
                           sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None,
                           shade_unchanged=True,group_column='Batch', **kwargs):
     """
@@ -837,7 +837,7 @@ def plot_modification_frequency(
 ):
     """
     Plots the frequency of insertions, deletions, and substitutions across the reference amplicon, including modifications outside the quantification window.
-    
+
     :param include_idxs_list: List of indices included in the quantification window
     :param all_insertion_count_vectors: List of insertion count vectors for each amplicon
     :param all_deletion_count_vectors: List of deletion count vectors for each amplicon
@@ -2193,7 +2193,7 @@ def plot_scaffold_indel_lengths(
 def get_rows_for_sgRNA_annotation(sgRNA_intervals, amp_len):
     """
     Returns an array specifying the row number that an sgRNA should be plotted on in order to avoid overlap
-    
+
     :param sgRNA_intervals: array of x coordinate tuples of start and stop
     :param amp_len: length of amplicon
 
@@ -2627,7 +2627,7 @@ def plot_log_nuc_freqs(df_nuc_freq,tot_aln_reads,plot_title,fig_filename_root=No
     """
     Plots a heatmap of the percentage of reads that had each nucletide at each base in the reference
     Positions in the reference that have more than one allele can be spotted using this plot
-    
+
     :param df_nuc_freq: DataFrame with nucleotide frequencies indexed by nucleotide
     :param tot_aln_reads: total number of reads aligned to the reference sequence
     :param plot_title: title of the plot
@@ -3022,7 +3022,7 @@ def custom_heatmap(data, vmin=None, vmax=None, cmap=None, center=None, robust=Fa
         ax.set_aspect("equal")
     plotter.plot(ax, cbar_ax, kwargs)
     return ax
-        
+
 
 def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
     """
@@ -3189,15 +3189,16 @@ def plot_amino_acid_heatmap(
         this_sgRNA_y_height = num_sgRNA_rows - 0.3
         add_sgRNA_to_ax(ax_hm_ref, sgRNA_intervals, sgRNA_y_start=this_sgRNA_y_start, sgRNA_y_height=this_sgRNA_y_height, amp_len=plot_aa_len, font_size='small', clip_on=False, sgRNA_names=sgRNA_names, sgRNA_mismatches=sgRNA_mismatches, x_offset=0, label_at_zero=True, sgRNA_rows=sgRNA_rows)
 
+    padding = 0.075
     #create boxes for ins
     for idx, lss in insertion_dict.items():
         for ls in lss:
-            ax_hm.add_patch(patches.Rectangle((ls[0], N_ROWS-idx-1), ls[1]-ls[0], 1, linewidth=3, edgecolor='r', fill=False))
+            ax_hm.add_patch(patches.Rectangle((ls[0] + padding, N_ROWS-idx-1 + padding), ls[1]-ls[0] - (2 * padding), 1 - (2 * padding), linewidth=1.5, edgecolor='r', fill=False))
 
     # create boxes for silent edits
     for idx, edit_inds in silent_edit_dict.items():
         for edit_ind in edit_inds:
-            ax_hm.add_patch(patches.Rectangle((edit_ind, N_ROWS-idx-1), 1, 1, linewidth=3, edgecolor='g', fill=False))
+            ax_hm.add_patch(patches.Rectangle((edit_ind + padding, N_ROWS-idx-1 + padding), 1 - (2 * padding), 1 - (2 * padding), linewidth=1.5, edgecolor='g', fill=False))
 
     #cut point vertical line
     if plot_cut_point:
@@ -3233,7 +3234,7 @@ def plot_amino_acid_heatmap(
         descriptions.append('Predicted cleavage position')
 
     lgd = ax_hm.legend(proxies, descriptions, numpoints=1, markerscale=2, loc='upper center', bbox_to_anchor=(0.5, 0), ncol=1, fancybox=True, shadow=False)
-    
+
     fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight', bbox_extra_artists=(lgd,))
     if SAVE_ALSO_PNG:
         fig.savefig(fig_filename_root+'.png', bbox_inches='tight', bbox_extra_artists=(lgd,))
@@ -3757,7 +3758,7 @@ def plot_alleles_table_prepped(reference_seq, prepped_df_alleles, annotations, y
     )
 
 
-def plot_alleles_table(reference_seq, df_alleles, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False, 
+def plot_alleles_table(reference_seq, df_alleles, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False,
                        plot_cut_point=True, cut_point_ind=None, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, annotate_wildtype_allele='****', **kwargs):
     """
     plots an allele table for a dataframe with allele frequencies
@@ -3798,7 +3799,7 @@ def plot_alleles_table(reference_seq, df_alleles, fig_filename_root=None, custom
                          sgRNA_names=sgRNA_names,
                          sgRNA_mismatches=sgRNA_mismatches)
 
-def plot_alleles_table_from_file(alleles_file_name, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False, 
+def plot_alleles_table_from_file(alleles_file_name, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False,
                                  plot_cut_point=True, cut_point_ind=None, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, annotate_wildtype_allele='', **kwargs):
     """
     plots an allele table for a dataframe with allele frequencies
@@ -3848,7 +3849,7 @@ def plot_alleles_table_from_file(alleles_file_name, fig_filename_root=None, cust
                          sgRNA_names=sgRNA_names,
                          sgRNA_mismatches=sgRNA_mismatches)
 
-def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=None, MAX_N_ROWS=None, SAVE_ALSO_PNG=False, 
+def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=None, MAX_N_ROWS=None, SAVE_ALSO_PNG=False,
                                     plot_cut_point=True, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, **kwargs):
     """
     plots an allele table for each sgRNA/amplicon in a CRISPresso run (useful for plotting after running using the plot harness)
@@ -3937,7 +3938,7 @@ def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=
             plot_count += 1
     print('Plotted ' + str(plot_count) + ' plots')
 
-def plot_alleles_table_compare(reference_seq, df_alleles, sample_name_1, sample_name_2, fig_filename_root=None, custom_colors=None, 
+def plot_alleles_table_compare(reference_seq, df_alleles, sample_name_1, sample_name_2, fig_filename_root=None, custom_colors=None,
                                MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False, plot_cut_point=True, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, **kwargs):
     """
     plots an allele table for a dataframe with allele frequencies from two CRISPResso runs
@@ -4048,8 +4049,8 @@ def plot_nucleotide_quilt_from_folder(crispresso_output_folder, fig_filename_roo
             for idx in quantification_window_idxs:
                 new_quant_window_idxs.append(idx - new_sel_cols_start - 1)
 
-            plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=fig_filename_root, custom_colors=custom_colors, save_also_png=save_also_png, 
-                                  min_text_pct=min_text_pct, max_text_pct=max_text_pct, quantification_window_idxs=new_quant_window_idxs, 
+            plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=fig_filename_root, custom_colors=custom_colors, save_also_png=save_also_png,
+                                  min_text_pct=min_text_pct, max_text_pct=max_text_pct, quantification_window_idxs=new_quant_window_idxs,
                                   sgRNA_intervals=new_sgRNA_intervals, sgRNA_names=sgRNA_names, sgRNA_mismatches=sgRNA_mismatches, shade_unchanged=shade_unchanged)
             plot_count += 1
 
@@ -4168,7 +4169,7 @@ def plot_reads_total(df_summary_quantification, fig_filename_root=None,save_png=
         spine.set_visible(False)
 
     fig.tight_layout()
-    
+
     if fig_filename_root is None:
         plt.show()
     else:
