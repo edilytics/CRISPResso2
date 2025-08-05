@@ -598,25 +598,19 @@ def test_get_base_edit_target_sequence():
     df_alleles = pd.read_csv('tests/df_alleles.txt')
     ref_seq = 'CGGCCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCTGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG'
     wt_ref_name = 'HDR'
-    target_ref_skip_allele_count = 0
+    base_editor_target_ref_skip_allele_count = 0
 
     target_seq = CRISPRessoCORE.get_base_edit_target_sequence(
         ref_seq,
         wt_ref_name,
         df_alleles,
-        target_ref_skip_allele_count
+        base_editor_target_ref_skip_allele_count
     )
 
     assert target_seq == 'AATACGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCCGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGGCATGGCCCCATTCGCACGGCTCTGGAGCGGC'
 
 
-def test_get_bp_changes():
-
-    # aln_ref_seq = 'CGGCCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCTGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGC---TTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG-------------------------------'
-    # aln_target_seq = 'AATACGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCCGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGGCATGGCCCCATTCGCACGGCTCTGGAGCGGC'
-    # ref_seq = 'CGGCCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCTGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG'
-    # ref_positions_to_include = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222]
-
+def test_get_bp_changes_one_sub():
     ref_seq = 'AAA'
     aln_ref_seq = 'AAA'
     aln_target_seq = 'CAA'
@@ -629,6 +623,9 @@ def test_get_bp_changes():
     assert bp_changes_arr[0][1] == 'A'
     assert bp_changes_arr[0][2] == 'C'
 
+def test_get_bp_changes_two_subs():
+    ref_seq = 'AAA'
+    aln_ref_seq = 'AAA'
     aln_target_seq = 'CCA'
     ref_positions_to_include = [0, 1, 2]
     ref_changes_dict = CRISPRessoCORE.get_refpos_values(aln_ref_seq, aln_target_seq)
@@ -638,13 +635,15 @@ def test_get_bp_changes():
     assert bp_changes_arr[0] == (0, 'A', 'C')
     assert bp_changes_arr[1] == (1, 'A', 'C')
 
+def test_get_bp_changes_insertions():
+
     ref_seq = 'AAAAAA'
     aln_ref_seq = 'AAA-AAA-----'
     aln_target_seq = 'AAACAAACCCCC'
     ref_positions_to_include = [0, 1, 2, 3, 4, 5]
     ref_changes_dict = CRISPRessoCORE.get_refpos_values(aln_ref_seq, aln_target_seq)
     bp_changes_arr = CRISPRessoCORE.get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include)
-
+    
     assert len(bp_changes_arr) == 2
     assert bp_changes_arr[0] == (2, 'A', 'AC')
     assert bp_changes_arr[1] == (5, 'A', 'ACCCCC')
@@ -652,16 +651,16 @@ def test_get_bp_changes():
 
 def test_get_base_edit_target_sequence():
 
-    df_alleles = pd.read_csv('tests/test_df.txt')
+    df_alleles = pd.read_csv('tests/test_be_df.txt')
     wt_ref_name = 'TEST'
     ref_seq = 'AAAA'
-    target_ref_skip_allele_count = 0
+    base_editor_target_ref_skip_allele_count = 0
 
     target_seq = CRISPRessoCORE.get_base_edit_target_sequence(
         ref_seq,
         wt_ref_name,
         df_alleles,
-        target_ref_skip_allele_count
+        base_editor_target_ref_skip_allele_count
     )
 
     assert target_seq == 'AAGA'
@@ -669,17 +668,17 @@ def test_get_base_edit_target_sequence():
 
 
 def test_get_upset_plot_counts():
-    df_alleles = pd.read_csv('tests/test_df.txt')
+    df_alleles = pd.read_csv('tests/test_be_df.txt')
     target_seq = 'AAGA'
     bp_changes_arr = [(3, 'A', 'G')]
     
-    consider_indels_outside_of_guide = False
+    base_editor_consider_indels_outside_of_guide = False
     wt_ref_name = 'TEST'
 
     counts_dict = CRISPRessoCORE.get_upset_plot_counts(
         df_alleles,
         bp_changes_arr,
-        consider_indels_outside_of_guide,
+        base_editor_consider_indels_outside_of_guide,
         wt_ref_name
     )
 
@@ -699,7 +698,7 @@ def test_write_base_edit_counts():
     ref_name = 'TEST'
     bp_changes_arr = [(3, 'A', 'G')]
     counts_dict = CRISPRessoCORE.get_upset_plot_counts(
-        pd.read_csv('tests/test_df.txt'),
+        pd.read_csv('tests/test_be_df.txt'),
         bp_changes_arr,
         False,
         ref_name,
