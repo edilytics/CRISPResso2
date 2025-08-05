@@ -6002,7 +6002,7 @@ def main():
 
 
                         plot_half_window = max(1, args.plot_window_size)
-                        df_alleles_around_cut=CRISPRessoShared.get_base_edit_dataframe_around_cut(df_alleles.loc[df_alleles['Reference_Name'] == ref_name], cut_point, plot_half_window, args.conversion_nuc_from)
+                        df_alleles_around_cut=CRISPRessoShared.get_base_edit_dataframe_around_cut(df_alleles.loc[df_alleles['Reference_Name'] == ref_name], args.conversion_nuc_from)
                         count_total = counts_total[ref_name]
                         if args.allele_plot_pcts_only_for_assigned_reference:
                             df_alleles_around_cut['%AllReads']=df_alleles_around_cut['%Reads']

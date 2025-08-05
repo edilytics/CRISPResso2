@@ -1333,17 +1333,16 @@ def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_
     return output_filename_r1, output_filename_r2
 
 
-def get_base_edit_row_around_cut(row, cut_point, offset, conversion_nuc_from):
+def get_base_edit_row_around_cut(row, conversion_nuc_from):
 
-    cut_idx = row['ref_positions'].index(cut_point)
     include_inds = [i for i,c in enumerate(row['Reference_Sequence']) if c == conversion_nuc_from]
 
     filtered_aligned_seq = ''.join([row['Aligned_Sequence'][i] for i in include_inds])
     filtered_ref_seq = ''.join([row['Reference_Sequence'][i] for i in include_inds])
 
     return (
-        filtered_aligned_seq, # row['Aligned_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1],
-        filtered_ref_seq, # row['Reference_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1],
+        filtered_aligned_seq,
+        filtered_ref_seq,
         row['Read_Status'] == 'UNMODIFIED',
         row['n_deleted'],
         row['n_inserted'],
@@ -1353,14 +1352,14 @@ def get_base_edit_row_around_cut(row, cut_point, offset, conversion_nuc_from):
         )
 
 
-def get_base_edit_dataframe_around_cut(df_alleles, cut_point, offset, conversion_nuc_inds, collapse_by_sequence=True):
+def get_base_edit_dataframe_around_cut(df_alleles, conversion_nuc_inds):
     if df_alleles.shape[0] == 0:
         return df_alleles
     ref1 = df_alleles['Reference_Sequence'].iloc[0]
     ref1 = ref1.replace('-','')
 
     df_alleles_around_cut = pd.DataFrame(
-        list(df_alleles.apply(lambda row: get_base_edit_row_around_cut(row, cut_point, offset, conversion_nuc_inds), axis=1).values),
+        list(df_alleles.apply(lambda row: get_base_edit_row_around_cut(row, conversion_nuc_inds), axis=1).values),
         columns=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated', '#Reads',
                  '%Reads'])
 
