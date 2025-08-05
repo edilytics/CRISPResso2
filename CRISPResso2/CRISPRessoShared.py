@@ -1355,8 +1355,6 @@ def get_base_edit_row_around_cut(row, conversion_nuc_from):
 def get_base_edit_dataframe_around_cut(df_alleles, conversion_nuc_inds):
     if df_alleles.shape[0] == 0:
         return df_alleles
-    ref1 = df_alleles['Reference_Sequence'].iloc[0]
-    ref1 = ref1.replace('-','')
 
     df_alleles_around_cut = pd.DataFrame(
         list(df_alleles.apply(lambda row: get_base_edit_row_around_cut(row, conversion_nuc_inds), axis=1).values),
