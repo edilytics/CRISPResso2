@@ -4241,9 +4241,9 @@ def plot_quantification_positions(
     plt.close(fig)
 
 
-def plot_combination_upset(fig_root, ref_name, bp_changes_arr, binary_allele_counts, save_also_png=False):
+def plot_combination_upset(fig_root, ref_name, bp_substitutions_arr, binary_allele_counts, save_also_png=False):
     header_arr = []
-    for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_changes_arr):
+    for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_substitutions_arr):
         header_arr.append(str(ref_ind) + ':' + ref_base + '->' + mod_base)
     header_arr.append('has_indel')
     header_arr.append('cat_counts')
@@ -4268,6 +4268,6 @@ def plot_combination_upset(fig_root, ref_name, bp_changes_arr, binary_allele_cou
 
     if save_also_png:
         plt.savefig(fig_root + '.png')
-        
+
     plt.savefig(fig_root + '.pdf')
     plt.close()

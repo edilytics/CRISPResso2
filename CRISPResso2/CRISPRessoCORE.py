@@ -198,21 +198,21 @@ def get_refpos_values(ref_aln_seq, read_aln_seq):
     return refpos_dict
 
 
-def get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include):
+def get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include):
     # discover positions and bases that are different between reference and target
-    bp_changes_arr = []
+    bp_substitutions_arr = []
     for idx in ref_positions_to_include:
         ref_base = ref_seq[idx]
         if ref_changes_dict[idx] != ref_base:
-            bp_changes_arr.append((idx, ref_base, ref_changes_dict[idx]))
-    return bp_changes_arr
+            bp_substitutions_arr.append((idx, ref_base, ref_changes_dict[idx]))
+    return bp_substitutions_arr
 
 
-def get_upset_plot_counts(df_alleles, bp_changes_arr, base_editor_consider_indels_outside_of_guide, wt_ref_name):
+def get_upset_plot_counts(df_alleles, bp_substitutions_arr, base_editor_consider_indels_outside_of_guide, wt_ref_name):
     # set up counters
-    binary_allele_counts = defaultdict(int) # e.g. T,T,X,T > 100 where each item is a string of the base at each position in bp_changes_arr, and 'X' is nontarget
-    category_allele_counts = defaultdict(int) # e.g. T,T,R,T > 100 where each item is a string of the base at each position in bp_changes_arr, and 'T' is Target, 'R' is Reference, 'D' is Deletion, 'I' is insertion, and 'N' is anything else
-    precise_allele_counts = defaultdict(int) # e.g. A,A,C,AA > 100 where each item is a string of the base at each position in bp_changes_arr
+    binary_allele_counts = defaultdict(int) # e.g. T,T,X,T > 100 where each item is a string of the base at each position in bp_substitutions_arr, and 'X' is nontarget
+    category_allele_counts = defaultdict(int) # e.g. T,T,R,T > 100 where each item is a string of the base at each position in bp_substitutions_arr, and 'T' is Target, 'R' is Reference, 'D' is Deletion, 'I' is insertion, and 'N' is anything else
+    precise_allele_counts = defaultdict(int) # e.g. A,A,C,AA > 100 where each item is a string of the base at each position in bp_substitutions_arr
 
     total_alleles = 0
     total_alleles_reads = 0
@@ -226,11 +226,11 @@ def get_upset_plot_counts(df_alleles, bp_changes_arr, base_editor_consider_indel
     total_other_noindel_reads = 0
     total_other_indel_reads = 0
 
-    target_base_counts = [0] * len(bp_changes_arr)
-    reference_base_counts = [0] * len(bp_changes_arr)
-    deletion_base_counts = [0] * len(bp_changes_arr)
-    insertion_base_counts = [0] * len(bp_changes_arr)
-    other_base_counts = [0] * len(bp_changes_arr)
+    target_base_counts = [0] * len(bp_substitutions_arr)
+    reference_base_counts = [0] * len(bp_substitutions_arr)
+    deletion_base_counts = [0] * len(bp_substitutions_arr)
+    insertion_base_counts = [0] * len(bp_substitutions_arr)
+    other_base_counts = [0] * len(bp_substitutions_arr)
 
     # iterate all alleles in input allele table
     for idx, allele in df_alleles.iterrows():
@@ -264,7 +264,7 @@ def get_upset_plot_counts(df_alleles, bp_changes_arr, base_editor_consider_indel
         binary_arr = []
         cat_arr = []
         val_arr = []
-        for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_changes_arr):
+        for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_substitutions_arr):
             base_at_pos = ref_base_position_lookup[ref_ind]
             this_binary = 'X'
             this_category = 'N'
@@ -313,7 +313,7 @@ def get_upset_plot_counts(df_alleles, bp_changes_arr, base_editor_consider_indel
         precise_allele_counts[val_arr_str] += allele['#Reads']
 
 
-    total_counts = [total_alleles_reads] * len(bp_changes_arr)
+    total_counts = [total_alleles_reads] * len(bp_substitutions_arr)
 
     return {
         "binary_allele_counts": binary_allele_counts,
@@ -356,31 +356,31 @@ def get_base_edit_target_sequence(ref_seq, wt_ref_name, df_alleles, base_editor_
     return target_seq
 
 
-def write_base_edit_counts(ref_name, counts_dict, bp_changes_arr, _jp):
+def write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp):
 
     prefix = '10i.' + ref_name
 
     with open(_jp(prefix + '.binary_allele_counts.txt'),'w') as fout:
         sorted_binary_allele_counts = sorted(counts_dict['binary_allele_counts'].keys(), key=lambda x: counts_dict['binary_allele_counts'][x], reverse=True)
-        fout.write("\t".join([str(x) for x in bp_changes_arr]) + '\thas_indel\tcount\n')
+        fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
         for allele_str in sorted_binary_allele_counts:
             fout.write(allele_str + '\t' + str(counts_dict['binary_allele_counts'][allele_str]) + '\n')
 
 
     with open(_jp(prefix + '.category_allele_counts.txt'),'w') as fout:
         sorted_category_allele_counts = sorted(counts_dict['category_allele_counts'].keys(), key=lambda x: counts_dict['category_allele_counts'][x], reverse=True)
-        fout.write("\t".join([str(x) for x in bp_changes_arr]) + '\thas_indel\tcount\n')
+        fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
         for allele_str in sorted_category_allele_counts:
             fout.write(allele_str + '\t' + str(counts_dict['category_allele_counts'][allele_str]) + '\n')
     
     with open(_jp(prefix + '.precise_allele_counts.txt'),'w') as fout:
         sorted_precise_allele_counts = sorted(counts_dict['precise_allele_counts'].keys(), key=lambda x: counts_dict['precise_allele_counts'][x], reverse=True)
-        fout.write("\t".join([str(x) for x in bp_changes_arr]) + '\thas_indel\tcount\n')
+        fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
         for allele_str in sorted_precise_allele_counts:
             fout.write(allele_str + '\t' + str(counts_dict['precise_allele_counts'][allele_str]) + '\n')
             
     with open(_jp(prefix + '.arrays.txt'),'w') as fout:
-        fout.write('Class\t' + "\t".join([str(x) for x in bp_changes_arr]) + '\n')
+        fout.write('Class\t' + "\t".join([str(x) for x in bp_substitutions_arr]) + '\n')
         fout.write('total_counts\t' + "\t".join([str(x) for x in counts_dict['total_counts']]) + '\n')
         fout.write('reference_counts\t' + "\t".join([str(x) for x in counts_dict['reference_base_counts']]) + '\n')
         fout.write('target_counts\t' + "\t".join([str(x) for x in counts_dict['target_base_counts']]) + '\n')
@@ -5733,25 +5733,25 @@ def main():
                         ref_positions_to_include = refs[wt_ref_name]['include_idxs']
 
                     ref_changes_dict = get_refpos_values(aln_ref_seq, aln_target_seq)
-                    bp_changes_arr = get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include)
+                    bp_substitutions_arr = get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
 
-                    debug('Found ' + str(len(bp_changes_arr)) + ' base changes: ' + str(bp_changes_arr))
-                    counts_dict = get_upset_plot_counts(df_alleles, bp_changes_arr, args.base_editor_consider_indels_outside_of_guide, wt_ref_name)
+                    debug('Found ' + str(len(bp_substitutions_arr)) + ' base changes: ' + str(bp_substitutions_arr))
+                    counts_dict = get_upset_plot_counts(df_alleles, bp_substitutions_arr, args.base_editor_consider_indels_outside_of_guide, wt_ref_name)
 
                     #TODO: do we need to write these files?
-                    write_base_edit_counts(ref_name, counts_dict, bp_changes_arr, _jp)
+                    write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp)
 
                     debug('Read ' + str(counts_dict['total_alleles']) + ' alleles with ' + str(counts_dict['total_alleles_reads']) + ' reads')
                     debug('Got ' + str(counts_dict['total_alleles_on_ref']) + ' alleles on reference "' + wt_ref_name + '" with ' + str(counts_dict['total_alleles_reads_on_ref']) + ' reads')
 
                     
-                    if len(bp_changes_arr) > 0:
+                    if len(bp_substitutions_arr) > 0:
 
                         fig_root_10i = _jp(f'10i.Base_editing_{wt_ref_name}_upset_plot.by_amplicon_combination.no_indels')
                         plot_10i_input = {
                             'fig_root': fig_root_10i,
                             'ref_name': ref_name,
-                            'bp_changes_arr': bp_changes_arr,
+                            'bp_substitutions_arr': bp_substitutions_arr,
                             'binary_allele_counts': counts_dict['binary_allele_counts'],
                             'save_also_png': save_png,
                         }

@@ -610,43 +610,43 @@ def test_get_base_edit_target_sequence():
     assert target_seq == 'AATACGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCCGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGGCATGGCCCCATTCGCACGGCTCTGGAGCGGC'
 
 
-def test_get_bp_changes_one_sub():
+def test_get_bp_subs_one_sub():
     ref_seq = 'AAA'
     aln_ref_seq = 'AAA'
     aln_target_seq = 'CAA'
     ref_positions_to_include = [0, 1, 2]
     ref_changes_dict = CRISPRessoCORE.get_refpos_values(aln_ref_seq, aln_target_seq)
-    bp_changes_arr = CRISPRessoCORE.get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include)
+    bp_substitutions_arr = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
 
-    assert len(bp_changes_arr) == 1
-    assert bp_changes_arr[0][0] == 0
-    assert bp_changes_arr[0][1] == 'A'
-    assert bp_changes_arr[0][2] == 'C'
+    assert len(bp_substitutions_arr) == 1
+    assert bp_substitutions_arr[0][0] == 0
+    assert bp_substitutions_arr[0][1] == 'A'
+    assert bp_substitutions_arr[0][2] == 'C'
 
-def test_get_bp_changes_two_subs():
+def test_get_bp_subs_two_subs():
     ref_seq = 'AAA'
     aln_ref_seq = 'AAA'
     aln_target_seq = 'CCA'
     ref_positions_to_include = [0, 1, 2]
     ref_changes_dict = CRISPRessoCORE.get_refpos_values(aln_ref_seq, aln_target_seq)
-    bp_changes_arr = CRISPRessoCORE.get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include)
+    bp_substitutions_arr = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
 
-    assert len(bp_changes_arr) == 2
-    assert bp_changes_arr[0] == (0, 'A', 'C')
-    assert bp_changes_arr[1] == (1, 'A', 'C')
+    assert len(bp_substitutions_arr) == 2
+    assert bp_substitutions_arr[0] == (0, 'A', 'C')
+    assert bp_substitutions_arr[1] == (1, 'A', 'C')
 
-def test_get_bp_changes_insertions():
+def test_get_bp_subs_insertions():
 
     ref_seq = 'AAAAAA'
     aln_ref_seq = 'AAA-AAA-----'
     aln_target_seq = 'AAACAAACCCCC'
     ref_positions_to_include = [0, 1, 2, 3, 4, 5]
     ref_changes_dict = CRISPRessoCORE.get_refpos_values(aln_ref_seq, aln_target_seq)
-    bp_changes_arr = CRISPRessoCORE.get_bp_changes(ref_changes_dict, ref_seq, ref_positions_to_include)
-    
-    assert len(bp_changes_arr) == 2
-    assert bp_changes_arr[0] == (2, 'A', 'AC')
-    assert bp_changes_arr[1] == (5, 'A', 'ACCCCC')
+    bp_substitutions_arr = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
+
+    assert len(bp_substitutions_arr) == 2
+    assert bp_substitutions_arr[0] == (2, 'A', 'AC')
+    assert bp_substitutions_arr[1] == (5, 'A', 'ACCCCC')
 
 
 def test_get_base_edit_target_sequence():
@@ -670,14 +670,14 @@ def test_get_base_edit_target_sequence():
 def test_get_upset_plot_counts():
     df_alleles = pd.read_csv('tests/test_be_df.txt')
     target_seq = 'AAGA'
-    bp_changes_arr = [(3, 'A', 'G')]
+    bp_substitutions_arr = [(3, 'A', 'G')]
     
     base_editor_consider_indels_outside_of_guide = False
     wt_ref_name = 'TEST'
 
     counts_dict = CRISPRessoCORE.get_upset_plot_counts(
         df_alleles,
-        bp_changes_arr,
+        bp_substitutions_arr,
         base_editor_consider_indels_outside_of_guide,
         wt_ref_name
     )
@@ -696,10 +696,10 @@ def test_write_base_edit_counts():
     clean_file_prefix = ""
     _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, clean_file_prefix + filename)
     ref_name = 'TEST'
-    bp_changes_arr = [(3, 'A', 'G')]
+    bp_substitutions_arr = [(3, 'A', 'G')]
     counts_dict = CRISPRessoCORE.get_upset_plot_counts(
         pd.read_csv('tests/test_be_df.txt'),
-        bp_changes_arr,
+        bp_substitutions_arr,
         False,
         ref_name,
     )
@@ -716,7 +716,7 @@ def test_write_base_edit_counts():
     CRISPRessoCORE.write_base_edit_counts(
         ref_name,
         counts_dict,
-        bp_changes_arr,
+        bp_substitutions_arr,
         _jp
     )
 
