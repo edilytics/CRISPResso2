@@ -5738,7 +5738,6 @@ def main():
                     debug('Found ' + str(len(bp_substitutions_arr)) + ' base changes: ' + str(bp_substitutions_arr))
                     counts_dict = get_upset_plot_counts(df_alleles, bp_substitutions_arr, args.base_editor_consider_indels_outside_of_guide, wt_ref_name)
 
-                    #TODO: do we need to write these files?
                     write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp)
 
                     debug('Read ' + str(counts_dict['total_alleles']) + ' alleles with ' + str(counts_dict['total_alleles_reads']) + ' reads')
