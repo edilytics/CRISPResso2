@@ -199,7 +199,7 @@ def get_refpos_values(ref_aln_seq, read_aln_seq):
 
 
 def get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include):
-    # discover positions and bases that are different between reference and target
+    """Discover positions and bases that are different between reference and target, i.e. substitutions."""
     bp_substitutions_arr = []
     for idx in ref_positions_to_include:
         ref_base = ref_seq[idx]
