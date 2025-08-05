@@ -5762,6 +5762,7 @@ def main():
                             'ref_name': ref_name,
                             'bp_changes_arr': bp_changes_arr,
                             'binary_allele_counts': counts_dict['binary_allele_counts'],
+                            'save_also_png': save_png,
                         }
                         
                         CRISPRessoPlot.plot_combination_upset(**plot_10i_input)

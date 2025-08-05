@@ -4241,7 +4241,7 @@ def plot_quantification_positions(
     plt.close(fig)
 
 
-def plot_combination_upset(fig_root, ref_name, bp_changes_arr, binary_allele_counts):
+def plot_combination_upset(fig_root, ref_name, bp_changes_arr, binary_allele_counts, save_also_png=False):
     header_arr = []
     for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_changes_arr):
         header_arr.append(str(ref_ind) + ':' + ref_base + '->' + mod_base)
@@ -4265,6 +4265,9 @@ def plot_combination_upset(fig_root, ref_name, bp_changes_arr, binary_allele_cou
     df_by_combination = pd.DataFrame(df_by_combination_items, columns=header_arr)
     df_by_combination.set_index(header_arr[:-1], inplace=True)
     ax_dict = upsetplot.UpSet(df_by_combination.cat_counts, element_size=40, show_counts=True, sort_categories_by='-input').plot()
-    plt.savefig(fig_root + '.png')
+
+    if save_also_png:
+        plt.savefig(fig_root + '.png')
+        
     plt.savefig(fig_root + '.pdf')
     plt.close()
