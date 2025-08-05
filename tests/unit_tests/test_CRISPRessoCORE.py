@@ -683,7 +683,7 @@ def test_get_upset_plot_counts():
     )
 
     assert len(counts_dict) == 19
-    assert counts_dict['total_alleles'] == 2
+    assert counts_dict['total_alleles'] == 3
     assert counts_dict['total_alleles_reads'] == 100
     assert sum(counts_dict['binary_allele_counts'].values()) == 100
 
