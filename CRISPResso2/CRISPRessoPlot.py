@@ -179,7 +179,9 @@ def get_amino_acid_colors(scheme):
         'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', '', '-'
     ]
 
-    if isinstance(scheme, dict):
+    if scheme is None:
+        color_dict = get_amino_acid_color_dict()
+    elif isinstance(scheme, dict):
         color_dict = scheme
     elif isinstance(scheme, str):
         color_dict = get_amino_acid_color_dict(scheme)
@@ -3052,11 +3054,11 @@ def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
     re_find_indels=re.compile("(-*-)")
     idx_row=0
 
-    for idx, row in df_alleles[df_alleles['%Reads']>=MIN_FREQUENCY][:MAX_N_ROWS].iterrows():
+    for seq, row in df_alleles[df_alleles['%Reads']>=MIN_FREQUENCY][:MAX_N_ROWS].iterrows():
 
 
-        X.append(amino_acids_to_numbers(idx))
-        annot.append(list(idx))
+        X.append(amino_acids_to_numbers(seq))
+        annot.append(list(seq))
 
         silent_edit_dict[idx_row] = row['silent_edit_inds']
 
@@ -3066,7 +3068,7 @@ def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
             insertion_dict[idx_row].append((p.start(), p.end()))
 
         y_labels.append('%.2f%% (%d reads)' % (row['%Reads'], row['#Reads']))
-        if idx == reference_seq and not has_indels:
+        if seq == reference_seq and not has_indels:
             is_reference.append(True)
         else:
             is_reference.append(False)
@@ -3074,11 +3076,11 @@ def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
         idx_row+=1
 
 
-        idxs_sub= [i_sub for i_sub in range(len(idx)) if \
-                   (row['Reference_Sequence'][i_sub]!=idx[i_sub].upper()) and \
+        idxs_sub= [i_sub for i_sub in range(len(seq)) if \
+                   (row['Reference_Sequence'][i_sub]!=seq[i_sub].upper()) and \
                    (row['Reference_Sequence'][i_sub]!='-') and\
-                   (idx[i_sub]!='-')]
-        to_append=np.array([{}]*len(idx), dtype=object)
+                   (seq[i_sub]!='-')]
+        to_append=np.array([{}]*len(seq), dtype=object)
         to_append[ idxs_sub]={'weight':'bold', 'color':'black','size':16}
         per_element_annot_kws.append(to_append)
 
@@ -3124,10 +3126,8 @@ def plot_amino_acid_heatmap(
     """
     plot_aa_len=len(reference_seq_amino_acids)
 
-    if isinstance(custom_colors['amino_acid_scheme'], str):
-        amino_acid_colors = get_amino_acid_colors(custom_colors['amino_acid_scheme'])
-    elif isinstance(custom_colors['amino_acid_scheme'], dict):
-        amino_acid_colors = get_amino_acid_colors(custom_colors['amino_acid_scheme'])
+    if isinstance(custom_colors.get('amino_acid_scheme', None), (str, dict)):
+        amino_acid_colors = get_amino_acid_colors(custom_colors.get('amino_acid_scheme',None))
 
     cmap = colors_mpl.ListedColormap(amino_acid_colors)
 
@@ -3158,16 +3158,6 @@ def plot_amino_acid_heatmap(
     sgRNA_rows = []
     num_sgRNA_rows = 0
 
-    # if False: # sgRNA_intervals and len(sgRNA_intervals) > 0:
-    #     sgRNA_rows = get_rows_for_sgRNA_annotation(sgRNA_intervals, plot_aa_len)
-    #     num_sgRNA_rows = max(sgRNA_rows) + 1
-    #     fig=plt.figure(figsize=(plot_aa_len*0.3, (N_ROWS+1 + num_sgRNA_rows)*0.6))
-    #     gs1 = gridspec.GridSpec(N_ROWS+2, N_COLUMNS)
-    #     gs2 = gridspec.GridSpec(N_ROWS+2, N_COLUMNS)
-    #     #ax_hm_ref heatmap for the reference
-    #     ax_hm_ref=plt.subplot(gs1[0:1,:])
-    #     ax_hm=plt.subplot(gs2[2:,:])
-    # else:
     fig=plt.figure(figsize=(plot_aa_len*0.3, (N_ROWS+1)*0.6))
     gs1 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
     gs2 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
@@ -3182,12 +3172,6 @@ def plot_amino_acid_heatmap(
     ax_hm.yaxis.tick_right()
     ax_hm.yaxis.set_ticklabels(y_labels[::-1], rotation=True, va='center')
     ax_hm.xaxis.set_ticks([])
-
-    #TODO: make sure these are accurate
-    if False: # sgRNA_intervals and len(sgRNA_intervals) > 0:
-        this_sgRNA_y_start = -1*num_sgRNA_rows
-        this_sgRNA_y_height = num_sgRNA_rows - 0.3
-        add_sgRNA_to_ax(ax_hm_ref, sgRNA_intervals, sgRNA_y_start=this_sgRNA_y_start, sgRNA_y_height=this_sgRNA_y_height, amp_len=plot_aa_len, font_size='small', clip_on=False, sgRNA_names=sgRNA_names, sgRNA_mismatches=sgRNA_mismatches, x_offset=0, label_at_zero=True, sgRNA_rows=sgRNA_rows)
 
     padding = 0.075
     #create boxes for ins

@@ -268,10 +268,19 @@ def test_get_silent_edits_multiple_deletions():
 
 
 def test_get_silent_edits_insertion():
-    ref_seq = 'AGS'
+    ref_seq = 'AGS-'
     seq = 'AGST'
     ref_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT')]
     seq_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT'), ('T', 'ACT')]
 
     silent_edits = CRISPRessoShared.get_silent_edits(ref_seq, ref_codons, seq, seq_codons)
     assert silent_edits == 'AGST'
+
+def test_get_silent_edits_middle_insertion():
+    ref_seq = 'AG-S'
+    seq = 'AGTS'
+    ref_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT')]
+    seq_codons = [('A', 'GCT'), ('G', 'GGT'),  ('T', 'ACT'), ('S', 'AGC')]
+
+    silent_edits = CRISPRessoShared.get_silent_edits(ref_seq, ref_codons, seq, seq_codons)
+    assert silent_edits == 'AGTs'

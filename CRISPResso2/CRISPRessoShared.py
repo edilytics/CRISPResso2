@@ -491,6 +491,34 @@ def insert_indels(seq, seq_codons):
     return seq_codons
 
 def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
+    """ Given a reference amino acid sequence, reference codons, amino acid read sequence, and read codons,
+    return the amino acid read sequence with silent edit amino acids as lower case chars.
+
+    for example:
+    
+    ref_seq = 'AG-S'
+    seq = 'AGTS'
+    ref_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT')]
+    seq_codons = [('A', 'GCT'), ('G', 'GGT'),  ('T', 'ACT'), ('S', 'AGC')]
+    returns:
+    'AGTs'
+
+    Parameters
+    ----------
+    ref_seq : str
+        Reference amino acid sequence, with insertions.
+    ref_codons : list of tuples
+        List of tuples containing the reference amino acid and its corresponding codon.
+    seq : str
+        Read amino acid sequence with deletions.
+    seq_codons : list of tuples
+        List of tuples containing the read amino acid and its corresponding codon.
+
+    Returns
+    -------
+    str
+        Read amino acid sequence with silent edits in lower case.
+     """
     silent_edit_inds = []
 
     ref_codons = insert_indels(ref_seq, ref_codons)
@@ -501,7 +529,7 @@ def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
             continue
         if r != s:
             continue
-        if r_codon != s_codon:
+        if r == s and r_codon != s_codon:
             silent_edit_inds.append((i, r.lower()))
     seq_list = list(seq)
     for i, char in silent_edit_inds:
@@ -1474,7 +1502,6 @@ def get_dataframe_around_cut_debug(df_alleles, cut_point, offset):
     return df_alleles_around_cut
 
 def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point):
-    # cut_idx = row['ref_positions'].index(cut_point)
     cut_idx = row['ref_positions'].index(amino_acid_cut_point)
     left_idx = row['ref_positions'].index(plot_left_idx)
     seq_acids_and_codons = get_amino_acids_and_codons(row['Aligned_Sequence'][left_idx::].replace('-', ''))
@@ -1498,17 +1525,12 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
         aligned_seq, reference_seq, range(len(reference_seq))
     )
 
-    # aligned_seq = get_silent_edits(
-    # silent_edit_inds = get_silent_edits(
     aligned_seq = get_silent_edits(
         reference_seq,
         ref_acids_and_codons,
         aligned_seq,
         seq_acids_and_codons,
         )
-
-    # row['silent_edit_inds'] = silent_edit_inds
-
 
     return (aligned_seq[:sequence_length],
             reference_seq[:sequence_length],
@@ -1531,7 +1553,6 @@ def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_
     df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
     df_alleles_around_cut['Unedited']=df_alleles_around_cut['Unedited']>0
 
-    # df_alleles_around_cut['silent_edit_inds'] = pd.Series(dtype='object')
     edits_series = pd.Series(dtype='object')
     row_ind = 0
     for idx, row in df_alleles_around_cut.iterrows():
@@ -1539,7 +1560,6 @@ def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_
         for i, c in enumerate(idx):
             if c.islower():
                 silent_edit_inds.append(i)
-        # df_alleles_around_cut.loc[idx]['silent_edit_inds'] = silent_edit_inds
         edits_series[row_ind] = silent_edit_inds
         row_ind += 1
 

@@ -730,13 +730,6 @@ def main():
                 if seq in rc_amp_seqs:
                     raise Exception('Amplicon sequences must be distinct! The amplicon sequence %s is the reverse complement of another amplicon sequence in the region file. Please provide only one of the two sequences.' % seq)
 
-            #check to see that no sequences and their reverse complements are present
-            amp_seqs = df_template.amplicon_seq.values #Beware, this is a numpy array of dtype str and if you add these arrays amp_seqs + rc_amp_seqs, it will concat the strings, not the arrays....
-            rc_amp_seqs = [CRISPRessoShared.reverse_complement(amp_seq) for amp_seq in amp_seqs]
-            for seq in amp_seqs:
-                if seq in rc_amp_seqs:
-                    raise Exception('Amplicon sequences must be distinct! The amplicon sequence %s is the reverse complement of another amplicon sequence in the region file. Please provide only one of the two sequences.' % seq)
-
             if not len(df_template.amplicon_name.unique())==df_template.shape[0]:
                 duplicated_entries = df_template.amplicon_name[df_template.amplicon_name.duplicated()]
                 raise CRISPRessoShared.BadParameterException('The amplicon names must be distinct! (Duplicated names: ' + str(duplicated_entries.values) + ')')
