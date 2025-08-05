@@ -150,15 +150,6 @@ sns.set_style('white')
 
 #########################################
 
-# def get_refpos_dict(ref_aln_seq):
-#     """Given a reference alignment this returns a dictionary such that refpos_dict[ind] = returns the index of the alignment corresponding to the ind'th base in the reference"""
-#     refpos_dict = {}
-#     ref_pos = 0
-#     for ind, ref_base in enumerate(ref_aln_seq):
-#         if ref_base != '-':
-#             refpos_dict[ref_pos] = ind
-#             ref_pos += 1
-#     return refpos_dict
 
 def get_refpos_values(ref_aln_seq, read_aln_seq):
     """
