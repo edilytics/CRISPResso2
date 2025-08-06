@@ -896,15 +896,9 @@
             "action": "store_true",
             "tools": ["Core", "Batch", "Pooled", "WGS", "Compare"]
         },
-        "base_editor_consider_changes_outside_of_guide": {
-            "keys": ["--base_editor_consider_changes_outside_of_guide"],
+        "base_editor_consider_changes_outside_qw": {
+            "keys": ["--base_editor_consider_changes_outside_qw"],
             "help": "Consider changes outside of the guide region. If this flag is not set, only reads with changes in the quantification window are considered for analysis.",
-            "action": "store_true",
-            "tools": ["Core", "Batch", "Pooled", "WGS"]
-        },
-        "base_editor_consider_indels_outside_of_guide": {
-            "keys": ["--base_editor_consider_indels_outside_of_guide"],
-            "help": "Consider indels outside of the guide region. If this flag is not set, only reads with indels in the quantification window are considered \"Indel\" reads.",
             "action": "store_true",
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },

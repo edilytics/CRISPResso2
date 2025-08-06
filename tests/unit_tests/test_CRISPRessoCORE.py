@@ -597,12 +597,10 @@ def test_irregular_sublist_generation():
 def test_get_base_edit_target_sequence():
     df_alleles = pd.read_csv('tests/df_alleles.txt')
     ref_seq = 'CGGCCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCTGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG'
-    wt_ref_name = 'HDR'
     base_editor_target_ref_skip_allele_count = 0
 
     target_seq = CRISPRessoCORE.get_base_edit_target_sequence(
         ref_seq,
-        wt_ref_name,
         df_alleles,
         base_editor_target_ref_skip_allele_count
     )
@@ -652,13 +650,11 @@ def test_get_bp_subs_insertions():
 def test_get_base_edit_target_sequence():
 
     df_alleles = pd.read_csv('tests/test_be_df.txt')
-    wt_ref_name = 'TEST'
     ref_seq = 'AAAA'
     base_editor_target_ref_skip_allele_count = 0
 
     target_seq = CRISPRessoCORE.get_base_edit_target_sequence(
         ref_seq,
-        wt_ref_name,
         df_alleles,
         base_editor_target_ref_skip_allele_count
     )
@@ -672,13 +668,11 @@ def test_get_upset_plot_counts():
     target_seq = 'AAGA'
     bp_substitutions_arr = [(3, 'A', 'G')]
     
-    base_editor_consider_indels_outside_of_guide = False
     wt_ref_name = 'TEST'
 
     counts_dict = CRISPRessoCORE.get_upset_plot_counts(
         df_alleles,
         bp_substitutions_arr,
-        base_editor_consider_indels_outside_of_guide,
         wt_ref_name
     )
 
@@ -700,7 +694,6 @@ def test_write_base_edit_counts():
     counts_dict = CRISPRessoCORE.get_upset_plot_counts(
         pd.read_csv('tests/test_be_df.txt'),
         bp_substitutions_arr,
-        False,
         ref_name,
     )
 

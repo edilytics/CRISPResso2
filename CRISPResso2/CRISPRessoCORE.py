@@ -208,7 +208,7 @@ def get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include):
     return bp_substitutions_arr
 
 
-def get_upset_plot_counts(df_alleles, bp_substitutions_arr, base_editor_consider_indels_outside_of_guide, wt_ref_name):
+def get_upset_plot_counts(df_alleles, bp_substitutions_arr, wt_ref_name):
     # set up counters
     binary_allele_counts = defaultdict(int) # e.g. T,T,X,T > 100 where each item is a string of the base at each position in bp_substitutions_arr, and 'X' is nontarget
     category_allele_counts = defaultdict(int) # e.g. T,T,R,T > 100 where each item is a string of the base at each position in bp_substitutions_arr, and 'T' is Target, 'R' is Reference, 'D' is Deletion, 'I' is insertion, and 'N' is anything else
@@ -250,12 +250,6 @@ def get_upset_plot_counts(df_alleles, bp_substitutions_arr, base_editor_consider
             has_indel_guide = True
 
         has_indel = has_indel_guide
-        if base_editor_consider_indels_outside_of_guide:
-            has_any_indel = False
-            if allele.all_deletion_positions != '[]': # need to run with detailed allele output to get this value
-                has_any_indel = True
-            if allele.all_insertion_positions != '[]':
-                has_any_indel = True
 
         ref_aln = allele.Reference_Sequence
         read_aln = allele.Aligned_Sequence
@@ -338,7 +332,7 @@ def get_upset_plot_counts(df_alleles, bp_substitutions_arr, base_editor_consider
         }
 
 
-def get_base_edit_target_sequence(ref_seq, wt_ref_name, df_alleles, base_editor_target_ref_skip_allele_count):
+def get_base_edit_target_sequence(ref_seq, df_alleles, base_editor_target_ref_skip_allele_count):
 
     target_seq = ""
     seen_nonref_allele_count = 0
@@ -5693,14 +5687,10 @@ def main():
 
                 wt_ref_name = ref_name
                 ref_seq = refs[wt_ref_name]['sequence']
-                target_seq = get_base_edit_target_sequence(ref_seq, wt_ref_name, df_alleles, args.base_editor_target_ref_skip_allele_count)
+                target_seq = get_base_edit_target_sequence(ref_seq, df_alleles, args.base_editor_target_ref_skip_allele_count)
 
                 if target_seq:
 
-                    if args.base_editor_consider_indels_outside_of_guide:
-                        if not crispresso2_info['running_info']['args'].write_detailed_allele_table:
-                            raise Exception('To use parameter --base_editor_consider_indels_outside_of_guide, CRISPResso run must be run with the parameter --write_detailed_allele_table')
-                    
                     # create reference/target read alignment
                     aln_gap_incentive = refs[wt_ref_name]['gap_incentive']
                     aln_gap_open_arg = args.needleman_wunsch_gap_open
@@ -5727,7 +5717,7 @@ def main():
                     debug('Aligned reference: ' + aln_ref_seq)
 
                     # get indices of reference sequence to include in analysis
-                    if args.base_editor_consider_changes_outside_of_guide:
+                    if args.base_editor_consider_changes_outside_qw:
                         ref_positions_to_include = [x for x in range(len(ref_seq))]
                     else:
                         ref_positions_to_include = refs[wt_ref_name]['include_idxs']
@@ -5736,7 +5726,7 @@ def main():
                     bp_substitutions_arr = get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
 
                     debug('Found ' + str(len(bp_substitutions_arr)) + ' base changes: ' + str(bp_substitutions_arr))
-                    counts_dict = get_upset_plot_counts(df_alleles, bp_substitutions_arr, args.base_editor_consider_indels_outside_of_guide, wt_ref_name)
+                    counts_dict = get_upset_plot_counts(df_alleles, bp_substitutions_arr, wt_ref_name)
 
                     write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp)
 
