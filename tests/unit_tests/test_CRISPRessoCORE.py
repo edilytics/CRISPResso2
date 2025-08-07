@@ -487,7 +487,7 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_modified
     assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(10, 23)), *list(range(35-7, 41-7))]
 
 
-def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_end_modified(): 
+def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_end_modified():
     # 5 bp deletion at end of 20 bp sequence
     quant_window_coordinates = '1-5_10-20'
     s1inds = [*list(range(16)), *[15, 15, 15, 15, 15]]
@@ -541,7 +541,7 @@ def test_large_similar_num_reads_input():
 
 def test_more_processes_than_reads():
 #     # Test with typical input
-    # assert CRISPRessoCORE.get_variant_cache_equal_boundaries(3, 5) 
+    # assert CRISPRessoCORE.get_variant_cache_equal_boundaries(3, 5)
     # assert that an exception is raised
     with pytest.raises(Exception):
         CRISPRessoCORE.get_variant_cache_equal_boundaries(3, 5)
@@ -565,7 +565,7 @@ def test_sublist_generation():
     unique_reads = 100
     mock_variant_cache = [i for i in range(unique_reads)]
     assert len(mock_variant_cache) == 100
-    boundaries = CRISPRessoCORE.get_variant_cache_equal_boundaries(unique_reads, n_processes) 
+    boundaries = CRISPRessoCORE.get_variant_cache_equal_boundaries(unique_reads, n_processes)
     assert boundaries == [0, 25, 50, 75, 100]
     sublists = []
     for i in range(n_processes):
@@ -581,7 +581,7 @@ def test_irregular_sublist_generation():
     unique_reads = 113
     mock_variant_cache = [i for i in range(unique_reads)]
     assert len(mock_variant_cache) == 113
-    boundaries = CRISPRessoCORE.get_variant_cache_equal_boundaries(unique_reads, n_processes) 
+    boundaries = CRISPRessoCORE.get_variant_cache_equal_boundaries(unique_reads, n_processes)
     # assert boundaries == [0, 25, 50, 75, 100]
     sublists = []
     for i in range(n_processes):
@@ -667,7 +667,7 @@ def test_get_upset_plot_counts():
     df_alleles = pd.read_csv('tests/test_be_df.txt')
     target_seq = 'AAGA'
     bp_substitutions_arr = [(3, 'A', 'G')]
-    
+
     wt_ref_name = 'TEST'
 
     counts_dict = CRISPRessoCORE.get_upset_plot_counts(
@@ -704,7 +704,7 @@ def test_write_base_edit_counts():
         '10i.TEST.counts.txt',
         '10i.TEST.precise_allele_counts.txt',
     ]
-    
+
 
     CRISPRessoCORE.write_base_edit_counts(
         ref_name,
@@ -718,10 +718,10 @@ def test_write_base_edit_counts():
             os.remove(filename)
         else:
             assert False
-    
-    
 
-    
+
+
+
 if __name__ == "__main__":
 # execute only if run as a script
     test_get_consensus_alignment_from_pairs()

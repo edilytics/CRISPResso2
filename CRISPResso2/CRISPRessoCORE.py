@@ -183,7 +183,7 @@ def get_refpos_values(ref_aln_seq, read_aln_seq):
         refpos_dict[0] = read_start_bases
         ref_aln_seq = ref_aln_seq[aln_index:]
         read_aln_seq = read_aln_seq[aln_index:]
-        
+
     ref_pos = 0
     last_nongap_ref_pos = 0
     for ind in range(len(ref_aln_seq)):
@@ -297,7 +297,7 @@ def get_upset_plot_counts(df_alleles, bp_substitutions_arr, wt_ref_name):
                 total_other_noindel_reads += allele['#Reads']
             else:
                 total_other_indel_reads += allele['#Reads']
-        
+
         binary_arr_str = "\t".join(binary_arr) + "\t" + str(has_indel)
         cat_arr_str = "\t".join(cat_arr) + "\t" + str(has_indel)
         val_arr_str = "\t".join(val_arr) + "\t" + str(has_indel)
@@ -366,13 +366,13 @@ def write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp):
         fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
         for allele_str in sorted_category_allele_counts:
             fout.write(allele_str + '\t' + str(counts_dict['category_allele_counts'][allele_str]) + '\n')
-    
+
     with open(_jp(prefix + '.precise_allele_counts.txt'),'w') as fout:
         sorted_precise_allele_counts = sorted(counts_dict['precise_allele_counts'].keys(), key=lambda x: counts_dict['precise_allele_counts'][x], reverse=True)
         fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
         for allele_str in sorted_precise_allele_counts:
             fout.write(allele_str + '\t' + str(counts_dict['precise_allele_counts'][allele_str]) + '\n')
-            
+
     with open(_jp(prefix + '.arrays.txt'),'w') as fout:
         fout.write('Class\t' + "\t".join([str(x) for x in bp_substitutions_arr]) + '\n')
         fout.write('total_counts\t' + "\t".join([str(x) for x in counts_dict['total_counts']]) + '\n')
@@ -1153,7 +1153,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         # Reading through the fastq file and enriching variantCache as a dictionary with the following:
             # Key: the unique DNA sequence from the fastq file
             # Value: an integer that represents how many times we've seen this specific read
-        
+
         num_reads = 0
         fastq1_id = fastq1_file.readline()
         fastq2_id = fastq2_file.readline()
@@ -1222,7 +1222,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         for p in processes:
             p.join() # pauses the main thread until the processes are finished
         info("Merging and aligning non processable reads.", {'percent_complete': 12})
-        
+
         re_aln = {} #cache for reads that have discrepancies and need to be processed individually
         not_aln = {} #cache for reads that don't align
         if os.path.exists(variants_dir):
@@ -1347,7 +1347,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                             N_TOT_READS += 1
                             N_COMPUTED_ALN += 1
                             variantCache[variant[match_name]['aln_seq']] = variant
-                            if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:                   
+                            if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:
                                 for name in variant['aln_ref_names']:
                                     match_name = "variant_" + name
                                     if READ_LENGTH == 0:
@@ -1489,7 +1489,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
 
                             sub_inds.append(payload['substitution_positions'])
                             edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
-                    
+
 
                         crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
                                 " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
@@ -1507,7 +1507,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                     if new_variant['caching_is_ok']:
                         variantCache[lookup_fastq_seq] = new_variant
                     else:
-                        if len(new_variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:                   
+                        if len(new_variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:
                             for name in new_variant['aln_ref_names']:
                                 match_name = "variant_" + name
                                 if READ_LENGTH == 0:
@@ -1548,7 +1548,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
             if '+' in key:
                 variant = variantCache[key]
                 alignment_key = variant["variant_" + variant['aln_ref_names'][0]]['aln_seq']
-                if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:                   
+                if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:
                     for name in variant['aln_ref_names']:
                         match_name = "variant_" + name
                         if READ_LENGTH == 0:
@@ -2677,6 +2677,9 @@ def main():
 
                 coding_seqs.append(exon_seq)
 
+        if len(coding_seqs) > 0:
+            crispresso2_info['running_info']['coding_seqs'] = coding_seqs
+
         ####SET REFERENCES TO COMPARE###
         ref_names = [] #ordered list of names
         refs = {} #dict of ref_name > ref object
@@ -3598,7 +3601,7 @@ def main():
 
             processed_output_filename = output_forward_filename
 
-        elif args.fastq_r1 != '' and args.fastq_r2 != '':#paired end reads     
+        elif args.fastq_r1 != '' and args.fastq_r2 != '':#paired end reads
             not_combined_1_filename = _jp('out.notCombined_1.fastq.gz')
             not_combined_2_filename = _jp('out.notCombined_2.fastq.gz')
             check_fastp()
@@ -5661,6 +5664,11 @@ def main():
             crispresso2_info['results']['refs'][ref_name]['plot_9_roots'] = []
             crispresso2_info['results']['refs'][ref_name]['plot_9_captions'] = []
             crispresso2_info['results']['refs'][ref_name]['plot_9_datas'] = []
+
+            crispresso2_info['results']['refs'][ref_name]['plot_9a_roots'] = []
+            crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'] = []
+            crispresso2_info['results']['refs'][ref_name]['plot_9a_datas'] = []
+
             crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'] = []
 
             crispresso2_info['results']['refs'][ref_name]['plot_10d_roots'] = []
@@ -5712,7 +5720,7 @@ def main():
                         gap_incentive=aln_gap_incentive,
                         gap_open=aln_gap_open_arg,
                         gap_extend=aln_gap_extend_arg)
-                    
+
                     debug('Aligned target:    ' + aln_target_seq)
                     debug('Aligned reference: ' + aln_ref_seq)
 
@@ -5733,7 +5741,7 @@ def main():
                     debug('Read ' + str(counts_dict['total_alleles']) + ' alleles with ' + str(counts_dict['total_alleles_reads']) + ' reads')
                     debug('Got ' + str(counts_dict['total_alleles_on_ref']) + ' alleles on reference "' + wt_ref_name + '" with ' + str(counts_dict['total_alleles_reads_on_ref']) + ' reads')
 
-                    
+
                     if len(bp_substitutions_arr) > 0:
 
                         fig_root_10i = _jp(f'10i.Base_editing_{wt_ref_name}_upset_plot.by_amplicon_combination.no_indels')
@@ -5744,7 +5752,7 @@ def main():
                             'binary_allele_counts': counts_dict['binary_allele_counts'],
                             'save_also_png': save_png,
                         }
-                        
+
                         CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
                         crispresso2_info['results']['refs'][ref_name]['plot_10i_root'] = os.path.basename(fig_root_10i)
                         crispresso2_info['results']['refs'][ref_name]['plot_10i_caption'] = f"Figure 10i: Upset plot of base editing changes for amplicon: {ref_name}"
@@ -5774,7 +5782,7 @@ def main():
                     plot_half_window_left = cut_point + 1
                     pass_cut_point = True
                     warn(f'sgRNA {0} is too close to the start of the amplicon to plot the full window. Truncating the window.')
-                
+
                 #Set right window size
                 if cut_point + args.plot_window_size < ref_len:
                     plot_half_window_right = args.plot_window_size
@@ -5782,7 +5790,7 @@ def main():
                     plot_half_window_right = ref_len - cut_point - 1
                     pass_cut_point = True
                     warn(f'sgRNA {0} is too close to the end of the amplicon to plot the full window. Truncating the window.')
-                    
+
                 df_alleles_around_cut = CRISPRessoShared.get_dataframe_around_cut_asymmetrical(
                     df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
                     cut_point,
@@ -5816,7 +5824,7 @@ def main():
                         new_sgRNA_intervals += [(int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1)]
                         if int_start <= cut_point and cut_point <= int_end:
                             new_cut_point = cut_point - new_sel_cols_start - 1
-         
+
                     prepped_df_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws, is_reference = CRISPRessoPlot.prep_alleles_table(
                         df_to_plot,
                         ref_seq_around_cut,
@@ -6039,6 +6047,45 @@ def main():
                             crispresso2_info['results']['refs'][ref_name]['plot_10h_roots'].append(os.path.basename(fig_filename_root))
                             crispresso2_info['results']['refs'][ref_name]['plot_10h_captions'].append("Figure 10f: Quilt of Base Edits for " + args.conversion_nuc_from + 'around cut site for ' + sgRNA_legend + ". Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.")
                             crispresso2_info['results']['refs'][ref_name]['plot_10h_datas'].append([('Allele frequency table', os.path.basename(base_edit_allele_filename))])
+
+            if refs[ref_name]['contains_coding_seq']:
+                for i, coding_seq in enumerate(coding_seqs):
+                    fig_filename_root = _jp('9a.'+ref_plot_name+'amino_acid_table_around_'+coding_seq)
+                    coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
+                    amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1)// 3
+                    df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
+                        df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
+                        refs[ref_name]['exon_intervals'][i][0],
+                        len(coding_seq_amino_acids),
+                        os.path.join(_ROOT, "BLOSUM62"),
+                        amino_acid_cut_point)
+
+                    plot_9a_input = {
+                        'reference_seq': coding_seq_amino_acids,
+                        'df_alleles': df_to_plot,
+                        'fig_filename_root': fig_filename_root,
+                        'custom_colors': custom_config["colors"],
+                        'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
+                        'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
+                        'SAVE_ALSO_PNG': save_png,
+                        'plot_cut_point': plot_cut_point,
+                        'sgRNA_intervals': new_sgRNA_intervals,
+                        'sgRNA_names': sgRNA_names,
+                        'sgRNA_mismatches': sgRNA_mismatches,
+                        'annotate_wildtype_allele': args.annotate_wildtype_allele,
+                        'cut_point': amino_acid_cut_point,
+                    }
+
+                    amino_acid_filename = _jp(ref_plot_name+'amino_acid_table_for_'+coding_seq+'.txt')
+                    df_to_plot.to_csv(amino_acid_filename, sep='\t', header=True, index=True)
+
+                    debug('Plotting amino acids for {0}'.format(ref_name))
+                    plot(CRISPRessoPlot.plot_amino_acid_table, plot_9a_input)
+                    crispresso2_info['results']['refs'][ref_name]['plot_9a_roots'].append(os.path.basename(fig_filename_root))
+                    crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'].append(
+                        "Figure 9a: Visualization of the distribution of identified amino acids based on the coding sequence (" + coding_seq+"). The vertical dashed line indicates the predicted cleavage site.")
+                    crispresso2_info['results']['refs'][ref_name]['plot_9a_datas'].append([('Amino Acid table', os.path.basename(amino_acid_filename))])
+
             info('Done!')
 
             #END GUIDE SPECIFIC PLOTS
