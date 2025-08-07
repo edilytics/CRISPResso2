@@ -916,7 +916,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         # Reading through the fastq file and enriching variantCache as a dictionary with the following:
             # Key: the unique DNA sequence from the fastq file
             # Value: an integer that represents how many times we've seen this specific read
-        
+
         num_reads = 0
         fastq1_id = fastq1_file.readline()
         fastq2_id = fastq2_file.readline()
@@ -985,7 +985,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         for p in processes:
             p.join() # pauses the main thread until the processes are finished
         info("Merging and aligning non processable reads.", {'percent_complete': 12})
-        
+
         re_aln = {} #cache for reads that have discrepancies and need to be processed individually
         not_aln = {} #cache for reads that don't align
         if os.path.exists(variants_dir):
@@ -1110,7 +1110,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                             N_TOT_READS += 1
                             N_COMPUTED_ALN += 1
                             variantCache[variant[match_name]['aln_seq']] = variant
-                            if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:                   
+                            if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:
                                 for name in variant['aln_ref_names']:
                                     match_name = "variant_" + name
                                     if READ_LENGTH == 0:
@@ -1252,7 +1252,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
 
                             sub_inds.append(payload['substitution_positions'])
                             edit_strings.append('D'+str(int(payload['deletion_n']))+';I'+str(int(payload['insertion_n']))+';S'+str(int(payload['substitution_n'])))
-                    
+
 
                         crispresso2_annotation = " ALN="+("&".join(new_variant['aln_ref_names'])) +\
                                 " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
@@ -1270,7 +1270,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                     if new_variant['caching_is_ok']:
                         variantCache[lookup_fastq_seq] = new_variant
                     else:
-                        if len(new_variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:                   
+                        if len(new_variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:
                             for name in new_variant['aln_ref_names']:
                                 match_name = "variant_" + name
                                 if READ_LENGTH == 0:
@@ -1311,7 +1311,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
             if '+' in key:
                 variant = variantCache[key]
                 alignment_key = variant["variant_" + variant['aln_ref_names'][0]]['aln_seq']
-                if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:                   
+                if len(variant['aln_ref_names']) == 1 or args.expand_ambiguous_alignments:
                     for name in variant['aln_ref_names']:
                         match_name = "variant_" + name
                         if READ_LENGTH == 0:
@@ -3183,7 +3183,8 @@ def main():
                     refs[ref_name]['sgRNA_mismatches'] = this_sgRNA_mismatches
                     refs[ref_name]['sgRNA_orig_sequences'] = refs[clone_ref_name]['sgRNA_orig_sequences']
                     refs[ref_name]['sgRNA_names'] = refs[clone_ref_name]['sgRNA_names']
-                    refs[ref_name]['include_idxs'] = this_include_idxs
+                    refs[ref_name]['include_idxs'] = np.array(this_include_idxs)
+                    refs[ref_name]['exclude_idxs'] = np.array(this_exclude_idxs)
                     refs[ref_name]['contains_guide'] = refs[clone_ref_name]['contains_guide']
 
                 #quantification window coordinates override other options
@@ -3199,8 +3200,8 @@ def main():
                     #subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
                     this_exclude_idxs = sorted(map(int, set(refs[ref_name]['exclude_idxs'])))
                     this_include_idxs = sorted(map(int, set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
-                    refs[ref_name]['include_idxs'] = this_include_idxs
-                    refs[ref_name]['exclude_idxs'] = this_exclude_idxs
+                    refs[ref_name]['include_idxs'] = np.array(this_include_idxs)
+                    refs[ref_name]['exclude_idxs'] = np.array(this_exclude_idxs)
 
                 if needs_exon_positions and clone_has_exons:
                     this_exon_positions = set()
@@ -3365,7 +3366,7 @@ def main():
 
             processed_output_filename = output_forward_filename
 
-        elif args.fastq_r1 != '' and args.fastq_r2 != '':#paired end reads     
+        elif args.fastq_r1 != '' and args.fastq_r2 != '':#paired end reads
             not_combined_1_filename = _jp('out.notCombined_1.fastq.gz')
             not_combined_2_filename = _jp('out.notCombined_2.fastq.gz')
             check_fastp()
@@ -4229,10 +4230,6 @@ def main():
             ref_info_file.write(refString)
             np.set_printoptions(linewidth=1000**1000) #no line breaks
             for ref_name in ref_names:
-                if isinstance(refs[ref_name]['include_idxs'], np.ndarray):
-                    refs[ref_name]['include_idxs'] = refs[ref_name]['include_idxs'].tolist()
-                if isinstance(refs[ref_name]['exclude_idxs'], np.ndarray):
-                    refs[ref_name]['exclude_idxs'] = refs[ref_name]['exclude_idxs'].tolist()
                 refString = ( refs[ref_name]['name'] + "\t" +
                     str(refs[ref_name]['sequence']) + "\t" +
                     str(refs[ref_name]['sequence_length']) + "\t" +
@@ -4251,8 +4248,8 @@ def main():
                     str(refs[ref_name]['exon_intervals']) + "\t" +
                     str(refs[ref_name]['exon_len_mods']) + "\t" +
                     str(refs[ref_name]['splicing_positions']) + "\t" +
-                    str(refs[ref_name]['include_idxs']) + "\t" +
-                    str(refs[ref_name]['exclude_idxs']) + "\t" +
+                    str(refs[ref_name]['include_idxs'] if not isinstance(refs[ref_name]['include_idxs'], np.ndarray) else refs[ref_name]['include_idxs'].tolist()) + "\t" +
+                    str(refs[ref_name]['exclude_idxs'] if not isinstance(refs[ref_name]['exclude_idxs'], np.ndarray) else refs[ref_name]['exclude_idxs'].tolist()) + "\t" +
                     str(refs[ref_name]['idx_cloned_from']) + "\n")
                 ref_info_file.write(refString)
             ref_info_file.close()
@@ -5474,7 +5471,7 @@ def main():
                     plot_half_window_left = cut_point + 1
                     pass_cut_point = True
                     warn(f'sgRNA {0} is too close to the start of the amplicon to plot the full window. Truncating the window.')
-                
+
                 #Set right window size
                 if cut_point + args.plot_window_size < ref_len:
                     plot_half_window_right = args.plot_window_size
@@ -5482,7 +5479,7 @@ def main():
                     plot_half_window_right = ref_len - cut_point - 1
                     pass_cut_point = True
                     warn(f'sgRNA {0} is too close to the end of the amplicon to plot the full window. Truncating the window.')
-                    
+
                 df_alleles_around_cut = CRISPRessoShared.get_dataframe_around_cut_asymmetrical(
                     df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
                     cut_point,
@@ -5516,7 +5513,7 @@ def main():
                         new_sgRNA_intervals += [(int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1)]
                         if int_start <= cut_point and cut_point <= int_end:
                             new_cut_point = cut_point - new_sel_cols_start - 1
-         
+
                     prepped_df_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws, is_reference = CRISPRessoPlot.prep_alleles_table(
                         df_to_plot,
                         ref_seq_around_cut,
