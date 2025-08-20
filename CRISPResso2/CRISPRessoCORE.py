@@ -5752,7 +5752,8 @@ def main():
                             'binary_allele_counts': counts_dict['binary_allele_counts'],
                             'save_also_png': save_png,
                         }
-
+                        #TODO: move this plot to per-sgRNA level. My understanding:
+                        # you can have multiple sgRNAs in a single amplicon, each with their own target.
                         CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
                         crispresso2_info['results']['refs'][ref_name]['plot_10i_root'] = os.path.basename(fig_root_10i)
                         crispresso2_info['results']['refs'][ref_name]['plot_10i_caption'] = f"Figure 10i: Upset plot of base editing changes for amplicon: {ref_name}"
@@ -6443,7 +6444,7 @@ def main():
 
         info(CRISPRessoShared.get_crispresso_footer())
         info('Analysis Complete!', {'percent_complete': 100})
-
+        breakpoint()
         sys.exit(0)
 
     except CRISPRessoShared.NTException as e:
