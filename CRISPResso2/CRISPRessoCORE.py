@@ -5691,74 +5691,9 @@ def main():
             crispresso2_info['results']['refs'][ref_name]['plot_10h_captions'] = []
             crispresso2_info['results']['refs'][ref_name]['plot_10h_datas'] = []
 
-            if args.base_editor_output and not args.crispresso1_mode and not args.suppress_plots:
-
-                wt_ref_name = ref_name
-                ref_seq = refs[wt_ref_name]['sequence']
-                target_seq = get_base_edit_target_sequence(ref_seq, df_alleles, args.base_editor_target_ref_skip_allele_count)
-
-                if target_seq:
-
-                    # create reference/target read alignment
-                    aln_gap_incentive = refs[wt_ref_name]['gap_incentive']
-                    aln_gap_open_arg = args.needleman_wunsch_gap_open
-                    aln_gap_extend_arg = args.needleman_wunsch_gap_extend
-
-                    aln_matrix_loc = args.needleman_wunsch_aln_matrix_loc
-                    if aln_matrix_loc == 'EDNAFULL':
-                        aln_matrix = CRISPResso2Align.make_matrix()
-                    else:
-                        if not os.path.exists(aln_matrix_loc):
-                            raise Exception('Alignment matrix file not found at ' + aln_matrix_loc)
-                        aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
-
-                    # TODO: Not sure if we need to be running this again here... shouldn't this be stored somewhere in refs or df_alleles?
-                    aln_target_seq, aln_ref_seq, aln_score = CRISPResso2Align.global_align(
-                        target_seq,
-                        ref_seq,
-                        matrix=aln_matrix,
-                        gap_incentive=aln_gap_incentive,
-                        gap_open=aln_gap_open_arg,
-                        gap_extend=aln_gap_extend_arg)
-
-                    debug('Aligned target:    ' + aln_target_seq)
-                    debug('Aligned reference: ' + aln_ref_seq)
-
-                    # get indices of reference sequence to include in analysis
-                    if args.base_editor_consider_changes_outside_qw:
-                        ref_positions_to_include = [x for x in range(len(ref_seq))]
-                    else:
-                        ref_positions_to_include = refs[wt_ref_name]['include_idxs']
-
-                    ref_changes_dict = get_refpos_values(aln_ref_seq, aln_target_seq)
-                    bp_substitutions_arr = get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
-
-                    debug('Found ' + str(len(bp_substitutions_arr)) + ' base changes: ' + str(bp_substitutions_arr))
-                    counts_dict = get_upset_plot_counts(df_alleles, bp_substitutions_arr, wt_ref_name)
-
-                    write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp)
-
-                    debug('Read ' + str(counts_dict['total_alleles']) + ' alleles with ' + str(counts_dict['total_alleles_reads']) + ' reads')
-                    debug('Got ' + str(counts_dict['total_alleles_on_ref']) + ' alleles on reference "' + wt_ref_name + '" with ' + str(counts_dict['total_alleles_reads_on_ref']) + ' reads')
-
-
-                    if len(bp_substitutions_arr) > 0:
-
-                        fig_root_10i = _jp(f'10i.Base_editing_{wt_ref_name}_upset_plot.by_amplicon_combination.no_indels')
-                        plot_10i_input = {
-                            'fig_root': fig_root_10i,
-                            'ref_name': ref_name,
-                            'bp_substitutions_arr': bp_substitutions_arr,
-                            'binary_allele_counts': counts_dict['binary_allele_counts'],
-                            'save_also_png': save_png,
-                        }
-                        #TODO: move this plot to per-sgRNA level. My understanding:
-                        # you can have multiple sgRNAs in a single amplicon, each with their own target.
-                        CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
-                        crispresso2_info['results']['refs'][ref_name]['plot_10i_root'] = os.path.basename(fig_root_10i)
-                        crispresso2_info['results']['refs'][ref_name]['plot_10i_caption'] = f"Figure 10i: Upset plot of base editing changes for amplicon: {ref_name}"
-                        crispresso2_info['results']['refs'][ref_name]['plot_10i_data'] = [('Binary Allele Counts', '10i.' + ref_name + '.binary_allele_counts.txt')]
-
+            crispresso2_info['results']['refs'][ref_name]['plot_10i_roots'] = []
+            crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'] = []
+            crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'] = []
 
             for sgRNA_ind, sgRNA_seq in enumerate(sgRNA_sequences):
                 cut_point = sgRNA_cut_points[sgRNA_ind]
@@ -6048,7 +5983,71 @@ def main():
                             crispresso2_info['results']['refs'][ref_name]['plot_10h_roots'].append(os.path.basename(fig_filename_root))
                             crispresso2_info['results']['refs'][ref_name]['plot_10h_captions'].append("Figure 10h: Quilt of Base Edits for " + args.conversion_nuc_from + 'around cut site for ' + sgRNA_legend + ". Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site.")
                             crispresso2_info['results']['refs'][ref_name]['plot_10h_datas'].append([('Allele frequency table', os.path.basename(base_edit_allele_filename))])
+                        wt_ref_name = ref_name
+                    ref_seq = refs[wt_ref_name]['sequence']
+                    target_seq = get_base_edit_target_sequence(ref_seq, df_alleles, args.base_editor_target_ref_skip_allele_count)
 
+                    if target_seq:
+
+                        # create reference/target read alignment
+                        aln_gap_incentive = refs[wt_ref_name]['gap_incentive']
+                        aln_gap_open_arg = args.needleman_wunsch_gap_open
+                        aln_gap_extend_arg = args.needleman_wunsch_gap_extend
+
+                        aln_matrix_loc = args.needleman_wunsch_aln_matrix_loc
+                        if aln_matrix_loc == 'EDNAFULL':
+                            aln_matrix = CRISPResso2Align.make_matrix()
+                        else:
+                            if not os.path.exists(aln_matrix_loc):
+                                raise Exception('Alignment matrix file not found at ' + aln_matrix_loc)
+                            aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
+
+                        # TODO: Not sure if we need to be running this again here... shouldn't this be stored somewhere in refs or df_alleles?
+                        aln_target_seq, aln_ref_seq, aln_score = CRISPResso2Align.global_align(
+                            target_seq,
+                            ref_seq,
+                            matrix=aln_matrix,
+                            gap_incentive=aln_gap_incentive,
+                            gap_open=aln_gap_open_arg,
+                            gap_extend=aln_gap_extend_arg)
+
+                        debug('Aligned target:    ' + aln_target_seq)
+                        debug('Aligned reference: ' + aln_ref_seq)
+
+                        # get indices of reference sequence to include in analysis
+                        if args.base_editor_consider_changes_outside_qw:
+                            ref_positions_to_include = [x for x in range(len(ref_seq))]
+                        else:
+                            ref_positions_to_include = refs[wt_ref_name]['include_idxs']
+                            breakpoint()
+
+                        ref_changes_dict = get_refpos_values(aln_ref_seq, aln_target_seq)
+                        bp_substitutions_arr = get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
+
+                        debug('Found ' + str(len(bp_substitutions_arr)) + ' base changes: ' + str(bp_substitutions_arr))
+                        counts_dict = get_upset_plot_counts(df_alleles, bp_substitutions_arr, wt_ref_name)
+
+                        write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp)
+
+                        debug('Read ' + str(counts_dict['total_alleles']) + ' alleles with ' + str(counts_dict['total_alleles_reads']) + ' reads')
+                        debug('Got ' + str(counts_dict['total_alleles_on_ref']) + ' alleles on reference "' + wt_ref_name + '" with ' + str(counts_dict['total_alleles_reads_on_ref']) + ' reads')
+
+
+                        if len(bp_substitutions_arr) > 0:
+                            fig_root_10i = _jp(f'10h.Base_editing_{wt_ref_name}_upset_plot.by_amplicon_combination.no_indels_{sgRNA_label}')
+                            plot_10i_input = {
+                                'fig_root': fig_root_10i,
+                                'ref_name': ref_name,
+                                'bp_substitutions_arr': bp_substitutions_arr,
+                                'binary_allele_counts': counts_dict['binary_allele_counts'],
+                                'save_also_png': save_png,
+                            }
+                            #TODO: move this plot to per-sgRNA level. My understanding:
+                            # you can have multiple sgRNAs in a single amplicon, each with their own target.
+                            CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
+                            crispresso2_info['results']['refs'][ref_name]['plot_10i_roots'].append(os.path.basename(fig_root_10i))
+                            crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'].append(f"Figure 10i: Upset plot of base editing changes for amplicon: {ref_name}")
+                            crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.binary_allele_counts.txt')])
             if refs[ref_name]['contains_coding_seq']:
                 for i, coding_seq in enumerate(coding_seqs):
                     fig_filename_root = _jp('9a.'+ref_plot_name+'amino_acid_table_around_'+coding_seq)
@@ -6444,7 +6443,6 @@ def main():
 
         info(CRISPRessoShared.get_crispresso_footer())
         info('Analysis Complete!', {'percent_complete': 100})
-        breakpoint()
         sys.exit(0)
 
     except CRISPRessoShared.NTException as e:
