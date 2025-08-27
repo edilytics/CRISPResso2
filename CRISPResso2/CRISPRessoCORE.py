@@ -5987,7 +5987,7 @@ def main():
                     ref_seq = refs[wt_ref_name]['sequence']
                     target_seq = get_base_edit_target_sequence(ref_seq, df_alleles, args.base_editor_target_ref_skip_allele_count)
 
-                    if target_seq:
+                    if target_seq and args.quantification_window_coordinates is None:
 
                         # create reference/target read alignment
                         aln_gap_incentive = refs[wt_ref_name]['gap_incentive']
@@ -6018,7 +6018,7 @@ def main():
                         if args.base_editor_consider_changes_outside_qw:
                             ref_positions_to_include = [x for x in range(len(ref_seq))]
                         else:
-                            # ref_positions_to_include = refs[wt_ref_name]['include_idxs']
+                            # TODO: qwc should override this
                             this_start, this_stop = sgRNA_intervals[sgRNA_ind]
                             ref_positions_to_include = list(range(this_start, this_stop + 1))
 
@@ -6028,7 +6028,7 @@ def main():
                         debug('Found ' + str(len(bp_substitutions_arr)) + ' base changes: ' + str(bp_substitutions_arr))
                         counts_dict = get_upset_plot_counts(df_alleles, bp_substitutions_arr, wt_ref_name)
 
-                        write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp)
+                        write_base_edit_counts(ref_name + '.' + sgRNA_label, counts_dict, bp_substitutions_arr, _jp)
 
                         debug('Read ' + str(counts_dict['total_alleles']) + ' alleles with ' + str(counts_dict['total_alleles_reads']) + ' reads')
                         debug('Got ' + str(counts_dict['total_alleles_on_ref']) + ' alleles on reference "' + wt_ref_name + '" with ' + str(counts_dict['total_alleles_reads_on_ref']) + ' reads')
@@ -6048,7 +6048,7 @@ def main():
                             CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_roots'].append(os.path.basename(fig_root_10i))
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'].append(f"Figure 10i: Upset plot of Base Edits for {args.conversion_nuc_from} around cut site for {sgRNA_legend}. Each dot matrix at the bottom represents a specific combination of base edits (colored by target position), and the bar plot at the top shows the number of reads with each combination.")
-                            crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.binary_allele_counts.txt')])
+                            crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.' + sgRNA_label + '.binary_allele_counts.txt')])
                             
             if refs[ref_name]['contains_coding_seq']:
                 for i, coding_seq in enumerate(coding_seqs):

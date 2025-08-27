@@ -578,6 +578,7 @@
 						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#{{amplicon_name}}_10h" role="tab" aria-controls="{{amplicon_name}}_10h" aria-selected="false">Base Edit Quilts</button>
   						  			</li>
             						{% endif %}
+                        <!-- TODO: fix this so it only renders if there is plot data in the dict. The point is that if we run qwc then it skips the plots but still creates the keys -->
 									{% if amplicon_name in report_data['figures']['locs'] and '10i' in report_data['figures']['sgRNA_based_names'][amplicon_name] %}
   						  			<li class="nav-item">
 						  				<button class="nav-link" data-bs-toggle="tab" data-bs-target="#{{amplicon_name}}_10i" role="tab" aria-controls="{{amplicon_name}}_10i" aria-selected="false">Substitution Co-occurences</button>
