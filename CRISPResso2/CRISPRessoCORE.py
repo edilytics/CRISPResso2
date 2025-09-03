@@ -6002,7 +6002,6 @@ def main():
                                 raise Exception('Alignment matrix file not found at ' + aln_matrix_loc)
                             aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
 
-                        # TODO: Not sure if we need to be running this again here... shouldn't this be stored somewhere in refs or df_alleles?
                         aln_target_seq, aln_ref_seq, aln_score = CRISPResso2Align.global_align(
                             target_seq,
                             ref_seq,
@@ -6018,7 +6017,6 @@ def main():
                         if args.base_editor_consider_changes_outside_qw:
                             ref_positions_to_include = [x for x in range(len(ref_seq))]
                         else:
-                            # TODO: qwc should override this
                             this_start, this_stop = sgRNA_intervals[sgRNA_ind]
                             ref_positions_to_include = list(range(this_start, this_stop + 1))
 
@@ -6043,8 +6041,6 @@ def main():
                                 'binary_allele_counts': counts_dict['binary_allele_counts'],
                                 'save_also_png': save_png,
                             }
-                            #TODO: move this plot to per-sgRNA level. My understanding:
-                            # you can have multiple sgRNAs in a single amplicon, each with their own target.
                             CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_roots'].append(os.path.basename(fig_root_10i))
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'].append(f"Figure 10i: Upset plot of Base Edits for {args.conversion_nuc_from} around cut site for {sgRNA_legend}. Each dot matrix at the bottom represents a specific combination of base edits (colored by target position), and the bar plot at the top shows the number of reads with each combination.")
