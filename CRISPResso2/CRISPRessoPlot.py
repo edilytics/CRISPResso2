@@ -3370,7 +3370,8 @@ def plot_alleles_heatmap(
     -sgRNA_names: array (for each sgRNA_interval) of names of sgRNAs (otherwise empty)
     -custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
     """
-    plot_nuc_len=len(reference_seq)
+    # plot_nuc_len=len(reference_seq)
+    plot_nuc_len = len(X[0]) if len(X) > 0 else len(reference_seq)
 
     # make a color map of fixed colors
     alpha=0.4
