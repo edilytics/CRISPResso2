@@ -5684,13 +5684,18 @@ def main():
                         for (int_start, int_end) in refs[ref_name]['sgRNA_intervals']:
                             new_sgRNA_intervals += [(int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1)]
 
-
                         prepped_df_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws, is_reference = CRISPRessoPlot.prep_alleles_table(
                             df_to_plot,
                             ref_seq_around_cut,
                             args.max_rows_alleles_around_cut_to_plot,
                             args.min_frequency_alleles_around_cut_to_plot,
                         )
+
+                        x_labels = []
+                        for ind, a in enumerate(refs[ref_name]['sequence']):
+                            if a == args.conversion_nuc_from:
+                                x_labels.append(ind)
+                        
                         plot_10h_input = {
                             'reference_seq': ref_seq_around_cut,
                             'prepped_df_alleles': prepped_df_alleles,
@@ -5707,12 +5712,14 @@ def main():
                             'sgRNA_names': None,
                             'sgRNA_mismatches': None,
                             'annotate_wildtype_allele': args.annotate_wildtype_allele,
+                            'plot_reference_sequence_above': False,
+                            'x_labels': x_labels,
                         }
-                        # TODO: Update caption
                         debug('Plotting allele distribution around cut for {0}'.format(ref_name))
-                        plot(CRISPRessoPlot.plot_alleles_table_prepped, plot_10h_input)
+                        # plot(CRISPRessoPlot.plot_alleles_table_prepped, plot_10h_input)
+                        CRISPRessoPlot.plot_alleles_table_prepped(**plot_10h_input)
                         crispresso2_info['results']['refs'][ref_name]['plot_10h_root'] = os.path.basename(fig_filename_root)
-                        crispresso2_info['results']['refs'][ref_name]['plot_10h_caption'] = "Figure 10h: Quilt of Base Edits for " + args.conversion_nuc_from + ' around cut site for ' + sgRNA_legend + ". Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site."
+                        crispresso2_info['results']['refs'][ref_name]['plot_10h_caption'] = "Figure 10h: Quilt of target Nucleotide: " + args.conversion_nuc_from + " across full allele sequences. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences."
                         crispresso2_info['results']['refs'][ref_name]['plot_10h_data'] = [('Allele frequency table', os.path.basename(base_edit_allele_filename))]
 
             ##new plots alleles around cut_sites
