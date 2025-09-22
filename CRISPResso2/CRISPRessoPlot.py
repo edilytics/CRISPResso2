@@ -3465,6 +3465,8 @@ def plot_alleles_heatmap(
 
     if not plot_reference_sequence_above:
         ax_hm.xaxis.tick_top()
+        ax_hm.xaxis.set_label_position('top')
+        ax_hm.set_xlabel("Reference position for target nucleotide (1-indexed)")
         ax_hm.xaxis.set_ticklabels(x_labels, rotation=90)
     else:
         ax_hm.xaxis.set_ticks([])
