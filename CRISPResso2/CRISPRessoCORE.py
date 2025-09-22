@@ -4623,7 +4623,6 @@ def main():
         crispresso2_info['results']['alignment_stats']['substitution_pct_vectors'] = substitution_pct_vectors
         crispresso2_info['results']['alignment_stats']['indelsub_pct_vectors'] = indelsub_pct_vectors
 
-
         #set unique plot name to appear as prefix to files for each reference
         seen_ref_names = {} #dict to track unique ref names
         for ref_name in ref_names:
@@ -4658,6 +4657,8 @@ def main():
             #    continue
 
             if not args.suppress_plots:
+                crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'] = []
+
                 ins_pct_vector_filename = _jp(ref_plot_name+'Effect_vector_insertion.txt')
                 save_vector_to_file(insertion_pct_vectors[ref_name], ins_pct_vector_filename)
                 crispresso2_info['results']['refs'][ref_name]['insertion_pct_vector_filename'] = os.path.basename(ins_pct_vector_filename)
@@ -5597,7 +5598,6 @@ def main():
             if not args.crispresso1_mode and args.base_editor_output:
                 if not args.suppress_plots:
 
-                    crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'] = []
                     
                     fig_filename_root= _jp('10a.'+ref_plot_name+'Substitution_frequencies_at_each_bp')
                     plot_10a_input = {
@@ -5692,7 +5692,7 @@ def main():
                         )
 
                         x_labels = []
-                        for ind, a in enumerate(refs[ref_name]['sequence']):
+                        for ind, a in enumerate(refs[ref_name]['sequence'], start=1):
                             if a == args.conversion_nuc_from:
                                 x_labels.append(ind)
                         
@@ -5711,15 +5711,14 @@ def main():
                             'sgRNA_intervals': None,
                             'sgRNA_names': None,
                             'sgRNA_mismatches': None,
-                            'annotate_wildtype_allele': args.annotate_wildtype_allele,
+                            'annotate_wildtype_allele': '',
                             'plot_reference_sequence_above': False,
                             'x_labels': x_labels,
                         }
                         debug('Plotting allele distribution around cut for {0}'.format(ref_name))
-                        # plot(CRISPRessoPlot.plot_alleles_table_prepped, plot_10h_input)
-                        CRISPRessoPlot.plot_alleles_table_prepped(**plot_10h_input)
+                        plot(CRISPRessoPlot.plot_alleles_table_prepped, plot_10h_input)
                         crispresso2_info['results']['refs'][ref_name]['plot_10h_root'] = os.path.basename(fig_filename_root)
-                        crispresso2_info['results']['refs'][ref_name]['plot_10h_caption'] = "Figure 10h: Quilt of target Nucleotide: " + args.conversion_nuc_from + " across full allele sequences. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences."
+                        crispresso2_info['results']['refs'][ref_name]['plot_10h_caption'] = "Figure 10h: Quilt of target nucleotide: " + args.conversion_nuc_from + " across entire amplicon. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences."
                         crispresso2_info['results']['refs'][ref_name]['plot_10h_data'] = [('Allele frequency table', os.path.basename(base_edit_allele_filename))]
 
             ##new plots alleles around cut_sites

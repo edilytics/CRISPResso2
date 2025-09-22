@@ -3456,11 +3456,9 @@ def plot_alleles_heatmap(
             ax_hm_ref = None
             ax_hm = plt.subplot(gs2[:,:])
 
-    xticklabels = x_labels or True
-
     if plot_reference_sequence_above:
         custom_heatmap(ref_seq_hm, annot=ref_seq_annot_hm, annot_kws={'size':16}, cmap=cmap, fmt='s', ax=ax_hm_ref, vmin=0, vmax=5, square=True)
-    custom_heatmap(X, annot=np.array(annot), annot_kws={'size':16}, cmap=cmap, fmt='s', ax=ax_hm, vmin=0, vmax=5, square=True, per_element_annot_kws=per_element_annot_kws, xticklabels=xticklabels)
+    custom_heatmap(X, annot=np.array(annot), annot_kws={'size':16}, cmap=cmap, fmt='s', ax=ax_hm, vmin=0, vmax=5, square=True, per_element_annot_kws=per_element_annot_kws)
 
     ax_hm.yaxis.tick_right()
     ax_hm.yaxis.set_ticklabels(y_labels[::-1], rotation=True, va='center')
@@ -3468,6 +3466,8 @@ def plot_alleles_heatmap(
     if not plot_reference_sequence_above:
         ax_hm.xaxis.tick_top()
         ax_hm.xaxis.set_ticklabels(x_labels, rotation=90)
+    else:
+        ax_hm.xaxis.set_ticks([])
 
     if sgRNA_intervals and len(sgRNA_intervals) > 0:
         this_sgRNA_y_start = -1*num_sgRNA_rows
