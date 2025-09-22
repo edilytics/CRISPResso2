@@ -5718,7 +5718,7 @@ def main():
                         debug('Plotting allele distribution around cut for {0}'.format(ref_name))
                         plot(CRISPRessoPlot.plot_alleles_table_prepped, plot_10h_input)
                         crispresso2_info['results']['refs'][ref_name]['plot_10h_root'] = os.path.basename(fig_filename_root)
-                        crispresso2_info['results']['refs'][ref_name]['plot_10h_caption'] = "Figure 10h: Quilt of target nucleotide: " + args.conversion_nuc_from + " across entire amplicon. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences."
+                        crispresso2_info['results']['refs'][ref_name]['plot_10h_caption'] = "Figure 10h: Quilt of target nucleotide: " + args.conversion_nuc_from + " across entire amplicon. The x-axis shows the corresponding position of the nucleotide in the reference amplicon (1-indexed). Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences."
                         crispresso2_info['results']['refs'][ref_name]['plot_10h_data'] = [('Allele frequency table', os.path.basename(base_edit_allele_filename))]
 
             ##new plots alleles around cut_sites
