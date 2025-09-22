@@ -3463,13 +3463,13 @@ def plot_alleles_heatmap(
     ax_hm.yaxis.tick_right()
     ax_hm.yaxis.set_ticklabels(y_labels[::-1], rotation=True, va='center')
 
-    if not plot_reference_sequence_above:
+    if plot_reference_sequence_above:
+        ax_hm.xaxis.set_ticks([])
+    else:
         ax_hm.xaxis.tick_top()
         ax_hm.xaxis.set_label_position('top')
         ax_hm.set_xlabel("Reference position for target nucleotide (1-indexed)")
         ax_hm.xaxis.set_ticklabels(x_labels, rotation=90)
-    else:
-        ax_hm.xaxis.set_ticks([])
 
     if sgRNA_intervals and len(sgRNA_intervals) > 0:
         this_sgRNA_y_start = -1*num_sgRNA_rows
