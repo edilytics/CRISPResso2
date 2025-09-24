@@ -8,27 +8,33 @@ import argparse
 import datetime
 import errno
 import gzip
-import json
-import textwrap
+import importlib.metadata
 import importlib.util
-from pathlib import Path
-
+import io
+import json
+import logging
 import numpy as np
 import os
 import pandas as pd
 import re
 import string
 import shutil
+import shlex
 import signal
 import subprocess as sb
+import textwrap
 import unicodedata
-import logging
+
 from inspect import getmodule, stack
+from pathlib import Path
 
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
 
-__version__ = "2.3.2"
+def read_version():
+    return importlib.metadata.version('CRISPResso2')
+
+__version__ = read_version()
 
 ###EXCEPTIONS############################
 class FastpException(Exception):
@@ -87,6 +93,7 @@ class PlotException(Exception):
     pass
 
 
+
 #########################################
 
 class StatusFormatter(logging.Formatter):
@@ -99,7 +106,7 @@ class StatusFormatter(logging.Formatter):
             record.percent_complete = self.last_percent_complete
         else:
             record.percent_complete = 0.0
-        record.json_message = record.getMessage().replace('\\', r'\\').replace('\n', r'\n').replace('"', r'\"')
+        record.json_message = record.getMessage().replace('\\', r'\\').replace('\n', r'\n').replace('"', r'\"').replace("_", r"\_")
         return super().format(record)
 
 
@@ -131,13 +138,13 @@ class LogStreamHandler(logging.StreamHandler):
 def set_console_log_level(logger, level, debug=False):
     for handler in logger.handlers:
         if isinstance(handler, LogStreamHandler):
-            if level == 4 or debug:
+            if level >= 4 or debug:
                 handler.setLevel(logging.DEBUG)
             elif level == 3:
                 handler.setLevel(logging.INFO)
             elif level == 2:
                 handler.setLevel(logging.WARNING)
-            elif level == 1:
+            elif level <= 1:
                 handler.setLevel(logging.ERROR)
             break
 
@@ -172,7 +179,6 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
     }
 
     for key, value in args_dict.items():
-        # print(key, value)
         tools = value.get('tools', [])  # Default to empty list if 'tools' is not found
         if tool in tools:
             action = value.get('action')  # Use None as default if 'action' is not found
@@ -226,13 +232,116 @@ def get_crispresso_options_lookup(tool):
             crispresso_options_lookup[key_sub] = d2
     return crispresso_options_lookup
 
+def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, paramInd=None, set_default_params=False, tool='Core'):
+    """
+    Updates a given command (cmd) by setting parameter options with new values in option_values.
+
+    Parameters
+    ----------
+    cmd : str
+        The command to run including original parameters
+    option_names_to_overwrite : list
+        List of options to overwrite e.g. crispresso options
+    option_values : dict or Pandas DataFrame
+        Values for the options to overwrite.
+    paramInd : int, optional
+        Index in dict - this is the run number in case of multiple runs.
+        If paramInd is specified, option_values should be a DataFrame and the function will look up the value in the row with index paramInd.
+        The default is None.
+    set_default_params : bool, optional
+        If True, for add values in option_values that are the same as the default values
+        If False, default values will not be added to the command
+    tool : str
+        The CRISPResso tool to create the argparser - the params from this tool will be used
+    Returns
+    -------
+    str
+        The updated command with the new options set.
+    -------
+    """
+    parser = getCRISPRessoArgParser(tool)
+    this_program = cmd.split()[0]
+    cmd = ' '.join(cmd.split()[1:])  # remove the program name from the command
+    args = parser.parse_args(shlex.split(cmd)) # shlex split keeps quoted parameters together
+
+    for option in option_names_to_overwrite:
+        if option:
+            if option in option_values:
+                if paramInd is None:
+                    if type(option_values) == dict:
+                        val = option_values[option]
+                    else:
+                        val = getattr(option_values, option)
+                else:
+                    val = option_values.loc[paramInd, option]
+                if val is None or str(val) == 'None':
+                    pass
+                elif str(val) == "True":
+                    setattr(args, option, True)
+                elif str(val) == "False":
+                    setattr(args, option, False)
+                elif isinstance(val, str):
+                    if val != "":
+                        setattr(args, option, str(val))
+                elif isinstance(val, bool):
+                    setattr(args, option, val)
+                else:
+                    setattr(args, option, str(val))
+
+    # reconstruct the command
+    new_cmd = this_program
+    for action in parser._actions:
+        if action.dest in args:
+            val = getattr(args, action.dest)
+            if not set_default_params and (val == action.default) or (str(val) == str(action.default)):
+                continue
+            if val is None or str(val) == "None":
+                continue
+            # argparse conveniently doesn't set type for bools - those action types are None
+            if action.nargs == 0:
+                if val: # if value is true
+                    new_cmd += ' --%s' % action.dest
+            elif action.type == bool: # but just in case...
+                if val:
+                    new_cmd += ' --%s' % action.dest
+            elif action.type == str:
+                if val != "":
+                    if re.fullmatch(r"[a-zA-Z0-9\._]*", val): # if the value is alphanumeric, don't have to quote it
+                        new_cmd += ' --%s %s' % (action.dest, val)
+                    elif val.startswith('"') and val.endswith('"'):
+                        new_cmd += ' --%s %s' % (action.dest, val)
+                    else:
+                        new_cmd += ' --%s "%s"' % (action.dest, val)
+            elif action.type == int:
+                new_cmd += ' --%s %s' % (action.dest, val)
+
+    return new_cmd
+
 
 def propagate_crispresso_options(cmd, options, params, paramInd=None):
-    ####
-    # cmd - the command to run
-    # options - list of options to propagate e.g. crispresso options
-    # params - arguments given to this program
-    # paramInd - index in dict - this is the run number in case of multiple runs.
+    """
+    Updates a given command (cmd) by setting parameter options with new values in params.
+    This is used to propagate options from the command line to the command that is run.
+
+    Parameters
+    ----------
+    cmd : str
+        The command to run including original parameters
+    options : list
+        List of options to propagate e.g. crispresso options
+    params : dict or Pandas DataFrame
+        Values for the options to propagate.
+    paramInd : int, optional
+        Index in dict - this is the run number in case of multiple runs.
+        If paramInd is specified, params should be a DataFrame and the function will look up the value in the row with index paramInd.
+        The default is None.
+    Returns
+    -------
+    str
+        The updated command with the new options set.
+    -------
+    """
+
     for option in options:
         if option:
             if option in params:
@@ -307,6 +416,126 @@ CIGAR_LOOKUP = {
 
 cigarUnexplodePattern = re.compile(r'((\w)\2{0,})')
 
+CODON_TO_AMINO_ACID = {
+    'TTT': 'Phe', 'TTC': 'Phe', 'TTA': 'Leu', 'TTG': 'Leu',
+    'TCT': 'Ser', 'TCC': 'Ser', 'TCA': 'Ser', 'TCG': 'Ser',
+    'TAT': 'Tyr', 'TAC': 'Tyr', 'TAA': 'STOP', 'TAG': 'STOP',
+    'TGT': 'Cys', 'TGC': 'Cys', 'TGA': 'STOP', 'TGG': 'Trp',
+    'CTT': 'Leu', 'CTC': 'Leu', 'CTA': 'Leu', 'CTG': 'Leu',
+    'CCT': 'Pro', 'CCC': 'Pro', 'CCA': 'Pro', 'CCG': 'Pro',
+    'CAT': 'His', 'CAC': 'His', 'CAA': 'Gln', 'CAG': 'Gln',
+    'CGT': 'Arg', 'CGC': 'Arg', 'CGA': 'Arg', 'CGG': 'Arg',
+    'ATT': 'Ile', 'ATC': 'Ile', 'ATA': 'Ile', 'ATG': 'Met',
+    'ACT': 'Thr', 'ACC': 'Thr', 'ACA': 'Thr', 'ACG': 'Thr',
+    'AAT': 'Asn', 'AAC': 'Asn', 'AAA': 'Lys', 'AAG': 'Lys',
+    'AGT': 'Ser', 'AGC': 'Ser', 'AGA': 'Arg', 'AGG': 'Arg',
+    'GTT': 'Val', 'GTC': 'Val', 'GTA': 'Val', 'GTG': 'Val',
+    'GCT': 'Ala', 'GCC': 'Ala', 'GCA': 'Ala', 'GCG': 'Ala',
+    'GAT': 'Asp', 'GAC': 'Asp', 'GAA': 'Glu', 'GAG': 'Glu',
+    'GGT': 'Gly', 'GGC': 'Gly', 'GGA': 'Gly', 'GGG': 'Gly'
+}
+
+# change amino acids to single char
+CODON_TO_AMINO_ACID_SINGLE_CHAR = {
+    'TTT': 'F', 'TTC': 'F', 'TTA': 'L', 'TTG': 'L',
+    'TCT': 'S', 'TCC': 'S', 'TCA': 'S', 'TCG': 'S',
+    'TAT': 'Y', 'TAC': 'Y', 'TAA': '*', 'TAG': '*',
+    'TGT': 'C', 'TGC': 'C', 'TGA': '*', 'TGG': 'W',
+    'CTT': 'L', 'CTC': 'L', 'CTA': 'L', 'CTG': 'L',
+    'CCT': 'P', 'CCC': 'P', 'CCA': 'P', 'CCG': 'P',
+    'CAT': 'H', 'CAC': 'H', 'CAA': 'Q', 'CAG': 'Q',
+    'CGT': 'R', 'CGC': 'R', 'CGA': 'R', 'CGG': 'R',
+    'ATT': 'I', 'ATC': 'I', 'ATA': 'I', 'ATG': 'M',
+    'ACT': 'T', 'ACC': 'T', 'ACA': 'T', 'ACG': 'T',
+    'AAT': 'N', 'AAC': 'N', 'AAA': 'K', 'AAG': 'K',
+    'AGT': 'S', 'AGC': 'S', 'AGA': 'R', 'AGG': 'R',
+    'GTT': 'V', 'GTC': 'V', 'GTA': 'V', 'GTG': 'V',
+    'GCT': 'A', 'GCC': 'A', 'GCA': 'A', 'GCG': 'A',
+    'GAT': 'D', 'GAC': 'D', 'GAA': 'E', 'GAG': 'E',
+    'GGT': 'G', 'GGC': 'G', 'GGA': 'G', 'GGG': 'G'
+}
+
+
+def get_amino_acids_and_codons(seq):
+    """ Given a nucleotide sequence, return the amino acid sequence and the codons."""
+    amino_acids = []
+    while len(seq) > 2:
+        codon, seq = seq[:3], seq[3:]
+        amino_acids.append((CODON_TO_AMINO_ACID_SINGLE_CHAR[codon], codon))
+    return amino_acids
+
+
+def get_amino_acids_from_nucs(seq):
+    """ Given a nucleotide sequence, return the amino acid sequence."""
+    amino_acids = []
+    while len(seq) > 2:
+        codon, seq = seq[:3], seq[3:]
+        if codon == '---':
+            amino_acids.append('-')
+        else:
+            amino_acids.append(CODON_TO_AMINO_ACID_SINGLE_CHAR[codon])
+    return ''.join(amino_acids)
+
+
+
+def insert_indels(seq, seq_codons):
+    indel_inds = []
+    for i, c in enumerate(seq):
+        if c == '-':
+            indel_inds.append(i)
+
+    for i in indel_inds:
+        seq_codons.insert(i, ('-', '---'))
+
+    return seq_codons
+
+def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
+    """ Given a reference amino acid sequence, reference codons, amino acid read sequence, and read codons,
+    return the amino acid read sequence with silent edit amino acids as lower case chars.
+
+    for example:
+    
+    ref_seq = 'AG-S'
+    seq = 'AGTS'
+    ref_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT')]
+    seq_codons = [('A', 'GCT'), ('G', 'GGT'),  ('T', 'ACT'), ('S', 'AGC')]
+    returns:
+    'AGTs'
+
+    Parameters
+    ----------
+    ref_seq : str
+        Reference amino acid sequence, with insertions.
+    ref_codons : list of tuples
+        List of tuples containing the reference amino acid and its corresponding codon.
+    seq : str
+        Read amino acid sequence with deletions.
+    seq_codons : list of tuples
+        List of tuples containing the read amino acid and its corresponding codon.
+
+    Returns
+    -------
+    str
+        Read amino acid sequence with silent edits in lower case.
+     """
+    silent_edit_inds = []
+
+    ref_codons = insert_indels(ref_seq, ref_codons)
+    seq_codons = insert_indels(seq, seq_codons)
+
+    for i, ((r, r_codon), (s, s_codon)) in enumerate(zip(ref_codons, seq_codons)):
+        if r == '-' or s == '-':
+            continue
+        if r != s:
+            continue
+        if r == s and r_codon != s_codon:
+            silent_edit_inds.append((i, r.lower()))
+    seq_list = list(seq)
+    for i, char in silent_edit_inds:
+        seq_list[i] = char
+
+    return ''.join(seq_list)
+
 
 def unexplode_cigar(exploded_cigar_string):
     """Make a CIGAR string from an exploded cigar string.
@@ -353,7 +582,7 @@ def get_ref_length_from_cigar(cigar_string):
 
 def clean_filename(filename):
     # get a clean name that we can use for a filename
-    validFilenameChars = "+-_.()%s%s" % (string.ascii_letters, string.digits)
+    validFilenameChars = "+-_.%s%s" % (string.ascii_letters, string.digits)
     filename = slugify(str(filename).replace(' ', '_'))
     cleanedFilename = unicodedata.normalize('NFKD', filename)
     return (''.join(c for c in cleanedFilename if c in validFilenameChars))
@@ -494,7 +723,6 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
 def get_n_reads_fastq(fastq_filename):
     if not os.path.exists(fastq_filename) or os.path.getsize(fastq_filename) == 0:
         return 0
-
     p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '' ) +"cat < %s | grep -c ." % fastq_filename, shell=True, stdout=sb.PIPE)
     n_reads = int(float(p.communicate()[0])/4.0)
     return n_reads
@@ -564,6 +792,11 @@ def check_output_folder(output_folder):
 # Thanks https://gist.github.com/simonw/7000493 for this idea
 class CRISPRessoJSONEncoder(json.JSONEncoder):
     def default(self, obj):
+        if isinstance(obj, CRISPRessoCOREResources.ResultsSlotsDict):
+            return {
+                '_type': 'ResultsSlotsDict',
+                'value': obj.__dict__,
+            }
         if isinstance(obj, np.ndarray):
             return {
                 '_type': 'np.ndarray',
@@ -621,10 +854,12 @@ class CRISPRessoJSONDecoder(json.JSONDecoder):
 
     def object_hook(self, obj):
         if '_type' in obj:
+            if obj['_type'] == 'ResultsSlotsDict':
+                return CRISPRessoCOREResources.ResultsSlotsDict(**obj['value'])
             if obj['_type'] == 'np.ndarray':
                 return np.array(obj['value'])
             if obj['_type'] == 'pd.DataFrame':
-                return pd.read_json(obj['value'], orient='split')
+                return pd.read_json(io.StringIO(obj['value'].decode('utf-8')), orient='split')
             if obj['_type'] == 'datetime.datetime':
                 return datetime.datetime.fromisoformat(obj['value'])
             if obj['_type'] == 'datetime.timedelta':
@@ -853,20 +1088,24 @@ def check_if_failed_run(folder_name, info):
     """
     Check the output folder for a info.json file and a status.txt file to see if the run completed successfully or not
 
-    input:
+    Parameters
+    ----------
     folder_name: path to output folder
     info: logger
 
-
-    returns:
-    bool True if run completed successfully, False otherwise
+    Returns
+    -------
+    bool True if run failed, False otherwise
     string describing why it failed
     """
 
     run_data_file = os.path.join(folder_name, 'CRISPResso2_info.json')
     status_info = os.path.join(folder_name, 'CRISPResso_status.json')
     if not os.path.isfile(run_data_file) or not os.path.isfile(status_info):
-        info("Skipping folder '%s'. Cannot find run data status file at '%s'."%(folder_name, run_data_file))
+        if not os.path.isfile(run_data_file):
+            info("Skipping folder '%s'. Cannot find run data file at '%s'."%(folder_name, run_data_file))
+        if not os.path.isfile(status_info):
+            info("Skipping folder '%s'. Cannot find status file at '%s'."%(folder_name, status_info))
         if "CRISPRessoPooled" in folder_name:
             unit = "amplicon"
         elif "CRISPRessoWGS" in folder_name:
@@ -884,24 +1123,24 @@ def check_if_failed_run(folder_name, info):
                     return True, str(status_dict['message'])
                 else:
                     return False, ""
-            except:
+            except Exception as e:
                 pass
 
         with open(status_info) as fh:
-                try:
-                    file_contents = fh.read()
-                    search_result = re.search(r'(\d+\.\d+)% (.+)', file_contents)
-                    if search_result:
-                        percent_complete, status = search_result.groups()
-                        if percent_complete != '100.00':
-                            info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status))
-                            return True, status
-                    else:
-                        return True, file_contents
-                except Exception as e:
-                    print(e)
-                    info("Skipping folder '%s'. Cannot parse status file '%s'." % (folder_name, status_info))
-                    return True, "Cannot parse status file '%s'." % (status_info)
+            try:
+                file_contents = fh.read()
+                search_result = re.search(r'(\d+\.\d+)% (.+)', file_contents)
+                if search_result:
+                    percent_complete, status = search_result.groups()
+                    if percent_complete != '100.00':
+                        info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status))
+                        return True, status
+                else:
+                    return True, file_contents
+            except Exception as e:
+                print(e)
+                info("Skipping folder '%s'. Cannot parse status file '%s'." % (folder_name, status_info))
+                return True, "Cannot parse status file '%s'." % (status_info)
         return False, ""
 
 
@@ -1214,36 +1453,61 @@ def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_
     return output_filename_r1, output_filename_r2
 
 
-######
-# allele modification functions
-######
+def get_base_edit_row_around_cut(row, conversion_nuc_from):
 
-def get_row_around_cut(row, cut_point, offset):
-    cut_idx = row['ref_positions'].index(cut_point)
-    return row['Aligned_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1], row['Reference_Sequence'][
-                                                                               cut_idx - offset + 1:cut_idx + offset + 1], \
-           row['Read_Status'] == 'UNMODIFIED', row['n_deleted'], row['n_inserted'], row['n_mutated'], row['#Reads'], \
-           row['%Reads']
+    include_inds = [i for i,c in enumerate(row['Reference_Sequence']) if c == conversion_nuc_from]
+
+    filtered_aligned_seq = ''.join([row['Aligned_Sequence'][i] for i in include_inds])
+    filtered_ref_seq = ''.join([row['Reference_Sequence'][i] for i in include_inds])
+
+    return (
+        filtered_aligned_seq,
+        filtered_ref_seq,
+        row['Read_Status'] == 'UNMODIFIED',
+        row['n_deleted'],
+        row['n_inserted'],
+        row['n_mutated'],
+        row['#Reads'],
+        row['%Reads']
+        )
 
 
-def get_dataframe_around_cut(df_alleles, cut_point, offset, collapse_by_sequence=True):
+def get_base_edit_dataframe_around_cut(df_alleles, conversion_nuc_inds):
     if df_alleles.shape[0] == 0:
         return df_alleles
-    ref1 = df_alleles['Reference_Sequence'].iloc[0]
-    ref1 = ref1.replace('-', '')
-    if (cut_point + offset + 1 > len(ref1)):
-        raise (BadParameterException(
-            'The plotting window cannot extend past the end of the amplicon. Amplicon length is ' + str(
-                len(ref1)) + ' but plot extends to ' + str(cut_point + offset + 1)))
 
     df_alleles_around_cut = pd.DataFrame(
-        list(df_alleles.apply(lambda row: get_row_around_cut(row, cut_point, offset), axis=1).values),
+        list(df_alleles.apply(lambda row: get_base_edit_row_around_cut(row, conversion_nuc_inds), axis=1).values),
         columns=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated', '#Reads',
                  '%Reads'])
 
     df_alleles_around_cut = df_alleles_around_cut.groupby(
         ['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted',
          'n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
+
+    df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
+    df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
+    return df_alleles_around_cut
+
+######
+# allele modification functions
+######
+
+def get_row_around_cut_asymmetrical(row,cut_point,plot_left,plot_right):
+    cut_idx=row['ref_positions'].index(cut_point)
+    return row['Aligned_Sequence'][cut_idx-plot_left+1:cut_idx+plot_right+1],row['Reference_Sequence'][cut_idx-plot_left+1:cut_idx+plot_right+1],row['Read_Status']=='UNMODIFIED',row['n_deleted'],row['n_inserted'],row['n_mutated'],row['#Reads'], row['%Reads']
+
+
+def get_dataframe_around_cut_asymmetrical(df_alleles, cut_point,plot_left,plot_right,collapse_by_sequence=True):
+    if df_alleles.shape[0] == 0:
+        return df_alleles
+    ref1 = df_alleles['Reference_Sequence'].iloc[0]
+    ref1 = ref1.replace('-','')
+
+    df_alleles_around_cut=pd.DataFrame(list(df_alleles.apply(lambda row: get_row_around_cut_asymmetrical(row,cut_point,plot_left,plot_right),axis=1).values),
+                    columns=['Aligned_Sequence','Reference_Sequence','Unedited','n_deleted','n_inserted','n_mutated','#Reads','%Reads'])
+
+    df_alleles_around_cut=df_alleles_around_cut.groupby(['Aligned_Sequence','Reference_Sequence','Unedited','n_deleted','n_inserted','n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
 
     df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
     df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
@@ -1270,6 +1534,75 @@ def get_dataframe_around_cut_debug(df_alleles, cut_point, offset):
 
     df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
     df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
+    return df_alleles_around_cut
+
+def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point):
+    cut_idx = row['ref_positions'].index(amino_acid_cut_point)
+    left_idx = row['ref_positions'].index(plot_left_idx)
+    seq_acids_and_codons = get_amino_acids_and_codons(row['Aligned_Sequence'][left_idx::].replace('-', ''))
+    ref_acids_and_codons = get_amino_acids_and_codons(row['Reference_Sequence'][left_idx::].replace('-', ''))
+    aligned_seq = ''.join(tup[0] for tup in seq_acids_and_codons)
+    reference_seq = ''.join(tup[0] for tup in ref_acids_and_codons)
+
+    gap_incentive = np.zeros(len(reference_seq)+1, dtype=int)
+    try:
+        gap_incentive[cut_idx] = 1
+    except:
+        pass
+    aligned_seq, reference_seq, score = CRISPResso2Align.global_align(
+        aligned_seq,
+        reference_seq,
+        matrix=CRISPResso2Align.read_matrix(matrix_path),
+        gap_incentive=gap_incentive,
+    )
+
+    aa_ref_positions = CRISPRessoCOREResources.find_indels_substitutions(
+        aligned_seq, reference_seq, range(len(reference_seq))
+    )
+
+    aligned_seq = get_silent_edits(
+        reference_seq,
+        ref_acids_and_codons,
+        aligned_seq,
+        seq_acids_and_codons,
+        )
+
+    return (aligned_seq[:sequence_length],
+            reference_seq[:sequence_length],
+            row['Read_Status']=='UNMODIFIED',
+            row['n_deleted'],
+            row['n_inserted'],
+            row['n_mutated'],
+            row['#Reads'],
+            row['%Reads'],)
+
+def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point, collapse_by_sequence=True):
+    if df_alleles.shape[0] == 0:
+        return df_alleles
+
+    df_alleles_around_cut=pd.DataFrame(list(df_alleles.apply(lambda row: get_amino_acid_row(row,plot_left_idx,sequence_length,matrix_path, amino_acid_cut_point),axis=1).values),
+                    columns=['Aligned_Sequence','Reference_Sequence','Unedited','n_deleted','n_inserted','n_mutated','#Reads','%Reads'])
+
+    df_alleles_around_cut=df_alleles_around_cut.groupby(['Aligned_Sequence','Reference_Sequence','Unedited','n_deleted','n_inserted','n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
+
+    df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
+    df_alleles_around_cut['Unedited']=df_alleles_around_cut['Unedited']>0
+
+    edits_series = pd.Series(dtype='object')
+    row_ind = 0
+    for idx, row in df_alleles_around_cut.iterrows():
+        silent_edit_inds = []
+        for i, c in enumerate(idx):
+            if c.islower():
+                silent_edit_inds.append(i)
+        edits_series[row_ind] = silent_edit_inds
+        row_ind += 1
+
+    edits_series.index = df_alleles_around_cut.index
+    df_alleles_around_cut['silent_edit_inds'] = edits_series
+
+    df_alleles_around_cut.index = df_alleles_around_cut.index.str.upper()
+
     return df_alleles_around_cut
 
 
@@ -1463,13 +1796,11 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
     if this_sgRNA_cut_points and plot_window_size > 0:
         for cut_p in this_sgRNA_cut_points:
             if cut_p - window_around_cut + 1 < 0:
-                raise BadParameterException(
-                    'Offset around cut would extend to the left of the amplicon. Please decrease plot_window_size parameter. Cut point: ' + str(
-                        cut_p) + ' window: ' + str(window_around_cut) + ' reference: ' + str(ref_seq_length))
+                logging.warning('Offset around cut would extend to the left of the amplicon. Window will be truncated.')
+                window_around_cut = cut_p + 1
             if cut_p + window_around_cut > ref_seq_length - 1:
-                raise BadParameterException(
-                    'Offset around cut would be greater than reference sequence length. Please decrease plot_window_size parameter. Cut point: ' + str(
-                        cut_p) + ' window: ' + str(window_around_cut) + ' reference: ' + str(ref_seq_length))
+                logging.warning('Offset around cut would be greater than reference sequence length. Window will be truncated.')
+                window_around_cut = ref_seq_length - cut_p - 1
             st = max(0, cut_p - window_around_cut + 1)
             en = min(ref_seq_length - 1, cut_p + window_around_cut + 1)
             this_sgRNA_plot_idxs.append(sorted(list(range(st, en))))
@@ -1869,6 +2200,7 @@ def check_custom_config(args):
             'G': '#FFFF99',
             'N': '#C8C8C8',
             '-': '#1E1E1E',
+            'amino_acid_scheme': 'unique'
         },
         "guardrails": {
             'min_total_reads': 10000,
@@ -1883,6 +2215,9 @@ def check_custom_config(args):
             'amplicon_to_read_length': 1.5
         }
     }
+
+    if args is None or not hasattr(args, 'config_file'):
+        return config
 
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
     if not is_C2Pro_installed():
@@ -1919,7 +2254,7 @@ def check_custom_config(args):
             if args.config_file:
                 logger.warn("Cannot read config file '%s', defaulting config parameters." % args.config_file)
             else:
-                logger.warn("No config file provided, defaulting config parameters.")
+                logger.debug("No config file provided, defaulting config parameters.")
     return config
 
 
@@ -2281,7 +2616,7 @@ class HighRateOfSubstitutionsGuardrail:
         if total_mods == 0:
             return
         if ((global_subs / total_mods) >= self.cutoff):
-            self.message = self.message + " Total modifications: {}, Substitutions: {}.".format(total_mods, global_subs)
+            self.message = self.message + " Total modifications: {}, Substitutions: {}.".format(int(total_mods), global_subs)
             self.messageHandler.display_warning('HighRateOfSubstitutionsGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
