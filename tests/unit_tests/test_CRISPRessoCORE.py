@@ -4,7 +4,7 @@ import pytest
 import pandas as pd
 from pytest_check import check
 
-from CRISPResso2 import CRISPRessoCORE, CRISPRessoShared
+from CRISPResso2 import CRISPRessoCORE, CRISPRessoShared, CRISPRessoCOREResources
 
 def calc_score(seq, ref):
     score = 0
@@ -720,6 +720,80 @@ def test_write_base_edit_counts():
             assert False
 
 
+def _make_df_alleles_multiple_deletions():
+    """Construct a mock df_alleles DataFrame covering sub, del, ins edits."""
+    ref_seq = "ATGCGTACGATCGTACGTAGCTAGCTAGCGTAGCTAGCTA"  # 40 bp
+    aln_seq = "ATGCGTACGATCGTACGT-GCTAGCTAGCGTAGCTAGCTA"
+    results_dict = CRISPRessoCOREResources.find_indels_substitutions(aln_seq, ref_seq, list(range(15, 25)))
+    print("dict is below:")
+    print(results_dict.keys())
+    rows = []
+
+    # ───────────── 1‑bp deletion removing G at index 19 ─────────────────────
+    aligned_seq_after_deletions = ref_seq[:19] + "-"*1 + ref_seq[20:]
+    # ref_positions is unchanged for deletions
+    ref_positions = list(range(len(ref_seq)))
+    rows.append({
+        "#Reads": 1,
+        "Aligned_Sequence": aligned_seq_after_deletions,
+        "Reference_Sequence": ref_seq,
+        "n_inserted": 0,
+        "n_deleted": 1,
+        "n_mutated": 0,
+        "Reference_Name": "Reference",
+        "ref_positions": ref_positions,
+        "insertion_coordinates": [],
+        "deletion_coordinates": [(19, 20)],  # [start, end] (0‑based, end exclusive)
+        "substitution_positions": [],
+    })
+    # ───────────── 5‑bp deletion removing G at index 19 ─────────────────────
+    aligned_seq_after_deletions = ref_seq[:19] + "-"*5 + ref_seq[24:]
+    rows.append({
+        "#Reads": 1,
+        "Aligned_Sequence": aligned_seq_after_deletions,
+        "Reference_Sequence": ref_seq,
+        "n_inserted": 0,
+        "n_deleted": 5,
+        "n_mutated": 0,
+        "Reference_Name": "Reference",
+        "ref_positions": ref_positions,
+        "insertion_coordinates": [],
+        "deletion_coordinates": [(19, 24)],  # [start, end] (0‑based, end exclusive)
+        "substitution_positions": [],
+    })
+
+    # ───────────── 2‑bp insertion "GG" after index 30 (between 30 and 31) ──
+    ins_seq = ref_seq[:31] + "GG" + ref_seq[31:]
+    rows.append({
+        "#Reads": 1,
+        "Aligned_Sequence": ins_seq,
+        "Reference_Sequence": ref_seq,
+        "n_inserted": 2,
+        "n_deleted": 0,
+        "n_mutated": 0,
+        "Reference_Name": "Reference",
+        "ref_positions": ref_positions,
+        "insertion_coordinates": [(31, 33)],  # slice storing inserted sequence
+        "deletion_coordinates": [],
+        "substitution_positions": [],
+    })
+   # ───────────── 10‑bp deletion removing G... at index 19 ─────────────────────
+    del_seq = ref_seq[:19] + ref_seq[29:]
+    rows.append({
+        "#Reads": 1,
+        "Aligned_Sequence": del_seq,
+        "Reference_Sequence": ref_seq,
+        "n_inserted": 0,
+        "n_deleted": 1,
+        "n_mutated": 0,
+        "Reference_Name": "Reference",
+        "ref_positions": ref_positions,
+        "insertion_coordinates": [],
+        "deletion_coordinates": [(19, 29)],  # [start, end] (0‑based, end exclusive)
+        "substitution_positions": [],
+    })
+
+    return pd.DataFrame(rows)
 def _make_df_alleles():
     """Construct a mock df_alleles DataFrame covering sub, del, ins edits."""
     ref_seq = "ATGCGTACGATCGTACGTAGCTAGCTAGCGTAGCTAGCTA"  # 40 bp
@@ -819,6 +893,35 @@ def _normalize_alt_map(alt_map):
     return norm
 
 
+def test_build_alt_map():
+    df_alleles = _make_df_alleles_multiple_deletions()
+
+    # Chromosome 1, reference starts at genomic coordinate 1
+    amplicon_positions = {"Reference": (1, 1)}
+
+    alt_map = CRISPRessoCORE.build_alt_map(df_alleles, amplicon_positions)
+
+    expected_alt_map = {
+        # SNP at 1 + 9 = 10
+        (1,10): {
+            "ref_seq": "A",  # reference base
+            "alt_seqs": [["sub", "G", 1]],
+        },
+        # 1‑bp deletion at 1 + 19 = 20
+        (1,20): {
+            "ref_seq": "AGCTAGCTAGC",  # flanking + deleted base (A|G)
+            "alt_seqs": [["delete", "G", 1], ['delete', 'GCTAGCTAGC', 1]],  # content is not used beyond length
+        },
+        # 2‑bp insertion after index 30 -> coordinate 32
+        (1,32): {
+            "ref_seq": "G",  # base before insertion
+            "alt_seqs": [["insert", "GG", 1]],
+        },
+    }
+    if _normalize_alt_map(alt_map) != _normalize_alt_map(expected_alt_map):
+        print(_normalize_alt_map(alt_map))
+        print(_normalize_alt_map(expected_alt_map))
+    assert _normalize_alt_map(alt_map) == _normalize_alt_map(expected_alt_map)
 def test_build_alt_map():
     df_alleles = _make_df_alleles()
 

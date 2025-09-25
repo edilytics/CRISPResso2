@@ -163,7 +163,6 @@ def build_alt_map(df_alleles, amplicon_positions):
     """
 
     alt_map = {}
-
     for _, df_allele in df_alleles.iterrows():
         # skip unmodified reads
         if (
@@ -175,8 +174,9 @@ def build_alt_map(df_alleles, amplicon_positions):
 
         # lookup amplicon‑specific chromosome & offset
         ref_name = df_allele["Reference_Name"]
+        # TODO ref_name could be csv if ambiguous read
         chrom, pos = amplicon_positions[ref_name]
-
+        # print(df_allele)
         # ─────────────────────── DELETIONS ────────────────────────
         for del_coords in df_allele["deletion_coordinates"]:
             left_index = pos + del_coords[0]
@@ -187,6 +187,7 @@ def build_alt_map(df_alleles, amplicon_positions):
 
             del_seq = df_allele["Reference_Sequence"][ref_idx_left:ref_idx_right]
             del_len = ref_idx_right - ref_idx_left
+            # breakpoint()
             reads = df_allele["#Reads"]
 
             if map_key in alt_map:
@@ -318,26 +319,23 @@ def vcf_text_from_alt_map(alt_map, num_reads, ref_names, vcf_file_path=None):
         return "\n".join(lines) + "\n"
 
 
-def write_vcf_file(df_alleles, ref_names, crispresso2_info, args, output_dir):
+def write_vcf_file(df_alleles, ref_names, args, vcf_path):
     """Outer function which creates alt_map, uses it to generate VCF text, and then writes to file."""
-    vcf_path = os.path.join(output_dir, "amplicon_variants.vcf")
-
+    
     try:
         all_coords = args.amplicon_coordinates.strip().split(',')
-        amplicon_names = args.amplicon_name.split(',')
+        if len(all_coords) != len(ref_names):
+            raise CRISPRessoShared.BadParameterException('Number of amplicon coordinates provided in --amplicon_coordinates does not match the number of amplicons provided.')
         num_reads = df_alleles['#Reads'].sum()
         amplicon_positions = {}
         for i, coord in enumerate(all_coords):
-            chrom_str, pos_str = coord.strip().split(':')
-            chrom = chrom_str
+            chrom, pos_str = coord.strip().split(':')
             pos = int(pos_str)
-            key = amplicon_names[i] if i < len(amplicon_names) else f"Amplicon{i+1-len(amplicon_names)}"
+            key = ref_names[i]
             amplicon_positions[key] = (chrom, pos)
     except ValueError:
         raise CRISPRessoShared.BadParameterException('Invalid format for --amplicon_coordinates.')
 
-    crispresso2_info['chr_num'] = chrom
-    crispresso2_info['amplicon_coordinate'] = pos
 
     alt_map = build_alt_map(df_alleles, amplicon_positions)
     vcf_text_from_alt_map(alt_map, num_reads, ref_names, vcf_path)
@@ -4710,12 +4708,14 @@ def main():
 
         info('Saving processed data...')
 
-
         if args.vcf_output:
+            # TODO delete after ensuring this is vestigial
             qwc_indexes = {}
             for ref_name in ref_names:
                 qwc_indexes[ref_name] = refs[ref_name]['include_idxs']
-            write_vcf_file(df_alleles, ref_names, crispresso2_info, args, OUTPUT_DIRECTORY)
+            # TODO add this path to crispresso2_info
+            vcf_path = os.path.join(OUTPUT_DIRECTORY, "amplicon_variants.vcf")
+            write_vcf_file(df_alleles, ref_names, args, vcf_path)
         # write the allele frequency table
         df_alleles.to_csv(_jp('Alleles_frequency_table.csv'), sep='\t', header=True, index=None)
 
