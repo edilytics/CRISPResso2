@@ -229,8 +229,19 @@ def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
                 }
             },
         ),
+        # deletion at second element
+        (
+            [make_del(1, 2, reads=1)],
+            {'Reference': (1, 1)},
+            {
+                (1, 2): {
+                    "ref_seq": REF_SEQ[0:2],
+                    "alt_edits": [["delete", REF_SEQ[1:2], 1]],
+                }
+            },
+        ),
     ],
-    ids=["del_single", "del_merge_same_len", "del_two_lengths_same_key"],
+    ids=["del_single", "del_merge_same_len", "del_two_lengths_same_key", "del_second_element"],
 )
 def test_build_alt_map_deletions(rows, amplicon_positions, expected):
     df = df_from_rows(*rows)
