@@ -47,6 +47,7 @@ def _process_deletions(row, chrom, pos, alt_map):
         )
 
 def _process_insertions(row, chrom, pos, alt_map):
+    """Uses ref_positions and insertion_coordinates to find the correct original base, returning the aln_edit object."""
     ref_positions = row["ref_positions"]
     ref_str = row["Reference_Sequence"]
     aln_str = row["Aligned_Sequence"]
@@ -86,6 +87,7 @@ def _process_insertions(row, chrom, pos, alt_map):
 
 
 def _process_substitutions(row, chrom, pos, alt_map):
+    """Uses ref_positions and substitution_position to find the correct original base, returning the aln_edit object."""
     ref_positions = row["ref_positions"]
     ref_str = row["Reference_Sequence"]
     aln_str = row["Aligned_Sequence"]
@@ -150,7 +152,7 @@ def build_alt_map(df_alleles, amplicon_positions):
           key: (chrom, left_index)
           value: {
               "ref_seq": str,      # longest reference context seen at the key
-              "alt_edits": [ [edit_type, alt_string, reads], ... ]
+              "alt_edits": [ [edit_type, alt_edit, reads], ... ]
           }
 
     Merge rules at a given key:
@@ -238,14 +240,7 @@ def _alt_seq_from_edit(ref_seq, edit_type, alt_edit):
 
 
 def _write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads, ref_names=None):
-    """
-    Takes one (chrom, pos) and returns the relevant VCF record line.
-    - alt_edits is a list of [edit_type, payload, reads] per event at this locus.
-    - num_reads is the total reads used to compute AF = reads/num_reads.
-    - If ref_names is provided (list), FORMAT=GT and one '.' per sample are appended.
-
-    Returns None if no valid ALTs remain (should be rare).
-    """
+    """Takes one (chrom, pos) and returns the relevant VCF record line."""
     if num_reads is None or num_reads <= 0:
         raise CRISPRessoShared.BadParameterException("Error counting total number of reads.")
 
@@ -272,71 +267,73 @@ def _write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads, ref_names=None):
     return record
 
 
-def _write_vcf_header(lines, ref_names):
-    lines.append("##fileformat=VCFv4.5")
-    lines.append("##source=CRISPResso2")
-    lines.append('##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">')
-    base = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO"
-    if ref_names:
-        base += "\tFORMAT\t" + "\t".join(ref_names)
-    lines.append(base)
+def vcf_lines_from_alt_map(alt_map, num_reads, ref_names, vcf_path):
+    """After being passed a single location, this generates the final alt_seqs and AFs, and returns the single VCF line."""
 
-
-def vcf_text_from_alt_map(alt_map, num_reads, ref_names, vcf_file_path=None):
-    """
-    Emit a VCF from alt_map. One record per (chrom, pos) key.
-    """
-    lines = []
-    _write_vcf_header(lines, ref_names)
-
-    # Deterministic site order
     def _key_sort(k):
         chrom, pos = k
         try:
-            c_key = (0, int(chrom))
+            c_key = (0, int(chrom))         # numeric chroms first (e.g., "1", 2)
         except (TypeError, ValueError):
-            c_key = (1, str(chrom))
+            c_key = (1, str(chrom))         # non‑numeric chroms next, lexicographic (e.g., "chr1", "chr10")
         return (c_key, int(pos))
 
-    ctx = open(vcf_file_path, "w") if vcf_file_path else nullcontext()
-    with ctx as fh:
-        if vcf_file_path:
-            fh.write("\n".join(lines) + "\n")
-
+    counter = 0
+    with open(vcf_path, "w") as f:
+        f.write("##fileformat=VCFv4.5\n")
+        f.write("##source=CRISPResso2\n")
+        f.write('##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n')
+        base = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO"
+        if ref_names:
+            base += "\tFORMAT\t" + "\t".join(ref_names)
+        f.write(base + "\n")
         for (chrom, pos) in sorted(alt_map.keys(), key=_key_sort):
             entry = alt_map[(chrom, pos)]
             ref_seq = entry["ref_seq"]
-            alt_edits = entry["alt_edits"]  # ← renamed everywhere
-
-            rec = _write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads, ref_names)
-            if rec is None:
-                continue
-            if vcf_file_path:
-                fh.write(rec + "\n")
-            else:
-                lines.append(rec)
-
-    if not vcf_file_path:
-        return "\n".join(lines) + "\n"
-
+            alt_edits = entry["alt_edits"]
+            f.write(_write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads, ref_names) + "\n")
+            counter += 1
+    return counter
 
 def write_vcf_file(df_alleles, ref_names, args, vcf_path):
-    """Outer function which creates alt_map, uses it to generate VCF text, and then writes to file."""
+    """Orchestrates: parse amplicon coordinates, build alt_map, make VCF, and write to file.
 
+    Parameters
+    ----------
+    df_alleles : pd.DataFrame
+        The alleles DataFrame from CRISPResso2 analysis.
+    ref_names : list of str
+        The list of reference names (amplicon names) in the same order as the input FASTA.
+    args : argparse.Namespace
+        The command-line arguments, used to get args.amplicon_coordinates.
+    vcf_path : str
+        The path to write the VCF file to.
+
+    Returns
+    -------
+    int
+        Solely for testing; the number of lines written to the VCF file (including header).
+    """
     try:
         all_coords = args.amplicon_coordinates.strip().split(',')
         if len(all_coords) != len(ref_names):
-            raise CRISPRessoShared.BadParameterException('Number of amplicon coordinates provided in --amplicon_coordinates does not match the number of amplicons provided.')
-        num_reads = df_alleles['#Reads'].sum()
+            raise CRISPRessoShared.BadParameterException(
+                f"Number of --amplicon_coordinates ({len(all_coords)}) does not match number of amplicons ({len(ref_names)})."
+            )
+
         amplicon_positions = {}
         for i, coord in enumerate(all_coords):
             chrom, pos_str = coord.strip().split(':')
             pos = int(pos_str)
-            key = ref_names[i]
-            amplicon_positions[key] = (chrom, pos)
-    except ValueError:
-        raise CRISPRessoShared.BadParameterException('Invalid format for --amplicon_coordinates.')
+            amplicon_positions[ref_names[i]] = (chrom, pos)
 
+    except ValueError:
+        raise CRISPRessoShared.BadParameterException("Invalid format for --amplicon_coordinates.")
+
+    # Denominator for AFs
+    num_reads = df_alleles['#Reads'].sum()
 
     alt_map = build_alt_map(df_alleles, amplicon_positions)
-    vcf_lines = vcf_text_from_alt_map(alt_map, num_reads, ref_names)
+    count = vcf_lines_from_alt_map(alt_map, num_reads, ref_names, vcf_path)
+
+    return count
