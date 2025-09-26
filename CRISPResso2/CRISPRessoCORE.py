@@ -25,11 +25,12 @@ from concurrent.futures import ProcessPoolExecutor, wait
 from datetime import datetime
 from functools import partial
 from multiprocessing import Process
+from contextlib import nullcontext
 
-from CRISPResso2 import CRISPRessoCOREResources
+from CRISPResso2 import (CRISPRessoCOREResources, CRISPRessoShared,
+                         CRISPRessoUtilities)
 from CRISPResso2.CRISPRessoCOREResources import ResultsSlotsDict
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
-from CRISPResso2 import CRISPRessoShared
 
 if CRISPRessoShared.is_C2Pro_installed():
     from CRISPRessoPro import __version__ as CRISPRessoProVersion
@@ -37,8 +38,7 @@ if CRISPRessoShared.is_C2Pro_installed():
 else:
     C2PRO_INSTALLED = False
 
-from CRISPResso2 import CRISPResso2Align
-from CRISPResso2 import CRISPRessoMultiProcessing
+from CRISPResso2 import CRISPResso2Align, CRISPRessoMultiProcessing
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -136,8 +136,6 @@ def get_n_reads_bam(bam_filename,bam_chr_loc=""):
     except ValueError:
         raise CRISPRessoShared.InstallationException('Error when running the command:' + cmd + '\nCheck that samtools is installed correctly.')
     return retval
-
-
 pd=check_library('pandas')
 np=check_library('numpy')
 
@@ -2638,6 +2636,12 @@ def main():
             crispresso2_info['bam_output'] = bam_output
             info('Writing bam output file: ' + bam_output)
 
+        if args.vcf_output:
+            if args.amplicon_coordinates == "":
+                raise CRISPRessoShared.BadParameterException('Please provide the coordinates of the VCF file using the --amplicon_coordinates parameter.')
+
+
+
 
         #### ASSERT GUIDE(S)
         guides = []
@@ -4498,6 +4502,17 @@ def main():
 
         info('Saving processed data...')
 
+        if args.vcf_output:
+            # TODO delete after ensuring this is vestigial
+            qwc_indexes = {}
+            for ref_name in ref_names:
+                qwc_indexes[ref_name] = refs[ref_name]['include_idxs']
+            # TODO add this path to crispresso2_info
+            vcf_path = os.path.join(OUTPUT_DIRECTORY, "amplicon_variants.vcf")
+            CRISPRessoUtilities.write_vcf_file(df_alleles, ref_names, args, vcf_path)
+        # write the allele frequency table
+        df_alleles.to_csv(_jp('Alleles_frequency_table.csv'), sep='\t', header=True, index=None)
+
         #write alleles table
         #crispresso1Cols = ["Aligned_Sequence","Reference_Sequence","NHEJ","UNMODIFIED","HDR","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
         #df_alleles.loc[:,crispresso1Cols].to_csv(_jp('Alleles_frequency_table.txt'),sep='\t',header=True,index=None)
@@ -5598,7 +5613,7 @@ def main():
             if not args.crispresso1_mode and args.base_editor_output:
                 if not args.suppress_plots:
 
-                    
+
                     fig_filename_root= _jp('10a.'+ref_plot_name+'Substitution_frequencies_at_each_bp')
                     plot_10a_input = {
                         'ref_len': ref_len,
@@ -5654,7 +5669,7 @@ def main():
                     crispresso2_info['results']['refs'][ref_name]['plot_10c_root'] = os.path.basename(fig_filename_root)
                     crispresso2_info['results']['refs'][ref_name]['plot_10c_caption'] = "Figure 10c: Substitution frequencies in the quantification window"
                     crispresso2_info['results']['refs'][ref_name]['plot_10c_data'] = [('Nucleotide frequencies in quantification window', os.path.basename(quant_window_sub_freq_filename))]
-                    
+
                     plot_half_window = max(1, args.plot_window_size)
                     df_alleles_around_cut = CRISPRessoShared.get_base_edit_dataframe_around_cut(df_alleles.loc[df_alleles['Reference_Name'] == ref_name], args.conversion_nuc_from)
                     count_total = counts_total[ref_name]
@@ -5695,7 +5710,7 @@ def main():
                         for ind, a in enumerate(refs[ref_name]['sequence'], start=1):
                             if a == args.conversion_nuc_from:
                                 x_labels.append(ind)
-                        
+
                         plot_10h_input = {
                             'reference_seq': ref_seq_around_cut,
                             'prepped_df_alleles': prepped_df_alleles,
@@ -6048,7 +6063,7 @@ def main():
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_roots'].append(os.path.basename(fig_root_10i))
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'].append(f"Figure 10i: Upset plot of Base Edits for {args.conversion_nuc_from} around cut site for {sgRNA_legend}. Each dot matrix at the bottom represents a specific combination of base edits (colored by target position), and the bar plot at the top shows the number of reads with each combination.")
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.' + sgRNA_label + '.binary_allele_counts.txt')])
-                            
+
             if refs[ref_name]['contains_coding_seq']:
                 for i, coding_seq in enumerate(coding_seqs):
                     fig_filename_root = _jp('9a.'+ref_plot_name+'amino_acid_table_around_'+coding_seq)
