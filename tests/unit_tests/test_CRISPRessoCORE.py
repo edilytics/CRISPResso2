@@ -719,6 +719,7 @@ def test_write_base_edit_counts():
         else:
             assert False
 
+
 if __name__ == "__main__":
 # execute only if run as a script
     test_get_consensus_alignment_from_pairs()
