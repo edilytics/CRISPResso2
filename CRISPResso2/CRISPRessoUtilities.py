@@ -1,14 +1,14 @@
 from collections import defaultdict
 from contextlib import nullcontext
 
-from CRISPResso2 import (CRISPRessoCOREResources, CRISPRessoShared,
-                         CRISPRessoUtilities)
+from CRISPResso2 import CRISPRessoShared
 
 
 def _ref_length_from_positions(ref_positions):
     """Infer true reference length from the max non-negative position."""
     nonneg = [p for p in ref_positions if p >= 0]
     return (max(nonneg) + 1) if nonneg else 0
+
 
 def _deletion_bounds(ref_positions, start_ref_pos, end_ref_pos_excl):
     """Return (left_char_idx, right_char_idx) to slice the Reference_Sequence so that it yields exactly the deleted span [start, end)."""
@@ -17,6 +17,7 @@ def _deletion_bounds(ref_positions, start_ref_pos, end_ref_pos_excl):
     # Works even when end == ref_len, because we use (end-1) as the right anchor.
     right = ref_positions.index(right_anchor) + 1
     return left, right
+
 
 def _process_deletions(row, chrom, pos, alt_map):
     ref_positions = row["ref_positions"]
@@ -45,6 +46,7 @@ def _process_deletions(row, chrom, pos, alt_map):
             alt_edit=deleted_edit,
             reads=reads,
         )
+
 
 def _process_insertions(row, chrom, pos, alt_map):
     """Uses ref_positions and insertion_coordinates to find the correct original base, returning the aln_edit object."""
@@ -294,6 +296,7 @@ def vcf_lines_from_alt_map(alt_map, num_reads, ref_names, vcf_path):
             f.write(_write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads, ref_names) + "\n")
             counter += 1
     return counter
+
 
 def write_vcf_file(df_alleles, ref_names, args, vcf_path):
     """Orchestrates: parse amplicon coordinates, build alt_map, make VCF, and write to file.
