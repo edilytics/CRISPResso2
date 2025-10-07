@@ -436,33 +436,33 @@ def test_build_alt_map_fidelity_like_real_row():
 
 
 def test_aln_to_alt_map_to_vcf():
-    ref1 = 'ATGCGTAC'
-    aln1 = 'ATGCG-AC'
+    ref1 = 'AATGCGTAC'
+    aln1 = 'AATGCG-AC'
     #            ^ Interested in this deletion across each of these examples
     payload1 = find_indels_substitutions(aln1, ref1, list(range(len(ref1)))).__dict__
     payload1['Reference_Sequence'] = ref1
     payload1['Aligned_Sequence'] = aln1
 
-    ref2 = 'A--TGCGTAC'
-    aln2 = 'ATTTGCG-AC'
+    ref2 = 'AA--TGCGTAC'
+    aln2 = 'AATTTGCG-AC'
     payload2 = find_indels_substitutions(aln2, ref2, list(range(len(ref2)))).__dict__
     payload2['Reference_Sequence'] = ref2
     payload2['Aligned_Sequence'] = aln2
 
-    ref3 = 'ATGCGTAC'
-    aln3 = 'A-GCG-AC'
+    ref3 = 'AATGCGTAC'
+    aln3 = 'AA-GCG-AC'
     payload3 = find_indels_substitutions(aln3, ref3, list(range(len(ref3)))).__dict__
     payload3['Reference_Sequence'] = ref3
     payload3['Aligned_Sequence'] = aln3
 
-    ref4 = 'ATG--CGTAC'
-    aln4 = 'A-GAACG-AC'
+    ref4 = 'AATG--CGTAC'
+    aln4 = 'AA-GAACG-AC'
     payload4 = find_indels_substitutions(aln4, ref4, list(range(len(ref4)))).__dict__
     payload4['Reference_Sequence'] = ref4
     payload4['Aligned_Sequence'] = aln4
 
-    ref5 = 'A--TGCGTAC'
-    aln5 = 'ATTTGCG-GG'
+    ref5 = 'AA--TGCGTAC'
+    aln5 = 'AATTTGCG-GG'
     payload5 = find_indels_substitutions(aln5, ref5, list(range(len(ref5)))).__dict__
     payload5['Reference_Sequence'] = ref5
     payload5['Aligned_Sequence'] = aln5
@@ -486,19 +486,21 @@ def test_aln_to_alt_map_to_vcf():
     amplicon_positions = {"Reference": (1, 1)}
     alt_map = utilities.build_alt_map(df, amplicon_positions)
 
-    # the deletion at position 5 in each example above, should occur 5 times
-    assert alt_map[(1, 6)] == {'ref_seq': 'GT', 'alt_edits': [['delete', 'T', 5]]}
-    # insertion of TT occurs 2 times in 2, 5 and deletion occurs 2 times in 3, 4
-    assert alt_map[(1, 1)] == {'ref_seq': 'AT', 'alt_edits': [['insert', 'TT', 2], ['delete', 'T', 2]]}
+    # deletion at position 5 in each example above, should occur 5 times
+    assert alt_map[(1, 7)] == {'ref_seq': 'GT', 'alt_edits': [['delete', 'T', 5]]}
+    # insertion of TT occurs 2 times in 2, 5 and
+    assert alt_map[(1, 2)] == {'ref_seq': 'A', 'alt_edits': [['insert', 'TT', 2]]}
+    # deletion of T occurs 2 times in 3, 4
+    assert alt_map[(1, 3)] == {'ref_seq': 'AT', 'alt_edits': [['delete', 'T', 2]]}
     # insertion of AA occurs 1 time in 4
-    assert alt_map[(1, 3)] == {'ref_seq': 'G', 'alt_edits': [['insert', 'AA', 1]]}
+    assert alt_map[(1, 4)] == {'ref_seq': 'G', 'alt_edits': [['insert', 'AA', 1]]}
     # substitution of A -> G occurs 1 time in 5
-    assert alt_map[(1, 7)] == {'ref_seq': 'A', 'alt_edits': [['sub', 'G', 1]]}
+    assert alt_map[(1, 8)] == {'ref_seq': 'A', 'alt_edits': [['sub', 'G', 1]]}
     # substitution of C -> G occurs 1 time in 5
-    assert alt_map[(1, 8)] == {'ref_seq': 'C', 'alt_edits': [['sub', 'G', 1]]}
+    assert alt_map[(1, 9)] == {'ref_seq': 'C', 'alt_edits': [['sub', 'G', 1]]}
 
-    # temp_vcf_path = 'aln_to_alt_map_to_vcf.vcf'
-    # num_vcf_rows = utilities.vcf_lines_from_alt_map(alt_map, 5, ['Reference'], temp_vcf_path)
-    # assert num_vcf_rows == len(alt_map)
+    temp_vcf_path = 'aln_to_alt_map_to_vcf.vcf'
+    num_vcf_rows = utilities.vcf_lines_from_alt_map(alt_map, 5, ['Reference'], temp_vcf_path)
+    assert num_vcf_rows == len(alt_map)
 
     # os.remove(temp_vcf_path)

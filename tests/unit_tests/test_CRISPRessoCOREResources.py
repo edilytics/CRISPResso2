@@ -1,4 +1,24 @@
+import pytest
+
 from CRISPResso2 import CRISPRessoCOREResources
+
+
+# This test should pass, but currently doesn't
+@pytest.mark.skip
+def test_find_indels_substitutions_second_del():
+    ref = 'ATGCGTAC'
+    aln = 'A-GCGTAC'
+    payload = CRISPRessoCOREResources.find_indels_substitutions(aln, ref, list(range(len(ref))))
+    assert payload['deletion_coordinates'] == [(1, 2)]
+
+
+def test_find_indels_substitutions_first_del():
+    ref = 'ATGCGTAC'
+    aln = '-TGCGTAC'
+    payload = CRISPRessoCOREResources.find_indels_substitutions(aln, ref, list(range(len(ref))))
+    assert payload['deletion_coordinates'] == [(0, 1)]
+
+
 
 def test_find_indels_substitutions():
     # no insertion or deletion
