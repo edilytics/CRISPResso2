@@ -467,6 +467,14 @@ def test_aln_to_alt_map_ins_del_same_pos():
     assert list(alt_map.keys()) == [(1, 2)]
     assert alt_map[(1, 2)] == {'ref_seq': 'ATG', 'alt_edits': [['delete', 'TG', 1], ['insert', 'TT', 1]]}
 
+    temp_vcf_path = 'aln_to_alt_map_ins_del_same_pos.vcf'
+    num_reads = 5
+    num_vcf_rows = utilities.vcf_lines_from_alt_map(alt_map, num_reads, ['Reference'], temp_vcf_path)
+    assert num_vcf_rows == len(alt_map)
+
+    # TODO add checks to the contents of the VCF file
+    os.remove(temp_vcf_path)
+
 
 def test_aln_to_alt_map_to_vcf():
     ref1 = 'AATGCGTAC'
@@ -532,7 +540,18 @@ def test_aln_to_alt_map_to_vcf():
     assert alt_map[(1, 9)] == {'ref_seq': 'C', 'alt_edits': [['sub', 'G', 1]]}
 
     temp_vcf_path = 'aln_to_alt_map_to_vcf.vcf'
-    num_vcf_rows = utilities.vcf_lines_from_alt_map(alt_map, 5, ['Reference'], temp_vcf_path)
+    num_reads = 5
+    num_vcf_rows = utilities.vcf_lines_from_alt_map(alt_map, num_reads, ['Reference'], temp_vcf_path)
     assert num_vcf_rows == len(alt_map)
 
-    # os.remove(temp_vcf_path)
+    with open(temp_vcf_path, 'r') as fh:
+        vcf_contents = fh.read()
+
+    assert '\t'.join(('1', '7', '.', 'GT', 'G', '.', 'PASS', f'AF={5 / num_reads}')) in vcf_contents
+    # TODO once things are fixed above, add what it should look like in the VCF
+    # assert '\t'.join(('1', '2', '.', 'A', 'ATT', '.', 'PASS', f'AF={2 / num_reads}')) in vcf_contents
+    assert '\t'.join(('1', '4', '.', 'G', 'GAA', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
+    assert '\t'.join(('1', '8', '.', 'A', 'G', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
+    assert '\t'.join(('1', '9', '.', 'C', 'G', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
+
+    os.remove(temp_vcf_path)
