@@ -464,7 +464,7 @@ def test_aln_to_alt_map_ins_del_same_pos():
     amplicon_positions = {"Reference": (1, 1)}
     alt_map = utilities.build_alt_map(df, amplicon_positions)
 
-    assert alt_map.keys() == [(1, 2)]
+    assert list(alt_map.keys()) == [(1, 2)]
     assert alt_map[(1, 2)] == {'ref_seq': 'ATG', 'alt_edits': [['delete', 'TG', 1], ['insert', 'TT', 1]]}
 
 
