@@ -10,7 +10,7 @@ def reconstitute_reads(crispresso_output_folder, fastq_output_file):
     print('Processing ' + crispresso_output_folder)
     crispresso2_info = CRISPRessoShared.load_crispresso_info(crispresso_output_folder)
 
-    total_alinged_reads = crispresso2_info['running_info']['alignment_stats']['N_CACHED_ALN'] + crispresso2_info['running_info']['alignment_stats']['N_COMPUTED_ALN']
+    total_aligned_reads = crispresso2_info['running_info']['alignment_stats']['N_CACHED_ALN'] + crispresso2_info['running_info']['alignment_stats']['N_COMPUTED_ALN']
 
     z = zipfile.ZipFile(os.path.join(crispresso_output_folder, crispresso2_info['running_info']['allele_frequency_table_zip_filename']))
     zf = z.open(crispresso2_info['running_info']['allele_frequency_table_filename'])
@@ -18,10 +18,12 @@ def reconstitute_reads(crispresso_output_folder, fastq_output_file):
 
     if df_alleles.shape[0] == 0:
         raise Exception('No alleles found in allele frequency table.')
-    if df_alleles.columns[0] != '#Reads':
-        raise Exception('Cannot parse allele frequency table, unexpected first column: ' + df_alleles.columns[0])
-    if df_alleles.columns[1] != 'Aligned_Sequence':
-        raise Exception('Cannot parse allele frequency table, unexpected second column: ' + df_alleles.columns[1])
+    if '#Reads' not in df_alleles.columns:
+        raise Exception('Cannot parse allele frequency table, missing #Reads column.')
+    if 'Aligned_Sequence' not in df_alleles.columns:
+        raise Exception('Cannot parse allele frequency table, missing Aligned_Sequence column.')
+    if 'Reference_Sequence' not in df_alleles.columns:
+        raise Exception('Cannot parse allele frequency table, missing Reference_Sequence column.')
 
     with open(fastq_output_file, "wt") as fout:
         allele_count = 0
@@ -38,8 +40,8 @@ def reconstitute_reads(crispresso_output_folder, fastq_output_file):
                 read_count += 1
             allele_count += 1
     print(f"Wrote {allele_count} alleles in {read_count} reads to {fastq_output_file}")
-    if read_count != total_alinged_reads:
-        print(f"Warning: total reads written ({read_count}) does not match total aligned reads ({total_alinged_reads})")
+    if read_count != total_aligned_reads:
+        print(f"Warning: total reads written ({read_count}) does not match total aligned reads ({total_aligned_reads})")
 
 
 if __name__ == "__main__":
