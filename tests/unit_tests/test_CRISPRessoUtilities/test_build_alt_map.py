@@ -435,6 +435,39 @@ def test_build_alt_map_fidelity_like_real_row():
     assert _normalize(out) == _normalize(expected)
 
 
+def test_aln_to_alt_map_ins_del_same_pos():
+    ref1 = 'AATGCGTAC'
+    aln1 = 'AA--CGTAC'
+    payload1 = find_indels_substitutions(aln1, ref1, list(range(len(ref1)))).__dict__
+    payload1['Reference_Sequence'] = ref1
+    payload1['Aligned_Sequence'] = aln1
+
+    ref2 = 'AA--TGCGTAC'
+    aln2 = 'AATTTGCGTAC'
+    payload2 = find_indels_substitutions(aln2, ref2, list(range(len(ref2)))).__dict__
+    payload2['Reference_Sequence'] = ref2
+    payload2['Aligned_Sequence'] = aln2
+
+    rows = [
+        payload1,
+        payload2,
+    ]
+
+    for row in rows:
+        row['#Reads'] = 1
+        row['Reference_Name'] = 'Reference'
+        row['n_inserted'] = row['insertion_n']
+        row['n_deleted'] = row['deletion_n']
+        row['n_mutated'] = row['substitution_n']
+
+    df = pd.DataFrame(rows)
+    amplicon_positions = {"Reference": (1, 1)}
+    alt_map = utilities.build_alt_map(df, amplicon_positions)
+
+    assert alt_map.keys() == [(1, 2)]
+    assert alt_map[(1, 2)] == {'ref_seq': 'ATG', 'alt_edits': [['delete', 'TG', 1], ['insert', 'TT', 1]]}
+
+
 def test_aln_to_alt_map_to_vcf():
     ref1 = 'AATGCGTAC'
     aln1 = 'AATGCG-AC'
