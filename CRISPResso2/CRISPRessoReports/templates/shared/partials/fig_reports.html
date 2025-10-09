@@ -10,7 +10,7 @@
         {% else %}
             {% set width = '100%' %}
         {% endif %}
-    
+
     {#- elif '9a' in fig_name -%}
         {% set coding_seq_length = report_data['run_data']['running_info']['coding_seqs'][seq_itr]|length|int %}
         {% if 30 > (coding_seq_length // 3) and (coding_seq_length //3) > 17%}

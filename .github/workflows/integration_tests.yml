@@ -80,6 +80,11 @@ jobs:
         run: |
           make prime-editor test print
 
+      - name: Run Base Editor
+        if: success() || failure()
+        run: |
+          make base_editor test print
+
       - name: Run Native Merging
         if: success() || failure()
         run: |
