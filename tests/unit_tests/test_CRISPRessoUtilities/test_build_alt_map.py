@@ -527,8 +527,8 @@ def test_aln_to_alt_map_to_vcf():
     amplicon_positions = {"Reference": (1, 1)}
     alt_map = utilities.build_alt_map(df, amplicon_positions)
 
-    # deletion at position 5 in each example above, should occur 5 times
-    assert alt_map[(1, 7)] == {'ref_seq': 'GT', 'alt_edits': [['delete', 'T', 5]]}
+    # deletion at position 9 (1-based) in each example above, should occur 5 times
+    assert alt_map[(1, 8)] == {'ref_seq': 'GT', 'alt_edits': [['delete', 'T', 5]]}
     # insertion of TT occurs 2 times in 2, 5 and deletion of T occurs 2 times in 3, 4
     # I'm not entirely certain what the ref_seq should be in this case... but I do know that there should be a deletion in the alt_edits
     assert alt_map[(1, 2)] == {'ref_seq': 'A', 'alt_edits': [['insert', 'TT', 2], ['delete', 'T', 2]]}
