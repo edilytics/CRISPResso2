@@ -57,7 +57,6 @@ def test_alt_seq_from_edit_errors(ref_seq, edit_type, alt_edit):
     with pytest.raises(CRISPRessoShared.BadParameterException):
         utilities._alt_seq_from_edit(ref_seq, edit_type, alt_edit)
 
-
 # ----------------------------- _write_vcf_line -----------------------------
 
 @pytest.mark.parametrize(

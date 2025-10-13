@@ -318,6 +318,16 @@ def test_build_alt_map_insertions(rows, amplicon_positions, expected):
     out = utilities.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
+
+def test_upsert_edit_del_and_ins():
+    alt_map = {
+        ('chrX', 10): {
+            'ref_seq': 'AT', 'alt_edits': [['delete', 'T', 2]]
+        },
+    }
+    utilities._upsert_edit(alt_map, ('chrX', 10), 'AT', 'insert', 'TT', 2)
+    assert alt_map[('chrX', 10)] == {'ref_seq': 'AT', 'alt_edits': [['delete', 'T', 2], ['insert', 'TT', 2]]}
+
 # ----------------------------- multiple amplicons & coordinate offsets -----------------------------
 
 @pytest.mark.parametrize(
@@ -486,7 +496,7 @@ def test_aln_to_alt_map_to_vcf():
     payload1['Aligned_Sequence'] = aln1
 
     ref2 = 'AA--TGCGTAC'
-    aln2 = 'AATTTGCG-AC'
+    aln2 = 'AAGGTGCG-AC'
     payload2 = find_indels_substitutions(aln2, ref2, list(range(len(ref2)))).__dict__
     payload2['Reference_Sequence'] = ref2
     payload2['Aligned_Sequence'] = aln2
@@ -504,7 +514,7 @@ def test_aln_to_alt_map_to_vcf():
     payload4['Aligned_Sequence'] = aln4
 
     ref5 = 'AA--TGCGTAC'
-    aln5 = 'AATTTGCG-GG'
+    aln5 = 'AAGGTGCG-GG'
     payload5 = find_indels_substitutions(aln5, ref5, list(range(len(ref5)))).__dict__
     payload5['Reference_Sequence'] = ref5
     payload5['Aligned_Sequence'] = aln5
@@ -531,7 +541,7 @@ def test_aln_to_alt_map_to_vcf():
     # deletion at position 7 (1-based) in each example above, should occur 5 times
     assert alt_map[(1, 6)] == {'ref_seq': 'GT', 'alt_edits': [['delete', 'T', 5]]}
     # insertion of TT occurs 2 times in 2, 5 and deletion of T occurs 2 times in 3, 4
-    assert alt_map[(1, 2)] == {'ref_seq': 'AT', 'alt_edits': [['insert', 'TT', 2], ['delete', 'T', 2]]}
+    assert alt_map[(1, 2)] == {'ref_seq': 'AT', 'alt_edits': [['insert', 'GG', 2], ['delete', 'T', 2]]}
     # insertion of AA occurs 1 time in 4
     assert alt_map[(1, 4)] == {'ref_seq': 'G', 'alt_edits': [['insert', 'AA', 1]]}
     # substitution of A -> G occurs 1 time in 5
@@ -548,8 +558,7 @@ def test_aln_to_alt_map_to_vcf():
         vcf_contents = fh.read()
 
     assert '\t'.join(('1', '6', '.', 'GT', 'G', '.', 'PASS', f'AF={5 / num_reads}')) in vcf_contents
-    # TODO once things are fixed above, add what it should look like in the VCF
-    assert '\t'.join(('1', '2', '.', 'AT', 'A,ATT', '.', 'PASS', f'AF={2 / num_reads},{2 / num_reads}')) in vcf_contents
+    assert '\t'.join(('1', '2', '.', 'AT', 'A,AGGT', '.', 'PASS', f'AF={2 / num_reads:.3f},{2 / num_reads:.3f}')) in vcf_contents
     assert '\t'.join(('1', '4', '.', 'G', 'GAA', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
     assert '\t'.join(('1', '8', '.', 'A', 'G', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
     assert '\t'.join(('1', '9', '.', 'C', 'G', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents

@@ -170,7 +170,7 @@ def build_alt_map(df_alleles, amplicon_positions):
         ref_name = row["Reference_Name"]
         chrom, pos = amplicon_positions[ref_name]
 
-        # Process each edit class
+        # Process each edit class, make sure that you always process deletions first, as it will set the proper reference length
         _process_deletions(row, chrom, pos, alt_map)
         _process_insertions(row, chrom, pos, alt_map)
         _process_substitutions(row, chrom, pos, alt_map)
@@ -183,7 +183,7 @@ def _alt_seq_from_edit(ref_seq, edit_type, alt_edit):
 
     - Insertions: keep left anchor (ref_seq[0]), inject inserted bases, then append any trailing ref context.
         (appending additional context will only occur if there's also a deletion at this position)
-    - Deletions: drop exactly len(alt_edit) bases immediately after the left anchor then append any remaining sequences in ref_seq
+    - Deletions: drop exactly len(alt_edit) bases immediately after the left anchor then append any remaining sequences in ref_seq.
         (this will only occur if there's another deletion with a longer span).
     - Substitutions: replace the left anchor base with the alt base, append trailing ref context.
 
