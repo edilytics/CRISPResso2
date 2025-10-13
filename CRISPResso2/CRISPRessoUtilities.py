@@ -10,33 +10,22 @@ def _ref_length_from_positions(ref_positions):
     return (max(nonneg) + 1) if nonneg else 0
 
 
-def _deletion_bounds(ref_positions, start_ref_pos, end_ref_pos_excl):
-    """Return (left_char_idx, right_char_idx) to slice the Reference_Sequence so that it yields exactly the deleted span [start, end)."""
-    left = ref_positions.index(start_ref_pos)
-    right_anchor = end_ref_pos_excl - 1
-    # Works even when end == ref_len, because we use (end-1) as the right anchor.
-    right = ref_positions.index(right_anchor) + 1
-    return left, right
-
-
 def _process_deletions(row, chrom, pos, alt_map):
     ref_positions = row["ref_positions"]
     ref_str = row["Reference_Sequence"]
     reads = row["#Reads"]
 
     for (start, end) in row["deletion_coordinates"]:
-        left_index = pos + start          # absolute 1-based coordinate
+        left_index = max(1, pos + start - 1)          # absolute 1-based coordinate
         key = (chrom, left_index)
 
-        # Slice the deleted span robustly
-        l_idx, r_idx = _deletion_bounds(ref_positions, start, end)
-        deleted_edit = ref_str[l_idx:r_idx]
+        if start == 0:
+            deleted_edit = ref_str[end]
+        else:
+            deleted_edit = ref_str[left_index:end]
 
         # ref_seq_for_key: left flank + deleted span (VCF-like), except when start==0 (no left flank)
-        if l_idx == 0:
-            ref_for_key = ref_str[l_idx:r_idx]               # no left flank available
-        else:
-            ref_for_key = ref_str[l_idx - 1:r_idx]           # include the base before the deletion
+        ref_for_key = ref_str[left_index - 1:end]
 
         _upsert_edit(
             alt_map,

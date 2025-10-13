@@ -110,8 +110,6 @@ def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
         "insertion_sizes": [len(ins_seq)],
     }
 
-
-
 # ----------------------------- core mixed case (old test modernized) -----------------------------
 
 @pytest.mark.parametrize(
@@ -135,8 +133,8 @@ def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
                     "ref_seq": "A",
                     "alt_edits": [["sub", "G", 1]],
                 },
-                # deletions at 1 + 19 = 20; longest ref_seq retained
-                (1, 20): {
+                # deletions at 19 (including the padding base, the deletion is at 20); longest ref_seq retained
+                (1, 19): {
                     "ref_seq": REF_SEQ[18:29],  # left flank + 10‑bp deleted block
                     "alt_edits": [
                         ["delete", REF_SEQ[19:20], 1],  # 1‑bp del
@@ -201,7 +199,7 @@ def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
             [make_del(19, 20, reads=1)],
             {"Reference": (1, 1)},
             {
-                (1, 20): {
+                (1, 19): {
                     "ref_seq": REF_SEQ[18:20],  # left flank + deleted
                     "alt_edits": [["delete", REF_SEQ[19:20], 1]],
                 }
@@ -212,7 +210,7 @@ def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
             [make_del(19, 20, reads=2), make_del(19, 20, reads=3)],
             {"Reference": (1, 1)},
             {
-                (1, 20): {
+                (1, 19): {
                     "ref_seq": REF_SEQ[18:20],
                     "alt_edits": [["delete", REF_SEQ[19:20], 5]],
                 }
@@ -223,7 +221,7 @@ def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
             [make_del(19, 20, reads=1), make_del(19, 29, reads=1)],
             {"Reference": (1, 1)},
             {
-                (1, 20): {
+                (1, 19): {
                     "ref_seq": REF_SEQ[18:29],  # longest window observed at this key
                     "alt_edits": [
                         ["delete", REF_SEQ[19:20], 1],
@@ -237,7 +235,7 @@ def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
             [make_del(1, 2, reads=1)],
             {'Reference': (1, 1)},
             {
-                (1, 2): {
+                (1, 1): {
                     "ref_seq": REF_SEQ[0:2],
                     "alt_edits": [["delete", REF_SEQ[1:2], 1]],
                 }
@@ -258,7 +256,7 @@ def test_build_alt_map_deletions(rows, amplicon_positions, expected):
             [make_del(39, 40, reads=1)],
             {"Reference": (1, 1)},
             {
-                (1, 40): {
+                (1, 39): {
                     "ref_seq": REF_SEQ[38:40],
                     "alt_edits": [["delete", REF_SEQ[39:40], 1]],
                 }
@@ -273,14 +271,17 @@ def test_build_alt_map_deletion_end_at_len_raises(rows, amplicon_positions, expe
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
 def test_build_alt_map_deletion_start_at_zero_should_anchor_correctly():
+    """When a deletion occurs at the start of a sequence, then you record the base after the deletion.
+
+    Source: https://bioinformatics.stackexchange.com/questions/2476/how-to-represent-a-deletion-at-position-1-in-a-vcf-file
+    """
     df = df_from_rows(make_del(0, 3, reads=1))  # delete first 3 bases
     amplicon_positions = {"Reference": (1, 1)}
     out = utilities.build_alt_map(df, amplicon_positions)
-    # Desired behavior: ref_seq is just the deleted span (no left flank available)
     expected = {
         (1, 1): {
             "ref_seq": REF_SEQ[0:3],
-            "alt_edits": [["delete", REF_SEQ[0:3], 1]],
+            "alt_edits": [["delete", REF_SEQ[3], 1]],
         }
     }
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
@@ -479,7 +480,7 @@ def test_aln_to_alt_map_ins_del_same_pos():
 def test_aln_to_alt_map_to_vcf():
     ref1 = 'AATGCGTAC'
     aln1 = 'AATGCG-AC'
-    #            ^ Interested in this deletion across each of these examples
+    #             ^ Interested in this deletion across each of these examples
     payload1 = find_indels_substitutions(aln1, ref1, list(range(len(ref1)))).__dict__
     payload1['Reference_Sequence'] = ref1
     payload1['Aligned_Sequence'] = aln1
@@ -527,11 +528,10 @@ def test_aln_to_alt_map_to_vcf():
     amplicon_positions = {"Reference": (1, 1)}
     alt_map = utilities.build_alt_map(df, amplicon_positions)
 
-    # deletion at position 9 (1-based) in each example above, should occur 5 times
-    assert alt_map[(1, 8)] == {'ref_seq': 'GT', 'alt_edits': [['delete', 'T', 5]]}
+    # deletion at position 7 (1-based) in each example above, should occur 5 times
+    assert alt_map[(1, 6)] == {'ref_seq': 'GT', 'alt_edits': [['delete', 'T', 5]]}
     # insertion of TT occurs 2 times in 2, 5 and deletion of T occurs 2 times in 3, 4
-    # I'm not entirely certain what the ref_seq should be in this case... but I do know that there should be a deletion in the alt_edits
-    assert alt_map[(1, 2)] == {'ref_seq': 'A', 'alt_edits': [['insert', 'TT', 2], ['delete', 'T', 2]]}
+    assert alt_map[(1, 2)] == {'ref_seq': 'AT', 'alt_edits': [['insert', 'TT', 2], ['delete', 'T', 2]]}
     # insertion of AA occurs 1 time in 4
     assert alt_map[(1, 4)] == {'ref_seq': 'G', 'alt_edits': [['insert', 'AA', 1]]}
     # substitution of A -> G occurs 1 time in 5
@@ -547,9 +547,9 @@ def test_aln_to_alt_map_to_vcf():
     with open(temp_vcf_path, 'r') as fh:
         vcf_contents = fh.read()
 
-    assert '\t'.join(('1', '7', '.', 'GT', 'G', '.', 'PASS', f'AF={5 / num_reads}')) in vcf_contents
+    assert '\t'.join(('1', '6', '.', 'GT', 'G', '.', 'PASS', f'AF={5 / num_reads}')) in vcf_contents
     # TODO once things are fixed above, add what it should look like in the VCF
-    # assert '\t'.join(('1', '2', '.', 'A', 'ATT', '.', 'PASS', f'AF={2 / num_reads}')) in vcf_contents
+    assert '\t'.join(('1', '2', '.', 'AT', 'A,ATT', '.', 'PASS', f'AF={2 / num_reads},{2 / num_reads}')) in vcf_contents
     assert '\t'.join(('1', '4', '.', 'G', 'GAA', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
     assert '\t'.join(('1', '8', '.', 'A', 'G', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
     assert '\t'.join(('1', '9', '.', 'C', 'G', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
