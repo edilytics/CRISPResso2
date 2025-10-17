@@ -4510,15 +4510,7 @@ def main():
             # TODO add this path to crispresso2_info
             vcf_path = os.path.join(OUTPUT_DIRECTORY, "amplicon_variants.vcf")
             CRISPRessoUtilities.write_vcf_file(df_alleles, ref_names, args, vcf_path)
-        # write the allele frequency table
-        df_alleles.to_csv(_jp('Alleles_frequency_table.csv'), sep='\t', header=True, index=None)
 
-        #write alleles table
-        #crispresso1Cols = ["Aligned_Sequence","Reference_Sequence","NHEJ","UNMODIFIED","HDR","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
-        #df_alleles.loc[:,crispresso1Cols].to_csv(_jp('Alleles_frequency_table.txt'),sep='\t',header=True,index=None)
-        #crispresso2Cols = ["Aligned_Sequence","Reference_Sequence","Reference_Name","Read_Status","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
-#        crispresso2Cols = ["Aligned_Sequence","Reference_Sequence","Reference_Name","Read_Status","n_deleted","n_inserted","n_mutated","#Reads","%Reads","Aligned_Reference_Names","Aligned_Reference_Scores"]
-#        crispresso2Cols = ["Read_Sequence","Amplicon_Sequence","Amplicon_Name","Read_Status","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
         crispresso2Cols = ["Aligned_Sequence", "Reference_Sequence", "Reference_Name", "Read_Status", "n_deleted", "n_inserted", "n_mutated", "#Reads", "%Reads"]
 
         allele_frequency_table_filename = 'Alleles_frequency_table.txt'
