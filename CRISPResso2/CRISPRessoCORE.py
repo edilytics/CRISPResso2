@@ -3909,7 +3909,7 @@ def main():
             hists_frameshift                    [ref_name] = Counter()
             hists_frameshift                    [ref_name][0] = 0
         #end initialize data structures for each ref
-        def get_allele_row(reference_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, write_detailed_allele_table):
+        def get_allele_row(reference_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload):
             """
             gets a row for storing allele information in the allele table
             parameters:
@@ -3922,7 +3922,7 @@ def main():
             returns:
                 row to put into allele table
             """
-            if args.write_detailed_allele_table:
+            if args.write_detailed_allele_table or args.vcf_output:
                 allele_row = {'#Reads':variant_count,
                     'Aligned_Sequence': variant_payload['aln_seq'],
                     'Reference_Sequence':variant_payload['aln_ref'],
@@ -3992,7 +3992,7 @@ def main():
             #if class is AMBIGUOUS (set above if the args.expand_ambiguous_alignments param is false) don't add the modifications in this allele to the allele summaries
             if class_name == "AMBIGUOUS":
                 variant_payload = variantCache[variant]["variant_"+aln_ref_names[0]]
-                allele_row = get_allele_row('AMBIGUOUS_'+aln_ref_names[0], variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, args.write_detailed_allele_table)
+                allele_row = get_allele_row('AMBIGUOUS_'+aln_ref_names[0], variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload)
                 alleles_list.append(allele_row)
                 continue #for ambiguous reads, don't add indels to reference totals
 
@@ -4001,7 +4001,7 @@ def main():
                 variant_payload = variantCache[variant]["variant_"+ref_name]
                 if args.discard_indel_reads and (variant_payload['deletion_n'] > 0 or variant_payload['insertion_n'] > 0):
                     counts_discarded[ref_name] += variant_count
-                    allele_row = get_allele_row('DISCARDED_'+aln_ref_names[0],variant_count,aln_ref_names_str,aln_ref_scores_str,variant_payload,args.write_detailed_allele_table)
+                    allele_row = get_allele_row('DISCARDED_'+aln_ref_names[0],variant_count,aln_ref_names_str,aln_ref_scores_str,variant_payload)
                     alleles_list.append(allele_row)
                     continue
 
@@ -4011,7 +4011,7 @@ def main():
                 else:
                     counts_unmodified[ref_name] += variant_count
 
-                allele_row = get_allele_row(ref_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, args.write_detailed_allele_table)
+                allele_row = get_allele_row(ref_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload)
                 alleles_list.append(allele_row)
 
                 this_effective_len= refs[ref_name]['sequence_length'] #how long is this alignment (insertions increase length, deletions decrease length)
