@@ -487,6 +487,19 @@ def test_aln_to_alt_map_ins_del_same_pos():
     os.remove(temp_vcf_path)
 
 
+def test_aln_to_alt_map_ins_then_del():
+    ref1 = 'AATTT---GCGTAC'
+    aln1 = 'AATTTCCCGCG---'
+
+    df = create_df_alleles((ref1, aln1))
+    amplicon_positions = {'Reference': (1, 1)}
+    alt_map = utilities.build_alt_map(df, amplicon_positions)
+
+    assert list(alt_map.keys()) == [(1, 8), (1, 5)]
+    assert alt_map[(1, 5)] == {'ref_seq': 'T', 'alt_edits': [['insert', 'CCC', 1]]}
+    assert alt_map[(1, 8)] == {'ref_seq': 'GTAC', 'alt_edits': [['delete', 'G', 1]]}
+
+
 def test_aln_to_alt_map_to_vcf():
     ref1 = 'AATGCGTAC'
     aln1 = 'AATGCG-AC'
