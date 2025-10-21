@@ -446,32 +446,32 @@ def test_build_alt_map_fidelity_like_real_row():
     assert _normalize(out) == _normalize(expected)
 
 
+def create_df_alleles(*refs_alns):
+    payloads = []
+    for ref, aln in refs_alns:
+        payload = find_indels_substitutions(aln, ref, list(range(len(ref)))).__dict__
+        payload['Reference_Sequence'] = ref
+        payload['Aligned_Sequence'] = aln
+        payloads += [payload]
+
+    for payload in payloads:
+        payload['#Reads'] = 1
+        payload['Reference_Name'] = 'Reference'
+        payload['n_inserted'] = payload['insertion_n']
+        payload['n_deleted'] = payload['deletion_n']
+        payload['n_mutated'] = payload['substitution_n']
+
+    return pd.DataFrame(payloads)
+
+
 def test_aln_to_alt_map_ins_del_same_pos():
     ref1 = 'AATGCGTAC'
     aln1 = 'AA--CGTAC'
-    payload1 = find_indels_substitutions(aln1, ref1, list(range(len(ref1)))).__dict__
-    payload1['Reference_Sequence'] = ref1
-    payload1['Aligned_Sequence'] = aln1
 
     ref2 = 'AA--TGCGTAC'
     aln2 = 'AATTTGCGTAC'
-    payload2 = find_indels_substitutions(aln2, ref2, list(range(len(ref2)))).__dict__
-    payload2['Reference_Sequence'] = ref2
-    payload2['Aligned_Sequence'] = aln2
 
-    rows = [
-        payload1,
-        payload2,
-    ]
-
-    for row in rows:
-        row['#Reads'] = 1
-        row['Reference_Name'] = 'Reference'
-        row['n_inserted'] = row['insertion_n']
-        row['n_deleted'] = row['deletion_n']
-        row['n_mutated'] = row['substitution_n']
-
-    df = pd.DataFrame(rows)
+    df = create_df_alleles((ref1, aln1), (ref2, aln2))
     amplicon_positions = {"Reference": (1, 1)}
     alt_map = utilities.build_alt_map(df, amplicon_positions)
 
@@ -491,50 +491,27 @@ def test_aln_to_alt_map_to_vcf():
     ref1 = 'AATGCGTAC'
     aln1 = 'AATGCG-AC'
     #             ^ Interested in this deletion across each of these examples
-    payload1 = find_indels_substitutions(aln1, ref1, list(range(len(ref1)))).__dict__
-    payload1['Reference_Sequence'] = ref1
-    payload1['Aligned_Sequence'] = aln1
 
     ref2 = 'AA--TGCGTAC'
     aln2 = 'AAGGTGCG-AC'
-    payload2 = find_indels_substitutions(aln2, ref2, list(range(len(ref2)))).__dict__
-    payload2['Reference_Sequence'] = ref2
-    payload2['Aligned_Sequence'] = aln2
 
     ref3 = 'AATGCGTAC'
     aln3 = 'AA-GCG-AC'
-    payload3 = find_indels_substitutions(aln3, ref3, list(range(len(ref3)))).__dict__
-    payload3['Reference_Sequence'] = ref3
-    payload3['Aligned_Sequence'] = aln3
 
     ref4 = 'AATG--CGTAC'
     aln4 = 'AA-GAACG-AC'
-    payload4 = find_indels_substitutions(aln4, ref4, list(range(len(ref4)))).__dict__
-    payload4['Reference_Sequence'] = ref4
-    payload4['Aligned_Sequence'] = aln4
 
     ref5 = 'AA--TGCGTAC'
     aln5 = 'AAGGTGCG-GG'
-    payload5 = find_indels_substitutions(aln5, ref5, list(range(len(ref5)))).__dict__
-    payload5['Reference_Sequence'] = ref5
-    payload5['Aligned_Sequence'] = aln5
 
-    rows = [
-        payload1,
-        payload2,
-        payload3,
-        payload4,
-        payload5,
-    ]
+    df = create_df_alleles(
+        (ref1, aln1),
+        (ref2, aln2),
+        (ref3, aln3),
+        (ref4, aln4),
+        (ref5, aln5),
+    )
 
-    for row in rows:
-        row['#Reads'] = 1
-        row['Reference_Name'] = 'Reference'
-        row['n_inserted'] = row['insertion_n']
-        row['n_deleted'] = row['deletion_n']
-        row['n_mutated'] = row['substitution_n']
-
-    df = pd.DataFrame(rows)
     amplicon_positions = {"Reference": (1, 1)}
     alt_map = utilities.build_alt_map(df, amplicon_positions)
 
