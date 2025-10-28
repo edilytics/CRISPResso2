@@ -26,17 +26,21 @@ def test_find_indels_substitutions_last_del():
     ref = 'ATGCGTAC'
     aln = 'ATGCGTA-'
     payload = CRISPRessoCOREResources.find_indels_substitutions(aln, ref, list(range(len(ref))))
-    assert payload['deletion_positions'] == [7]
-    assert payload['deletion_coordinates'] == [(7, 7)]
     assert payload['deletion_n'] == 1
+    assert payload['deletion_positions'] == [7]
+    assert payload['all_deletion_positions'] == [7]
+    assert payload['deletion_coordinates'] == [(7, 7)]
+    assert payload['all_deletion_coordinates'] == [(7, 7)]
 
 
 def test_find_indels_substitutions_last_2_del():
     ref = 'ATGCGTAC'
     aln = 'ATGCGT--'
     payload = CRISPRessoCOREResources.find_indels_substitutions(aln, ref, list(range(len(ref))))
-    assert payload['deletion_coordinates'] == [(6, 7)]
     assert payload['deletion_n'] == 2
+    assert payload['deletion_coordinates'] == [(6, 7)]
+    assert payload['all_deletion_coordinates'] == [(6, 7)]
+    assert payload['deletion_positions'] == [6, 7]
     assert payload['all_deletion_positions'] == [6, 7]
 
 
