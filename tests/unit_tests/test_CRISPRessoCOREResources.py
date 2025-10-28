@@ -184,7 +184,7 @@ def test_find_indels_substitutions():
         'insertion_coordinates': [(91, 92)],
         'insertion_sizes': [54],
         'insertion_n': 54,
-        'all_deletion_positions': [191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221],
+        'all_deletion_positions': [191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222],
         'all_deletion_coordinates': [(191, 222)],
         'deletion_positions': [],
         'deletion_coordinates': [],
