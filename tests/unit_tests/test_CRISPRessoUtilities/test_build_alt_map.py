@@ -109,8 +109,8 @@ def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
                     ],
                 },
                 # insertion after index 30 -> key (1, 32)
-                (1, 32): {
-                    "ref_seq": REF_SEQ[31],
+                (1, 31): {
+                    "ref_seq": REF_SEQ[30],
                     "alt_edits": [["insert", "GG", 1]],
                 },
             },
