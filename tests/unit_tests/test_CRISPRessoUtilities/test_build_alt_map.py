@@ -458,7 +458,7 @@ def test_aln_to_alt_map_ins_then_del():
 
     assert list(alt_map.keys()) == [(1, 8), (1, 5)]
     assert alt_map[(1, 5)] == {'ref_seq': 'T', 'alt_edits': [['insert', 'CCC', 1]]}
-    assert alt_map[(1, 8)] == {'ref_seq': 'GTAC', 'alt_edits': [['delete', 'G', 1]]}
+    assert alt_map[(1, 8)] == {'ref_seq': 'GTAC', 'alt_edits': [['delete', 'TAC', 1]]}
 
 
 def test_aln_to_alt_map_to_vcf():
