@@ -1,5 +1,27 @@
 from CRISPResso2 import CRISPRessoCOREResources
 
+
+def test_find_indels_substitutions_first_del():
+    ref = 'ATGCGTAC'
+    aln = '-TGCGTAC'
+    payload = CRISPRessoCOREResources.find_indels_substitutions(aln, ref, list(range(len(ref))))
+    assert payload['deletion_coordinates'] == [(0, 1)]
+
+
+def test_find_indels_substitutions_second_del():
+    ref = 'ATGCGTAC'
+    aln = 'A-GCGTAC'
+    payload = CRISPRessoCOREResources.find_indels_substitutions(aln, ref, list(range(len(ref))))
+    assert payload['deletion_coordinates'] == [(1, 2)]
+
+
+def test_find_indels_substitutions_third_del():
+    ref = 'ATGCGTAC'
+    aln = 'AT-CGTAC'
+    payload = CRISPRessoCOREResources.find_indels_substitutions(aln, ref, list(range(len(ref))))
+    assert payload['deletion_coordinates'] == [(2, 3)]
+
+
 def test_find_indels_substitutions():
     # no insertion or deletion
     payload = CRISPRessoCOREResources.find_indels_substitutions(
