@@ -152,13 +152,20 @@ def find_indels_substitutions(read_seq_al, ref_seq_al, _include_indx):
 
     if start_deletion != -1:
         end_deletion = ref_positions[seq_len - 1]
-        all_deletion_positions.extend(range(start_deletion, end_deletion))
-        all_deletion_coordinates.append((start_deletion, end_deletion))
-        if include_indx_set.intersection(range(start_deletion, end_deletion)):
-            deletion_positions.extend(range(start_deletion, end_deletion))
-            deletion_coordinates.append((start_deletion, end_deletion))
-            deletion_sizes.append(end_deletion - start_deletion)
-
+        if start_deletion == end_deletion:  # indicates a 1bp deletion at the end
+            all_deletion_positions.extend([start_deletion])
+            all_deletion_coordinates.append((start_deletion, end_deletion))
+            if include_indx_set.intersection([start_deletion]):
+                deletion_positions.extend([start_deletion])
+                deletion_coordinates.append((start_deletion, end_deletion))
+                deletion_sizes.append(1)
+        else:
+            all_deletion_positions.extend(range(start_deletion, end_deletion + 1))
+            all_deletion_coordinates.append((start_deletion, end_deletion))
+            if include_indx_set.intersection(range(start_deletion, end_deletion)):
+                deletion_positions.extend(range(start_deletion, end_deletion + 1))
+                deletion_coordinates.append((start_deletion, end_deletion))
+                deletion_sizes.append((end_deletion + 1) - start_deletion)
     cdef size_t substitution_n = len(substitution_positions)
     cdef size_t deletion_n = sum(deletion_sizes)
     cdef size_t insertion_n = sum(insertion_sizes)
