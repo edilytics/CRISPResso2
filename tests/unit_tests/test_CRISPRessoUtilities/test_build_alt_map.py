@@ -269,19 +269,19 @@ def test_build_alt_map_deletion_start_at_zero_should_anchor_correctly():
         (
             [make_ins(30, "GG", reads=1)],
             {"Reference": (1, 1)},
-            {(1, 32): {"ref_seq": REF_SEQ[31], "alt_edits": [["insert", "GG", 1]]}},
+            {(1, 31): {"ref_seq": REF_SEQ[30], "alt_edits": [["insert", "GG", 1]]}},
         ),
         # merge same inserted string and key (reads sum)
         (
             [make_ins(30, "GG", reads=2), make_ins(30, "GG", reads=3)],
             {"Reference": (1, 1)},
-            {(1, 32): {"ref_seq": REF_SEQ[31], "alt_edits": [["insert", "GG", 5]]}},
+            {(1, 31): {"ref_seq": REF_SEQ[30], "alt_edits": [["insert", "GG", 5]]}},
         ),
         # split different inserted strings at same key
         (
             [make_ins(30, "GG", reads=1), make_ins(30, "T", reads=1)],
             {"Reference": (1, 1)},
-            {(1, 32): {"ref_seq": REF_SEQ[31], "alt_edits": [["insert", "GG", 1], ["insert", "T", 1]]}},
+            {(1, 31): {"ref_seq": REF_SEQ[30], "alt_edits": [["insert", "GG", 1], ["insert", "T", 1]]}},
         ),
     ],
     ids=["ins_single", "ins_merge_same_seq", "ins_split_diff_seq"],
