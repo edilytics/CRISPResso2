@@ -320,8 +320,8 @@ def test_upsert_edit_del_and_ins():
             {
                 # SNP: chrom 1, pos = 1 + 2 = 3
                 (1, 3): {"ref_seq": REF_SEQ[2], "alt_edits": [["sub", "T", 1]]},
-                # insertion on chrom 2: left_index = 1000 + (0+1) = 1001
-                (2, 1001): {"ref_seq": REF_SEQ[1], "alt_edits": [["insert", "G", 2]]},
+                # insertion on chrom 2: left_index = 1000 + 0 = 1000
+                (2, 1000): {"ref_seq": REF_SEQ[0], "alt_edits": [["insert", "G", 2]]},
             },
         ),
     ],
