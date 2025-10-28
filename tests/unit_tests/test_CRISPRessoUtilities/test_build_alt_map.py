@@ -22,9 +22,6 @@ def _normalize_alt_map(alt_map):
         }
     return norm
 
-def df_from_rows(*rows):
-    return pd.DataFrame(list(rows))
-
 
 def create_df_alleles(*refs_alns):
     payloads = []
@@ -232,18 +229,28 @@ def test_build_alt_map_deletions(rows, amplicon_positions, expected):
     [
         (
             [make_del(39, 40, reads=1)],
+            {'Reference': (1, 1)},
+            {
+                (1, 39):{
+                    'ref_seq': REF_SEQ[38:40],
+                    'alt_edits': [['delete', REF_SEQ[39:49], 1]],
+                }
+            },
+        ),
+        (
+            [make_del(38, 40, reads=1)],
             {"Reference": (1, 1)},
             {
-                (1, 39): {
-                    "ref_seq": REF_SEQ[38:40],
-                    "alt_edits": [["delete", REF_SEQ[39:40], 1]],
+                (1, 38): {
+                    "ref_seq": REF_SEQ[37:40],
+                    "alt_edits": [["delete", REF_SEQ[38:40], 1]],
                 }
             },
         ),
     ],
+    ids=['last_element', 'second_to_last_element']
 )
 def test_build_alt_map_deletion_end_at_len_raises(rows, amplicon_positions, expected):
-    # delete last base: (39, 40) for a 40‑bp ref
     df = create_df_alleles(*rows)
     out = utilities.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)

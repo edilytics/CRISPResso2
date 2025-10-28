@@ -21,10 +21,13 @@ def _process_deletions(row, chrom, pos, alt_map):
         ref_start = ref_positions.index(start)
         ref_end = ref_positions.index(end)
 
-        if start == 0:
+        if start == 0:  # deletion at the start of a sequence
             deleted_edit = ref_str[ref_end]
             ref_for_key = ref_str[ref_start:ref_end]
-        else:
+        elif ref_end == len(ref_str) - 1:  # deletion at the end of a sequence
+            deleted_edit = ref_str[ref_start:ref_end + 1]
+            ref_for_key = ref_str[ref_start - 1:ref_end + 1]
+        else:  # deletion in the middle of a sequence
             deleted_edit = ref_str[ref_start:ref_end]
             ref_for_key = ref_str[ref_start - 1:ref_end]
 
