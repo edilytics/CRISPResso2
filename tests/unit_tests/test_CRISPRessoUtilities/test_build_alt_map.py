@@ -26,64 +26,43 @@ def df_from_rows(*rows):
     return pd.DataFrame(list(rows))
 
 
+def create_df_alleles(*refs_alns):
+    payloads = []
+    for ref, aln in refs_alns:
+        payload = find_indels_substitutions(aln, ref, list(range(len(ref)))).__dict__
+        payload['Reference_Sequence'] = ref
+        payload['Aligned_Sequence'] = aln
+        payloads += [payload]
+
+    for payload in payloads:
+        payload['#Reads'] = 1
+        payload['Reference_Name'] = 'Reference'
+        payload['n_inserted'] = payload['insertion_n']
+        payload['n_deleted'] = payload['deletion_n']
+        payload['n_mutated'] = payload['substitution_n']
+
+    return pd.DataFrame(payloads)
+
+
 # ----------------------------- alteration functions -----------------------------
 # These functions are used throughout the tests to alter the base REF_SEQ before calling build_alt_map.
 
 def make_unmodified(reads=1, ref_name="Reference"):
     """Unmodified read identical to REF_SEQ."""
-    return {
-        "#Reads": reads,
-        "Aligned_Sequence": REF_SEQ,
-        "Reference_Sequence": REF_SEQ,
-        "n_inserted": 0,
-        "n_deleted": 0,
-        "n_mutated": 0,
-        "Reference_Name": ref_name,
-        "ref_positions": REF_POSITIONS,
-        "insertion_coordinates": [],
-        "deletion_coordinates": [],
-        "substitution_positions": [],
-        "insertion_sizes": [],
-    }
+    return (REF_SEQ, REF_SEQ)
 
 
 def make_sub(position, alt_base, reads=1, ref_name="Reference"):
     """Single‑nucleotide substitution at 0‑based ref index 'position'."""
     aligned = REF_SEQ[:position] + alt_base + REF_SEQ[position + 1 :]
-    return {
-        "#Reads": reads,
-        "Aligned_Sequence": aligned,
-        "Reference_Sequence": REF_SEQ,
-        "n_inserted": 0,
-        "n_deleted": 0,
-        "n_mutated": 1,
-        "Reference_Name": ref_name,
-        "ref_positions": REF_POSITIONS,
-        "insertion_coordinates": [],
-        "deletion_coordinates": [],
-        "substitution_positions": [position],
-        "insertion_sizes": [],
-    }
+    return (REF_SEQ, aligned)
 
 
 def make_del(start, end, reads=1, ref_name="Reference"):
     """Deletion [start, end) in reference coordinates (end exclusive)."""
     deletion_len = end - start
     aligned = REF_SEQ[:start] + "-"*deletion_len + REF_SEQ[end:]  # aligned sequence without the deleted block
-    return {
-        "#Reads": reads,
-        "Aligned_Sequence": aligned,
-        "Reference_Sequence": REF_SEQ,
-        "n_inserted": 0,
-        "n_deleted": 1,
-        "n_mutated": 0,
-        "Reference_Name": ref_name,
-        "ref_positions": REF_POSITIONS,
-        "insertion_coordinates": [],
-        "deletion_coordinates": [(start, end)],
-        "substitution_positions": [],
-        "insertion_sizes": [],
-    }
+    return (REF_SEQ, aligned)
 
 
 def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
@@ -94,21 +73,9 @@ def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
     """
     aligned_start = after_index + 1
     aligned = REF_SEQ[:aligned_start] + ins_seq + REF_SEQ[aligned_start:]
-    # updated_ref_seq = REF_SEQ [:aligned_start] + "-"*len(ins_seq) + REF_SEQ[aligned_start:]
-    return {
-        "#Reads": reads,
-        "Aligned_Sequence": aligned,
-        "Reference_Sequence": REF_SEQ,
-        "n_inserted": len(ins_seq),
-        "n_deleted": 0,
-        "n_mutated": 0,
-        "Reference_Name": ref_name,
-        "ref_positions": REF_POSITIONS,
-        "insertion_coordinates": [(after_index + 1, aligned_start)],
-        "deletion_coordinates": [],
-        "substitution_positions": [],
-        "insertion_sizes": [len(ins_seq)],
-    }
+    updated_ref_seq = REF_SEQ[:aligned_start] + "-"*len(ins_seq) + REF_SEQ[aligned_start:]
+    return (updated_ref_seq, aligned)
+
 
 # ----------------------------- core mixed case (old test modernized) -----------------------------
 
@@ -152,7 +119,7 @@ def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
     ids=["mixed_edits_happy_path"],
 )
 def test_build_alt_map_mixed(rows, amplicon_positions, expected):
-    df = df_from_rows(*rows)
+    df = create_df_alleles(*rows)
     alt_map = utilities.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(alt_map) == _normalize_alt_map(expected)
 
@@ -184,7 +151,7 @@ def test_build_alt_map_mixed(rows, amplicon_positions, expected):
     ids=["sub_single", "sub_merge_same_base", "sub_split_diff_base"],
 )
 def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
-    df = df_from_rows(*rows)
+    df = create_df_alleles(*rows)
     out = utilities.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
@@ -245,9 +212,10 @@ def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
     ids=["del_single", "del_merge_same_len", "del_two_lengths_same_key", "del_second_element"],
 )
 def test_build_alt_map_deletions(rows, amplicon_positions, expected):
-    df = df_from_rows(*rows)
+    df = create_df_alleles(*rows)
     out = utilities.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
+
 
 @pytest.mark.parametrize(
     "rows, amplicon_positions, expected",
@@ -266,9 +234,10 @@ def test_build_alt_map_deletions(rows, amplicon_positions, expected):
 )
 def test_build_alt_map_deletion_end_at_len_raises(rows, amplicon_positions, expected):
     # delete last base: (39, 40) for a 40‑bp ref
-    df = df_from_rows(*rows)
+    df = create_df_alleles(*rows)
     out = utilities.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
+
 
 def test_build_alt_map_deletion_start_at_zero_should_anchor_correctly():
     """When a deletion occurs at the start of a sequence, then you record the base after the deletion.
@@ -314,7 +283,7 @@ def test_build_alt_map_deletion_start_at_zero_should_anchor_correctly():
     ids=["ins_single", "ins_merge_same_seq", "ins_split_diff_seq"],
 )
 def test_build_alt_map_insertions(rows, amplicon_positions, expected):
-    df = df_from_rows(*rows)
+    df = create_df_alleles(*rows)
     out = utilities.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
@@ -328,8 +297,8 @@ def test_upsert_edit_del_and_ins():
     utilities._upsert_edit(alt_map, ('chrX', 10), 'AT', 'insert', 'TT', 2)
     assert alt_map[('chrX', 10)] == {'ref_seq': 'AT', 'alt_edits': [['delete', 'T', 2], ['insert', 'TT', 2]]}
 
-# ----------------------------- multiple amplicons & coordinate offsets -----------------------------
 
+# ----------------------------- multiple amplicons & coordinate offsets -----------------------------
 @pytest.mark.parametrize(
     "rows, amplicon_positions, expected",
     [
@@ -349,7 +318,7 @@ def test_upsert_edit_del_and_ins():
     ids=["two_amplicons_offsets"],
 )
 def test_build_alt_map_multi_amplicon_and_offsets(rows, amplicon_positions, expected):
-    df = df_from_rows(*rows)
+    df = create_df_alleles(*rows)
     out = utilities.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
@@ -365,14 +334,14 @@ def test_build_alt_map_multi_amplicon_and_offsets(rows, amplicon_positions, expe
     ids=["only_unmodified", "mixed_with_unmodified"],
 )
 def test_build_alt_map_skips_unmodified(rows, amplicon_positions, expected_size):
-    df = df_from_rows(*rows)
+    df = create_df_alleles(*rows)
     out = utilities.build_alt_map(df, amplicon_positions)
     assert len(out) == expected_size
 
 # ----------------------------- ensuring that insertions are keyed by right anchor -----------------------------
 
+# TODO refactor this function
 def test_build_alt_map_fidelity_like_real_row():
-
     # Short 40bp reference used across tests
     REF_SEQ = "ATGCGTACGATCGTACGTAGCTAGCTAGCGTAGCTAGCTA"
 
@@ -444,24 +413,6 @@ def test_build_alt_map_fidelity_like_real_row():
         }
 
     assert _normalize(out) == _normalize(expected)
-
-
-def create_df_alleles(*refs_alns):
-    payloads = []
-    for ref, aln in refs_alns:
-        payload = find_indels_substitutions(aln, ref, list(range(len(ref)))).__dict__
-        payload['Reference_Sequence'] = ref
-        payload['Aligned_Sequence'] = aln
-        payloads += [payload]
-
-    for payload in payloads:
-        payload['#Reads'] = 1
-        payload['Reference_Name'] = 'Reference'
-        payload['n_inserted'] = payload['insertion_n']
-        payload['n_deleted'] = payload['deletion_n']
-        payload['n_mutated'] = payload['substitution_n']
-
-    return pd.DataFrame(payloads)
 
 
 def test_aln_to_alt_map_ins_del_same_pos():
