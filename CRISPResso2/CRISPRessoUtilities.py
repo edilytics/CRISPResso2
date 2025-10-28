@@ -18,14 +18,15 @@ def _process_deletions(row, chrom, pos, alt_map):
     for (start, end) in row["deletion_coordinates"]:
         left_index = max(1, pos + start - 1)          # absolute 1-based coordinate
         key = (chrom, left_index)
+        ref_start = ref_positions.index(start)
+        ref_end = ref_positions.index(end)
 
         if start == 0:
-            deleted_edit = ref_str[end]
+            deleted_edit = ref_str[ref_end]
+            ref_for_key = ref_str[ref_start:ref_end]
         else:
-            deleted_edit = ref_str[left_index:end]
-
-        # ref_seq_for_key: left flank + deleted span (VCF-like), except when start==0 (no left flank)
-        ref_for_key = ref_str[left_index - 1:end]
+            deleted_edit = ref_str[ref_start:ref_end]
+            ref_for_key = ref_str[ref_start - 1:ref_end]
 
         _upsert_edit(
             alt_map,

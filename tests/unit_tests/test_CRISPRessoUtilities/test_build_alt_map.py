@@ -254,7 +254,7 @@ def test_build_alt_map_deletion_start_at_zero_should_anchor_correctly():
 
     Source: https://bioinformatics.stackexchange.com/questions/2476/how-to-represent-a-deletion-at-position-1-in-a-vcf-file
     """
-    df = df_from_rows(make_del(0, 3, reads=1))  # delete first 3 bases
+    df = create_df_alleles(make_del(0, 3, reads=1))  # delete first 3 bases
     amplicon_positions = {"Reference": (1, 1)}
     out = utilities.build_alt_map(df, amplicon_positions)
     expected = {
