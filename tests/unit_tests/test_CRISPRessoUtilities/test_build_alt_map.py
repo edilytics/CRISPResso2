@@ -30,17 +30,23 @@ def create_df_alleles(*refs_alns):
     payloads = []
     for ref, *aln in refs_alns:
         if isinstance(aln, list):
-            aln, num_reads = aln
-        else:
-            num_reads = 1
+            if len(aln) == 1:
+                aln = aln[0]
+                num_reads = 1
+                ref_name = 'Reference'
+            elif len(aln) == 2:
+                aln, num_reads = aln
+                ref_name = 'Reference'
+            elif len(aln) == 3:
+                aln, num_reads, ref_name = aln
         payload = find_indels_substitutions(aln, ref, list(range(len(ref)))).__dict__
         payload['Reference_Sequence'] = ref
         payload['Aligned_Sequence'] = aln
         payload['#Reads'] = num_reads
+        payload['Reference_Name'] = ref_name
         payloads += [payload]
 
     for payload in payloads:
-        payload['Reference_Name'] = 'Reference'
         payload['n_inserted'] = payload['insertion_n']
         payload['n_deleted'] = payload['deletion_n']
         payload['n_mutated'] = payload['substitution_n']
@@ -53,20 +59,20 @@ def create_df_alleles(*refs_alns):
 
 def make_unmodified(reads=1, ref_name="Reference"):
     """Unmodified read identical to REF_SEQ."""
-    return (REF_SEQ, REF_SEQ, reads)
+    return (REF_SEQ, REF_SEQ, reads, ref_name)
 
 
 def make_sub(position, alt_base, reads=1, ref_name="Reference"):
     """Single‑nucleotide substitution at 0‑based ref index 'position'."""
     aligned = REF_SEQ[:position] + alt_base + REF_SEQ[position + 1 :]
-    return (REF_SEQ, aligned, reads)
+    return (REF_SEQ, aligned, reads, ref_name)
 
 
 def make_del(start, end, reads=1, ref_name="Reference"):
     """Deletion [start, end) in reference coordinates (end exclusive)."""
     deletion_len = end - start
     aligned = REF_SEQ[:start] + "-"*deletion_len + REF_SEQ[end:]  # aligned sequence without the deleted block
-    return (REF_SEQ, aligned, reads)
+    return (REF_SEQ, aligned, reads, ref_name)
 
 
 def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
@@ -78,7 +84,7 @@ def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
     aligned_start = after_index + 1
     aligned = REF_SEQ[:aligned_start] + ins_seq + REF_SEQ[aligned_start:]
     updated_ref_seq = REF_SEQ[:aligned_start] + "-"*len(ins_seq) + REF_SEQ[aligned_start:]
-    return (updated_ref_seq, aligned, reads)
+    return (updated_ref_seq, aligned, reads, ref_name)
 
 
 # ----------------------------- core mixed case (old test modernized) -----------------------------
