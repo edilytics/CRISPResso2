@@ -136,7 +136,7 @@ def find_indels_substitutions(read_seq_al, ref_seq_al, _include_indx):
             current_insertion_size += 1
 
         if read_seq_al[idx_c] == '-' and start_deletion == -1:  # this is the first part of a deletion
-            if idx_c - 1 > 0:
+            if idx_c - 1 >= 0:
                 start_deletion = ref_positions[idx_c]
             else:
                 start_deletion = 0
