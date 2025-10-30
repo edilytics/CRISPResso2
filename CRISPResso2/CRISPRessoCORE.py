@@ -25,11 +25,12 @@ from concurrent.futures import ProcessPoolExecutor, wait
 from datetime import datetime
 from functools import partial
 from multiprocessing import Process
+from contextlib import nullcontext
 
-from CRISPResso2 import CRISPRessoCOREResources
+from CRISPResso2 import (CRISPRessoCOREResources, CRISPRessoShared,
+                         CRISPRessoUtilities)
 from CRISPResso2.CRISPRessoCOREResources import ResultsSlotsDict
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
-from CRISPResso2 import CRISPRessoShared
 
 if CRISPRessoShared.is_C2Pro_installed():
     from CRISPRessoPro import __version__ as CRISPRessoProVersion
@@ -37,8 +38,7 @@ if CRISPRessoShared.is_C2Pro_installed():
 else:
     C2PRO_INSTALLED = False
 
-from CRISPResso2 import CRISPResso2Align
-from CRISPResso2 import CRISPRessoMultiProcessing
+from CRISPResso2 import CRISPResso2Align, CRISPRessoMultiProcessing
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -136,8 +136,6 @@ def get_n_reads_bam(bam_filename,bam_chr_loc=""):
     except ValueError:
         raise CRISPRessoShared.InstallationException('Error when running the command:' + cmd + '\nCheck that samtools is installed correctly.')
     return retval
-
-
 pd=check_library('pandas')
 np=check_library('numpy')
 
@@ -2638,6 +2636,12 @@ def main():
             crispresso2_info['bam_output'] = bam_output
             info('Writing bam output file: ' + bam_output)
 
+        if args.vcf_output:
+            if args.amplicon_coordinates == "":
+                raise CRISPRessoShared.BadParameterException('Please provide the coordinates of the VCF file using the --amplicon_coordinates parameter.')
+
+
+
 
         #### ASSERT GUIDE(S)
         guides = []
@@ -3905,7 +3909,7 @@ def main():
             hists_frameshift                    [ref_name] = Counter()
             hists_frameshift                    [ref_name][0] = 0
         #end initialize data structures for each ref
-        def get_allele_row(reference_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, write_detailed_allele_table):
+        def get_allele_row(reference_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload):
             """
             gets a row for storing allele information in the allele table
             parameters:
@@ -3918,7 +3922,7 @@ def main():
             returns:
                 row to put into allele table
             """
-            if args.write_detailed_allele_table:
+            if args.write_detailed_allele_table or args.vcf_output:
                 allele_row = {'#Reads':variant_count,
                     'Aligned_Sequence': variant_payload['aln_seq'],
                     'Reference_Sequence':variant_payload['aln_ref'],
@@ -3988,7 +3992,7 @@ def main():
             #if class is AMBIGUOUS (set above if the args.expand_ambiguous_alignments param is false) don't add the modifications in this allele to the allele summaries
             if class_name == "AMBIGUOUS":
                 variant_payload = variantCache[variant]["variant_"+aln_ref_names[0]]
-                allele_row = get_allele_row('AMBIGUOUS_'+aln_ref_names[0], variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, args.write_detailed_allele_table)
+                allele_row = get_allele_row('AMBIGUOUS_'+aln_ref_names[0], variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload)
                 alleles_list.append(allele_row)
                 continue #for ambiguous reads, don't add indels to reference totals
 
@@ -3997,7 +4001,7 @@ def main():
                 variant_payload = variantCache[variant]["variant_"+ref_name]
                 if args.discard_indel_reads and (variant_payload['deletion_n'] > 0 or variant_payload['insertion_n'] > 0):
                     counts_discarded[ref_name] += variant_count
-                    allele_row = get_allele_row('DISCARDED_'+aln_ref_names[0],variant_count,aln_ref_names_str,aln_ref_scores_str,variant_payload,args.write_detailed_allele_table)
+                    allele_row = get_allele_row('DISCARDED_'+aln_ref_names[0],variant_count,aln_ref_names_str,aln_ref_scores_str,variant_payload)
                     alleles_list.append(allele_row)
                     continue
 
@@ -4007,7 +4011,7 @@ def main():
                 else:
                     counts_unmodified[ref_name] += variant_count
 
-                allele_row = get_allele_row(ref_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, args.write_detailed_allele_table)
+                allele_row = get_allele_row(ref_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload)
                 alleles_list.append(allele_row)
 
                 this_effective_len= refs[ref_name]['sequence_length'] #how long is this alignment (insertions increase length, deletions decrease length)
@@ -4498,12 +4502,15 @@ def main():
 
         info('Saving processed data...')
 
-        #write alleles table
-        #crispresso1Cols = ["Aligned_Sequence","Reference_Sequence","NHEJ","UNMODIFIED","HDR","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
-        #df_alleles.loc[:,crispresso1Cols].to_csv(_jp('Alleles_frequency_table.txt'),sep='\t',header=True,index=None)
-        #crispresso2Cols = ["Aligned_Sequence","Reference_Sequence","Reference_Name","Read_Status","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
-#        crispresso2Cols = ["Aligned_Sequence","Reference_Sequence","Reference_Name","Read_Status","n_deleted","n_inserted","n_mutated","#Reads","%Reads","Aligned_Reference_Names","Aligned_Reference_Scores"]
-#        crispresso2Cols = ["Read_Sequence","Amplicon_Sequence","Amplicon_Name","Read_Status","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
+        if args.vcf_output:
+            # TODO delete after ensuring this is vestigial
+            qwc_indexes = {}
+            for ref_name in ref_names:
+                qwc_indexes[ref_name] = refs[ref_name]['include_idxs']
+            # TODO add this path to crispresso2_info
+            vcf_path = os.path.join(OUTPUT_DIRECTORY, "amplicon_variants.vcf")
+            CRISPRessoUtilities.write_vcf_file(df_alleles, ref_names, args, vcf_path)
+
         crispresso2Cols = ["Aligned_Sequence", "Reference_Sequence", "Reference_Name", "Read_Status", "n_deleted", "n_inserted", "n_mutated", "#Reads", "%Reads"]
 
         allele_frequency_table_filename = 'Alleles_frequency_table.txt'
