@@ -3,10 +3,12 @@
 ############################################################
 
 #FROM continuumio/miniconda3
-FROM mambaorg/micromamba:2.3.2
+FROM mambaorg/micromamba:2.3.3
 
-# File Author / Maintainer
-MAINTAINER Kendell Clement
+USER root
+
+LABEL org.opencontainers.image.authors="support@edilytics.com"
+
 RUN apt-get update && apt-get install gcc g++ bowtie2 samtools libsys-hostname-long-perl \
   -y --no-install-recommends \
   && apt-get clean \
