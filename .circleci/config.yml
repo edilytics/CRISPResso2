@@ -32,7 +32,7 @@ jobs:
           command: |
             rm -rf /opt/conda/bin/CRISPRess*
             rm -rf /opt/conda/lib/python*/site-packages/CRISPResso2*
-            python setup.py install
+            pip install .
 
       - save_cache:
           paths:
