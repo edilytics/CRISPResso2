@@ -19,6 +19,7 @@ from copy import deepcopy
 import re
 from matplotlib import colors as colors_mpl
 import seaborn as sns
+import upsetplot
 
 from CRISPResso2 import CRISPRessoShared
 
@@ -90,13 +91,126 @@ def get_color_lookup(nucs, alpha, custom_colors=None):
         return colors
 
 
+def get_amino_acid_color_dict(scheme='clustal'):
+    if scheme == 'clustal':
+        return {
+            '*': '#FF0000',  # Assuming this is a stop codon or wildcard, you can choose an appropriate color.
+            'A': '#000000',  # No specific color given, so default to black or choose an appropriate color.
+            'C': '#000000',  # No specific color given, so default to black or choose an appropriate color.
+            'D': '#000000',  # No specific color given, so default to black or choose an appropriate color.
+            'E': '#000000',  # No specific color given, so default to black or choose an appropriate color.
+            'F': '#0000FF',  # Blue
+            'G': '#FFA500',  # Orange
+            'H': '#FF5733',  # Red
+            'I': '#008000',  # Green
+            'K': '#FF5733',  # Red
+            'L': '#008000',  # Green
+            'M': '#008000',  # Green
+            'N': '#000000',  # No specific color given, so default to black or choose an appropriate color.
+            'P': '#FFA500',  # Orange
+            'Q': '#000000',  # No specific color given, so default to black or choose an appropriate color.
+            'R': '#FF5733',  # Red
+            'S': '#FFA500',  # Orange
+            'T': '#FFA500',  # Orange
+            'V': '#008000',  # Green
+            'W': '#0000FF',  # Blue
+            'Y': '#0000FF',  # Blue
+            '' : '#FFFFFF',  # White
+            '-': '#FFFFFF',  # White
+        }
+    if scheme == 'something':
+        return {
+            '*': '#000000',  # Stop codon - Black
+            'A': '#90EE90',  # Light green
+            'G': '#90EE90',  # Light green
+            'C': '#008000',  # Green
+            'D': '#006400',  # Dark green
+            'E': '#006400',  # Dark green
+            'N': '#006400',  # Dark green
+            'Q': '#006400',  # Dark green
+            'I': '#0000FF',  # Blue
+            'L': '#0000FF',  # Blue
+            'M': '#0000FF',  # Blue
+            'V': '#0000FF',  # Blue
+            'F': '#C8A2C8',  # Lilac
+            'W': '#C8A2C8',  # Lilac
+            'Y': '#C8A2C8',  # Lilac
+            'H': '#00008B',  # Dark blue
+            'K': '#FFA500',  # Orange
+            'R': '#FFA500',  # Orange
+            'P': '#FFC0CB',  # Pink
+            'S': '#FF0000',  # Red
+            'T': '#FF0000',  # Red
+            '': '#FFFFFF',   # White
+            '-': '#FFFFFF',  # White
+        }
+
+    if scheme == 'unique':
+        return {
+                '*': '#FF0000',  # Red (stop codon or wildcard)
+                'A': '#000000',  # Black
+                'C': '#1E90FF',  # DodgerBlue
+                'D': '#FF4500',  # OrangeRed
+                'E': '#32CD32',  # LimeGreen
+                'F': '#FFD700',  # Gold
+                'G': '#8A2BE2',  # BlueViolet
+                'H': '#FF69B4',  # HotPink
+                'I': '#00FF7F',  # SpringGreen
+                'K': '#00BFFF',  # DeepSkyBlue
+                'L': '#FF6347',  # Tomato
+                'M': '#ADFF2F',  # GreenYellow
+                'N': '#FF8C00',  # DarkOrange
+                'P': '#A52A2A',  # Brown
+                'Q': '#00CED1',  # DarkTurquoise
+                'R': '#8A2BE2',  # BlueViolet
+                'S': '#48D1CC',  # MediumTurquoise
+                'T': '#C71585',  # MediumVioletRed
+                'V': '#4682B4',  # SteelBlue
+                'W': '#D2691E',  # Chocolate
+                'Y': '#9ACD32',  # YellowGreen
+                '': '#FFFFFF',   # White (Empty)
+                '-': '#B0B0B0',  # Grey
+            }
+
+def get_amino_acid_colors(scheme):
+
+    # this will preserve the order of the amino acids
+    amino_acids = [
+        '*', 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
+        'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', '', '-'
+    ]
+
+    if scheme is None:
+        color_dict = get_amino_acid_color_dict()
+    elif isinstance(scheme, dict):
+        color_dict = scheme
+    elif isinstance(scheme, str):
+        color_dict = get_amino_acid_color_dict(scheme)
+    else:
+        raise TypeError(f'Amino acid color scheme must be a dictionary or a string. Got {type(scheme)}')
+
+    hex_alpha = '66'
+    return list(color_dict[aa] + hex_alpha for aa in amino_acids)
+
+def amino_acids_to_numbers(seq):
+    amino_acids = [
+        '*', 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
+        'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', '', '-'
+    ]
+    d = {aa: i for i, aa in enumerate(amino_acids)}
+    return [d[aa] for aa in seq]
+
+
+
+
+
 def hex_to_rgb(value):
     value = value.lstrip('#')
     lv = len(value)
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
 
 def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom_colors=None, save_also_png=False,
-                          min_text_pct=0.5, max_text_pct=0.95, quantification_window_idxs=None, 
+                          min_text_pct=0.5, max_text_pct=0.95, quantification_window_idxs=None,
                           sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None,
                           shade_unchanged=True,group_column='Batch', **kwargs):
     """
@@ -726,7 +840,7 @@ def plot_modification_frequency(
 ):
     """
     Plots the frequency of insertions, deletions, and substitutions across the reference amplicon, including modifications outside the quantification window.
-    
+
     :param include_idxs_list: List of indices included in the quantification window
     :param all_insertion_count_vectors: List of insertion count vectors for each amplicon
     :param all_deletion_count_vectors: List of deletion count vectors for each amplicon
@@ -2082,7 +2196,7 @@ def plot_scaffold_indel_lengths(
 def get_rows_for_sgRNA_annotation(sgRNA_intervals, amp_len):
     """
     Returns an array specifying the row number that an sgRNA should be plotted on in order to avoid overlap
-    
+
     :param sgRNA_intervals: array of x coordinate tuples of start and stop
     :param amp_len: length of amplicon
 
@@ -2516,7 +2630,7 @@ def plot_log_nuc_freqs(df_nuc_freq,tot_aln_reads,plot_title,fig_filename_root=No
     """
     Plots a heatmap of the percentage of reads that had each nucletide at each base in the reference
     Positions in the reference that have more than one allele can be spotted using this plot
-    
+
     :param df_nuc_freq: DataFrame with nucleotide frequencies indexed by nucleotide
     :param tot_aln_reads: total number of reads aligned to the reference sequence
     :param plot_title: title of the plot
@@ -2899,7 +3013,8 @@ def custom_heatmap(data, vmin=None, vmax=None, cmap=None, center=None, robust=Fa
                           annot_kws, per_element_annot_kws, cbar, cbar_kws, xticklabels,
                           yticklabels, mask)
 
-    # Add the pcolormesh kwargs here
+
+    # Add the pcolormesh kwargs herelin
     kwargs["linewidths"] = linewidths
     kwargs["edgecolor"] = linecolor
 
@@ -2910,6 +3025,207 @@ def custom_heatmap(data, vmin=None, vmax=None, cmap=None, center=None, robust=Fa
         ax.set_aspect("equal")
     plotter.plot(ax, cbar_ax, kwargs)
     return ax
+
+
+def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
+    """
+    Prepares a df of alleles for Plotting
+    input:
+    -df_alleles: pandas dataframe of alleles to plot
+    -reference_seq: sequence of unmodified reference
+    -MAX_N_ROWS: max number of rows to plot
+    -MIN_FREQUENCY: min frequency for a row to be plotted
+    returns:
+    -X: list of numbers representing nucleotides of the allele
+    -annot: list of nucleotides (letters) of the allele
+    -y_labels: list of labels for each row/allele
+    -insertion_dict: locations of insertions -- red squares will be drawn around these
+    -per_element_annot_kws: annotations for each cell (e.g. bold for substitutions, etc.)
+    -is_reference: list of booleans for whether the read is equal to the reference
+    """
+
+    X=[]
+    annot=[]
+    y_labels=[]
+    insertion_dict=defaultdict(list)
+    silent_edit_dict=defaultdict(list)
+    per_element_annot_kws=[]
+    is_reference=[]
+
+    re_find_indels=re.compile("(-*-)")
+    idx_row=0
+
+    for seq, row in df_alleles[df_alleles['%Reads']>=MIN_FREQUENCY][:MAX_N_ROWS].iterrows():
+
+
+        X.append(amino_acids_to_numbers(seq))
+        annot.append(list(seq))
+
+        silent_edit_dict[idx_row] = row['silent_edit_inds']
+
+        has_indels = False
+        for p in re_find_indels.finditer(row['Reference_Sequence']):
+            has_indels = True
+            insertion_dict[idx_row].append((p.start(), p.end()))
+
+        y_labels.append('%.2f%% (%d reads)' % (row['%Reads'], row['#Reads']))
+        if seq == reference_seq and not has_indels:
+            is_reference.append(True)
+        else:
+            is_reference.append(False)
+
+        idx_row+=1
+
+
+        idxs_sub= [i_sub for i_sub in range(len(seq)) if \
+                   (row['Reference_Sequence'][i_sub]!=seq[i_sub].upper()) and \
+                   (row['Reference_Sequence'][i_sub]!='-') and\
+                   (seq[i_sub]!='-')]
+        to_append=np.array([{}]*len(seq), dtype=object)
+        to_append[ idxs_sub]={'weight':'bold', 'color':'black','size':16}
+        per_element_annot_kws.append(to_append)
+
+    for i, (x, a) in enumerate(zip(X, annot)):
+        X[i] = x + amino_acids_to_numbers([''] * (len(reference_seq) - len(a)))
+        annot[i] = a + [''] * (len(reference_seq) - len(a))
+
+    return X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, is_reference, reference_seq
+
+def plot_amino_acid_heatmap(
+        reference_seq_amino_acids,
+        fig_filename_root,
+        X,
+        annot,
+        y_labels,
+        insertion_dict,
+        silent_edit_dict,
+        per_element_annot_kws,
+        custom_colors,
+        SAVE_ALSO_PNG=False,
+        plot_cut_point=True,
+        sgRNA_intervals=None,
+        sgRNA_names=None,
+        sgRNA_mismatches=None,
+        amino_acid_cut_point=None,
+        **kwargs):
+    """
+    Plots alleles in a heatmap (nucleotides color-coded for easy visualization)
+    input:
+    -reference_seq: sequence of reference allele to plot
+    -fig_filename: figure filename to plot (not including '.pdf' or '.png')
+    -X: list of numbers representing nucleotides of the allele
+    -annot: list of nucleotides (letters) of the allele
+    -y_labels: list of labels for each row/allele
+    -insertion_dict: locations of insertions -- red squares will be drawn around these
+    -per_element_annot_kws: annotations for each cell (e.g. bold for substitutions, etc.)
+    -SAVE_ALSO_PNG: whether to write png file as well
+    -plot_cut_point: if false, won't draw 'predicted cleavage' line
+    -sgRNA_intervals: locations where sgRNA is located
+    -sgRNA_mismatches: array (for each sgRNA_interval) of locations in sgRNA where there are mismatches
+    -sgRNA_names: array (for each sgRNA_interval) of names of sgRNAs (otherwise empty)
+    -custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
+    """
+    plot_aa_len=len(reference_seq_amino_acids)
+
+    if isinstance(custom_colors.get('amino_acid_scheme', None), (str, dict)):
+        amino_acid_colors = get_amino_acid_colors(custom_colors.get('amino_acid_scheme',None))
+
+    cmap = colors_mpl.ListedColormap(amino_acid_colors)
+
+    if len(per_element_annot_kws) > 1:
+        per_element_annot_kws=np.vstack(per_element_annot_kws[::-1])
+    else:
+        per_element_annot_kws=np.array(per_element_annot_kws)
+    ref_seq_hm=np.expand_dims(amino_acids_to_numbers(reference_seq_amino_acids), 1).T
+    ref_seq_annot_hm=np.expand_dims(list(reference_seq_amino_acids), 1).T
+
+    annot=annot[::-1]
+    X=X[::-1]
+
+    N_ROWS=len(X)
+    N_COLUMNS=plot_aa_len
+
+    if N_ROWS < 1:
+        fig, ax = plt.subplots()
+        fig.text(0.5, 0.5, 'No Alleles', horizontalalignment='center', verticalalignment='center', transform = ax.transAxes)
+        ax.set_clip_on(False)
+
+        fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight')
+        if SAVE_ALSO_PNG:
+            fig.savefig(fig_filename_root+'.png', bbox_inches='tight')
+        plt.close(fig)
+        return
+
+    sgRNA_rows = []
+    num_sgRNA_rows = 0
+
+    fig=plt.figure(figsize=(plot_aa_len*0.3, (N_ROWS+1)*0.6))
+    gs1 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
+    gs2 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
+    #ax_hm_ref heatmap for the reference
+    ax_hm_ref=plt.subplot(gs1[0,:])
+    ax_hm=plt.subplot(gs2[1:,:])
+
+
+    custom_heatmap(ref_seq_hm, annot=ref_seq_annot_hm, annot_kws={'size':16}, cmap=cmap, fmt='s', ax=ax_hm_ref, vmin=0, vmax=len(cmap.colors), square=True)
+    custom_heatmap(X, annot=np.array(annot), annot_kws={'size':16}, cmap=cmap, fmt='s', ax=ax_hm, vmin=0, vmax=len(cmap.colors), square=True, per_element_annot_kws=per_element_annot_kws)
+
+    ax_hm.yaxis.tick_right()
+    ax_hm.yaxis.set_ticklabels(y_labels[::-1], rotation=True, va='center')
+    ax_hm.xaxis.set_ticks([])
+
+    padding = 0.075
+    #create boxes for ins
+    for idx, lss in insertion_dict.items():
+        for ls in lss:
+            ax_hm.add_patch(patches.Rectangle((ls[0] + padding, N_ROWS-idx-1 + padding), ls[1]-ls[0] - (2 * padding), 1 - (2 * padding), linewidth=1.5, edgecolor='r', fill=False))
+
+    # create boxes for silent edits
+    for idx, edit_inds in silent_edit_dict.items():
+        for edit_ind in edit_inds:
+            ax_hm.add_patch(patches.Rectangle((edit_ind + padding, N_ROWS-idx-1 + padding), 1 - (2 * padding), 1 - (2 * padding), linewidth=1.5, edgecolor='g', fill=False))
+
+    #cut point vertical line
+    if plot_cut_point:
+        ax_hm.vlines(amino_acid_cut_point, *ax_hm.get_ylim(), linestyles='dashed')
+
+
+    ax_hm_ref.yaxis.tick_right()
+    ax_hm_ref.xaxis.set_ticks([])
+    ax_hm_ref.yaxis.set_ticklabels(['Reference'], rotation=True, va='center')
+
+
+
+    gs2.update(left=0, right=1, hspace=0.05, wspace=0, top=1*(((N_ROWS)*1.13))/(N_ROWS))
+    gs1.update(left=0, right=1, hspace=0.05, wspace=0,)
+
+    sns.set_context(rc={'axes.facecolor':'white','lines.markeredgewidth': 1,'mathtext.fontset' : 'stix','text.usetex':True,'text.latex.unicode':True} )
+
+    proxies = [matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='black',
+                    mec='none', marker=r'$\mathbf{{{}}}$'.format('bold'), ms=18),
+               matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='none',
+                    mec='g', marker='s', ms=8, markeredgewidth=2.5),
+               matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='none',
+                    mec='r', marker='s', ms=8, markeredgewidth=2.5),
+              matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='none',
+                    mec='black', marker='_', ms=2,),
+              matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='none',
+                    mec='black', marker=r'*', ms=4, markeredgewidth=2.5),]
+    descriptions=['Substitutions', 'Silent Edits', 'Insertions', 'Deletions', 'Stop Codons']
+
+    if plot_cut_point:
+        proxies.append(
+              matplotlib.lines.Line2D([0], [1], linestyle='--', c='black', ms=6))
+        descriptions.append('Predicted cleavage position')
+
+    lgd = ax_hm.legend(proxies, descriptions, numpoints=1, markerscale=2, loc='upper center', bbox_to_anchor=(0.5, 0), ncol=1, fancybox=True, shadow=False)
+
+    fig.savefig(fig_filename_root+'.pdf', bbox_inches='tight', bbox_extra_artists=(lgd,))
+    if SAVE_ALSO_PNG:
+        fig.savefig(fig_filename_root+'.png', bbox_inches='tight', bbox_extra_artists=(lgd,))
+    plt.close(fig)
+
+
 
 
 def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
@@ -3034,6 +3350,8 @@ def plot_alleles_heatmap(
         sgRNA_intervals=None,
         sgRNA_names=None,
         sgRNA_mismatches=None,
+        plot_reference_sequence_above=True,
+        x_labels=None,
         **kwargs):
     """
     Plots alleles in a heatmap (nucleotides color-coded for easy visualization)
@@ -3054,7 +3372,7 @@ def plot_alleles_heatmap(
     -sgRNA_names: array (for each sgRNA_interval) of names of sgRNAs (otherwise empty)
     -custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
     """
-    plot_nuc_len=len(reference_seq)
+    plot_nuc_len = len(X[0]) if len(X) > 0 else len(reference_seq)
 
     # make a color map of fixed colors
     alpha=0.4
@@ -3126,19 +3444,32 @@ def plot_alleles_heatmap(
         ax_hm=plt.subplot(gs2[2:,:])
     else:
         fig=plt.figure(figsize=(plot_nuc_len*0.3, (N_ROWS+1)*0.6))
-        gs1 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
-        gs2 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
-        #ax_hm_ref heatmap for the reference
-        ax_hm_ref=plt.subplot(gs1[0,:])
-        ax_hm=plt.subplot(gs2[1:,:])
+        if plot_reference_sequence_above:
+            gs1 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
+            gs2 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
+            #ax_hm_ref heatmap for the reference
+            ax_hm_ref=plt.subplot(gs1[0,:])
+            ax_hm=plt.subplot(gs2[1:,:])
+        else:
+            gs1 = None
+            gs2 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
+            ax_hm_ref = None
+            ax_hm = plt.subplot(gs2[:,:])
 
-
-    custom_heatmap(ref_seq_hm, annot=ref_seq_annot_hm, annot_kws={'size':16}, cmap=cmap, fmt='s', ax=ax_hm_ref, vmin=0, vmax=5, square=True)
+    if plot_reference_sequence_above:
+        custom_heatmap(ref_seq_hm, annot=ref_seq_annot_hm, annot_kws={'size':16}, cmap=cmap, fmt='s', ax=ax_hm_ref, vmin=0, vmax=5, square=True)
     custom_heatmap(X, annot=np.array(annot), annot_kws={'size':16}, cmap=cmap, fmt='s', ax=ax_hm, vmin=0, vmax=5, square=True, per_element_annot_kws=per_element_annot_kws)
 
     ax_hm.yaxis.tick_right()
     ax_hm.yaxis.set_ticklabels(y_labels[::-1], rotation=True, va='center')
-    ax_hm.xaxis.set_ticks([])
+
+    if plot_reference_sequence_above:
+        ax_hm.xaxis.set_ticks([])
+    else:
+        ax_hm.xaxis.tick_top()
+        ax_hm.xaxis.set_label_position('top')
+        ax_hm.set_xlabel("Reference position for target nucleotide (1-indexed)")
+        ax_hm.xaxis.set_ticklabels(x_labels, rotation=90)
 
     if sgRNA_intervals and len(sgRNA_intervals) > 0:
         this_sgRNA_y_start = -1*num_sgRNA_rows
@@ -3177,15 +3508,15 @@ def plot_alleles_heatmap(
             cut_point_ind = [plot_nuc_len / 2]
         ax_hm.vlines(cut_point_ind,*ax_hm.get_ylim(),linestyles='dashed')
 
-
-    ax_hm_ref.yaxis.tick_right()
-    ax_hm_ref.xaxis.set_ticks([])
-    ax_hm_ref.yaxis.set_ticklabels(['Reference'], rotation=True, va='center')
-
+    if ax_hm_ref:
+        ax_hm_ref.yaxis.tick_right()
+        ax_hm_ref.xaxis.set_ticks([])
+        ax_hm_ref.yaxis.set_ticklabels(['Reference'], rotation=True, va='center')
 
 
     gs2.update(left=0, right=1, hspace=0.05, wspace=0, top=1*(((N_ROWS)*1.13))/(N_ROWS))
-    gs1.update(left=0, right=1, hspace=0.05, wspace=0,)
+    if gs1:
+        gs1.update(left=0, right=1, hspace=0.05, wspace=0,)
 
     sns.set_context(rc={'axes.facecolor':'white','lines.markeredgewidth': 1,'mathtext.fontset' : 'stix','text.usetex':True,'text.latex.unicode':True} )
 
@@ -3360,7 +3691,7 @@ def plot_alleles_heatmap_hist(reference_seq, X, annot, y_labels, insertion_dict,
 
 def plot_alleles_table_prepped(reference_seq, prepped_df_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws,
         is_reference, fig_filename_root=None, custom_colors=None, SAVE_ALSO_PNG=False, plot_cut_point=True, cut_point_ind=None,
-        sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, annotate_wildtype_allele='****', **kwargs,):
+        sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, annotate_wildtype_allele='****', plot_reference_sequence_above=True, x_labels=None, **kwargs,):
     """Plot an allele table for a pre-filtered dataframe with allele frequencies.
 
     Parameters
@@ -3397,6 +3728,10 @@ def plot_alleles_table_prepped(reference_seq, prepped_df_alleles, annotations, y
         Array (for each sgRNA_interval) of locations in sgRNA where there are mismatches.
     annotate_wildtype_allele : str
         String to add to the end of the wildtype allele (e.g. '****' or '').
+    plot_reference_sequence_above : bool
+        Whether to plot the reference sequence above the alleles.
+    x_labels : list
+        Custom x-axis labels (otherwise None).
     kwargs : dict
         Additional keyword arguments.
 
@@ -3424,10 +3759,12 @@ def plot_alleles_table_prepped(reference_seq, prepped_df_alleles, annotations, y
         sgRNA_intervals=sgRNA_intervals,
         sgRNA_names=sgRNA_names,
         sgRNA_mismatches=sgRNA_mismatches,
+        plot_reference_sequence_above=plot_reference_sequence_above,
+        x_labels=x_labels,
     )
 
 
-def plot_alleles_table(reference_seq, df_alleles, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False, 
+def plot_alleles_table(reference_seq, df_alleles, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False,
                        plot_cut_point=True, cut_point_ind=None, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, annotate_wildtype_allele='****', **kwargs):
     """
     plots an allele table for a dataframe with allele frequencies
@@ -3468,7 +3805,7 @@ def plot_alleles_table(reference_seq, df_alleles, fig_filename_root=None, custom
                          sgRNA_names=sgRNA_names,
                          sgRNA_mismatches=sgRNA_mismatches)
 
-def plot_alleles_table_from_file(alleles_file_name, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False, 
+def plot_alleles_table_from_file(alleles_file_name, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False,
                                  plot_cut_point=True, cut_point_ind=None, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, annotate_wildtype_allele='', **kwargs):
     """
     plots an allele table for a dataframe with allele frequencies
@@ -3518,7 +3855,7 @@ def plot_alleles_table_from_file(alleles_file_name, fig_filename_root=None, cust
                          sgRNA_names=sgRNA_names,
                          sgRNA_mismatches=sgRNA_mismatches)
 
-def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=None, MAX_N_ROWS=None, SAVE_ALSO_PNG=False, 
+def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=None, custom_colors=None, MIN_FREQUENCY=None, MAX_N_ROWS=None, SAVE_ALSO_PNG=False,
                                     plot_cut_point=True, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, **kwargs):
     """
     plots an allele table for each sgRNA/amplicon in a CRISPresso run (useful for plotting after running using the plot harness)
@@ -3607,7 +3944,7 @@ def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=
             plot_count += 1
     print('Plotted ' + str(plot_count) + ' plots')
 
-def plot_alleles_table_compare(reference_seq, df_alleles, sample_name_1, sample_name_2, fig_filename_root=None, custom_colors=None, 
+def plot_alleles_table_compare(reference_seq, df_alleles, sample_name_1, sample_name_2, fig_filename_root=None, custom_colors=None,
                                MIN_FREQUENCY=0.5, MAX_N_ROWS=100, SAVE_ALSO_PNG=False, plot_cut_point=True, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, **kwargs):
     """
     plots an allele table for a dataframe with allele frequencies from two CRISPResso runs
@@ -3718,12 +4055,38 @@ def plot_nucleotide_quilt_from_folder(crispresso_output_folder, fig_filename_roo
             for idx in quantification_window_idxs:
                 new_quant_window_idxs.append(idx - new_sel_cols_start - 1)
 
-            plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=fig_filename_root, custom_colors=custom_colors, save_also_png=save_also_png, 
-                                  min_text_pct=min_text_pct, max_text_pct=max_text_pct, quantification_window_idxs=new_quant_window_idxs, 
+            plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=fig_filename_root, custom_colors=custom_colors, save_also_png=save_also_png,
+                                  min_text_pct=min_text_pct, max_text_pct=max_text_pct, quantification_window_idxs=new_quant_window_idxs,
                                   sgRNA_intervals=new_sgRNA_intervals, sgRNA_names=sgRNA_names, sgRNA_mismatches=sgRNA_mismatches, shade_unchanged=shade_unchanged)
             plot_count += 1
 
     print('Plotted ' + str(plot_count) + ' plots')
+
+def plot_amino_acid_table(reference_seq,df_alleles,fig_filename_root,custom_colors,MIN_FREQUENCY=0.5,MAX_N_ROWS=100,SAVE_ALSO_PNG=False,plot_cut_point=True,sgRNA_intervals=None,sgRNA_names=None,sgRNA_mismatches=None,annotate_wildtype_allele='****',amino_acid_cut_point=None,**kwargs):
+    """
+    plots an allele table for a dataframe with allele frequencies
+    input:
+    reference_seq: the reference amplicon sequence to plot
+    df_alleles: merged dataframe (should include columns "#Reads','%Reads')
+    fig_filename: figure filename to plot (not including '.pdf' or '.png')
+    MIN_FREQUENCY: sum of alleles % must add to this to be plotted
+    MAX_N_ROWS: max rows to plot
+    SAVE_ALSO_PNG: whether to write png file as well
+    plot_cut_point: if false, won't draw 'predicted cleavage' line
+    sgRNA_intervals: locations where sgRNA is located
+    sgRNA_mismatches: array (for each sgRNA_interval) of locations in sgRNA where there are mismatches
+    sgRNA_names: array (for each sgRNA_interval) of names of sgRNAs (otherwise empty)
+    custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
+    annotate_wildtype_allele: string to add to the end of the wildtype allele (e.g. ** or '')
+    """
+    X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, is_reference, ref_sequence_amino_acids = prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY)
+    if annotate_wildtype_allele != '':
+        for ix, is_ref in enumerate(is_reference):
+            if is_ref:
+                y_labels[ix] += annotate_wildtype_allele
+
+    plot_amino_acid_heatmap(ref_sequence_amino_acids, fig_filename_root, X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, custom_colors, SAVE_ALSO_PNG, plot_cut_point, sgRNA_intervals, sgRNA_names, sgRNA_mismatches, amino_acid_cut_point)
+
 
 def plot_unmod_mod_pcts(df_summary_quantification, fig_filename_root=None, save_png=False, cutoff=None, max_samples_to_include_unprocessed=20, **kwargs):
     """
@@ -3812,7 +4175,7 @@ def plot_reads_total(df_summary_quantification, fig_filename_root=None,save_png=
         spine.set_visible(False)
 
     fig.tight_layout()
-    
+
     if fig_filename_root is None:
         plt.show()
     else:
@@ -4238,3 +4601,35 @@ def plot_quantification_positions(
         if save_also_png:
             fig.savefig(plot_path + '.png', bbox_inches='tight', bbox_extra_artists=(lgd,))
     plt.close(fig)
+
+
+def plot_combination_upset(fig_root, ref_name, bp_substitutions_arr, binary_allele_counts, save_also_png=False):
+    header_arr = []
+    for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_substitutions_arr):
+        header_arr.append(str(ref_ind) + ':' + ref_base + '->' + mod_base)
+    header_arr.append('has_indel')
+    header_arr.append('cat_counts')
+
+    df_by_combination_items = []
+    for ref_comb in binary_allele_counts:
+        arr_for_upset = ref_comb.split("\t")
+        for i in range(len(arr_for_upset)-1): # don't check the last column (has indel)
+            arr_for_upset[i] = arr_for_upset[i] == 'T'
+        arr_for_upset[len(arr_for_upset)-1] = arr_for_upset[len(arr_for_upset)-1] == 'True'
+
+        arr_for_upset.append(binary_allele_counts[ref_comb])
+        df_by_combination_items.append(arr_for_upset)
+    for i, col in enumerate(header_arr):
+        if col in ['has_indel', 'cat_counts']:
+            continue
+        if len(col) > 8:
+            header_arr[i] = col[:8] + '...'
+    df_by_combination = pd.DataFrame(df_by_combination_items, columns=header_arr)
+    df_by_combination.set_index(header_arr[:-1], inplace=True)
+    ax_dict = upsetplot.UpSet(df_by_combination.cat_counts, element_size=40, show_counts=True, sort_categories_by='-input').plot()
+
+    if save_also_png:
+        plt.savefig(fig_root + '.png')
+
+    plt.savefig(fig_root + '.pdf')
+    plt.close()

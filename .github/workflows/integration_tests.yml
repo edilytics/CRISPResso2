@@ -6,6 +6,10 @@ on:
   pull_request:
     types: [opened, reopened]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -79,6 +83,11 @@ jobs:
         if: success() || failure()
         run: |
           make prime-editor test print
+
+      - name: Run Base Editor
+        if: success() || failure()
+        run: |
+          make base_editor test print
 
       - name: Run Native Merging
         if: success() || failure()
