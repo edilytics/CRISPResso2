@@ -9,6 +9,8 @@ USER root
 
 LABEL org.opencontainers.image.authors="support@edilytics.com"
 
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
+
 RUN apt-get update && apt-get install gcc g++ bowtie2 samtools libsys-hostname-long-perl \
   -y --no-install-recommends \
   && apt-get clean \
@@ -34,11 +36,11 @@ RUN micromamba install -c conda-forge -c bioconda -y -n base --debug fastp numpy
 # install crispresso
 COPY . /CRISPResso2
 WORKDIR /CRISPResso2
-RUN /usr/local/bin/_entrypoint.sh pip install . \
-  && /usr/local/bin/_entrypoint.sh CRISPResso -h \
-  && /usr/local/bin/_entrypoint.sh CRISPRessoBatch -h \
-  && /usr/local/bin/_entrypoint.sh CRISPRessoPooled -h \
-  && /usr/local/bin/_entrypoint.sh CRISPRessoWGS -h \
-  && /usr/local/bin/_entrypoint.sh CRISPRessoCompare -h
+RUN pip install . \
+  && CRISPResso -h \
+  && CRISPRessoBatch -h \
+  && CRISPRessoPooled -h \
+  && CRISPRessoWGS -h \
+  && CRISPRessoCompare -h
 
-ENTRYPOINT ["/usr/local/bin/_entrypoint.sh", "python","/CRISPResso2/CRISPResso2_router.py"]
+ENTRYPOINT ["python","/CRISPResso2/CRISPResso2_router.py"]
