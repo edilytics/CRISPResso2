@@ -19,7 +19,10 @@ def _process_deletions(row, chrom, pos, alt_map):
         left_index = max(1, pos + start - 1)          # absolute 1-based coordinate
         key = (chrom, left_index)
         ref_start = ref_positions.index(start)
-        ref_end = ref_positions.index(end)
+        try:
+            ref_end = ref_positions.index(end)
+        except ValueError:  # deletion extends to the end of the sequence, and end is not in ref_positions
+            ref_end = ref_positions.index(end - 1)
 
         if start == 0:  # deletion at the start of a sequence
             deleted_edit = ref_str[ref_end]
