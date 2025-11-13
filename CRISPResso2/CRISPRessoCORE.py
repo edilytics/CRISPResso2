@@ -1248,7 +1248,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                 else:
                                     if args.debug:
                                         error(f"Could not parse variant from line: {line}")
-                                    error(f"Could not parse variant from file")
+                                    raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not parse variant from file")
                                 variant_count = variantCache[seq][0]
                                 N_TOT_READS += variant_count
                                 variant = variant_dict
@@ -1767,7 +1767,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                                 else:
                                     if args.debug:
                                         error(f"Could not parse variant from line: {line}")
-                                    error(f"Could not parse variant from file")
+                                    raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not parse variant from file")
                                 variant_count = variantCache[seq]
                                 N_TOT_READS += variant_count
                                 variant = variant_dict
@@ -1977,7 +1977,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                 else:
                                     if args.debug:
                                         error(f"Could not parse variant from line: {line}")
-                                    error(f"Could not parse variant from file")
+                                    raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not parse variant from file")
                                 variant_count = variantCache[seq]
                                 new_variant['count'] = variant_count
                                 N_TOT_READS += variant_count
@@ -2257,6 +2257,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
 
             # if the sequence has been seen and can't be aligned, skip it
             if fastq_seq in not_aln:
+                new_variant = not_aln[fastq_seq]
                 new_sam_entry = [
                     fastq_id,  # read id
                     '4',             # flag = unmapped 0x4
