@@ -4504,10 +4504,6 @@ def main():
         info('Saving processed data...')
 
         if args.vcf_output:
-            # TODO delete after ensuring this is vestigial
-            qwc_indexes = {}
-            for ref_name in ref_names:
-                qwc_indexes[ref_name] = refs[ref_name]['include_idxs']
             # TODO add this path to crispresso2_info
             vcf_path = os.path.join(OUTPUT_DIRECTORY, "amplicon_variants.vcf")
             CRISPRessoUtilities.write_vcf_file(df_alleles, ref_names, args, vcf_path)
