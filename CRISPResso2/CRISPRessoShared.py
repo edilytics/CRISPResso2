@@ -10,6 +10,9 @@ import errno
 import gzip
 import importlib.metadata
 import importlib.util
+import importlib.metadata
+from pathlib import Path
+
 import io
 import json
 import logging
@@ -494,7 +497,7 @@ def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
     return the amino acid read sequence with silent edit amino acids as lower case chars.
 
     for example:
-    
+
     ref_seq = 'AG-S'
     seq = 'AGTS'
     ref_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT')]
