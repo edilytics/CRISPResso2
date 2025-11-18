@@ -19,14 +19,16 @@ def _process_deletions(row, chrom, pos, alt_map):
         left_index = max(1, pos + start - 1)          # absolute 1-based coordinate
         key = (chrom, left_index)
         ref_start = ref_positions.index(start)
+        edit_type = "delete"
         try:
             ref_end = ref_positions.index(end)
         except ValueError:  # deletion extends to the end of the sequence, and end is not in ref_positions
             ref_end = ref_positions.index(end - 1)
 
         if start == 0:  # deletion at the start of a sequence
-            deleted_edit = ref_str[ref_end]
-            ref_for_key = ref_str[ref_start:ref_end]
+            edit_type = "delete_start"
+            deleted_edit = ref_str[ref_start:ref_end]
+            ref_for_key = ref_str[ref_start:ref_end + 1]
         elif ref_end == len(ref_str) - 1:  # deletion at the end of a sequence
             deleted_edit = ref_str[ref_start:ref_end + 1]
             ref_for_key = ref_str[ref_start - 1:ref_end + 1]
@@ -38,14 +40,14 @@ def _process_deletions(row, chrom, pos, alt_map):
             alt_map,
             key,
             ref_for_key,
-            edit_type="delete",
+            edit_type=edit_type,
             alt_edit=deleted_edit,
             reads=reads,
         )
 
 
 def _process_insertions(row, chrom, pos, alt_map):
-    """Uses ref_positions and insertion_coordinates to find the correct original base, returning the aln_edit object."""
+    """Uses ref_positions and insertion_coordinates to find the correct original base."""
     ref_positions = row["ref_positions"]
     ref_str = row["Reference_Sequence"]
     aln_str = row["Aligned_Sequence"]
@@ -85,7 +87,7 @@ def _process_insertions(row, chrom, pos, alt_map):
 
 
 def _process_substitutions(row, chrom, pos, alt_map):
-    """Uses ref_positions and substitution_position to find the correct original base, returning the aln_edit object."""
+    """Uses ref_positions and substitution_position to find the correct original base."""
     ref_positions = row["ref_positions"]
     ref_str = row["Reference_Sequence"]
     aln_str = row["Aligned_Sequence"]
@@ -117,7 +119,7 @@ def _upsert_edit(alt_map, key, ref_seq_for_key, edit_type, alt_edit, reads):
         return
 
     # Merge rule
-    if edit_type == "delete":
+    if edit_type == "delete" or edit_type == 'delete_start':
         target_len = len(alt_edit)
         for existing in entry["alt_edits"]:
             if existing[0] == "delete" and len(existing[1]) == target_len:
@@ -201,9 +203,9 @@ def _alt_seq_from_edit(ref_seq, edit_type, alt_edit):
         The length of ref_seq is always 1 + the longest deleted span at this position.
         If there are no deletions, ref_seq is a single base (the left anchor).
     edit_type : str
-        The type of edit, one of "insert", "delete", or "sub".
+        The type of edit, one of "insert", "delete", "delete_start", or "sub".
     alt_edit : str
-        The inserted bases (for "insert"), the deleted bases (for "delete"),
+        The inserted bases (for "insert"), the deleted bases (for "delete" and "delete_start"),
         or the alt base (for "sub").
 
 
@@ -227,6 +229,14 @@ def _alt_seq_from_edit(ref_seq, edit_type, alt_edit):
                 f"Deletion alt_edit ({alt_edit}) must be at least 1 base pair shorter than ref_seq: ({ref_seq})."
             )
         return ref_seq[0] + ref_seq[alt_len + 1:]
+
+    if edit_type == "delete_start":
+        if len(ref_seq) > 1:
+            return ref_seq[alt_len:]
+        elif len(ref_seq) == 0 or len(ref_seq) == 1:
+            raise CRISPRessoShared.BadParameterException(
+                f"The ref_seq for deletion at the start of a seq should always have at least 2 basepairs. {ref_seq}."
+            )
 
     if edit_type == "sub":
         if alt_len != 1:

@@ -266,11 +266,136 @@ def test_build_alt_map_deletion_start_at_zero_should_anchor_correctly():
     out = utilities.build_alt_map(df, amplicon_positions)
     expected = {
         (1, 1): {
-            "ref_seq": REF_SEQ[0:3],
-            "alt_edits": [["delete", REF_SEQ[3], 1]],
+            "ref_seq": REF_SEQ[0:4],
+            "alt_edits": [["delete_start", REF_SEQ[0:3], 1]],
         }
     }
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
+
+
+def test_build_alt_map_deletion_start():
+    ref1 = 'GATTACA'
+    aln1 = '-ATTACA'
+
+    df = create_df_alleles(
+        (ref1, aln1),
+    )
+
+    amplicon_positions = {"Reference": (1, 1)}
+    alt_map = utilities.build_alt_map(df, amplicon_positions)
+
+    assert alt_map[(1, 1)] == {
+        'ref_seq': 'GA',
+        'alt_edits': [['delete_start', 'G', 1]],
+    }
+
+
+    vcf_line = utilities._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
+    assert 'GA\tA' in vcf_line
+
+
+def test_build_alt_map_multi_deletion_start():
+    ref1 = 'AACCTTGG'
+    aln1 = '-ACCTTGG'
+
+    ref2 = 'AACCTTGG'
+    aln2 = '--CCTTGG'
+
+    ref3 = 'AACCTTGG'
+    aln3 = '---CTTGG'
+
+    ref4 = 'AACCTTGG'
+    aln4 = '----TTGG'
+
+    ref5 = 'AACCTTGG'
+    aln5 = '-----TGG'
+
+    ref6 = 'AACCTTGG'
+    aln6 = '------GG'
+
+    ref7 = 'AACCTTGG'
+    aln7 = '-------G'
+
+    df = create_df_alleles(
+        (ref1, aln1),
+        (ref2, aln2),
+        (ref3, aln3),
+        (ref4, aln4),
+        (ref5, aln5),
+        (ref6, aln6),
+        (ref7, aln7),
+    )
+
+    amplicon_positions = {"Reference": (1, 1)}
+    alt_map = utilities.build_alt_map(df, amplicon_positions)
+
+    assert alt_map[(1, 1)] == {
+        'ref_seq': 'AACCTTGG',
+        'alt_edits': [
+            ['delete_start', 'A', 1],
+            ['delete_start', 'AA', 1],
+            ['delete_start', 'AAC', 1],
+            ['delete_start', 'AACC', 1],
+            ['delete_start', 'AACCT', 1],
+            ['delete_start', 'AACCTT', 1],
+            ['delete_start', 'AACCTTG', 1],
+        ],
+    }
+
+    vcf_line = utilities._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
+    assert 'AACCTTGG\tG,GG,TGG,TTGG,CTTGG,CCTTGG,ACCTTGG' in vcf_line
+
+
+def test_build_alt_map_multi_deletion_start_and_middle():
+    ref1 = 'AACCTTGG'
+    aln1 = '-ACCTTGG'
+
+    ref2 = 'AACCTTGG'
+    aln2 = '--CCTTGG'
+
+    ref3 = 'AACCTTGG'
+    aln3 = 'A--CTTGG'
+
+    ref4 = 'AACCTTGG'
+    aln4 = '----TTGG'
+
+    ref5 = 'AACCTTGG'
+    aln5 = '-----TGG'
+
+    ref6 = 'AACCTTGG'
+    aln6 = '------GG'
+
+    ref7 = 'AACCTTGG'
+    aln7 = '-------G'
+
+    df = create_df_alleles(
+        (ref1, aln1),
+        (ref2, aln2),
+        (ref3, aln3),
+        (ref4, aln4),
+        (ref5, aln5),
+        (ref6, aln6),
+        (ref7, aln7),
+    )
+
+    amplicon_positions = {"Reference": (1, 1)}
+    alt_map = utilities.build_alt_map(df, amplicon_positions)
+
+    assert alt_map[(1, 1)] == {
+        'ref_seq': 'AACCTTGG',
+        'alt_edits': [
+            ['delete_start', 'A', 1],
+            ['delete_start', 'AA', 1],
+            ['delete', 'AC', 1],
+            ['delete_start', 'AACC', 1],
+            ['delete_start', 'AACCT', 1],
+            ['delete_start', 'AACCTT', 1],
+            ['delete_start', 'AACCTTG', 1],
+        ],
+    }
+
+    vcf_line = utilities._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
+    assert 'AACCTTGG\tG,GG,TGG,TTGG,ACTTGG,CCTTGG,ACCTTGG' in vcf_line
 
 
 # ----------------------------- insertions -----------------------------
@@ -485,12 +610,16 @@ def test_aln_to_alt_map_to_vcf():
     ref5 = 'AA--TGCGTAC'
     aln5 = 'AAGGTGCG-GG'
 
+    ref6 = 'AATGCGTAC'
+    aln6 = '-------AC'
+
     df = create_df_alleles(
         (ref1, aln1),
         (ref2, aln2),
         (ref3, aln3),
         (ref4, aln4),
         (ref5, aln5),
+        (ref6, aln6),
     )
 
     amplicon_positions = {"Reference": (1, 1)}
@@ -506,6 +635,8 @@ def test_aln_to_alt_map_to_vcf():
     assert alt_map[(1, 8)] == {'ref_seq': 'A', 'alt_edits': [['sub', 'G', 1]]}
     # substitution of C -> G occurs 1 time in 5
     assert alt_map[(1, 9)] == {'ref_seq': 'C', 'alt_edits': [['sub', 'G', 1]]}
+    # deletion at position 1 (1-based) occurs 1 time in 6
+    assert alt_map[(1, 1)] == {'ref_seq': 'AATGCGTA', 'alt_edits': [['delete_start', 'AATGCGT', 1]]}
 
     temp_vcf_path = 'aln_to_alt_map_to_vcf.vcf'
     num_reads = 5
@@ -520,5 +651,6 @@ def test_aln_to_alt_map_to_vcf():
     assert '\t'.join(('1', '4', '.', 'G', 'GAA', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
     assert '\t'.join(('1', '8', '.', 'A', 'G', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
     assert '\t'.join(('1', '9', '.', 'C', 'G', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
+    assert '\t'.join(('1', '1', '.', 'AATGCGTA', 'A', '.', 'PASS', f'AF={1 / num_reads}')) in vcf_contents
 
     os.remove(temp_vcf_path)
