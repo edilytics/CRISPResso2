@@ -122,7 +122,7 @@ def _upsert_edit(alt_map, key, ref_seq_for_key, edit_type, alt_edit, reads):
     if edit_type == "delete" or edit_type == 'delete_start':
         target_len = len(alt_edit)
         for existing in entry["alt_edits"]:
-            if existing[0] == "delete" and len(existing[1]) == target_len:
+            if existing[0] == edit_type and len(existing[1]) == target_len:
                 existing[2] += reads
                 break
         else:

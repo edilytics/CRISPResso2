@@ -372,9 +372,11 @@ def test_build_alt_map_multi_deletion_start_and_middle():
         (ref1, aln1),
         (ref2, aln2),
         (ref3, aln3),
+        (ref3, aln3),
         (ref4, aln4),
         (ref5, aln5),
         (ref6, aln6),
+        (ref7, aln7),
         (ref7, aln7),
     )
 
@@ -386,11 +388,11 @@ def test_build_alt_map_multi_deletion_start_and_middle():
         'alt_edits': [
             ['delete_start', 'A', 1],
             ['delete_start', 'AA', 1],
-            ['delete', 'AC', 1],
+            ['delete', 'AC', 2],
             ['delete_start', 'AACC', 1],
             ['delete_start', 'AACCT', 1],
             ['delete_start', 'AACCTT', 1],
-            ['delete_start', 'AACCTTG', 1],
+            ['delete_start', 'AACCTTG', 2],
         ],
     }
 
