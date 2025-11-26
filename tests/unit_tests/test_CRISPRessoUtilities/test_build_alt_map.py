@@ -484,58 +484,14 @@ def test_build_alt_map_skips_unmodified(rows, amplicon_positions, expected_size)
 
 # ----------------------------- ensuring that insertions are keyed by right anchor -----------------------------
 
-# TODO refactor this function
 def test_build_alt_map_fidelity_like_real_row():
     # Short 40bp reference used across tests
-    REF_SEQ = "ATGCGTACGATCGTACGTAGCTAGCTAGCGTAGCTAGCTA"
+    ref_seq = "ATGCGTACGA---TCGTACGTAGCTAGCTAGCGTAGCTAGCTA"
+    aln_seq = "ATGCGTACGAGGGTCGTACGTAGCTAGCTAGCGTAGCTAGCTA"
+    num_reads = 7
+    ins_right_anchor = 9
 
-    # --- build a CRISPResso‑like "real" row ---
-    left_pad = 4
-    right_pad = 5
-    ins_right_anchor = 11        # insertion between 10 and 11; right anchor == 11
-    ins_seq = "GGG"
-    reads = 7
-
-    # Aligned includes inserted bases; Reference shows '-' at the inserted site
-    aligned_seq = (
-        "-" * left_pad
-        + REF_SEQ[:ins_right_anchor]
-        + ins_seq
-        + REF_SEQ[ins_right_anchor:]
-        + "-" * right_pad
-    )
-    reference_seq = (
-        "-" * left_pad
-        + REF_SEQ[:ins_right_anchor]
-        + "-" * len(ins_seq)
-        + REF_SEQ[ins_right_anchor:]
-        + "-" * right_pad
-    )
-
-    # ref_positions spans the padded string length; negatives where there's no ref base
-    ref_positions = (
-        [-1] * left_pad
-        + list(range(ins_right_anchor))        # 0..10 map one-to-one
-        + [-999] * len(ins_seq)                # inserted segment has no ref coordinate
-        + list(range(ins_right_anchor, len(REF_SEQ)))  # 11..39
-        + [-1] * right_pad
-    )
-
-    row = {
-        "#Reads": reads,
-        "Aligned_Sequence": aligned_seq,
-        "Reference_Sequence": reference_seq,
-        "n_inserted": len(ins_seq),
-        "n_deleted": 0,
-        "n_mutated": 0,
-        "Reference_Name": "Reference",
-        "ref_positions": ref_positions,
-        "insertion_coordinates": [(ins_right_anchor, left_pad + ins_right_anchor)],
-        "deletion_coordinates": [],
-        "substitution_positions": [],
-        "insertion_sizes": [len(ins_seq)],
-    }
-    df = pd.DataFrame([row])
+    df = create_df_alleles((ref_seq, aln_seq, num_reads))
 
     # Amplicon starts at absolute position 500 on chromosome 1
     amplicon_positions = {"Reference": (1, 500)}
@@ -543,8 +499,8 @@ def test_build_alt_map_fidelity_like_real_row():
     # Expected: key uses the right anchor; ref_seq is the anchor base; alt carries inserted string & reads
     expected = {
         (1, 500 + ins_right_anchor): {
-            "ref_seq": REF_SEQ[ins_right_anchor],
-            "alt_edits": [["insert", ins_seq, reads]],
+            "ref_seq": ref_seq[ins_right_anchor],
+            "alt_edits": [["insert", "GGG", num_reads]],
         }
     }
 
@@ -578,7 +534,10 @@ def test_aln_to_alt_map_ins_del_same_pos():
     num_vcf_rows = utilities.vcf_lines_from_alt_map(alt_map, num_reads, ['Reference'], temp_vcf_path)
     assert num_vcf_rows == len(alt_map)
 
-    # TODO add checks to the contents of the VCF file
+    with open(temp_vcf_path) as fh:
+        vcf_contents = fh.read()
+    assert 'ATG\tA,ATTTG' in vcf_contents
+
     os.remove(temp_vcf_path)
 
 
