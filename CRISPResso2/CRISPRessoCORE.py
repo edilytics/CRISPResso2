@@ -458,7 +458,7 @@ def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinat
             start += 1
         while end not in idxs and end > min_idx:
             end -= 1
-        if end > start:
+        if end >= start:
             include_idxs.extend(range(idxs.index(start), idxs.index(end) + 1))
 
     return list(filter(lambda x: x >= 0, include_idxs))
