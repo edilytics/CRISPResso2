@@ -597,6 +597,50 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_end():
     assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == list(range(1, 9))
 
 
+def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_before_qw():
+    quant_window_coordinates = '6-9'
+
+    # Ind:           11
+    #      012345678901
+    # QWC:       |  |
+    ref = 'GGGTACTGTCCA'
+    aln = 'GGGTA-TGTCCA'
+    # QWC:       |  |
+    # Ind:            1
+    #      01234 567890
+    s1inds, _ = CRISPRessoShared.get_relative_coordinates(ref, aln)
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == list(range(5, 9))
+
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_before_qw():
+    quant_window_coordinates = '6-9'
+    # Ind:            1
+    #      01234 567890
+    # QWC:        |  |
+    ref = 'GGGTA-TGTCCA'
+    aln = 'GGGTACTGTCCA'
+    # QWC:        |  |
+    # Ind:           11
+    #      012345678901
+    s1inds, _ = CRISPRessoShared.get_relative_coordinates(ref, aln)
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == list(range(7, 11))
+
+
+def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_deletion_outside_qw():
+    quant_window_coordinates = '4-6_11-14'
+
+    # Ind:               11111
+    #      0123    45678901234
+    # QWC:         | |    |  |
+    ref = 'GGGT----ACTTTTGTCCA'
+    aln = 'GGGTTCCCACT---GTCCA'
+    # QWC:         | |    |  |
+    # Ind:           1   11111
+    #      01234567890   12345
+    s1inds, _ = CRISPRessoShared.get_relative_coordinates(ref, aln)
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [8, 9, 10, 12, 13, 14, 15]
+
+
 def test_get_cloned_include_idxs_from_quant_window_coordinates_insertion_across_qw():
     # 6 bp insertion in middle of 4 bp sequence
     quant_window_coordinates = '1-3'
