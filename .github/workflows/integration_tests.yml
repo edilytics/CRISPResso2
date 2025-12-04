@@ -68,6 +68,7 @@ jobs:
         with:
           repository: edilytics/CRISPResso2_tests
           # ref: '<BRANCH-NAME>' # update to specific branch
+          ref: cole/fix-qwc-deletion
 
       - name: Run Basic
         run: |
