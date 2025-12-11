@@ -1,12 +1,33 @@
 # Changelog
 
 ## Unreleased
-## VERSION - Name - DATE
 ### ADDED
+
+- Add an amino acid nucleotide quilt plot by [@mbowcut2](https://github.com/pinellolab/CRISPResso2/pull/552) in [#552](https://github.com/pinellolab/CRISPResso2/pull/552)
+
+- Add `scriptsreconstituteReads.py` to generate FASTQ from CRISPResso2 output by [@kclem](https://github.com/kclem) in [`a800762`](https://github.com/pinellolab/CRISPResso2/commit/a800762712e692a9fc7005b3510d013924c843a5) and [`cd79dcc`](https://github.com/pinellolab/CRISPResso2/commit/cd79dcc3ca9c06736dc6cd409d43dee8e4d1ae69)
+
+- Add an [UpSet plot](https://upset.app/) to represent bystander edits for Base Editing analyses by [@mbowcut2](https://github.com/mbowcut2) in [#554](https://github.com/pinellolab/CRISPResso2/pull/554)
+
+- Allow for messages to be served via CRISPResso reports by [@Colelyman](https://github.com/Colelyman) in [#583](https://github.com/pinellolab/CRISPResso2/pull/583)
 
 ### FIXED
 
+- Fix the `x_lim` settings on plot 3b by [@kclem](https://github.com/kclem) in [`56bd430`](https://github.com/pinellolab/CRISPResso2/commit/56bd4306292136ed95d7032b0582c6ad370dd79b)
+
+- Fix parsing the `CRISPResso2_info.json` in CRISPRessoPooled by [@kclem](https://github.com/kclem) in [#558](https://github.com/pinellolab/CRISPResso2/pull/558)
+
+- Forced cloned `include_idxs` to be `np.array`s by [@kclem](https://github.com/kclem) in [`da4badb`](https://github.com/pinellolab/CRISPResso2/commit/da4badb34282928fe62cbe56dabf8b0d9b1acdee)
+
+- Fix the link to the CRISPResso cup in reports (so that SSL works correctly) by [@Colelyman](https://github.com/Colelyman) in [#571](https://github.com/pinellolab/CRISPResso2/pull/571)
+
+- Fix the quantification of deletions at the second position of the sequence by [@Colelyman](https://github.com/Colelyman) in [#574](https://github.com/pinellolab/CRISPResso2/pull/574)
+
+- Fix an issue with
+
 ### CHANGED
+
+- Update the base Docker image to `mambaorg/micromamba:2.3.3` and remove dependency on Anaconda `defaults` channel by [@Colelyman](https://github.com/Colelyman) in [#575](https://github.com/pinellolab/CRISPResso2/pull/575)
 
 ### REMOVED
 
@@ -388,10 +409,10 @@
 - Python 3 release
 
     - Incorporates updates and changes from python2 up to this point
-    
+
     - Adds multiprocessing to CRISPRessoBase to parallelize image generation to speed up results
         - CRISPRessoBatch, CRISPRessoPooled, and CRISPRessoWGS allocate processes to sub-CRISPResso commands so that sqrt(n_processes) sub-commands are run, each with sqrt(n_processes) unless plotting is turned off (via --suppress_report or --suppress_plots in which case n_processes are run, each with 1 process.
-    
+
     - The crispresso_info dictionary containing run information is saved as json so it can be read across versions of python and by other programs (e.g. R). The dict structure of the object has also been changed to be more navigable and hierarchical.
 
     - Because of changes to crispresso_info, this version of CRISPResso will not be able to finish incomplete runs (e.g. checkpointing of CRISPRessoPooled) that were started by previous python2 versions of CRISPResso, or aggregate or access information from previous runs (e.g. using CRISPRessoAggregate, CRISPRessoCompare, or the custom python plotting scripts in scripts). However, even if we were to have stuck with pickle format for crispresso_info, the python2 and python3 versions were incompatible anyway. So we figured this was a good time to move toward a better format.
@@ -508,7 +529,7 @@ Guide names with spaces produce file names with hyphens instead of spaces
 --prime_editing_pegRNA_spacer_seq
 --prime_editing_pegRNA_extension_seq
 and optionally
---prime_editing_pegRNA_extension_quantification_window_size 
+--prime_editing_pegRNA_extension_quantification_window_size
 --prime_editing_pegRNA_scaffold_sequence
 --prime_editing_nicking_guide_seq
 with a summary shown in the report
