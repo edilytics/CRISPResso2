@@ -602,3 +602,38 @@ CRISPResso_on_SAMPLE/CRISPResso2_report.html
 - More precise plotting of cleavage cut site and quantification window
 
 - Bioconda updates
+
+
+## v2.0.26 - 03/06/2019
+### Added
+- Add report display name, remove paths from stored files, fix sgRNA plot, CRISPRessoPooled report HTML, add citation to report
+
+
+## v2.0.25 - 02/21/2019
+### Added
+- Add inferring of guides
+
+
+## v2.0.24 - 02/13/2019
+### Changed
+- Update docker, setup.py
+
+
+## v2.0.23 - 01/24/2019
+### Added
+- Add manifest.in
+
+
+## v2.0.22 - 01/23/2019
+### Changed
+- Change license location, license update
+
+
+## v2.0.21 - 01/22/2019
+### Changed
+- Detangled root location dependency from params
+
+
+## v2.0.20b - 01/22/2019
+### Changed
+- Prepare for bioconda integration
