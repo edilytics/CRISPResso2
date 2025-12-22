@@ -3343,7 +3343,14 @@ def main():
                 if not needs_cut_points and not needs_sgRNA_intervals and not needs_exon_positions and args.quantification_window_coordinates is None:
                     continue
 
-                fws1, fws2, fwscore=CRISPResso2Align.global_align(refs[ref_name]['sequence'], refs[clone_ref_name]['sequence'], matrix=aln_matrix, gap_open=args.needleman_wunsch_gap_open, gap_extend=args.needleman_wunsch_gap_extend, gap_incentive=refs[clone_ref_name]['gap_incentive'])
+                fws1, fws2, fwscore = CRISPResso2Align.global_align(
+                    refs[clone_ref_name]['sequence'],
+                    refs[ref_name]['sequence'],
+                    matrix=aln_matrix,
+                    gap_open=args.needleman_wunsch_gap_open,
+                    gap_extend=args.needleman_wunsch_gap_extend,
+                    gap_incentive=refs[ref_name]['gap_incentive'],
+                )
                 if fwscore < 60:
                     continue
 
