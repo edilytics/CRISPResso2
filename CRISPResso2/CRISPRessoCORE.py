@@ -6446,6 +6446,7 @@ def main():
 
         info(CRISPRessoShared.get_crispresso_footer())
         info('Analysis Complete!', {'percent_complete': 100})
+
         sys.exit(0)
 
     except CRISPRessoShared.NTException as e:
