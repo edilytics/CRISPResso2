@@ -49,10 +49,53 @@ pd = check_library('pandas')
 np = check_library('numpy')
 
 
+def should_plot_large_plots(num_rows, c2pro_installed, use_matplotlib, large_plot_cutoff=300):
+    """Determine if large plots should be plotted.
+
+    Parameters
+    ----------
+    num_rows : int
+        Number of rows in the dataframe.
+    c2pro_installed : bool
+        Whether CRISPRessoPro is installed.
+    use_matplotlib : bool
+        Whether to use matplotlib when CRISPRessoPro is installed, i.e. value
+        of `--use_matplotlib`.
+    large_plot_cutoff : int, optional
+        Number of samples at which to not plot large plots with matplotlib.
+        Note that each sample has 6 rows in the datafame. Defaults to 300.
+
+    Returns
+    -------
+    bool
+        Whether to plot large plots.
+    """
+    return (
+        (not use_matplotlib and c2pro_installed)
+        or (num_rows / 6) < large_plot_cutoff
+    )
+
+
 def main():
     try:
         start_time =  datetime.now()
         start_time_string =  start_time.strftime('%Y-%m-%d %H:%M:%S')
+
+        # if no args are given, print a simplified help message
+        if len(sys.argv) == 1:
+            raise CRISPRessoShared.BadParameterException(CRISPRessoShared.format_cl_text('usage: CRISPRessoBatch  [-bs BATCH_SETTINGS]  [-n NAME]\n' + \
+                'commonly-used arguments:\n' + \
+                '-h, --help            show the full list of arguments\n' + \
+                '-v, --version         show program\'s version number and exit\n' + \
+                '-bs BATCH_SETTINGS    Tab-separated file where rows are samples and columns specify settings for each sample.\n' + \
+                '-n NAME, --name NAME  Name for the analysis (default: name based on input file name)'
+            ))
+
+        parser = CRISPRessoShared.getCRISPRessoArgParser("Batch", parser_title = 'CRISPRessoBatch Parameters')
+
+        args = parser.parse_args()
+
+        CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
         description = ['~~~CRISPRessoBatch~~~', '-Analysis of CRISPR/Cas9 outcomes from batch deep sequencing data-']
         batch_string = r'''
@@ -62,26 +105,7 @@ def main():
 ||__)/--\| \__|  ||
 |_________________|
         '''
-        print(CRISPRessoShared.get_crispresso_header(description, batch_string))
-
-        # if no args are given, print a simplified help message
-        if len(sys.argv) == 1:
-            print(CRISPRessoShared.format_cl_text('usage: CRISPRessoBatch  [-bs BATCH_SETTINGS]  [-n NAME]\n' + \
-                'commonly-used arguments:\n' + \
-                '-h, --help            show the full list of arguments\n' + \
-                '-v, --version         show program\'s version number and exit\n' + \
-                '-bs BATCH_SETTINGS    Tab-separated file where rows are samples and columns specify settings for each sample.\n' + \
-                '-n NAME, --name NAME  Name for the analysis (default: name based on input file name)'
-            ))
-            sys.exit()
-
-        parser = CRISPRessoShared.getCRISPRessoArgParser("Batch", parser_title = 'CRISPRessoBatch Parameters')
-
-        args = parser.parse_args()
-
-        CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
-
-        debug_flag = args.debug
+        info(CRISPRessoShared.get_crispresso_header(description, batch_string))
 
         crispresso_options = CRISPRessoShared.get_core_crispresso_options()
         options_to_ignore = {'name', 'output_folder', 'zip_output'}
@@ -373,6 +397,7 @@ def main():
             num_processes=n_processes_for_batch,
             process_futures=process_futures,
             process_pool=process_pool,
+            halt_on_plot_fail=args.halt_on_plot_fail,
         )
 
         window_nuc_pct_quilt_plot_names = []
@@ -388,14 +413,14 @@ def main():
         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_titles'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_labels'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_datas'] = {}
+        crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_divs'] = {}
 
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_names'] = []
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_paths'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_titles'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_labels'] = {}
         crispresso2_info['results']['general_plots']['allele_modification_line_plot_datas'] = {}
-
-        large_plot_cutoff = 300
+        crispresso2_info['results']['general_plots']['allele_modification_line_plot_divs'] = {}
 
         percent_complete_start, percent_complete_end = 90, 99
         if all_amplicons:
@@ -580,11 +605,11 @@ def main():
                         sub_modification_percentage_summary_filename = _jp(amplicon_plot_name + 'Modification_percentage_summary_around_sgRNA_'+sgRNA+'.txt')
                         sub_modification_percentage_summary_df.to_csv(sub_modification_percentage_summary_filename, sep='\t', index=None)
 
-                        if not args.suppress_plots and not args.suppress_batch_summary_plots and (nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
+                        if not args.suppress_plots and not args.suppress_batch_summary_plots and should_plot_large_plots(sub_nucleotide_percentage_summary_df.shape[0], C2PRO_INSTALLED, args.use_matplotlib):
                             # plot for each guide
                             # show all sgRNA's on the plot
-                            sub_sgRNA_intervals = []
-                            for sgRNA_interval in consensus_sgRNA_intervals:
+                            sub_sgRNA_intervals, sub_consensus_guides = [], []
+                            for sgRNA_index, sgRNA_interval in enumerate(consensus_sgRNA_intervals):
                                 newstart = None
                                 newend = None
                                 for idx, i in enumerate(sgRNA_plot_idxs):
@@ -606,6 +631,10 @@ def main():
                                     newend = len(include_idxs) - 1
                                 # and add it to the list
                                 sub_sgRNA_intervals.append((newstart, newend))
+                                sub_consensus_guides.append(consensus_guides[sgRNA_index])
+
+                            # scale the include_idxs to be in terms of the plot centered around the sgRNA
+                            sub_include_idxs = include_idxs - sgRNA_plot_idxs[0]
 
                             this_window_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt_around_sgRNA_'+sgRNA)
                             nucleotide_quilt_input = {
@@ -614,7 +643,8 @@ def main():
                                 'fig_filename_root': f'{this_window_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_window_nuc_pct_quilt_plot_name,
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': sub_sgRNA_intervals,
-                                'quantification_window_idxs': include_idxs,
+                                'sgRNA_sequences': sub_consensus_guides,
+                                'quantification_window_idxs': sub_include_idxs,
                                 'custom_colors': custom_config['colors'],
                             }
                             debug('Plotting nucleotide percentage quilt for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
@@ -628,7 +658,7 @@ def main():
                             crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base around the guide ' + sgRNA + ' for the amplicon ' + amplicon_name
                             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
 
-                            if args.base_editor_output and (sub_nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
+                            if args.base_editor_output and should_plot_large_plots(sub_nucleotide_percentage_summary_df.shape[0], False, args.use_matplotlib):
                                 this_window_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_conversion_map_around_sgRNA_'+sgRNA)
                                 conversion_map_input = {
                                     'nuc_pct_df': sub_nucleotide_percentage_summary_df,
@@ -637,7 +667,7 @@ def main():
                                     'conversion_nuc_to': args.conversion_nuc_to,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': sub_sgRNA_intervals,
-                                    'quantification_window_idxs': include_idxs,
+                                    'quantification_window_idxs': sub_include_idxs,
                                     'custom_colors': custom_config['colors']
                                 }
                                 debug('Plotting nucleotide conversion map for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
@@ -656,7 +686,7 @@ def main():
                                                                                 ]
                         # done with per-sgRNA plots
 
-                    if not args.suppress_plots and not args.suppress_batch_summary_plots:  # plot the whole region
+                    if not args.suppress_plots and not args.suppress_batch_summary_plots and should_plot_large_plots(nucleotide_percentage_summary_df.shape[0], C2PRO_INSTALLED, args.use_matplotlib):  # plot the whole region
                         this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt')
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
@@ -664,6 +694,7 @@ def main():
                             'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_nuc_pct_quilt_plot_name,
                             'save_also_png': save_png,
                             'sgRNA_intervals': consensus_sgRNA_intervals,
+                            'sgRNA_sequences': consensus_guides,
                             'quantification_window_idxs': include_idxs,
                             'custom_colors': custom_config['colors'],
                         }
@@ -679,7 +710,7 @@ def main():
                             crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = ''
                         crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base for the amplicon ' + amplicon_name
                         crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
-                        if args.base_editor_output and (sub_nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
+                        if args.base_editor_output and should_plot_large_plots(nucleotide_percentage_summary_df.shape[0], False, args.use_matplotlib):
                             this_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_conversion_map')
                             conversion_map_input = {
                                 'nuc_pct_df': nucleotide_percentage_summary_df,
@@ -706,7 +737,7 @@ def main():
                             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
 
                 else:  # guides are not the same
-                    if not args.suppress_plots and not args.suppress_batch_summary_plots:
+                    if not args.suppress_plots and not args.suppress_batch_summary_plots and should_plot_large_plots(nucleotide_percentage_summary_df.shape[0], C2PRO_INSTALLED, args.use_matplotlib):
                         this_nuc_pct_quilt_plot_name = _jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt')
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
@@ -724,8 +755,8 @@ def main():
                         nuc_pct_quilt_plot_names.append(plot_name)
                         crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base for the amplicon ' + amplicon_name
                         crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
-                        if args.base_editor_output and (sub_nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
-                            this_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_percentage_quilt')
+                        if args.base_editor_output and should_plot_large_plots(nucleotide_percentage_summary_df.shape[0], False, args.use_matplotlib):
+                            this_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_conversion_map')
                             conversion_map_input = {
                                 'nuc_pct_df': nucleotide_percentage_summary_df,
                                 'fig_filename_root': this_nuc_conv_plot_name,
@@ -745,7 +776,7 @@ def main():
                             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nucleotide_frequency_summary_filename)), ('Modification frequencies', os.path.basename(modification_frequency_summary_filename))]
 
                 # allele modification frequency heatmap and line plots
-                if C2PRO_INSTALLED and not args.use_matplotlib and not args.suppress_plots and not args.suppress_batch_summary_plots and (nucleotide_percentage_summary_df.shape[0] / 6) < large_plot_cutoff:
+                if C2PRO_INSTALLED and not args.use_matplotlib and not args.suppress_plots and not args.suppress_batch_summary_plots:
                     if guides_all_same:
                         sgRNA_intervals = [consensus_sgRNA_intervals] * modification_frequency_summary_df.shape[0]
                     else:
@@ -771,11 +802,13 @@ def main():
                         plot_name = 'CRISPRessoBatch_percentage_of_{0}_across_alleles_{1}_heatmap'.format(modification_type.lower(), amplicon_name)
                         plot_path = '{0}.html'.format(_jp(plot_name))
 
+                        heatmap_div_id = '{0}-allele-modification-heatmap-{1}'.format(amplicon_name.lower(), modification_type.lower())
                         allele_modification_heatmap_input = {
                             'sample_values': modification_df,
                             'sample_sgRNA_intervals': sgRNA_intervals,
                             'plot_path': plot_path,
                             'title': modification_type,
+                            'div_id': heatmap_div_id,
                             'amplicon_name': amplicon_name,
                         }
                         debug('Plotting allele modification heatmap for {0}'.format(amplicon_name))
@@ -799,15 +832,18 @@ def main():
                                 ),
                             ),
                         ]
+                        crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_divs'][plot_name] = heatmap_div_id
 
                         plot_name = 'CRISPRessoBatch_percentage_of_{0}_across_alleles_{1}_line'.format(modification_type.lower(), amplicon_name)
                         plot_path = '{0}.html'.format(_jp(plot_name))
 
+                        line_div_id = '{0}-allele-modification-line-{1}'.format(amplicon_name.lower(), modification_type.lower())
                         allele_modification_line_input = {
                             'sample_values': modification_df,
                             'sample_sgRNA_intervals': sgRNA_intervals,
                             'plot_path': plot_path,
                             'title': modification_type,
+                            'div_id': line_div_id,
                             'amplicon_name': amplicon_name,
                         }
                         debug('Plotting allele modification line plot for {0}'.format(amplicon_name))
@@ -831,6 +867,7 @@ def main():
                                 ),
                             ),
                         ]
+                        crispresso2_info['results']['general_plots']['allele_modification_line_plot_divs'][plot_name] = line_div_id
             #end if amp_found_count > 0 (how many folders had information for this amplicon)
         #end per-amplicon analysis
 
@@ -904,7 +941,12 @@ def main():
                 debug('CRISPResso batch results:')
                 for future in process_futures:
                     debug('future: ' + str(future))
-            future_results = [f.result() for f in process_futures] #required to raise exceptions thrown from within future
+            for future in process_futures:
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.warning('Error in plot pool: %s' % e)
+                    logger.debug(traceback.format_exc())
             process_pool.shutdown()
 
         if not args.suppress_report:
@@ -939,7 +981,7 @@ def main():
                 CRISPRessoShared.zip_results(path_value[1])
             else:
                 CRISPRessoShared.zip_results(OUTPUT_DIRECTORY)
-        print(CRISPRessoShared.get_crispresso_footer())
+        info(CRISPRessoShared.get_crispresso_footer())
         sys.exit(0)
 
     except Exception as e:

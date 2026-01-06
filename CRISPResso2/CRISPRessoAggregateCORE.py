@@ -45,16 +45,6 @@ def main():
         start_time =  datetime.now()
         start_time_string =  start_time.strftime('%Y-%m-%d %H:%M:%S')
 
-        description = ['~~~CRISPRessoAggregate~~~', '-Aggregation of CRISPResso Run Data-']
-        aggregate_string = r'''
-___________________________________
-|      __  __  _   _  __     ___ _ |
-| /\  /__ /__ |_) |_ /__  /\  | |_ |
-|/--\ \_| \_| | \ |_ \_| /--\ | |_ |
-|__________________________________|
-        '''
-        print(CRISPRessoShared.get_crispresso_header(description, aggregate_string))
-
         parser = argparse.ArgumentParser(description="Aggregate CRISPResso2 Runs")
         parser.add_argument("-p", "--prefix", action='append', help="Prefix for CRISPResso folders to aggregate (may be specified multiple times)", default=[])
         parser.add_argument("-s", "--suffix", type=str, help="Suffix for CRISPResso folders to aggregate", default="")
@@ -71,6 +61,7 @@ ___________________________________
 
         parser.add_argument('--debug', help='Show debug messages', action='store_true')
         parser.add_argument('-v', '--verbosity', type=int, help='Verbosity level of output to the console (1-4), 4 is the most verbose', default=3)
+        parser.add_argument('--halt_on_plot_fail', action="store_true", help="Halt execution if a plot fails to generate")
 
         # CRISPRessoPro params
         parser.add_argument('--use_matplotlib', action='store_true',
@@ -84,6 +75,17 @@ ___________________________________
             from CRISPRessoPro import plot as CRISPRessoPlot
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
+
+        description = ['~~~CRISPRessoAggregate~~~', '-Aggregation of CRISPResso Run Data-']
+        aggregate_string = r'''
+___________________________________
+|      __  __  _   _  __     ___ _ |
+| /\  /__ /__ |_) |_ /__  /\  | |_ |
+|/--\ \_| \_| | \ |_ \_| /--\ | |_ |
+|__________________________________|
+        '''
+        info(CRISPRessoShared.get_crispresso_header(description, aggregate_string))
+
 
         output_folder_name='CRISPRessoAggregate_on_%s' % args.name
         OUTPUT_DIRECTORY=os.path.abspath(output_folder_name)
@@ -109,6 +111,7 @@ ___________________________________
         crispresso2_info = {'running_info': {}, 'results': {'alignment_stats': {}, 'general_plots': {}}} #keep track of all information for this run to be pickled and saved at the end of the run
         crispresso2_info['running_info']['version'] = CRISPRessoShared.__version__
         crispresso2_info['running_info']['args'] = deepcopy(args)
+        crispresso2_info['running_info']['command_used'] = ' '.join(sys.argv)
 
         crispresso2_info['running_info']['log_filename'] = os.path.basename(log_filename)
 
@@ -130,6 +133,7 @@ ___________________________________
             num_processes=n_processes,
             process_pool=process_pool,
             process_futures=process_futures,
+            halt_on_plot_fail=args.halt_on_plot_fail,
         )
 
         #glob returns paths including the original prefix
@@ -227,7 +231,7 @@ ___________________________________
 
         if successfully_imported_count > 0:
 
-            crispresso2_folders = crispresso2_folder_infos.keys()
+            crispresso2_folders = list(sorted(crispresso2_folder_infos.keys()))
             crispresso2_folder_names = {}
             crispresso2_folder_htmls = {}#file_loc->html folder loc
             quilt_plots_to_show = {}  # name->{'href':path to report, 'img': png}
@@ -515,8 +519,10 @@ ___________________________________
                                     'fig_filename_root': this_window_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': sub_sgRNA_intervals,
+                                    'sgRNA_sequences': consensus_guides,
                                     'quantification_window_idxs': include_idxs,
                                     'group_column': 'Folder',
+                                    'custom_colors': None,
                                 }
                                 plot(
                                     CRISPRessoPlot.plot_nucleotide_quilt,
@@ -550,8 +556,10 @@ ___________________________________
                                     'fig_filename_root': this_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': consensus_sgRNA_intervals,
+                                    'sgRNA_sequences': consensus_guides,
                                     'quantification_window_idxs': include_idxs,
                                     'group_column': 'Folder',
+                                    'custom_colors': None,
                                 }
                                 plot(
                                     CRISPRessoPlot.plot_nucleotide_quilt,
@@ -589,8 +597,10 @@ ___________________________________
                                     'fig_filename_root': this_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': consensus_sgRNA_intervals,
+                                    'sgRNA_sequences': consensus_guides,
                                     'quantification_window_idxs': consensus_include_idxs,
                                     'group_column': 'Folder',
+                                    'custom_colors': None,
                                 }
                                 plot(
                                     CRISPRessoPlot.plot_nucleotide_quilt,
@@ -614,12 +624,14 @@ ___________________________________
                         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_titles'] = {}
                         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_labels'] = {}
                         crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_datas'] = {}
+                        crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_divs'] = {}
 
                         crispresso2_info['results']['general_plots']['allele_modification_line_plot_names'] = []
                         crispresso2_info['results']['general_plots']['allele_modification_line_plot_paths'] = {}
                         crispresso2_info['results']['general_plots']['allele_modification_line_plot_titles'] = {}
                         crispresso2_info['results']['general_plots']['allele_modification_line_plot_labels'] = {}
                         crispresso2_info['results']['general_plots']['allele_modification_line_plot_datas'] = {}
+                        crispresso2_info['results']['general_plots']['allele_modification_line_plot_divs'] = {}
                         if guides_all_same:
                             sgRNA_intervals = [consensus_sgRNA_intervals] * modification_frequency_summary_df.shape[0]
                         else:
@@ -645,11 +657,14 @@ ___________________________________
                             plot_name = 'CRISPRessoAggregate_percentage_of_{0}_across_alleles_{1}_heatmap'.format(modification_type.lower(), amplicon_name)
                             plot_path = '{0}.html'.format(_jp(plot_name))
 
+                            heatmap_div_id = '{0}-allele-modification-heatmap-{1}'.format(amplicon_name.lower(), modification_type.lower())
                             allele_modification_heatmap_input = {
                                 'sample_values': modification_df,
                                 'sample_sgRNA_intervals': sgRNA_intervals,
                                 'plot_path': plot_path,
                                 'title': modification_type,
+                                'div_id': heatmap_div_id,
+                                'amplicon_name': amplicon_name,
                             }
                             plot(
                                 CRISPRessoPlot.plot_allele_modification_heatmap,
@@ -671,15 +686,19 @@ ___________________________________
                                     ),
                                 ),
                             ]
+                            crispresso2_info['results']['general_plots']['allele_modification_heatmap_plot_divs'][plot_name] = heatmap_div_id
 
                             plot_name = 'CRISPRessoAggregate_percentage_of_{0}_across_alleles_{1}_line'.format(modification_type.lower(), amplicon_name)
                             plot_path = '{0}.html'.format(_jp(plot_name))
 
+                            line_div_id = '{0}-allele-modification-line-{1}'.format(amplicon_name.lower(), modification_type.lower())
                             allele_modification_line_input = {
                                 'sample_values': modification_df,
                                 'sample_sgRNA_intervals': sgRNA_intervals,
                                 'plot_path': plot_path,
                                 'title': modification_type,
+                                'div_id': line_div_id,
+                                'amplicon_name': amplicon_name,
                             }
                             plot(
                                 CRISPRessoPlot.plot_allele_modification_line,
@@ -700,6 +719,7 @@ ___________________________________
                                     ),
                                 ),
                             ]
+                            crispresso2_info['results']['general_plots']['allele_modification_line_plot_divs'][plot_name] = line_div_id
 
             crispresso2_info['results']['general_plots']['window_nuc_pct_quilt_plot_names'] = window_nuc_pct_quilt_plot_names
             crispresso2_info['results']['general_plots']['nuc_pct_quilt_plot_names'] = nuc_pct_quilt_plot_names
@@ -771,7 +791,7 @@ ___________________________________
 
             header = 'Name\tUnmodified%\tModified%\tReads_total\tReads_aligned\tUnmodified\tModified\tDiscarded\tInsertions\tDeletions\tSubstitutions\tOnly Insertions\tOnly Deletions\tOnly Substitutions\tInsertions and Deletions\tInsertions and Substitutions\tDeletions and Substitutions\tInsertions Deletions and Substitutions'
             header_els = header.split("\t")
-            df_summary_quantification=pd.DataFrame(quantification_summary, columns=header_els)
+            df_summary_quantification=pd.DataFrame(quantification_summary, columns=header_els).sort_values(by=['Name'])
             samples_quantification_summary_filename = _jp('CRISPRessoAggregate_quantification_of_editing_frequency.txt') #this file has one line for each run (sum of all amplicons)
             df_summary_quantification.fillna('NA').to_csv(samples_quantification_summary_filename, sep='\t', index=None)
             crispresso2_info['results']['alignment_stats']['samples_quantification_summary_filename'] = os.path.basename(samples_quantification_summary_filename)
@@ -833,11 +853,17 @@ ___________________________________
                 report_filename = OUTPUT_DIRECTORY+'.html'
                 if (args.place_report_in_output_folder):
                     report_filename = _jp("CRISPResso2Aggregate_report.html")
-                CRISPRessoReport.make_aggregate_report(crispresso2_info, args.name,
-                                                       report_filename, OUTPUT_DIRECTORY,
-                                                       _ROOT, crispresso2_folders,
-                                                       crispresso2_folder_htmls,
-                                                       quilt_plots_to_show)
+                CRISPRessoReport.make_aggregate_report(
+                    crispresso2_info,
+                    args.name,
+                    report_filename,
+                    OUTPUT_DIRECTORY,
+                    _ROOT,
+                    crispresso2_folders,
+                    crispresso2_folder_htmls,
+                    logger,
+                    compact_plots_to_show=quilt_plots_to_show,
+                )
                 crispresso2_info['running_info']['report_location'] = report_filename
                 crispresso2_info['running_info']['report_filename'] = os.path.basename(report_filename)
         else: #no files successfully imported
@@ -869,11 +895,16 @@ ___________________________________
                 debug('Plot pool results:')
                 for future in process_futures:
                     debug('future: ' + str(future))
-            future_results = [f.result() for f in process_futures] #required to raise exceptions thrown from within future
+            for future in process_futures:
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.warning('Error in plot pool: %s' % e)
+                    logger.debug(traceback.format_exc())
             process_pool.shutdown()
 
         info('Analysis Complete!', {'percent_complete': 100})
-        print(CRISPRessoShared.get_crispresso_footer())
+        info(CRISPRessoShared.get_crispresso_footer())
         sys.exit(0)
 
     except Exception as e:

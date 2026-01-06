@@ -94,6 +94,12 @@ def get_matching_allele_files(run_info_1, run_info_2):
 
 def main():
     try:
+        parser = CRISPRessoShared.getCRISPRessoArgParser("Compare", parser_title = 'CRISPRessoCompare Parameters')
+
+        args = parser.parse_args()
+
+        CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
+        
         description = ['~~~CRISPRessoCompare~~~', '-Comparison of two CRISPResso analyses-']
         compare_header = r'''
  ___________________________
@@ -103,23 +109,15 @@ def main():
 |___________________________|
         '''
         compare_header = CRISPRessoShared.get_crispresso_header(description, compare_header)
-        print(compare_header)
-
-        parser = CRISPRessoShared.getCRISPRessoArgParser("Compare", parser_title = 'CRISPRessoCompare Parameters')
-
-        args = parser.parse_args()
+        info(compare_header)
 
         if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
             from CRISPResso2 import CRISPRessoPlot
         else:
             from CRISPRessoPro import plot as CRISPRessoPlot
 
-        CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
-
-        debug_flag = args.debug
-
         if args.zip_output and not args.place_report_in_output_folder:
-            logger.warn('Invalid arguement combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True.')
+            warn('Invalid argument combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True.')
             args.place_report_in_output_folder = True
         #check that the CRISPResso output is present and fill amplicon_info
         quantification_file_1, amplicon_names_1, amplicon_info_1=CRISPRessoShared.check_output_folder(args.crispresso_output_folder_1)
@@ -195,7 +193,8 @@ def main():
         sig_counts = {}  # number of bp significantly modified (bonferonni corrected fisher pvalue)
         sig_counts_quant_window = {}
         percent_complete_start, percent_complete_end = 10, 90
-        percent_complete_step = (percent_complete_end - percent_complete_start) / len(amplicon_names_in_both)
+        if amplicon_names_in_both:
+            percent_complete_step = (percent_complete_end - percent_complete_start) / len(amplicon_names_in_both)
         for amplicon_name in amplicon_names_in_both:
             percent_complete = percent_complete_start + percent_complete_step * amplicon_names_in_both.index(amplicon_name)
             info('Loading data for amplicon %s' % amplicon_name, {'percent_complete': percent_complete})
@@ -292,7 +291,7 @@ def main():
                 tot_counts_2 = np.array(mod_freqs_2['Total'], dtype=float)
                 unmod_counts_2 = tot_counts_2 - mod_counts_2
 
-                fisher_results = [stats.fisher_exact([[z[0], z[1]], [z[2], z[3]]]) if max(z) > 0 else [np.NaN, 1.0] for z in zip(mod_counts_1, unmod_counts_1, mod_counts_2, unmod_counts_2)]
+                fisher_results = [stats.fisher_exact([[z[0], z[1]], [z[2], z[3]]]) if max(z) > 0 else [np.nan, 1.0] for z in zip(mod_counts_1, unmod_counts_1, mod_counts_2, unmod_counts_2)]
                 oddsratios, pvalues = [a for a, b in fisher_results], [b for a, b in fisher_results]
 
                 mod_df = []
@@ -397,7 +396,7 @@ def main():
                 quant_cols = ['#Reads_'+sample_1_name, '%Reads_'+sample_1_name, '#Reads_'+sample_2_name, '%Reads_'+sample_2_name]
                 merged[quant_cols] = merged[quant_cols].fillna(0)
                 lfc_error =0.1
-                merged['each_LFC'] = np.log2(((merged['%Reads_'+sample_1_name]+lfc_error)/(merged['%Reads_'+sample_2_name]+lfc_error)).astype(float)).replace([np.inf, np.NaN], 0)
+                merged['each_LFC'] = np.log2(((merged['%Reads_'+sample_1_name]+lfc_error)/(merged['%Reads_'+sample_2_name]+lfc_error)).astype(float)).replace([np.inf, np.nan], 0)
                 merged = merged.sort_values(['%Reads_'+sample_1_name, 'Reference_Sequence', 'n_deleted', 'n_inserted', 'n_mutated'], ascending=False)
                 merged = merged.reset_index(drop=True).set_index('Aligned_Sequence')
                 args.crispresso_output_folder_root = os.path.split(allele_file_1)[1].replace(".txt", "")
@@ -454,7 +453,7 @@ def main():
             CRISPRessoShared.zip_results(OUTPUT_DIRECTORY)
 
         info('Analysis Complete!', {'percent_complete': 100})
-        print(CRISPRessoShared.get_crispresso_footer())
+        info(CRISPRessoShared.get_crispresso_footer())
         sys.exit(0)
 
     except Exception as e:
