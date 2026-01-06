@@ -82,7 +82,7 @@ def main():
         compare_header = CRISPRessoShared.get_crispresso_header(
             description, compare_header,
         )
-        print(compare_header)
+        info(compare_header)
 
         parser = argparse.ArgumentParser(
             description='CRISPRessoPooledWGSCompare Parameters',
@@ -231,7 +231,7 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
 
         log_filename = _jp('CRISPRessoPooledWGSCompare_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
-        logger.addHandler(CRISPRessoShared.StatusHandler(_jp('CRISPRessoPooledWGSCompare_status.json')))
+        logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoPooledWGSCompare_status.json')))
 
         with open(log_filename, 'w+') as outfile:
             outfile.write(
@@ -367,6 +367,7 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
                 'CRISPREssoPooledWGSCompare Report<br>{0} vs {1}'.format(
                     sample_1_name, sample_2_name,
                 ),
+                logger,
             )
             crispresso2_info['running_info']['report_location'] = report_name
             crispresso2_info['running_info']['report_filename'] = os.path.basename(report_name)
@@ -379,7 +380,7 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
             CRISPRessoShared.zip_results(OUTPUT_DIRECTORY)
 
         info('All Done!', {'percent_complete': 100})
-        print(CRISPRessoShared.get_crispresso_footer())
+        info(CRISPRessoShared.get_crispresso_footer())
         sys.exit(0)
 
     except Exception as e:
