@@ -81,6 +81,22 @@ def main():
         start_time =  datetime.now()
         start_time_string =  start_time.strftime('%Y-%m-%d %H:%M:%S')
 
+        # if no args are given, print a simplified help message
+        if len(sys.argv) == 1:
+            raise CRISPRessoShared.BadParameterException(CRISPRessoShared.format_cl_text('usage: CRISPRessoBatch  [-bs BATCH_SETTINGS]  [-n NAME]\n' + \
+                'commonly-used arguments:\n' + \
+                '-h, --help            show the full list of arguments\n' + \
+                '-v, --version         show program\'s version number and exit\n' + \
+                '-bs BATCH_SETTINGS    Tab-separated file where rows are samples and columns specify settings for each sample.\n' + \
+                '-n NAME, --name NAME  Name for the analysis (default: name based on input file name)'
+            ))
+
+        parser = CRISPRessoShared.getCRISPRessoArgParser("Batch", parser_title = 'CRISPRessoBatch Parameters')
+
+        args = parser.parse_args()
+
+        CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
+
         description = ['~~~CRISPRessoBatch~~~', '-Analysis of CRISPR/Cas9 outcomes from batch deep sequencing data-']
         batch_string = r'''
  _________________
@@ -89,26 +105,7 @@ def main():
 ||__)/--\| \__|  ||
 |_________________|
         '''
-        print(CRISPRessoShared.get_crispresso_header(description, batch_string))
-
-        # if no args are given, print a simplified help message
-        if len(sys.argv) == 1:
-            print(CRISPRessoShared.format_cl_text('usage: CRISPRessoBatch  [-bs BATCH_SETTINGS]  [-n NAME]\n' + \
-                'commonly-used arguments:\n' + \
-                '-h, --help            show the full list of arguments\n' + \
-                '-v, --version         show program\'s version number and exit\n' + \
-                '-bs BATCH_SETTINGS    Tab-separated file where rows are samples and columns specify settings for each sample.\n' + \
-                '-n NAME, --name NAME  Name for the analysis (default: name based on input file name)'
-            ))
-            sys.exit()
-
-        parser = CRISPRessoShared.getCRISPRessoArgParser("Batch", parser_title = 'CRISPRessoBatch Parameters')
-
-        args = parser.parse_args()
-
-        CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
-
-        debug_flag = args.debug
+        info(CRISPRessoShared.get_crispresso_header(description, batch_string))
 
         crispresso_options = CRISPRessoShared.get_core_crispresso_options()
         options_to_ignore = {'name', 'output_folder', 'zip_output'}
@@ -400,6 +397,7 @@ def main():
             num_processes=n_processes_for_batch,
             process_futures=process_futures,
             process_pool=process_pool,
+            halt_on_plot_fail=args.halt_on_plot_fail,
         )
 
         window_nuc_pct_quilt_plot_names = []
@@ -983,7 +981,7 @@ def main():
                 CRISPRessoShared.zip_results(path_value[1])
             else:
                 CRISPRessoShared.zip_results(OUTPUT_DIRECTORY)
-        print(CRISPRessoShared.get_crispresso_footer())
+        info(CRISPRessoShared.get_crispresso_footer())
         sys.exit(0)
 
     except Exception as e:

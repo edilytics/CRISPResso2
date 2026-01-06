@@ -33,8 +33,8 @@ import re
 
 def main():
     version = re.search(
-        r'^__version__\s*=\s*"(.*)"',
-        open('CRISPResso2/CRISPRessoShared.py').read(),
+        r'^version\s*=\s*"(.*)"',
+        open('pyproject.toml').read(),
         re.M
     ).group(1)
 
@@ -91,6 +91,7 @@ def main():
               'jinja2',
               'scipy',
               'numpy',
+              'upsetplot',
               ],
           cmdclass = command_classes,
           ext_modules = ext_modules

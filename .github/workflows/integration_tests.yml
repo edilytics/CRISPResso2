@@ -6,6 +6,10 @@ on:
   pull_request:
     types: [opened, reopened]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -41,8 +45,7 @@ jobs:
           CACHE_NUMBER: 0
         with:
           path: /usr/share/miniconda/envs/test_env
-          key:
-            conda-${{ runner.os }}--${{ runner.arch }}--${{ steps.get-date.outputs.today }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
+          key: conda-${{ runner.os }}--${{ runner.arch }}--${{ steps.get-date.outputs.today }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
 
       - name: Update Conda Env
         run: |
@@ -80,6 +83,31 @@ jobs:
         run: |
           make prime-editor test print
 
+      - name: Run Base Editor
+        if: success() || failure()
+        run: |
+          make base_editor test print
+
+      - name: Run Native Merging
+        if: success() || failure()
+        run: |
+          make nhej_native_merge test print
+
+      - name: Run BAM Input
+        if: success() || failure()
+        run: |
+          make bam test print
+
+      - name: Run BAM Output
+        if: success() || failure()
+        run: |
+          make bam-out test print
+
+      - name: Run BAM Genome Output
+        if: success() || failure()
+        run: |
+          make bam-out-genome test print
+
       - name: Run Batch
         if: success() || failure()
         run: |
@@ -114,3 +142,23 @@ jobs:
         if: success() || failure()
         run: |
           make compare test print
+
+      - name: Run Aggregate
+        if: success() || failure()
+        run: |
+          make aggregate test print
+
+      - name: Run Asym Allele Plot Left
+        if: success() || failure()
+        run: |
+          make asym-left test print
+
+      - name: Run Asym Allele Plot Right
+        if: success() || failure()
+        run: |
+          make asym-right test print
+
+      - name: Run Asym Allele Plot Both
+        if: success() || failure()
+        run: |
+          make asym-both test print

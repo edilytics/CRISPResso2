@@ -28,13 +28,20 @@ from functools import partial
 
 from markupsafe import Markup
 
+try:
+    import flask
+except ImportError:
+    flask = None
+
 
 def render_partial(template_name, renderer=None, markup=True, **data):
+    """
+    Renders a partial template and returns the result. If `markup` is True, the result is wrapped in a `Markup` object.
+    """
     if renderer is None:
         if flask is None:
             raise PartialsException('No renderer specified')
-        else:
-            renderer = flask.render_template
+        renderer = flask.render_template
 
     if markup:
         return Markup(renderer(template_name, **data))
@@ -43,4 +50,7 @@ def render_partial(template_name, renderer=None, markup=True, **data):
 
 
 def generate_render_partial(renderer, markup=True):
+    """
+    Returns a partial function that renders a template using the specified renderer.
+    """
     return partial(render_partial, renderer=renderer, markup=markup)
