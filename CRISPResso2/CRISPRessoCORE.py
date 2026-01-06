@@ -562,11 +562,11 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
                 aln_strand = '-'
 
 #                print "for " + ref_name + " got fws1: " + str(fws1) + " and fws2: " + str(fws2) + " score: " +str(fwscore)
-        aln_scores.append(score)
         ref_aln_details.append((ref_name, s1, s2, score))
         if score > best_unfiltered_score:
             best_unfiltered_score = score
             best_unfiltered_name = ref_name
+        aln_scores.append(score)
         
 
         #reads are matched to the reference to which they best align. The 'min_aln_score' is calculated using only the changes in 'include_idxs'
@@ -582,7 +582,6 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
             best_match_names.append(ref_name)
             best_match_strands.append(aln_strand)
 
-    refs[best_unfiltered_name]['all_unfiltered_aln_scores'].append(best_unfiltered_score)
     if best_match_score > 0:
         new_variant = {}
         new_variant['count'] = 1
@@ -947,7 +946,6 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
             best_match_s2s.append(s2)
             best_match_names.append(ref_name)
 
-    refs[best_unfiltered_name]['all_unfiltered_aln_scores'].append(best_unfiltered_score)
     if best_match_score > 0:
         new_variant = {}
         new_variant['count'] = 1
@@ -1086,7 +1084,6 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
 
     """
     variant_file_path = os.path.join(variants_dir, f"variants_{process_id}.tsv")
-
     variant_lines = ""
     with open(variant_file_path, 'w') as file:
         file.truncate() # Ensures tsv file is empty before writing to it
@@ -1279,6 +1276,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                     N_CACHED_NOTALN += (variant_count - 1)
                                     # remove the unaligned reads from the cache
                                     unaligned_reads.append(seq)
+                                    not_aln[seq] = variant
                                 elif variant['best_match_score'] > 0:
                                     variantCache[seq] = variant
                                     N_COMPUTED_ALN += 1
@@ -1596,12 +1594,12 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
         "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
         "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
-        "READ_LENGTH": READ_LENGTH
+        "READ_LENGTH": READ_LENGTH,
         }
-    return(aln_stats)
+    return aln_stats, not_aln
 
 
-def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out=False):
+def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory):
     """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
     Parameters
     ----------
@@ -1683,8 +1681,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
     if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
         pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
-    if fastq_write_out:
-        not_aligned_variants = {}
+
+    not_aligned_variants = {}
 
 
 
@@ -1796,8 +1794,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                                 if variant['best_match_score'] <= 0:
                                     N_COMPUTED_NOTALN += 1
                                     N_CACHED_NOTALN += (variant_count - 1)
-                                    if fastq_write_out:
-                                        not_aligned_variants[seq] = variant
+                                    not_aligned_variants[seq] = variant
                                     # remove the unaligned reads from the cache
                                     unaligned_reads.append(seq)
                                 elif variant['best_match_score'] > 0:
@@ -1835,8 +1832,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                 N_COMPUTED_NOTALN += 1
                 N_CACHED_NOTALN += (variant_count - 1)
                 unaligned_reads.append(fastq_seq)
-                if fastq_write_out:
-                    not_aligned_variants[fastq_seq] = variant
+                not_aligned_variants[fastq_seq] = variant
             elif variant['best_match_score'] > 0:
                 variantCache[fastq_seq] = variant
                 N_COMPUTED_ALN += 1
@@ -1868,12 +1864,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
             "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
             "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
             "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
-            "READ_LENGTH": READ_LENGTH
+            "READ_LENGTH": READ_LENGTH,
             }
-    if fastq_write_out:
-        return(aln_stats, not_aligned_variants)
-    else:
-        return(aln_stats)
+    return(aln_stats, not_aligned_variants)
 
 
 def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, refs, args, files_to_remove, output_directory):
@@ -2008,7 +2001,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     crispresso_sam_optional_fields = "c2:Z:ALN=NA" +\
                                             " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                                             " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
-                                    not_aln[seq] = crispresso_sam_optional_fields
+                                    not_aln[seq] = new_variant
+                                    not_aln[seq]['crispresso_sam_optional_fields'] = crispresso_sam_optional_fields       
                                 else:
                                     class_names = []
                                     ins_inds = []
@@ -2076,7 +2070,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                             " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                             " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
                     sam_line_els.append(crispresso_sam_optional_fields)
-                    not_aln[fastq_seq] = crispresso_sam_optional_fields
+                    not_aln[fastq_seq] = new_variant
+                    not_aln[fastq_seq]['crispresso_sam_optional_fields'] = crispresso_sam_optional_fields
                 else:
                     N_COMPUTED_ALN+=1
                     N_CACHED_ALN += (variant_count - 1)
@@ -2135,12 +2130,11 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             sam_line_els = sam_line.rstrip().split("\t")
             fastq_seq = sam_line_els[9]
             if fastq_seq in not_aln:
-                sam_line_els.append(not_aln[fastq_seq]) #Crispresso2 alignment: NA
+                sam_line_els.append(not_aln[fastq_seq]['crispresso_sam_optional_fields']) #Crispresso2 alignment: NA
                 sam_out.write("\t".join(sam_line_els)+"\n")
             elif fastq_seq in variantCache:
                 sam_line_els.append(variantCache[fastq_seq]['crispresso2_annotation'])
                 sam_out.write("\t".join(sam_line_els)+"\n")
-
     for fastq_seq in not_aln.keys():
         del variantCache[fastq_seq]
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
@@ -2154,14 +2148,14 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
             "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
             "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
-            "READ_LENGTH": READ_LENGTH
+            "READ_LENGTH": READ_LENGTH,
             }
-    return(aln_stats)
+    return aln_stats, not_aln
 
 
 def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, refs, args, files_to_remove, output_directory):
 
-    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
+    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory)
     info("Reads processed, now annotating fastq_output file: %s"%(fastq_output))
 
     if fastq_input.endswith('.gz'):
@@ -2225,7 +2219,7 @@ def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, 
             fastq_id = fastq_input_handle.readline()
 
 
-    return aln_stats
+    return aln_stats, not_aln
 
 def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, variantCache, ref_names, refs, args, files_to_remove, output_directory):
     """
@@ -2250,7 +2244,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         files_to_remove: list of files to remove
         output_directory: directory to write output tsv files to
     """
-    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
+    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory)
     info("Reads processed, now annotating fastq_output file: %s"%(bam_output))
 
 
@@ -2296,7 +2290,6 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
                         " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                         " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
                 new_sam_entry.append(crispresso_sam_optional_fields)
-                not_aln[fastq_seq] = new_sam_entry
                 sam_out_handle.write("\t".join(new_sam_entry)+"\n")  # write cached alignment with modified read id and qual
                 continue
 
@@ -2394,7 +2387,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         os.remove(sam_out)
 
     info("Finished writing out to bam file: %s"%(bam_output))
-    return(aln_stats)
+    return aln_stats, not_aln
 
 
 def normalize_name(name, fastq_r1, fastq_r2, bam_input):
@@ -2454,14 +2447,35 @@ def to_numeric_ignore_columns(df, ignore_columns):
     return df
 
 
-def get_and_save_homology_scores(refs, alleles_homology_scores_filename, _jp):
+def get_scores_and_counts(variant_dict):
+    homology_scores = []
+    counts = []
+    alleles_homology_scores_and_counts = []
+    for seq, variant in variant_dict.items():
+        if len(variant) > 1:
+            homology_scores.append(max(variant['aln_scores']))
+            counts.append(variant['count'])
+            alleles_homology_scores_and_counts.append({
+                'sequence': seq,
+                'homology_score': variant['best_match_score'],
+                'count': variant['count']
+            })
+    return homology_scores, counts, alleles_homology_scores_and_counts
+
+
+def get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename, _jp):
     """Get and save the unfiltered homology scores for all alleles"""
-    alleles_homology_scores = []
-    for dic in refs.values():
-        alleles_homology_scores.extend(dic['all_unfiltered_aln_scores'])
+
+    aln_homology_scores, aln_counts, aln_alleles_homology_scores_and_counts = get_scores_and_counts(variantCache)
+    not_aln_homology_scores, not_aln_counts, not_aln_alleles_homology_scores_and_counts = get_scores_and_counts(not_aln_variant_objects)
+
+    alleles_homology_scores_and_counts = aln_alleles_homology_scores_and_counts + not_aln_alleles_homology_scores_and_counts
+    homology_scores = aln_homology_scores + not_aln_homology_scores
+    counts = aln_counts + not_aln_counts
+
     with open(_jp(alleles_homology_scores_filename), 'w') as f:
-        json.dump(alleles_homology_scores, f)
-    return alleles_homology_scores
+        json.dump(alleles_homology_scores_and_counts, f)
+    return homology_scores, counts
 
 
 def main():
@@ -3260,7 +3274,6 @@ def main():
                    'sequence': this_seq,
                    'sequence_length': this_seq_length,
                    'min_aln_score': this_min_aln_score,
-                   'all_unfiltered_aln_scores': [],
                    'gap_incentive': this_gap_incentive,
                    'sgRNA_cut_points': this_sgRNA_cut_points,
                    'sgRNA_intervals': this_sgRNA_intervals,
@@ -3756,22 +3769,23 @@ def main():
 
         ####INITIALIZE CACHE####
         variantCache = {}
+        not_aln_variant_objects = {}
 
         #operates on variantCache
         if args.bam_input:
-            aln_stats = process_bam(args.bam_input, args.bam_chr_loc, crispresso2_info['bam_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+            aln_stats, not_aln_variant_objects = process_bam(args.bam_input, args.bam_chr_loc, crispresso2_info['bam_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.fastq_output and not args.crispresso_merge:
-            aln_stats = process_fastq_write_out(processed_output_filename, crispresso2_info['fastq_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+            aln_stats, not_aln_variant_objects = process_fastq_write_out(processed_output_filename, crispresso2_info['fastq_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.bam_output:
             bam_header += '@PG\tID:crispresso2\tPN:crispresso2\tVN:'+CRISPRessoShared.__version__+'\tCL:"'+crispresso_cmd_to_write+'"\n'
-            aln_stats = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+            aln_stats, not_aln_variant_objects = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.crispresso_merge:
             if args.fastq_output:
-                aln_stats = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY, crispresso2_info['fastq_output'])
+                aln_stats, not_aln_variant_objects = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY, crispresso2_info['fastq_output'])
             else:
-                aln_stats = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+                aln_stats, not_aln_variant_objects = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         else:
-            aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+            aln_stats, not_aln_variant_objects = process_fastq(processed_output_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
 
         #put empty sequence into cache
         cache_fastq_seq = ''
@@ -4953,17 +4967,19 @@ def main():
                 crispresso2_info['results']['general_plots']['plot_1d_data'] = [('Allele table', os.path.basename(allele_frequency_table_filename))]
 
             alleles_homology_scores_filename = 'Alleles_homology_scores.txt'
-            homology_scores = get_and_save_homology_scores(refs, alleles_homology_scores_filename, _jp)
+            homology_scores, counts = get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename, _jp)
             plot_1e_root = _jp('1e.Allele_homology_histogram')
             plot_1e_input = {
                 'fig_root': plot_1e_root,
                 'homology_scores': homology_scores,
-                'save_also_png': save_png
+                'counts': counts,
+                'min_homology': args.default_min_aln_score,
+                'save_also_png': save_png,
             }
             debug('Plotting alleles homology histogram', {'percent_complete': 47})
             plot(CRISPRessoPlot.plot_alleles_homology_histogram, plot_1e_input)
             crispresso2_info['results']['general_plots']['plot_1e_root'] = os.path.basename(plot_1e_root)
-            crispresso2_info['results']['general_plots']['plot_1e_caption'] = "Figure 1e: Distribution of read alignment homology scores, showing the best-scoring alignment of each sequencing read to the provided amplicons."
+            crispresso2_info['results']['general_plots']['plot_1e_caption'] = "Figure 1e: Distribution of read alignment homology scores, showing the best-scoring alignment of each sequencing read to the provided amplicons. The dashed line indicates the minimum alignment score threshold used to discard low-quality alignments."
             crispresso2_info['results']['general_plots']['plot_1e_data'] = [('Alleles Homology Scores', os.path.basename(alleles_homology_scores_filename))]
         ###############################################################################################################################################
 
