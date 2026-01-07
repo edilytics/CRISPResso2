@@ -2463,7 +2463,7 @@ def get_scores_and_counts(variant_dict):
     return homology_scores, counts, alleles_homology_scores_and_counts
 
 
-def get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename, _jp):
+def get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename):
     """Get and save the unfiltered homology scores for all alleles"""
 
     aln_homology_scores, aln_counts, aln_alleles_homology_scores_and_counts = get_scores_and_counts(variantCache)
@@ -2475,7 +2475,7 @@ def get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_
 
     alleles_homology_scores_and_counts.sort(key=lambda x: x['homology_score'], reverse=True)
 
-    with open(_jp(alleles_homology_scores_filename), 'w') as f:
+    with open(alleles_homology_scores_filename, 'w') as f:
         json.dump(alleles_homology_scores_and_counts, f)
     return homology_scores, counts
 
@@ -3771,7 +3771,6 @@ def main():
 
         ####INITIALIZE CACHE####
         variantCache = {}
-        not_aln_variant_objects = {}
 
         #operates on variantCache
         if args.bam_input:
@@ -4968,8 +4967,8 @@ def main():
                 crispresso2_info['results']['general_plots']['plot_1d_caption'] = "Figure 1d: Frequency of detection of dsODN " + args.dsODN
                 crispresso2_info['results']['general_plots']['plot_1d_data'] = [('Allele table', os.path.basename(allele_frequency_table_filename))]
 
-            alleles_homology_scores_filename = 'Alleles_homology_scores.txt'
-            homology_scores, counts = get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename, _jp)
+            alleles_homology_scores_filename = _jp('Alleles_homology_scores.txt')
+            homology_scores, counts = get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename)
             plot_1e_root = _jp('1e.Allele_homology_histogram')
             plot_1e_input = {
                 'fig_root': plot_1e_root,
