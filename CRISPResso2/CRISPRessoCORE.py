@@ -2457,7 +2457,7 @@ def get_scores_and_counts(variant_dict):
             counts.append(variant['count'])
             alleles_homology_scores_and_counts.append({
                 'sequence': seq,
-                'homology_score': variant['best_match_score'],
+                'homology_score': max(variant['aln_scores']),
                 'count': variant['count']
             })
     return homology_scores, counts, alleles_homology_scores_and_counts
