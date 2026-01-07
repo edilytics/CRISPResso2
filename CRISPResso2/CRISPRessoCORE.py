@@ -2473,7 +2473,7 @@ def get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_
     homology_scores = aln_homology_scores + not_aln_homology_scores
     counts = aln_counts + not_aln_counts
 
-    alleles_homology_scores_and_counts.sort(key=lambda x: x['homology_score'], reverse=True)
+    alleles_homology_scores_and_counts.sort(key=lambda x: (x['homology_score'], x['sequence']), reverse=True)
 
     with open(alleles_homology_scores_filename, 'w') as f:
         json.dump(alleles_homology_scores_and_counts, f)
