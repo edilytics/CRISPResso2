@@ -31,7 +31,7 @@ def check_library(library_name):
     try:
         return __import__(library_name)
     except:
-        error('You need to install {0} module to use CRISPRessoPooledWGSCompare!'.format(library_name))
+        error(f'You need to install {library_name} module to use CRISPRessoPooledWGSCompare!')
         sys.exit(1)
 
 
@@ -44,9 +44,7 @@ def check_PooledWGS_output_folder(output_folder):
         return quantification_summary_file
     else:
         raise PooledWGSOutputFolderIncompleteException(
-            'The folder {0} is not a valid CRISPRessoPooled or CRISPRessoWGS output folder.'.format(
-                output_folder,
-            ),
+            f'The folder {output_folder} is not a valid CRISPRessoPooled or CRISPRessoWGS output folder.',
         )
 
 
@@ -201,18 +199,11 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
         get_name_from_folder = lambda x: os.path.basename(os.path.abspath(x)).replace('CRISPRessoPooled_on_', '').replace('CRISPRessoWGS_on_', '')
 
         if not args.name:
-            database_id = '{0}_VS_{1}'.format(
-                get_name_from_folder(
-                    args.crispresso_pooled_wgs_output_folder_1,
-                ),
-                get_name_from_folder(
-                    args.crispresso_pooled_wgs_output_folder_2,
-                ),
-            )
+            database_id = f'{get_name_from_folder(args.crispresso_pooled_wgs_output_folder_1)}_VS_{get_name_from_folder(args.crispresso_pooled_wgs_output_folder_2)}'
         else:
             database_id = CRISPRessoShared.slugify(args.name)
 
-        OUTPUT_DIRECTORY = 'CRISPRessoPooledWGSCompare_on_{0}'.format(database_id)
+        OUTPUT_DIRECTORY = f'CRISPRessoPooledWGSCompare_on_{database_id}'
 
         if args.output_folder:
             OUTPUT_DIRECTORY = os.path.join(
@@ -223,11 +214,11 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
         log_filename = _jp('CRISPRessoPooledWGSCompare_RUNNING_LOG.txt')
 
         try:
-            info('Creating Folder %s' % OUTPUT_DIRECTORY, {'percent_complete': 0})
+            info(f'Creating Folder {OUTPUT_DIRECTORY}', {'percent_complete': 0})
             os.makedirs(OUTPUT_DIRECTORY)
             info('Done!')
         except:
-            warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
+            warn(f'Folder {OUTPUT_DIRECTORY} already exists.')
 
         log_filename = _jp('CRISPRessoPooledWGSCompare_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
@@ -235,9 +226,7 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
 
         with open(log_filename, 'w+') as outfile:
             outfile.write(
-                '[Command used]:\nCRISPRessoPooledWGSCompare {0}\n\n[Execution log]:\n'.format(
-                    ' '.join(sys.argv),
-                ),
+                f'[Command used]:\nCRISPRessoPooledWGSCompare {" ".join(sys.argv)}\n\n[Execution log]:\n',
             )
 
         crispresso2Compare_info_file = os.path.join(OUTPUT_DIRECTORY,'CRISPResso2PooledWGSCompare_info.json')
@@ -262,15 +251,15 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
 #        df_comp=df_quant_1.set_index(['Name','Amplicon']).join(df_quant_2.set_index(['Name','Amplicon']),lsuffix='_%s' % args.sample_1_name,rsuffix='_%s' % args.sample_2_name)
         df_comp = df_quant_1.set_index('Name').join(
             df_quant_2.set_index('Name'),
-            lsuffix='_{0}'.format(sample_1_name),
-            rsuffix='_{0}'.format(sample_2_name),
+            lsuffix=f'_{sample_1_name}',
+            rsuffix=f'_{sample_2_name}',
         )
 
-        debug('looking for ' + '({0}-{1})_Unmodified%'.format(sample_1_name, sample_2_name))
+        debug(f'looking for ({sample_1_name}-{sample_2_name})_Unmodified%')
         df_comp[
-            '({0}-{1})_Unmodified%'.format(sample_1_name, sample_2_name)
-        ] = df_comp['Unmodified%_{0}'.format(sample_1_name)] - df_comp[
-            'Unmodified%_{0}'.format(sample_2_name)
+            f'({sample_1_name}-{sample_2_name})_Unmodified%'
+        ] = df_comp[f'Unmodified%_{sample_1_name}'] - df_comp[
+            f'Unmodified%_{sample_2_name}'
         ]
 
         df_comp.fillna('NA').to_csv(_jp('COMPARISON_SAMPLES_QUANTIFICATION_SUMMARIES.txt'), sep='\t')
@@ -284,34 +273,24 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
             if idx in processed_regions:
                 continue
             if row.isnull().any():
-                warn('Skipping sample {0} since it was not processed in one or both conditions'.format(idx))
+                warn(f'Skipping sample {idx} since it was not processed in one or both conditions')
             else:
                 processed_regions.append(idx)
                 crispresso_output_folder_1 = os.path.join(
                     args.crispresso_pooled_wgs_output_folder_1,
-                    'CRISPResso_on_{0}'.format(idx),
+                    f'CRISPResso_on_{idx}',
                 )
                 crispresso_output_folder_2 = os.path.join(
                     args.crispresso_pooled_wgs_output_folder_2,
-                    'CRISPResso_on_{0}'.format(idx),
+                    f'CRISPResso_on_{idx}',
                 )
-                compare_output_name = '{0}_{1}_VS_{2}'.format(
-                    idx, sample_1_name, sample_2_name,
-                )
-                crispresso_compare_cmd = CRISPResso_compare_to_call + \
-                    ' "{0}" "{1}" -o "{2}" -n {3} -n1 "{4}" -n2 "{5}" '.format(
-                      crispresso_output_folder_1,
-                      crispresso_output_folder_2,
-                      OUTPUT_DIRECTORY,
-                      compare_output_name,
-                      args.sample_1_name + '_' + idx,
-                      args.sample_2_name + '_' + idx,
-                    )
+                compare_output_name = f'{idx}_{sample_1_name}_VS_{sample_2_name}'
+                crispresso_compare_cmd = f'{CRISPResso_compare_to_call} "{crispresso_output_folder_1}" "{crispresso_output_folder_2}" -o "{OUTPUT_DIRECTORY}" -n {compare_output_name} -n1 "{args.sample_1_name + "_" + idx}" -n2 "{args.sample_2_name + "_" + idx}" '
 
                 crispresso_compare_cmd = CRISPRessoShared.propagate_crispresso_options(
                     crispresso_compare_cmd, crispresso_compare_options, args,
                 )
-                info('Running CRISPRessoCompare:%s' % crispresso_compare_cmd)
+                info(f'Running CRISPRessoCompare:{crispresso_compare_cmd}')
                 crispresso_cmds.append(crispresso_compare_cmd)
 
                 sub_folder = os.path.join(
@@ -364,9 +343,7 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
                 report_name,
                 OUTPUT_DIRECTORY,
                 _ROOT,
-                'CRISPREssoPooledWGSCompare Report<br>{0} vs {1}'.format(
-                    sample_1_name, sample_2_name,
-                ),
+                f'CRISPREssoPooledWGSCompare Report<br>{sample_1_name} vs {sample_2_name}',
                 logger,
             )
             crispresso2_info['running_info']['report_location'] = report_name
@@ -390,5 +367,5 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
 
         if debug_flag:
             traceback.print_exc(file=sys.stdout)
-        error('\n\nERROR: %s' % e)
+        error(f'\n\nERROR: {e}')
         sys.exit(-1)

@@ -5,6 +5,7 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 '''
 
 import argparse
+import ast
 import datetime
 import errno
 import gzip
@@ -644,7 +645,7 @@ def parse_count_file(fileName):
                 lab_freqs[lab] = lab_freq_arr
         return ampSeq, lab_freqs
     else:
-        print("Cannot find output file '%s'" % fileName)
+        print(f"Cannot find output file '{fileName}'")
         return None, None
 
 
@@ -663,7 +664,7 @@ def parse_alignment_file(fileName):
                 lab_freqs[lab] = lab_freq_arr
         return ampSeq, lab_freqs
     else:
-        print("Cannot find output file '%s'" % fileName)
+        print(f"Cannot find output file '{fileName}'")
         return None, None
 
 def assert_fastq_format(file_path, max_lines_to_check=100):
@@ -869,7 +870,8 @@ class CRISPRessoJSONDecoder(json.JSONDecoder):
                     microseconds=obj['value']['microseconds'],
                 )
             if obj['_type'] == 'set':
-                return eval(obj['value'])
+                # Use ast.literal_eval for safe evaluation instead of eval()
+                return ast.literal_eval(obj['value'])
             if obj['_type'] == 'range':
                 start, end, step = re.match(
                     r'range\((\d+), (\d+)(?:, (\d+))?\)', obj['value'],
@@ -1042,20 +1044,12 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
             view_cmd_2 = 'gunzip -c'
         min_overlap_param = ""
         if min_paired_end_reads_overlap:
-            min_overlap_param = "--overlap_len_require {0}".format(min_paired_end_reads_overlap)
-        file_generation_command = "{paste} | {head} | paste - - - - | {awk} | {fastp}".format(
-            paste="bash -c 'paste <({view_cmd_1} \"{fastq_r1}\") <({view_cmd_2} \"{fastq_r2}\")'".format(
-                view_cmd_1=view_cmd_1, fastq_r1=fastq_r1, view_cmd_2=view_cmd_2, fastq_r2=fastq_r2,
-            ),
-            head='head -n {num_reads}'.format(
-                num_reads=number_of_reads_to_consider * 4,
-            ),
-            awk="awk -v OFS=\"\\n\" -v FS=\"\\t\" '{{print($1,$3,$5,$7,$2,$4,$6,$8)}}'",
-            fastp='{fastp_command} --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering --stdin --interleaved_in --merge {min_overlap_param} --stdout 2>/dev/null'.format(
-                fastp_command=fastp_command,
-                min_overlap_param=min_overlap_param,
-            ),
-        )
+            min_overlap_param = f"--overlap_len_require {min_paired_end_reads_overlap}"
+        paste_cmd = f"bash -c 'paste <({view_cmd_1} \"{fastq_r1}\") <({view_cmd_2} \"{fastq_r2}\")'"
+        head_cmd = f'head -n {number_of_reads_to_consider * 4}'
+        awk_cmd = "awk -v OFS=\"\\n\" -v FS=\"\\t\" '{{print($1,$3,$5,$7,$2,$4,$6,$8)}}'"
+        fastp_cmd = f'{fastp_command} --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering --stdin --interleaved_in --merge {min_overlap_param} --stdout 2>/dev/null'
+        file_generation_command = f"{paste_cmd} | {head_cmd} | paste - - - - | {awk_cmd} | {fastp_cmd}"
     count_frequent_cmd = file_generation_command + " | awk '((NR-2)%4==0){print $1}' | sort | uniq -c | sort -nr "
 
     def default_sigpipe():
@@ -2154,13 +2148,9 @@ def zip_results(results_folder):
     output_folder = path_values[0]
     folder_id = path_values[1]
     if output_folder == "":
-        cmd_to_zip = 'zip -m -r {0} {1}'.format(
-            folder_id + ".zip", folder_id
-        )
+        cmd_to_zip = f'zip -m -r {folder_id + ".zip"} {folder_id}'
     else:
-        cmd_to_zip = 'cd {0} && zip -m -r {1} {2} .'.format(
-            output_folder, folder_id + ".zip", folder_id
-        )
+        cmd_to_zip = f'cd {output_folder} && zip -m -r {folder_id + ".zip"} {folder_id} .'
     sb.call(cmd_to_zip, shell=True)
     return
 
@@ -2252,7 +2242,7 @@ def check_custom_config(args):
             return custom_config
         except Exception:
             if args.config_file:
-                logger.warn("Cannot read config file '%s', defaulting config parameters." % args.config_file)
+                logger.warn(f"Cannot read config file '{args.config_file}', defaulting config parameters.")
             else:
                 logger.debug("No config file provided, defaulting config parameters.")
     return config
@@ -2369,7 +2359,7 @@ class GuardrailMessageHandler:
         message : string
             Related guardrail message
         """
-        html_warning = '<div class="alert alert-danger"><strong>Guardrail Warning!</strong>{0}</div>'.format(message)
+        html_warning = f'<div class="alert alert-danger"><strong>Guardrail Warning!</strong>{message}</div>'
         self.html_messages.append(html_warning)
 
     def get_messages(self):
@@ -2395,7 +2385,7 @@ class TotalReadsGuardrail:
         """
         self.messageHandler = messageHandler
         self.minimum = minimum
-        self.message = " Low number of total reads: <{}.".format(minimum)
+        self.message = f" Low number of total reads: <{minimum}."
 
     def safety(self, total_reads):
         """Safety check, if total is below minimum send warnings
@@ -2406,7 +2396,7 @@ class TotalReadsGuardrail:
             The total reads, unaligned and aligned
         """
         if total_reads < self.minimum:
-            self.message = self.message + " Total reads: {}.".format(total_reads)
+            self.message = self.message + f" Total reads: {total_reads}."
             self.messageHandler.display_warning('TotalReadsGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2424,7 +2414,7 @@ class OverallReadsAlignedGuardrail:
             The float representation of percentage of minimum reads to be aligned
         """
         self.messageHandler = messageHandler
-        self.message = " <={val}% of reads were aligned.".format(val=(cutoff * 100))
+        self.message = f" <={cutoff * 100}% of reads were aligned."
         self.cutoff = cutoff
 
     def safety(self, total_reads, n_read_aligned):
@@ -2440,7 +2430,7 @@ class OverallReadsAlignedGuardrail:
         if total_reads == 0:
             return
         if (n_read_aligned/total_reads) <= self.cutoff:
-            self.message = self.message + " Total reads: {}, Aligned reads: {}.".format(total_reads, n_read_aligned)
+            self.message = self.message + f" Total reads: {total_reads}, Aligned reads: {n_read_aligned}."
             self.messageHandler.display_warning('OverallReadsAlignedGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2476,7 +2466,7 @@ class DisproportionateReadsAlignedGuardrail:
         expected_per_amplicon = n_read_aligned / len(reads_aln_amplicon.keys())
         for amplicon, aligned in reads_aln_amplicon.items():
             if aligned <= (expected_per_amplicon * self.cutoff) or aligned >= (expected_per_amplicon * (1 - self.cutoff)):
-                amplicon_message = self.message + amplicon + ", Percent of aligned reads aligned to this amplicon: {}%.".format(round((aligned/n_read_aligned) * 100, 2))
+                amplicon_message = self.message + amplicon + f", Percent of aligned reads aligned to this amplicon: {round((aligned/n_read_aligned) * 100, 2)}%."
                 self.messageHandler.display_warning('DisproportionateReadsAlignedGuardrail', amplicon_message)
                 self.messageHandler.report_warning(amplicon_message)
 
@@ -2494,7 +2484,7 @@ class LowRatioOfModsInWindowToOutGuardrail:
             The float representation of the maximum percentage of modifications outside of the quantification window
         """
         self.messageHandler = messageHandler
-        self.message = " <={}% of modifications were inside of the quantification window.".format(cutoff * 100)
+        self.message = f" <={cutoff * 100}% of modifications were inside of the quantification window."
         self.cutoff = cutoff
 
     def safety(self, mods_in_window, mods_outside_window):
@@ -2511,7 +2501,7 @@ class LowRatioOfModsInWindowToOutGuardrail:
         if total_mods == 0:
             return
         if ((mods_in_window / total_mods) <= self.cutoff):
-            self.message = self.message + " Total modifications: {}, Modifications in window: {}, Modifications outside window: {}.".format(total_mods, mods_in_window, mods_outside_window)
+            self.message = self.message + f" Total modifications: {total_mods}, Modifications in window: {mods_in_window}, Modifications outside window: {mods_outside_window}."
             self.messageHandler.display_warning('LowRatioOfModsInWindowToOutGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2529,7 +2519,7 @@ class HighRateOfModificationAtEndsGuardrail:
             The float representation of the maximum percentage reads that have modifications on either end
         """
         self.messageHandler = messageHandler
-        self.message = " >={}% of reads have modifications at the start or end.".format(round(percentage_start_end * 100, 2))
+        self.message = f" >={round(percentage_start_end * 100, 2)}% of reads have modifications at the start or end."
         self.percent = percentage_start_end
 
     def safety(self, total_reads, irregular_reads):
@@ -2545,7 +2535,7 @@ class HighRateOfModificationAtEndsGuardrail:
         if total_reads == 0:
             return
         if (irregular_reads / total_reads) >= self.percent:
-            self.message = self.message + " Total reads: {}, Irregular reads: {}.".format(total_reads, irregular_reads)
+            self.message = self.message + f" Total reads: {total_reads}, Irregular reads: {irregular_reads}."
             self.messageHandler.display_warning('HighRateOfModificationAtEndsGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2563,7 +2553,7 @@ class HighRateOfSubstitutionsOutsideWindowGuardrail:
             The float representation of how many of the total substitutions can be outside of the quantification window
         """
         self.messageHandler = messageHandler
-        self.message = " >={}% of substitutions were outside of the quantification window.".format(cutoff * 100)
+        self.message = f" >={cutoff * 100}% of substitutions were outside of the quantification window."
         self.cutoff = cutoff
 
     def safety(self, global_subs, subs_outside_window):
@@ -2579,7 +2569,7 @@ class HighRateOfSubstitutionsOutsideWindowGuardrail:
         if global_subs == 0:
             return
         if ((subs_outside_window / global_subs) >= self.cutoff):
-            self.message = self.message + " Total substitutions: {}, Substitutions outside window: {}.".format(global_subs, subs_outside_window)
+            self.message = self.message + f" Total substitutions: {global_subs}, Substitutions outside window: {subs_outside_window}."
             self.messageHandler.display_warning('HighRateOfSubstitutionsOutsideWindowGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2597,7 +2587,7 @@ class HighRateOfSubstitutionsGuardrail:
             The float representation of how many of the total modifications can be subsitutions
         """
         self.messageHandler = messageHandler
-        self.message = " >={}% of modifications were substitutions. This could potentially indicate poor sequencing quality.".format(cutoff * 100)
+        self.message = f" >={cutoff * 100}% of modifications were substitutions. This could potentially indicate poor sequencing quality."
         self.cutoff = cutoff
 
     def safety(self, mods_in_window, mods_outside_window, global_subs):
@@ -2616,7 +2606,7 @@ class HighRateOfSubstitutionsGuardrail:
         if total_mods == 0:
             return
         if ((global_subs / total_mods) >= self.cutoff):
-            self.message = self.message + " Total modifications: {}, Substitutions: {}.".format(int(total_mods), global_subs)
+            self.message = self.message + f" Total modifications: {int(total_mods)}, Substitutions: {global_subs}."
             self.messageHandler.display_warning('HighRateOfSubstitutionsGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2649,7 +2639,7 @@ class ShortSequenceGuardrail:
         """
         for name, length in sequences.items():
             if length < self.cutoff:
-                sequence_message = self.message + name + ", Length: {}.".format(length)
+                sequence_message = self.message + name + f", Length: {length}."
                 self.messageHandler.display_warning('ShortSequenceGuardrail', sequence_message)
                 self.messageHandler.report_warning(sequence_message)
 
@@ -2669,7 +2659,7 @@ class LongAmpliconShortReadsGuardrail:
         """
         self.messageHandler = messageHandler
         self.cutoff = cutoff
-        self.message = " Amplicon length is greater than {}x the length of the reads: ".format(cutoff)
+        self.message = f" Amplicon length is greater than {cutoff}x the length of the reads: "
 
     def safety(self, amplicons, read_len):
         """Safety check, comparison between amplicon length and read length
@@ -2683,6 +2673,6 @@ class LongAmpliconShortReadsGuardrail:
         """
         for name, length in amplicons.items():
             if length > (read_len * self.cutoff):
-                sequence_message = self.message + name + ", Amplicon length: {}, Read length: {}.".format(length, read_len)
+                sequence_message = self.message + name + f", Amplicon length: {length}, Read length: {read_len}."
                 self.messageHandler.display_warning('LongAmpliconShortReadsGuardrail', sequence_message)
                 self.messageHandler.report_warning(sequence_message)

@@ -241,9 +241,7 @@ def normalize_name(name, fastq_r1, fastq_r2, aligned_pooled_bam):
         clean_name = CRISPRessoShared.clean_filename(name)
         if name != clean_name:
             warn(
-                'The specified name {0} contained invalid characters and was changed to: {1}'.format(
-                    name, clean_name,
-                ),
+                f'The specified name {name} contained invalid characters and was changed to: {clean_name}',
             )
         return clean_name
 
@@ -298,7 +296,7 @@ def main():
 
         files_to_remove = []
 
-        OUTPUT_DIRECTORY = 'CRISPRessoPooled_on_{0}'.format(normalize_name(args.name, args.fastq_r1, args.fastq_r2, args.aligned_pooled_bam))
+        OUTPUT_DIRECTORY = f'CRISPRessoPooled_on_{normalize_name(args.name, args.fastq_r1, args.fastq_r2, args.aligned_pooled_bam)}'
 
         if args.output_folder:
             OUTPUT_DIRECTORY = os.path.join(os.path.abspath(args.output_folder), OUTPUT_DIRECTORY)
@@ -467,8 +465,9 @@ def main():
             info('Splitting paired end single fastq file into two files...')
             args.fastq_r1, args.fastq_r2 = CRISPRessoShared.split_interleaved_fastq(
                 args.fastq_r1,
-                output_filename_r1=_jp('{0}_splitted_r1.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
-                output_filename_r2=_jp('{0}_splitted_r2.fastq.gz'.format(os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', ''))),
+                base_name = os.path.basename(args.fastq_r1).replace('.fastq', '').replace('.gz', '')
+                output_filename_r1=_jp(f'{base_name}_splitted_r1.fastq.gz'),
+                output_filename_r2=_jp(f'{base_name}_splitted_r2.fastq.gz'),
             )
             files_to_remove += [args.fastq_r1, args.fastq_r2]
 
@@ -491,15 +490,7 @@ def main():
                     trim_cmd = crispresso2_info['running_info']['finished_steps']['trim_input']
                 else:
                     info('Trimming sequences with fastp...')
-                    trim_cmd = '{command} -i {r1} -o {out} {options} --json {json_report} --html {html_report} >> {log} 2>&1'.format(
-                        command=args.fastp_command,
-                        r1=args.fastq_r1,
-                        out=output_forward_filename,
-                        options=args.fastp_options_string,
-                        json_report=_jp('fastp_report.json'),
-                        html_report=_jp('fastp_report.html'),
-                        log=log_filename,
-                    )
+                    trim_cmd = f'{args.fastp_command} -i {args.fastq_r1} -o {output_forward_filename} {args.fastp_options_string} --json {_jp("fastp_report.json")} --html {_jp("fastp_report.html")} >> {log_filename} 2>&1'
                     fastp_status = sb.call(trim_cmd, shell=True)
 
                     if fastp_status:
@@ -534,23 +525,10 @@ def main():
                 fastp_cmd = crispresso2_info['running_info']['finished_steps']['merge_paired_fastq']
             else:
                 info('Merging paired sequences with fastp...')
-                fastp_cmd = '{command} -i {r1} -I {r2} --merge --merged_out {out_merged} --unpaired1 {unpaired1} --unpaired2 {unpaired2} --overlap_len_require {min_overlap} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
-                    command=args.fastp_command,
-                    r1=args.fastq_r1,
-                    r2=args.fastq_r2,
-                    out_merged=processed_output_filename,
-                    unpaired1=not_combined_1_filename,
-                    unpaired2=not_combined_2_filename,
-                    min_overlap=args.min_paired_end_reads_overlap,
-                    num_threads=n_processes_for_pooled,
-                    json_report=_jp('fastp_report.json'),
-                    html_report=_jp('fastp_report.html'),
-                    options=args.fastp_options_string,
-                    log=log_filename,
-                )
+                fastp_cmd = f'{args.fastp_command} -i {args.fastq_r1} -I {args.fastq_r2} --merge --merged_out {processed_output_filename} --unpaired1 {not_combined_1_filename} --unpaired2 {not_combined_2_filename} --overlap_len_require {args.min_paired_end_reads_overlap} --thread {n_processes_for_pooled} --json {_jp("fastp_report.json")} --html {_jp("fastp_report.html")} {args.fastp_options_string} >> {log_filename} 2>&1'
 
                 if args.debug:
-                    info('Fastp command: {0}'.format(fastp_cmd))
+                    info(f'Fastp command: {fastp_cmd}')
 
                 fastp_status = sb.call(fastp_cmd, shell=True)
 
@@ -572,7 +550,7 @@ def main():
                 new_merged_filename = _jp('out.forcemerged_uncombined.fastq.gz')
                 num_reads_force_merged = CRISPRessoShared.force_merge_pairs(not_combined_1_filename, not_combined_2_filename, new_merged_filename)
                 new_output_filename = _jp('out.forcemerged.fastq.gz')
-                merge_command = "cat {0} {1} > {2}".format(processed_output_filename, new_merged_filename, new_output_filename)
+                merge_command = f"cat {processed_output_filename} {new_merged_filename} > {new_output_filename}"
                 merge_status = sb.call(merge_command, shell=True)
                 if merge_status:
                     raise CRISPRessoShared.FastpException('Force-merging read pairs failed to run, please check the log file.')
@@ -807,20 +785,15 @@ def main():
 
             if args.limit_open_files_for_demux:
                 bam_iter = CRISPRessoShared.get_command_output(
-                    '(samtools sort {bam_file} | samtools view -F {samtools_exclude_flags}) 2>> {log_file}'.format(
-                        bam_file=bam_filename_amplicons,
-                        samtools_exclude_flags=args.samtools_exclude_flags,
-                        log_file=log_filename,
-                    ),
+                    f'(samtools sort {bam_filename_amplicons} | samtools view -F {args.samtools_exclude_flags}) 2>> {log_filename}'
+                ),
                 )
                 curr_file, curr_chr = None, None
                 for bam_line in bam_iter:
                     bam_line_els = bam_line.split('\t')
                     if len(bam_line_els) < 9:
                         if args.debug:
-                            info('ERROR got unexpected line from bam: {0} with els: {1}'.format(
-                                bam_line, str(bam_line_els),
-                            ))
+                            info(f'ERROR got unexpected line from bam: {bam_line} with els: {str(bam_line_els)}')
                         continue
                     line_chr = bam_line_els[2]
 
@@ -830,14 +803,10 @@ def main():
                         if curr_file is not None:
                             curr_file.close()
                         curr_file = gzip.open(
-                            _jp('{0}.fastq.gz'.format(line_chr)),
+                            _jp(f'{line_chr}.fastq.gz'),
                             'wt',
                         )
-                    curr_file.write('@{read_name}\n{seq}\n+\n{qual}\n'.format(
-                        read_name=bam_line_els[0],
-                        seq=bam_line_els[9],
-                        qual=bam_line_els[10],
-                    ))
+                    curr_file.write(f'@{bam_line_els[0]}\n{bam_line_els[9]}\n+\n{bam_line_els[10]}\n')
                     curr_chr = line_chr
                 if curr_file is not None:
                     curr_file.close()
@@ -1036,9 +1005,9 @@ def main():
 
         # align reads to the genome in an unbiased way
         if RUNNING_MODE=='ONLY_GENOME' or RUNNING_MODE=='AMPLICONS_AND_GENOME':
-            bam_filename_genome = _jp('{0}_GENOME_ALIGNED.bam'.format(normalize_name(
+            bam_filename_genome = _jp(f'{normalize_name(
                 args.name, args.fastq_r1, args.fastq_r2, args.aligned_pooled_bam,
-            )))
+            )}_GENOME_ALIGNED.bam')
             # if input bam is provided, don't align reads to the genome and use that bam
             if args.aligned_pooled_bam is not None:
                 bam_filename_genome = args.aligned_pooled_bam

@@ -260,9 +260,7 @@ def normalize_name(name, bam_file):
         clean_name = CRISPRessoShared.slugify(name)
         if name != clean_name:
             warn(
-                'The specified name {0} contained invalid characters and was changed to: {1}'.format(
-                    name, clean_name,
-                ),
+                f'The specified name {name} contained invalid characters and was changed to: {clean_name}',
             )
         return clean_name
 

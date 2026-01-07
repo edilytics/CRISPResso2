@@ -100,7 +100,7 @@ def check_program(binary_name, download_url=None, version_flag=None, version_reg
     None, will exit if program is not installed.
     """
     if not which(binary_name):
-        error('You need to install and have the command #####{0}##### in your PATH variable to use CRISPResso!\n Please read the documentation!'.format(binary_name))
+        error(f'You need to install and have the command #####{binary_name}##### in your PATH variable to use CRISPResso!\n Please read the documentation!')
         if download_url:
             error('You can download it here: {0}'.format(download_url))
         sys.exit(1)

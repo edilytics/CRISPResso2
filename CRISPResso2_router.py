@@ -31,7 +31,11 @@ elif sys.argv[1]=='CRISPRessoPooledWGSCompare':
 elif sys.argv[1]=='CRISPRessoAggregate':
     sb.call(["CRISPRessoAggregate"]+ sys.argv[2:])
 elif sys.argv[1]=='License':
-    with open("LICENSE.txt", 'r') as fin:
-        print(fin.read())
+    try:
+        with open("LICENSE.txt", 'r') as fin:
+            print(fin.read())
+    except IOError as e:
+        print(f"Error reading LICENSE.txt: {e}")
+        sys.exit(1)
 else:
     print(usage)
