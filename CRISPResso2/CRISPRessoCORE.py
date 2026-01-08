@@ -1136,7 +1136,6 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
     N_MODS_OUTSIDE_WINDOW = 0 # number of modifications found outside the quantification window
     N_READS_IRREGULAR_ENDS = 0 # number of reads with modifications at the 0 or -1 position
     READ_LENGTH = 0
-    unaligned_reads = []
 
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
@@ -1274,8 +1273,6 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                 if variant['best_match_score'] <= 0:
                                     N_COMPUTED_NOTALN += 1
                                     N_CACHED_NOTALN += (variant_count - 1)
-                                    # remove the unaligned reads from the cache
-                                    unaligned_reads.append(seq)
                                     not_aln[seq] = variant
                                 elif variant['best_match_score'] > 0:
                                     variantCache[seq] = variant
@@ -1301,7 +1298,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         else:
             raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find output folder, try deleting output folder and rerunning CRISPResso")
 
-        for seq in unaligned_reads:
+        for seq in not_aln:
             del variantCache[seq]
 
         for key in list(variantCache.keys()):
