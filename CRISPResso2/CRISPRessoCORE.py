@@ -2472,8 +2472,11 @@ def get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_
 
     alleles_homology_scores_and_counts.sort(key=lambda x: (x['homology_score'], x['sequence']), reverse=True)
 
+    # refactor above to dump as tsv
     with open(alleles_homology_scores_filename, 'w') as f:
-        json.dump(alleles_homology_scores_and_counts, f)
+        f.write("sequence\thomology_score\tcount\n")
+        for allele in alleles_homology_scores_and_counts:
+            f.write(f"{allele['sequence']}\t{allele['homology_score']}\t{allele['count']}\n")
     return homology_scores, counts
 
 
