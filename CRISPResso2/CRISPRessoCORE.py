@@ -567,7 +567,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
             best_unfiltered_score = score
             best_unfiltered_name = ref_name
         aln_scores.append(score)
-        
+
 
         #reads are matched to the reference to which they best align. The 'min_aln_score' is calculated using only the changes in 'include_idxs'
         if score > best_match_score and score > refs[ref_name]['min_aln_score']:
@@ -926,7 +926,7 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
                 qual = rvqual
                 s2 = rvs2
                 score = rvscore
-            
+
             if score > best_unfiltered_score:
                 best_unfiltered_score = score
                 best_unfiltered_name = ref_name
@@ -1863,7 +1863,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
             "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
             "READ_LENGTH": READ_LENGTH,
             }
-    return(aln_stats, not_aligned_variants)
+    return aln_stats, not_aligned_variants
 
 
 def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, refs, args, files_to_remove, output_directory):
@@ -1999,7 +1999,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                             " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                                             " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
                                     not_aln[seq] = new_variant
-                                    not_aln[seq]['crispresso_sam_optional_fields'] = crispresso_sam_optional_fields       
+                                    not_aln[seq]['crispresso_sam_optional_fields'] = crispresso_sam_optional_fields
                                 else:
                                     class_names = []
                                     ins_inds = []
