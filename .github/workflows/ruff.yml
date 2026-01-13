@@ -1,0 +1,24 @@
+name: Run Ruff
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Ruff
+        run: ruff check . --statistics
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: make down
