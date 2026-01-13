@@ -44,20 +44,20 @@ def propagate_options(cmd, options, params, paramInd):
                 if val is None:
                     pass
                 elif str(val) == "True":
-                    cmd+=' --%s' % option
+                    cmd += f' --{option}'
                 elif str(val) =="False":
                     pass
                 elif isinstance(val, str):
                     if val != "":
                         if " " in val or "-" in val:
-                            cmd+=' --%s "%s"' % (option, str(val)) # quotes for options with spaces
+                            cmd += f' --{option} "{str(val)}"'  # quotes for options with spaces
                         else:
-                            cmd+=' --%s %s' % (option, str(val))
+                            cmd += f' --{option} {str(val)}'
                 elif isinstance(val, bool):
                     if val:
-                        cmd+=' --%s' % option
+                        cmd += f' --{option}'
                 else:
-                    cmd+=' --%s %s' % (option, str(val))
+                    cmd += f' --{option} {str(val)}'
 #    print("cmd is " + str(cmd))
     return cmd
 
@@ -65,7 +65,7 @@ def check_library(library_name):
         try:
                 return __import__(library_name)
         except:
-                error('You need to install %s module to use CRISPRessoMeta!' % library_name)
+                error(f'You need to install {library_name} module to use CRISPRessoMeta!')
                 sys.exit(1)
 
 
@@ -217,7 +217,7 @@ def main():
         if args.name and args.name != "":
             meta_folder_name = args.name
 
-        output_folder_name='CRISPRessoMeta_on_%s' % meta_folder_name
+        output_folder_name = f'CRISPRessoMeta_on_{meta_folder_name}'
         OUTPUT_DIRECTORY=os.path.abspath(output_folder_name)
 
         if args.meta_output_folder:
@@ -226,10 +226,10 @@ def main():
         _jp=lambda filename: os.path.join(OUTPUT_DIRECTORY, filename) #handy function to put a file in the output directory
 
         try:
-            info('Creating Folder %s' % OUTPUT_DIRECTORY, {'percent_complete': 0})
+            info(f'Creating Folder {OUTPUT_DIRECTORY}', {'percent_complete': 0})
             os.makedirs(OUTPUT_DIRECTORY)
         except:
-            warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
+            warn(f'Folder {OUTPUT_DIRECTORY} already exists.')
 
         log_filename=_jp('CRISPRessoMeta_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
@@ -271,7 +271,7 @@ def main():
         completed_meta_arr = []
         for idx, row in meta_params.iterrows():
             metaName = CRISPRessoShared.slugify(row["name"])
-            folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % metaName)
+            folder_name = os.path.join(OUTPUT_DIRECTORY, f'CRISPResso_on_{metaName}')
             run_data_file = os.path.join(folder_name, 'CRISPResso2_info.json')
             if os.path.isfile(run_data_file) is False:
                 info("Skipping folder '%s'. Cannot find run data at '%s'."%(folder_name, run_data_file))
@@ -320,7 +320,7 @@ def main():
             wrote_header = False
             for idx, row in meta_params.iterrows():
                 metaName = CRISPRessoShared.slugify(row["name"])
-                folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % metaName)
+                folder_name = os.path.join(OUTPUT_DIRECTORY, f'CRISPResso_on_{metaName}')
                 run_data = run_datas[idx]
                 if run_data is None:
                     continue
@@ -339,7 +339,7 @@ def main():
             wrote_header = False
             for idx, row in meta_params.iterrows():
                 metaName = CRISPRessoShared.slugify(row["name"])
-                folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % metaName)
+                folder_name = os.path.join(OUTPUT_DIRECTORY, f'CRISPResso_on_{metaName}')
 
                 run_data = run_datas[idx]
                 if run_data is None:
@@ -377,7 +377,7 @@ def main():
         if debug_flag:
             traceback.print_exc(file=sys.stdout)
 
-        error('\n\nERROR: %s' % e)
+        error(f'\n\nERROR: {e}')
         sys.exit(-1)
 
 if __name__ == '__main__':

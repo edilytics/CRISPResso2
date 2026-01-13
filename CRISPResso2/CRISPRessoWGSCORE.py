@@ -46,7 +46,7 @@ def check_library(library_name):
         try:
                 return __import__(library_name)
         except:
-                error('You need to install %s module to use CRISPRessoWGS!' % library_name)
+                error(f'You need to install {library_name} module to use CRISPRessoWGS!')
                 sys.exit(1)
 
 def find_wrong_nt(sequence):
@@ -101,7 +101,11 @@ def check_bowtie2():
 #extract region
 def get_region_from_fa(chr_id, bpstart, bpend, uncompressed_reference):
     region='%s:%d-%d' % (chr_id, bpstart, bpend-1)
-    p = sb.Popen("samtools faidx %s %s |   grep -v ^\> | tr -d '\n'" %(uncompressed_reference, region), shell=True, stdout=sb.PIPE)
+    p1 = sb.Popen(['samtools', 'faidx', uncompressed_reference, region], stdout=sb.PIPE)
+    p2 = sb.Popen(['grep', '-v', '^>'], stdin=p1.stdout, stdout=sb.PIPE)
+    p = sb.Popen(['tr', '-d', '\n'], stdin=p2.stdout, stdout=sb.PIPE)
+    p1.stdout.close()
+    p2.stdout.close()
     return p.communicate()[0].decode('utf-8').upper()
 
 def find_overlapping_genes(row, df_genes):
@@ -114,13 +118,13 @@ def find_overlapping_genes(row, df_genes):
         if 'name' in row_g.keys() and 'name2' in row_g.keys():
             genes_overlapping.append( '%s (%s)' % (row_g.name2, row_g['name']))
         elif '#name' in row_g.keys() and 'name2' in row_g.keys():
-            genes_overlapping.append( '%s (%s)' % (row_g.name2, row_g['#name']))
+            genes_overlapping.append(f'{row_g.name2} ({row_g["#name"]})')
         elif '#name' in row_g.keys():
-            genes_overlapping.append( '%s' % (row_g['#name']))
+            genes_overlapping.append(str(row_g['#name']))
         elif 'name' in row_g.keys():
-            genes_overlapping.append( '%s' % (row_g['name']))
+            genes_overlapping.append(str(row_g['name']))
         else:
-            genes_overlapping.append( '%s' % (row_g[0]))
+            genes_overlapping.append(str(row_g[0]))
 
     row['gene_overlapping']=','.join(genes_overlapping)
 
@@ -165,13 +169,9 @@ def write_trimmed_fastq(in_bam_filename, bpstart, bpend, out_fastq_filename):
     Returns:
         n_reasd (int): number of reads written to the output fastq file
     """
-    p = sb.Popen(
-        f'samtools view {in_bam_filename} | cut -f1,4,6,10,11',
-        stdout=sb.PIPE,
-        stderr=sb.PIPE,
-        shell=True,
-        text=True,
-    )
+    p1 = sb.Popen(['samtools', 'view', in_bam_filename], stdout=sb.PIPE)
+    p = sb.Popen(['cut', '-f1,4,6,10,11'], stdin=p1.stdout, stdout=sb.PIPE, stderr=sb.PIPE, text=True)
+    p1.stdout.close()
 
     output, stderr = p.communicate()
     n_reads = 0
@@ -201,7 +201,12 @@ pd=check_library('pandas')
 np=check_library('numpy')
 
 def get_n_reads_fastq(fastq_filename):
-     p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '' ) +"cat < %s | wc -l" % fastq_filename, shell=True, stdout=sb.PIPE)
+     if fastq_filename.endswith('.gz'):
+         p1 = sb.Popen(['zcat', fastq_filename], stdout=sb.PIPE)
+     else:
+         p1 = sb.Popen(['cat', fastq_filename], stdout=sb.PIPE)
+     p = sb.Popen(['wc', '-l'], stdin=p1.stdout, stdout=sb.PIPE)
+     p1.stdout.close()
      n_reads = int(float(p.communicate()[0])/4.0)
      return n_reads
 
@@ -214,11 +219,10 @@ def extract_reads(row, samtools_exclude_flags):
 
         info('Extracting reads in:%s and creating .bam file: %s' % (region, row.bam_file_with_reads_in_region))
 
-        cmd = rf'''samtools view -b -F {samtools_exclude_flags} --reference {row.reference_file} {row.original_bam} {region} > {row.bam_file_with_reads_in_region} '''
-        sb.call(cmd, shell=True)
+        with open(row.bam_file_with_reads_in_region, 'wb') as outfile:
+            sb.call(['samtools', 'view', '-b', '-F', str(samtools_exclude_flags), '--reference', row.reference_file, row.original_bam, region], stdout=outfile)
 
-        cmd=r'''samtools index %s ''' % (row.bam_file_with_reads_in_region)
-        sb.call(cmd, shell=True)
+        sb.call(['samtools', 'index', row.bam_file_with_reads_in_region])
 
         #trim reads in bam and convert in fastq
         row.n_reads=write_trimmed_fastq(row.bam_file_with_reads_in_region, row.bpstart, row.bpend, row.fastq_file_trimmed_reads_in_region)
@@ -317,17 +321,17 @@ def main():
                              'bowtie2_index'} # these options will be set for each sub-run or should be not be passed to sub-runs because they are wgs-specific
         crispresso_options_for_wgs = list(crispresso_options-options_to_ignore)
 
-        OUTPUT_DIRECTORY='CRISPRessoWGS_on_%s' % normalize_name(args.name, args.bam_file)
+        OUTPUT_DIRECTORY = f'CRISPRessoWGS_on_{normalize_name(args.name, args.bam_file)}'
         if args.output_folder:
             OUTPUT_DIRECTORY=os.path.join(os.path.abspath(args.output_folder), OUTPUT_DIRECTORY)
 
         _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename) #handy function to put a file in the output directory
         try:
-            info('Creating Folder %s' % OUTPUT_DIRECTORY)
+            info(f'Creating Folder {OUTPUT_DIRECTORY}')
             os.makedirs(OUTPUT_DIRECTORY)
             info('Done!')
         except:
-            warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
+            warn(f'Folder {OUTPUT_DIRECTORY} already exists.')
 
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoWGS_status.json')))
 
@@ -437,12 +441,12 @@ def main():
             info('Index file for input .bam file exists, skipping generation.')
         else:
             info('Creating index file for input .bam file...')
-            sb.call('samtools index %s ' % (args.bam_file), shell=True)
+            sb.call(['samtools', 'index', args.bam_file])
 
 
         #load gene annotation
         if args.gene_annotations:
-            info('Loading gene coordinates from annotation file: %s...' % args.gene_annotations)
+            info(f'Loading gene coordinates from annotation file: {args.gene_annotations}...')
             try:
                 df_genes=pd.read_csv(args.gene_annotations, compression='gzip', sep="\t")
                 df_genes.txEnd=df_genes.txEnd.astype(int)
@@ -499,7 +503,8 @@ def main():
             info('The index for the reference fasta file is already present! Skipping generation.')
         else:
             info('Indexing reference file... Please be patient!')
-            sb.call('samtools faidx %s >>%s 2>&1' % (uncompressed_reference, log_filename), shell=True)
+            with open(log_filename, 'a') as logfile:
+                sb.call(['samtools', 'faidx', uncompressed_reference], stdout=logfile, stderr=sb.STDOUT)
 
         info('Retrieving reference sequences for amplicons and checking for sgRNAs')
         df_regions['sequence']=df_regions.apply(lambda row: get_region_from_fa(row.chr_id, row.bpstart, row.bpend, uncompressed_reference), axis=1)
@@ -549,8 +554,8 @@ def main():
 
         def set_filenames(row):
             row_fastq_exists = False
-            fastq_gz_filename=os.path.join(ANALYZED_REGIONS, '%s.fastq.gz' % CRISPRessoShared.clean_filename('REGION_'+str(row.run_name)))
-            bam_region_filename=os.path.join(ANALYZED_REGIONS, '%s.bam' % CRISPRessoShared.clean_filename('REGION_'+str(row.run_name)))
+            fastq_gz_filename = os.path.join(ANALYZED_REGIONS, f'{CRISPRessoShared.clean_filename("REGION_"+str(row.run_name))}.fastq.gz')
+            bam_region_filename = os.path.join(ANALYZED_REGIONS, f'{CRISPRessoShared.clean_filename("REGION_"+str(row.run_name))}.bam')
             #if bam file already exists, don't regenerate it
             if os.path.isfile(fastq_gz_filename):
                 row_fastq_exists = True
@@ -600,13 +605,13 @@ def main():
                 (row['fastq_file_trimmed_reads_in_region'], row['sequence'], OUTPUT_DIRECTORY, row['run_name'])
 
                 if row['sgRNA'] and not pd.isnull(row['sgRNA']):
-                    crispresso_cmd+=' -g %s' % row['sgRNA']
+                    crispresso_cmd += f' -g {row["sgRNA"]}'
 
                 if row['Expected_HDR'] and not pd.isnull(row['Expected_HDR']):
-                    crispresso_cmd+=' -e %s' % row['Expected_HDR']
+                    crispresso_cmd += f' -e {row["Expected_HDR"]}'
 
                 if row['Coding_sequence'] and not pd.isnull(row['Coding_sequence']):
-                    crispresso_cmd+=' -c %s' % row['Coding_sequence']
+                    crispresso_cmd += f' -c {row["Coding_sequence"]}'
 
                 crispresso_cmd=CRISPRessoShared.overwrite_crispresso_options(cmd=crispresso_cmd, option_names_to_overwrite=crispresso_options_for_wgs, option_values=args)
 
@@ -636,7 +641,7 @@ def main():
         failed_batch_arr_desc = []
         for idx, row in df_regions.iterrows():
             run_name = row.run_name
-            folder_name = 'CRISPResso_on_%s' % run_name
+            folder_name = f'CRISPResso_on_{run_name}'
 
             failed_run_bool, failed_run_desc = CRISPRessoShared.check_if_failed_run(_jp(folder_name), info)
             all_region_names.append(run_name)
@@ -645,7 +650,7 @@ def main():
             if failed_run_bool:
                 failed_batch_arr.append(run_name)
                 failed_batch_arr_desc.append(failed_run_desc)
-                warn('Skipping the folder %s: not enough reads, incomplete, or empty folder.'% folder_name)
+                warn(f'Skipping the folder {folder_name}: not enough reads, incomplete, or empty folder.')
                 this_els = empty_line_els[:]
                 this_els[n_reads_index] = row.n_reads
                 to_add = [run_name]
@@ -767,7 +772,7 @@ def main():
 
     except Exception as e:
         print_stacktrace_if_debug()
-        error('\n\nERROR: %s' % e)
+        error(f'\n\nERROR: {e}')
         sys.exit(-1)
 
 if __name__ == '__main__':

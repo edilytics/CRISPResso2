@@ -41,7 +41,7 @@ def check_library(library_name):
     try:
         return __import__(library_name)
     except:
-        error('You need to install %s module to use CRISPRessoBatch!' % library_name)
+        error(f'You need to install {library_name} module to use CRISPRessoBatch!')
         sys.exit(1)
 
 
@@ -127,7 +127,7 @@ def main():
                 )
             batch_folder_name = clean_name
 
-        output_folder_name = 'CRISPRessoBatch_on_%s' % batch_folder_name
+        output_folder_name = f'CRISPRessoBatch_on_{batch_folder_name}'
         OUTPUT_DIRECTORY = os.path.abspath(output_folder_name)
 
         if args.batch_output_folder:
@@ -142,10 +142,10 @@ def main():
         CRISPRessoPlot.setMatplotlibDefaults()
 
         try:
-            info('Creating Folder %s' % OUTPUT_DIRECTORY, {'percent_complete': 0})
+            info(f'Creating Folder {OUTPUT_DIRECTORY}', {'percent_complete': 0})
             os.makedirs(OUTPUT_DIRECTORY)
         except:
-            warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
+            warn(f'Folder {OUTPUT_DIRECTORY} already exists.')
 
         log_filename = _jp('CRISPRessoBatch_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
@@ -335,7 +335,7 @@ def main():
         failed_batch_arr_desc = []
         for idx, row in batch_params.iterrows():
             batch_name = CRISPRessoShared.slugify(row["name"])
-            folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % batch_name)
+            folder_name = os.path.join(OUTPUT_DIRECTORY, f'CRISPResso_on_{batch_name}')
             # check if run failed
             failed_run_bool, failed_status_string = CRISPRessoShared.check_if_failed_run(folder_name, info)
             if failed_run_bool:
@@ -450,7 +450,7 @@ def main():
             batches_with_this_amplicon = []
             for idx, row in batch_params.iterrows():
                 batch_name = CRISPRessoShared.slugify(row["name"])
-                folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % batch_name)
+                folder_name = os.path.join(OUTPUT_DIRECTORY, f'CRISPResso_on_{batch_name}')
                 run_data = run_datas[idx]
                 if run_data is None:
                     continue
@@ -578,7 +578,7 @@ def main():
 
                 # if guides are all the same, merge substitutions and perform base editor comparison at guide quantification window
                 if guides_all_same and consensus_guides != []:
-                    info("All guides are equal. Performing comparison of batches for amplicon '%s'"% amplicon_name)
+                    info(f"All guides are equal. Performing comparison of batches for amplicon '{amplicon_name}'")
                     include_idxs = consensus_include_idxs  # include indexes are the same for all guides
                     for idx, sgRNA in enumerate(consensus_guides):
                         sgRNA_plot_idxs = consensus_sgRNA_plot_idxs[idx]
@@ -874,7 +874,7 @@ def main():
             wrote_header = False
             for idx, row in batch_params.iterrows():
                 batch_name = CRISPRessoShared.slugify(row["name"])
-                folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % batch_name)
+                folder_name = os.path.join(OUTPUT_DIRECTORY, f'CRISPResso_on_{batch_name}')
                 run_data = run_datas[idx]
                 if run_data is None:
                     continue
@@ -894,7 +894,7 @@ def main():
             outfile.write("\t".join(['Batch','Reference','total_reads','modified_frameshift','modified_non_frameshift','non_modified_non_frameshift','splicing_sites_modified','splice_sites_unmodified'])+"\n")
             for idx, row in batch_params.iterrows():
                 batch_name = CRISPRessoShared.slugify(row["name"])
-                folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % batch_name)
+                folder_name = os.path.join(OUTPUT_DIRECTORY, f'CRISPResso_on_{batch_name}')
                 run_data = run_datas[idx]
                 if run_data is None:
                     continue
@@ -913,7 +913,7 @@ def main():
             wrote_header = False
             for idx, row in batch_params.iterrows():
                 batch_name = CRISPRessoShared.slugify(row["name"])
-                folder_name = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_on_%s' % batch_name)
+                folder_name = os.path.join(OUTPUT_DIRECTORY, f'CRISPResso_on_{batch_name}')
 
                 run_data = run_datas[idx]
                 if run_data is None:
@@ -937,7 +937,7 @@ def main():
                 try:
                     future.result()
                 except Exception as e:
-                    logger.warning('Error in plot pool: %s' % e)
+                    logger.warning(f'Error in plot pool: {e}')
                     logger.debug(traceback.format_exc())
             process_pool.shutdown()
 
@@ -984,7 +984,7 @@ def main():
         if debug_flag:
             traceback.print_exc(file=sys.stdout)
 
-        error('\n\nERROR: %s' % e)
+        error(f'\n\nERROR: {e}')
         sys.exit(-1)
 
 if __name__ == '__main__':

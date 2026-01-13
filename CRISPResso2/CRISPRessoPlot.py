@@ -1571,9 +1571,9 @@ def plot_frameshift_analysis(
             non_modified_non_frameshift,
         ],
         labels=[
-            'Frameshift mutation\n(%d reads)' % modified_frameshift,
-            'In-frame mutation\n(%d reads)' % modified_non_frameshift,
-            'Noncoding mutation\n(%d reads)' % non_modified_non_frameshift,
+            f'Frameshift mutation\n({modified_frameshift} reads)',
+            f'In-frame mutation\n({modified_non_frameshift} reads)',
+            f'Noncoding mutation\n({non_modified_non_frameshift} reads)',
         ],
         explode=(0.0, 0.0, 0.0),
         colors=[
@@ -1783,9 +1783,9 @@ def plot_global_frameshift_analysis(
             global_non_modified_non_frameshift,
         ],
         labels=[
-            'Frameshift mutation\n(%d reads)' % global_modified_frameshift,
-            'In-frame mutation\n(%d reads)' % global_modified_non_frameshift,
-            'Noncoding mutation\n(%d reads)' % global_non_modified_non_frameshift,
+            f'Frameshift mutation\n({global_modified_frameshift} reads)',
+            f'In-frame mutation\n({global_modified_non_frameshift} reads)',
+            f'Noncoding mutation\n({global_non_modified_non_frameshift} reads)',
         ],
         explode=(0.0, 0.0, 0.0),
         colors=[
@@ -1923,8 +1923,8 @@ def plot_impact_on_splice_sites(
             (global_count_total - global_splicing_sites_modified),
         ],
         labels=[
-            'Potential splice sites modified\n(%d reads)' % global_splicing_sites_modified,
-            'Unmodified\n(%d reads)' % (global_count_total - global_splicing_sites_modified),
+            f'Potential splice sites modified\n({global_splicing_sites_modified} reads)',
+            f'Unmodified\n({global_count_total - global_splicing_sites_modified} reads)',
         ],
         explode=(0.0, 0),
         colors=[
@@ -2132,8 +2132,8 @@ def plot_potential_splice_sites(
             (count_total - splicing_sites_modified),
         ],
         labels=[
-            'Potential splice sites modified\n(%d reads)' % splicing_sites_modified,
-            'Unmodified\n(%d reads)' % (count_total - splicing_sites_modified),
+            f'Potential splice sites modified\n({splicing_sites_modified} reads)',
+            f'Unmodified\n({count_total - splicing_sites_modified} reads)',
         ],
         explode=(0.0, 0),
         colors=[
@@ -2806,7 +2806,7 @@ def plot_conversion_at_sel_nucs_not_include_ref(df_subs, ref_name, ref_sequence,
     ax2 = ax.twiny()
     ax2.set_xlim(ax.get_xlim())
     ax2.set_xticks(np.append(ind, len(from_nuc_indices)-0.5))
-    ax2.set_xticklabels(["%0.2f%%"%(x*100)  for x in sub_freq] +["         $\it{\% Non-" + conversion_nuc_from + "}$"])
+    ax2.set_xticklabels([f"{x*100:0.2f}%" for x in sub_freq] + [f"         $\it{{% Non-{conversion_nuc_from}}}$"])
 
     #plot legend
     legend_patches = []
@@ -4205,9 +4205,9 @@ def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
     """
     plt.figure(figsize=(12, 12))
     ax = plt.subplot(111)
-    labels = ['READS\nIN INPUTS\n(%d)' % N_READS_INPUT,
-              'READS AFTER\nPREPROCESSING\n(%d)' % N_READS_AFTER_PREPROCESSING,
-              'READS\nALIGNED\n(%d)' % N_TOTAL]
+    labels = [f'READS\nIN INPUTS\n({N_READS_INPUT})',
+              f'READS AFTER\nPREPROCESSING\n({N_READS_AFTER_PREPROCESSING})',
+              f'READS\nALIGNED\n({N_TOTAL})']
     sizes = [N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL]
     rects = ax.bar(np.arange(len(sizes)), sizes, color='silver')
     # label each bar

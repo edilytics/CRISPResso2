@@ -9,6 +9,7 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 import logging
 import multiprocessing as mp
 import signal
+import shlex
 import subprocess as sb
 from functools import partial
 from inspect import getmodule, stack
@@ -34,9 +35,9 @@ def run_crispresso(crispresso_cmds, descriptor, idx):
     crispresso_cmd=crispresso_cmds[idx]
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
 
-    logger.info('Running CRISPResso on %s #%d/%d: %s' % (descriptor, idx, len(crispresso_cmds), crispresso_cmd))
+    logger.info(f'Running CRISPResso on {descriptor} #{idx}/{len(crispresso_cmds)}: {crispresso_cmd}')
 
-    return_value = sb.call(crispresso_cmd, shell=True)
+    return_value = sb.call(shlex.split(crispresso_cmd))
 
     if return_value == 137:
         logger.warn('CRISPResso was killed by your system (return value %d) on %s #%d: "%s"\nPlease reduce the number of processes (-p) and run again.'%(return_value, descriptor, idx, crispresso_cmd))
@@ -94,7 +95,7 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor = 'region',
     else:
         int_n_processes = int(n_processes)
 
-    logger.info("Running CRISPResso with %d processes" % int_n_processes)
+    logger.info(f"Running CRISPResso with {int_n_processes} processes")
     if int_n_processes > 1:
         pool = mp.Pool(processes=int_n_processes)
         pFunc = partial(run_crispresso, crispresso_cmds, descriptor)
@@ -247,7 +248,10 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
 
 
 def run_subprocess(cmd):
-    return sb.call(cmd, shell=True)
+    if isinstance(cmd, str):
+        return sb.call(shlex.split(cmd))
+    else:
+        return sb.call(cmd)
 
 def run_parallel_commands(commands_arr, n_processes=1, descriptor='CRISPResso2', continue_on_fail=False):
     """

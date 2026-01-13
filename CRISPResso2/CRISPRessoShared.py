@@ -301,18 +301,18 @@ def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, 
             # argparse conveniently doesn't set type for bools - those action types are None
             if action.nargs == 0:
                 if val: # if value is true
-                    new_cmd += ' --%s' % action.dest
+                    new_cmd += f' --{action.dest}'
             elif action.type == bool: # but just in case...
                 if val:
-                    new_cmd += ' --%s' % action.dest
+                    new_cmd += f' --{action.dest}'
             elif action.type == str:
                 if val != "":
                     if re.fullmatch(r"[a-zA-Z0-9\._]*", val): # if the value is alphanumeric, don't have to quote it
-                        new_cmd += ' --%s %s' % (action.dest, val)
+                        new_cmd += f' --{action.dest} {val}'
                     elif val.startswith('"') and val.endswith('"'):
-                        new_cmd += ' --%s %s' % (action.dest, val)
+                        new_cmd += f' --{action.dest} {val}'
                     else:
-                        new_cmd += ' --%s "%s"' % (action.dest, val)
+                        new_cmd += f' --{action.dest} "{val}"'
             elif action.type == int:
                 new_cmd += ' --%s %s' % (action.dest, val)
 
@@ -356,22 +356,22 @@ def propagate_crispresso_options(cmd, options, params, paramInd=None):
                 if val is None:
                     pass
                 elif str(val) == "True":
-                    cmd += ' --%s' % option
+                    cmd += f' --{option}'
                 elif str(val) == "False":
                     pass
                 elif isinstance(val, str):
                     if val != "":
                         if re.match(r'-\d+$', val):
-                            cmd += ' --%s %s' % (option, str(val))
+                            cmd += f' --{option} {str(val)}'
                         elif " " in val or "-" in val:
-                            cmd += ' --%s "%s"' % (option, str(val))  # quotes for options with spaces
+                            cmd += f' --{option} "{str(val)}"'  # quotes for options with spaces
                         else:
-                            cmd += ' --%s %s' % (option, str(val))
+                            cmd += f' --{option} {str(val)}'
                 elif isinstance(val, bool):
                     if val:
-                        cmd += ' --%s' % option
+                        cmd += f' --{option}'
                 else:
-                    cmd += ' --%s %s' % (option, str(val))
+                    cmd += f' --{option} {str(val)}'
     return cmd
 
 
@@ -724,7 +724,12 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
 def get_n_reads_fastq(fastq_filename):
     if not os.path.exists(fastq_filename) or os.path.getsize(fastq_filename) == 0:
         return 0
-    p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '' ) +"cat < %s | grep -c ." % fastq_filename, shell=True, stdout=sb.PIPE)
+    if fastq_filename.endswith('.gz'):
+        p1 = sb.Popen(['zcat', fastq_filename], stdout=sb.PIPE)
+    else:
+        p1 = sb.Popen(['cat', fastq_filename], stdout=sb.PIPE)
+    p = sb.Popen(['grep', '-c', '.'], stdin=p1.stdout, stdout=sb.PIPE)
+    p1.stdout.close()
     n_reads = int(float(p.communicate()[0])/4.0)
     return n_reads
 
@@ -959,9 +964,14 @@ def get_command_output(command):
     returns:
         iter to read the output
     """
-    p = sb.Popen(command,
+    import shlex
+    if isinstance(command, str):
+        cmd_parts = shlex.split(command)
+    else:
+        cmd_parts = command
+    p = sb.Popen(cmd_parts,
                  stdout=sb.PIPE,
-                 stderr=sb.STDOUT, shell=True,
+                 stderr=sb.STDOUT,
                  #  encoding='utf-8',universal_newlines=True)
                  universal_newlines=True,
                  bufsize=-1)  # bufsize system default
@@ -1060,10 +1070,10 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
 
     piped_commands = count_frequent_cmd.split("|")
     pipes = [None] * len(piped_commands)
-    pipes[0] = sb.Popen(piped_commands[0], stdout=sb.PIPE, preexec_fn=default_sigpipe, shell=True)
+    pipes[0] = sb.Popen(shlex.split(piped_commands[0].strip()), stdout=sb.PIPE, preexec_fn=default_sigpipe)
     for pipe_i in range(1, len(piped_commands)):
-        pipes[pipe_i] = sb.Popen(piped_commands[pipe_i], stdin=pipes[pipe_i - 1].stdout, stdout=sb.PIPE,
-                                 preexec_fn=default_sigpipe, shell=True)
+        pipes[pipe_i] = sb.Popen(shlex.split(piped_commands[pipe_i].strip()), stdin=pipes[pipe_i - 1].stdout, stdout=sb.PIPE,
+                                 preexec_fn=default_sigpipe)
     top_unaligned = pipes[-1].communicate()[0]
 
     if pipes[-1].poll() != 0:
@@ -2147,11 +2157,15 @@ def zip_results(results_folder):
     path_values = os.path.split(results_folder)
     output_folder = path_values[0]
     folder_id = path_values[1]
-    if output_folder == "":
-        cmd_to_zip = f'zip -m -r {folder_id + ".zip"} {folder_id}'
-    else:
-        cmd_to_zip = f'cd {output_folder} && zip -m -r {folder_id + ".zip"} {folder_id} .'
-    sb.call(cmd_to_zip, shell=True)
+    original_cwd = os.getcwd()
+    try:
+        if output_folder == "":
+            sb.call(['zip', '-m', '-r', folder_id + ".zip", folder_id])
+        else:
+            os.chdir(output_folder)
+            sb.call(['zip', '-m', '-r', folder_id + ".zip", folder_id, '.'])
+    finally:
+        os.chdir(original_cwd)
     return
 
 

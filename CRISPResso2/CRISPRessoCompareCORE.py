@@ -27,7 +27,7 @@ def check_library(library_name):
         try:
                 return __import__(library_name)
         except:
-                error('You need to install %s module to use CRISPRessoCompare!' % library_name)
+                error(f'You need to install {library_name} module to use CRISPRessoCompare!')
                 sys.exit(1)
 
 
@@ -148,11 +148,11 @@ def main():
         log_filename = _jp('CRISPRessoCompare_RUNNING_LOG.txt')
 
         try:
-            info('Creating Folder %s' % OUTPUT_DIRECTORY, {'percent_complete': 0})
+            info(f'Creating Folder {OUTPUT_DIRECTORY}', {'percent_complete': 0})
             os.makedirs(OUTPUT_DIRECTORY)
             info('Done!')
         except:
-            warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
+            warn(f'Folder {OUTPUT_DIRECTORY} already exists.')
 
         log_filename = _jp('CRISPRessoCompare_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
@@ -192,7 +192,7 @@ def main():
             percent_complete_step = (percent_complete_end - percent_complete_start) / len(amplicon_names_in_both)
         for amplicon_name in amplicon_names_in_both:
             percent_complete = percent_complete_start + percent_complete_step * amplicon_names_in_both.index(amplicon_name)
-            info('Loading data for amplicon %s' % amplicon_name, {'percent_complete': percent_complete})
+            info(f'Loading data for amplicon {amplicon_name}', {'percent_complete': percent_complete})
             profile_1=parse_profile(amplicon_info_1[amplicon_name]['quantification_file'])
             profile_2=parse_profile(amplicon_info_2[amplicon_name]['quantification_file'])
 
@@ -459,5 +459,5 @@ def main():
         if debug_flag:
             traceback.print_exc(file=sys.stdout)
 
-        error('\n\nERROR: %s' % e)
+        error(f'\n\nERROR: {e}')
         sys.exit(-1)

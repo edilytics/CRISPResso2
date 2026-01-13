@@ -52,13 +52,13 @@ def main():
             f2_out = open(fastq_r2_out, 'w')
     ###END CREATION OF FILEHANDLES##
 
-    print('Fastq R1: %s' % args.fastq_r1)
-    print('Fastq R2: %s' % args.fastq_r2)
-    print('Fastq R1 out: %s' % fastq_r1_out)
-    print('Fastq R2 out: %s' % fastq_r2_out)
+    print(f'Fastq R1: {args.fastq_r1}')
+    print(f'Fastq R2: {args.fastq_r2}')
+    print(f'Fastq R1 out: {fastq_r1_out}')
+    print(f'Fastq R2 out: {fastq_r2_out}')
 
-    print('Include seq: %s' % args.include_seq)
-    print('Exclude seq: %s' % args.exclude_seq)
+    print(f'Include seq: {args.include_seq}')
+    print(f'Exclude seq: {args.exclude_seq}')
 
 
     read_read_count = 0

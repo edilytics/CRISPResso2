@@ -87,23 +87,23 @@ ___________________________________
         info(CRISPRessoShared.get_crispresso_header(description, aggregate_string))
 
 
-        output_folder_name='CRISPRessoAggregate_on_%s' % args.name
+        output_folder_name=f'CRISPRessoAggregate_on_{args.name}'
         OUTPUT_DIRECTORY=os.path.abspath(output_folder_name)
 
         _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename) #handy function to put a file in the output directory
 
         try:
-             info('Creating Folder %s' % OUTPUT_DIRECTORY)
+             info(f'Creating Folder {OUTPUT_DIRECTORY}')
              os.makedirs(OUTPUT_DIRECTORY)
         except:
-             warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
+             warn(f'Folder {OUTPUT_DIRECTORY} already exists.')
 
         log_filename=_jp('CRISPRessoAggregate_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoAggregate_status.json')))
 
         with open(log_filename, 'w+') as outfile:
-              outfile.write('[Command used]:\n%s\n\n[Execution log]:\n' % ' '.join(sys.argv))
+              outfile.write(f'[Command used]:\n{' '.join(sys.argv)}\n\n[Execution log]:\n')
 
         crispresso2Aggregate_info_file = os.path.join(
             OUTPUT_DIRECTORY, 'CRISPResso2Aggregate_info.json',
@@ -171,7 +171,7 @@ ___________________________________
                     if 'good_region_names' in pooled_data['results']:
                         run_names = pooled_data['results']['good_region_names']
                         for run_name in run_names:
-                            run_folder_loc = os.path.join(folder, 'CRISPResso_on_%s'%run_name)
+                            run_folder_loc = os.path.join(folder, f'CRISPResso_on_{run_name}')
                             try:
                                 run_data = CRISPRessoShared.load_crispresso_info(run_folder_loc)
                                 crispresso2_folder_infos[run_folder_loc] = run_data
@@ -191,7 +191,7 @@ ___________________________________
                     if 'completed_batch_arr' in batch_data['results']:
                         run_names = batch_data['results']['completed_batch_arr']
                         for run_name in run_names:
-                            run_folder_loc = os.path.join(folder, 'CRISPResso_on_%s'%run_name)
+                            run_folder_loc = os.path.join(folder, f'CRISPResso_on_{run_name}')
                             try:
                                 run_data = CRISPRessoShared.load_crispresso_info(run_folder_loc)
                                 crispresso2_folder_infos[run_folder_loc] = run_data
@@ -211,7 +211,7 @@ ___________________________________
                     if 'good_region_folders' in wgs_data['results']:
                         run_names = wgs_data['results']['good_region_folders']
                         for run_name in run_names:
-                            run_folder_loc = os.path.join(folder, 'CRISPResso_on_%s'%run_name)
+                            run_folder_loc = os.path.join(folder, f'CRISPResso_on_{run_name}')
                             try:
                                 run_data = CRISPRessoShared.load_crispresso_info(run_folder_loc)
                                 crispresso2_folder_infos[run_folder_loc] = run_data
@@ -352,7 +352,7 @@ ___________________________________
                         guides_all_same = False
 
                     if 'nuc_freq_filename' not in run_data['results']['refs'][run_amplicon_name]:
-                        info("Skipping the amplicon '%s' in folder '%s'. Cannot find nucleotide information."%(run_amplicon_name, crispresso2_folder))
+                        info(f"Skipping the amplicon '{run_amplicon_name}' in folder '{crispresso2_folder}'. Cannot find nucleotide information.")
                         continue
 
                     nucleotide_frequency_file = os.path.join(crispresso2_folder, run_data['results']['refs'][run_amplicon_name]['nuc_freq_filename'])
@@ -365,26 +365,26 @@ ___________________________________
                     ampSeq_cf, mod_freqs = CRISPRessoShared.parse_count_file(count_file)
 
                     if ampSeq_nf is None or ampSeq_np is None or ampSeq_cf is None:
-                        info("Skipping the amplicon '%s' in folder '%s'. Could not parse run output."%(run_amplicon_name, crispresso2_folder))
-                        info("Nucleotide frequency amplicon: '%s', Nucleotide percentage amplicon: '%s', Count vectors amplicon: '%s'"%(ampSeq_nf, ampSeq_np, ampSeq_cf))
+                        info(f"Skipping the amplicon '{run_amplicon_name}' in folder '{crispresso2_folder}'. Could not parse run output.")
+                        info(f"Nucleotide frequency amplicon: '{ampSeq_nf}', Nucleotide percentage amplicon: '{ampSeq_np}', Count vectors amplicon: '{ampSeq_cf}'")
                         continue
                     if ampSeq_nf != ampSeq_np or ampSeq_np != ampSeq_cf:
-                        warn("Skipping the amplicon '%s' in folder '%s'. Parsed amplicon sequences do not match\nnf:%s\nnp:%s\ncf:%s\nrf:%s"%(run_amplicon_name, crispresso2_folder, ampSeq_nf, ampSeq_np, ampSeq_cf, amplicon_seq))
+                        warn(f"Skipping the amplicon '{run_amplicon_name}' in folder '{crispresso2_folder}'. Parsed amplicon sequences do not match\nnf:{ampSeq_nf}\nnp:{ampSeq_np}\ncf:{ampSeq_cf}\nrf:{amplicon_seq}")
                         continue
                     if consensus_sequence == "":
                         consensus_sequence = ampSeq_nf
                     if ampSeq_nf != consensus_sequence:
-                        info("Skipping the amplicon '%s' in folder '%s'. Amplicon sequences do not match."%(run_amplicon_name, crispresso2_folder))
+                        info(f"Skipping the amplicon '{run_amplicon_name}' in folder '{crispresso2_folder}'. Amplicon sequences do not match.")
                         continue
                     if 'Total' not in mod_freqs:
-                        info("Skipping the amplicon '%s' in folder '%s'. Processing did not complete."%(run_amplicon_name, crispresso2_folder))
+                        info(f"Skipping the amplicon '{run_amplicon_name}' in folder '{crispresso2_folder}'. Processing did not complete.")
                         continue
                     if mod_freqs['Total'][0] == 0 or mod_freqs['Total'][0] == "0":
-                        info("Skipping the amplicon '%s' in folder '%s'. Got no reads for amplicon."%(run_amplicon_name, crispresso2_folder))
+                        info(f"Skipping the amplicon '{run_amplicon_name}' in folder '{crispresso2_folder}'. Got no reads for amplicon.")
                         continue
                     this_amp_total_reads = run_data['results']['alignment_stats']['counts_total'][run_amplicon_name]
                     if this_amp_total_reads < args.min_reads_for_inclusion:
-                        info("Skipping the amplicon '%s' in folder '%s'. Got %s reads (min_reads_for_inclusion is %d)."%(run_amplicon_name, crispresso2_folder, str(this_amp_total_reads), args.min_reads_for_inclusion))
+                        info(f"Skipping the amplicon '{run_amplicon_name}' in folder '{crispresso2_folder}'. Got {this_amp_total_reads} reads (min_reads_for_inclusion is {args.min_reads_for_inclusion}).")
                         continue
 
                     mod_pcts = {}
@@ -416,7 +416,7 @@ ___________________________________
                         modification_percentage_summary.append(pct_row)
 
                 if amp_found_count == 0:
-                    info("Couldn't find any data for amplicon '%s'. Not compiling results."%amplicon_name)
+                    info(f"Couldn't find any data for amplicon '{amplicon_name}'. Not compiling results.")
                 else:
                     amplicon_plot_name = amplicon_name+"."
                     if len(amplicon_names) == 1 and amplicon_name == "Reference":
@@ -460,7 +460,7 @@ ___________________________________
 
                     #if guides are all the same, merge substitutions and perform base editor comparison at guide quantification window
                     if guides_all_same and consensus_guides != []:
-                        info("All guides are equal. Performing comparison of runs for amplicon '%s'"% amplicon_name)
+                        info(f"All guides are equal. Performing comparison of runs for amplicon '{amplicon_name}'")
                         include_idxs = consensus_include_idxs #include indexes are the same for all guides
                         for idx, sgRNA in enumerate(consensus_guides):
                             sgRNA_plot_idxs = consensus_sgRNA_plot_idxs[idx]
@@ -899,7 +899,7 @@ ___________________________________
                 try:
                     future.result()
                 except Exception as e:
-                    logger.warning('Error in plot pool: %s' % e)
+                    logger.warning(f'Error in plot pool: {e}')
                     logger.debug(traceback.format_exc())
             process_pool.shutdown()
 
@@ -915,7 +915,7 @@ ___________________________________
         if debug_flag:
             traceback.print_exc(file=sys.stdout)
 
-        error('\n\nERROR: %s' % e)
+        error(f'\n\nERROR: {e}')
         sys.exit(-1)
 
 if __name__ == '__main__':
