@@ -6,12 +6,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
 
     steps:
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Conda
         uses: conda-incubator/setup-miniconda@v3
@@ -21,12 +22,5 @@ jobs:
             activate-environment: test_env
             environment-file: .github/envs/test_env.yml
 
-      - name: Checkout code
-        uses: actions/checkout@v3
-
       - name: Run Ruff
         run: ruff check . --statistics
-
-      - name: Tear down Docker Compose
-        if: always()
-        run: make down
