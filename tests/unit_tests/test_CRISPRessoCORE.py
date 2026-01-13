@@ -6,6 +6,7 @@ from pytest_check import check
 
 from CRISPResso2 import CRISPRessoCORE, CRISPRessoShared
 
+
 def calc_score(seq, ref):
     score = 0
     for seq_i, ref_i in zip(seq, ref):
@@ -23,13 +24,13 @@ def test_get_consensus_alignment_from_pairs():
 
     print("testing Easy")
 
-    #basic test
-    qual1                =   "AAAA"
-    aln1_seq             = "--CGAT----"
-    aln1_ref             = "ATCGATCGAT"
-    aln2_seq             = "-----TCGAT"
-    aln2_ref             = "ATCGATCGAT"
-    qual2                =      "AAAAA"
+    # basic test
+    qual1 = "AAAA"
+    aln1_seq = "--CGAT----"
+    aln1_ref = "ATCGATCGAT"
+    aln2_seq = "-----TCGAT"
+    aln2_ref = "ATCGATCGAT"
+    qual2 = "AAAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -42,18 +43,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNCGATCGAT"
-        assert ref_seq ==      "ATCGATCGAT"
+        assert aln_seq == "NNCGATCGAT"
+        assert ref_seq == "ATCGATCGAT"
         assert score == 80
         assert caching_ok
 
-    #test quality difference
-    qual1                =   "AAAB"
-    aln1_seq             = "--CGAT----"
-    aln1_ref             = "ATCGATCGAT"
-    aln2_seq             = "-----GCGAT"
-    aln2_ref             = "ATCGATCGAT"
-    qual2                =      "AAAAA"
+    # test quality difference
+    qual1 = "AAAB"
+    aln1_seq = "--CGAT----"
+    aln1_ref = "ATCGATCGAT"
+    aln2_seq = "-----GCGAT"
+    aln2_ref = "ATCGATCGAT"
+    qual2 = "AAAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -66,18 +67,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNCGATCGAT"
-        assert ref_seq ==      "ATCGATCGAT"
+        assert aln_seq == "NNCGATCGAT"
+        assert ref_seq == "ATCGATCGAT"
         assert score == 80
         assert not caching_ok
 
-    #test quality difference
-    qual1                =   "AAAA"
-    aln1_seq             = "--CGAT----"
-    aln1_ref             = "ATCGATCGAT"
-    aln2_seq             = "-----GCGAT"
-    aln2_ref             = "ATCGATCGAT"
-    qual2                =      "BAAAA"
+    # test quality difference
+    qual1 = "AAAA"
+    aln1_seq = "--CGAT----"
+    aln1_ref = "ATCGATCGAT"
+    aln2_seq = "-----GCGAT"
+    aln2_ref = "ATCGATCGAT"
+    qual2 = "BAAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -90,18 +91,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNCGAGCGAT"
-        assert ref_seq ==      "ATCGATCGAT"
+        assert aln_seq == "NNCGAGCGAT"
+        assert ref_seq == "ATCGATCGAT"
         assert score == 70
         assert not caching_ok
 
-    #gaps between r1 and r2
-    qual1                = "AAAAAAAAAA"
-    aln1_seq             = "--CGA-----"
-    aln1_ref             = "ATCGATCGAT"
-    aln2_seq             = "-------GA-"
-    aln2_ref             = "ATCGATCGAT"
-    qual2                = "AAAAAAAAAA"
+    # gaps between r1 and r2
+    qual1 = "AAAAAAAAAA"
+    aln1_seq = "--CGA-----"
+    aln1_ref = "ATCGATCGAT"
+    aln2_seq = "-------GA-"
+    aln2_ref = "ATCGATCGAT"
+    qual2 = "AAAAAAAAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -114,20 +115,20 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNCGANNGAN"
-        assert ref_seq ==      "ATCGATCGAT"
+        assert aln_seq == "NNCGANNGAN"
+        assert ref_seq == "ATCGATCGAT"
         assert score == 50
         assert caching_ok
 
     print('Finished easy tests... now for the hard stuff')
 
-    #insertion in r1
-    qual1                =   "AAAA"
-    aln1_seq             = "--CCGA-----".replace(" ","") #added replace for vertical alignment
-    aln1_ref             = "ATC-GATCGAT".replace(" ","")
-    aln2_seq             = "--- ----GA-".replace(" ","")
-    aln2_ref             = "ATC GATCGAT".replace(" ","")
-    qual2                =         "AA"
+    # insertion in r1
+    qual1 = "AAAA"
+    aln1_seq = "--CCGA-----".replace(" ", "")  # added replace for vertical alignment
+    aln1_ref = "ATC-GATCGAT".replace(" ", "")
+    aln2_seq = "--- ----GA-".replace(" ", "")
+    aln2_ref = "ATC GATCGAT".replace(" ", "")
+    qual2 = "AA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -140,18 +141,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNCCGANNGAN"
-        assert ref_seq ==      "ATC-GATCGAT"
+        assert aln_seq == "NNCCGANNGAN"
+        assert ref_seq == "ATC-GATCGAT"
         assert score == 45.455
         assert caching_ok
 
-    #deletion in r1
-    qual1                =   "AA"
-    aln1_seq             = "--C-A-----".replace(" ","")
-    aln1_ref             = "ATCGATCGAT".replace(" ","")
-    aln2_seq             = "-------GA-".replace(" ","")
-    aln2_ref             = "ATCGATCGAT".replace(" ","")
-    qual2                =        "AA"
+    # deletion in r1
+    qual1 = "AA"
+    aln1_seq = "--C-A-----".replace(" ", "")
+    aln1_ref = "ATCGATCGAT".replace(" ", "")
+    aln2_seq = "-------GA-".replace(" ", "")
+    aln2_ref = "ATCGATCGAT".replace(" ", "")
+    qual2 = "AA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -164,18 +165,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNC-ANNGAN"
-        assert ref_seq ==      "ATCGATCGAT"
+        assert aln_seq == "NNC-ANNGAN"
+        assert ref_seq == "ATCGATCGAT"
         assert score == 40
         assert caching_ok
 
-    #insertion in r2
-    qual1                =   "AAAA"
-    aln1_seq             = "--CCGA-----".replace(" ","") #added replace for vertical alignment
-    aln1_ref             = "ATCCGATC AT".replace(" ","")
-    aln2_seq             = "--------GA-".replace(" ","")
-    aln2_ref             = "ATCCGATC-AT".replace(" ","")
-    qual2                =         "AA"
+    # insertion in r2
+    qual1 = "AAAA"
+    aln1_seq = "--CCGA-----".replace(" ", "")  # added replace for vertical alignment
+    aln1_ref = "ATCCGATC AT".replace(" ", "")
+    aln2_seq = "--------GA-".replace(" ", "")
+    aln2_ref = "ATCCGATC-AT".replace(" ", "")
+    qual2 = "AA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -188,18 +189,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNCCGANNGAN"
-        assert ref_seq ==      "ATCCGATC-AT"
+        assert aln_seq == "NNCCGANNGAN"
+        assert ref_seq == "ATCCGATC-AT"
         assert score == 45.455
         assert caching_ok
 
     # deletion in r2
-    qual1                =   "AAA"
-    aln1_seq             = "--CGA-----".replace(" ","")
-    aln1_ref             = "ATCGATCGAT".replace(" ","")
-    aln2_seq             = "-----T-GA-".replace(" ","")
-    aln2_ref             = "ATCGATCGAT".replace(" ","")
-    qual2                =      "AAA"
+    qual1 = "AAA"
+    aln1_seq = "--CGA-----".replace(" ", "")
+    aln1_ref = "ATCGATCGAT".replace(" ", "")
+    aln2_seq = "-----T-GA-".replace(" ", "")
+    aln2_ref = "ATCGATCGAT".replace(" ", "")
+    qual2 = "AAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -212,18 +213,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNCGAT-GAN"
-        assert ref_seq ==      "ATCGATCGAT"
+        assert aln_seq == "NNCGAT-GAN"
+        assert ref_seq == "ATCGATCGAT"
         assert score == 60
         assert caching_ok
 
     # insertion in r1 and r2
-    qual1                =   "AAAAAA"
-    aln1_seq             = "--CGATCC---".replace(" ","")
-    aln1_ref             = "ATCGAT-CGAT".replace(" ","")
-    aln2_seq             = "----ATACGA-".replace(" ","")
-    aln2_ref             = "ATCGAT-CGAT".replace(" ","")
-    qual2                =     "AAAAAA ".replace(" ", "")
+    qual1 = "AAAAAA"
+    aln1_seq = "--CGATCC---".replace(" ", "")
+    aln1_ref = "ATCGAT-CGAT".replace(" ", "")
+    aln2_seq = "----ATACGA-".replace(" ", "")
+    aln2_ref = "ATCGAT-CGAT".replace(" ", "")
+    qual2 = "AAAAAA ".replace(" ", "")
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -236,18 +237,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNCGATCCGAN"
-        assert ref_seq ==      "ATCGAT-CGAT"
+        assert aln_seq == "NNCGATCCGAN"
+        assert ref_seq == "ATCGAT-CGAT"
         assert score == 63.636
         assert not caching_ok
 
     # insertion in r1 and r2, different positions
-    qual1                =   "AAAAAA"
-    aln1_seq             = "--CGATCC---".replace(" ","")
-    aln1_ref             = "ATCGAT-CGAT".replace(" ","")
-    aln2_seq             = "----ATATGA-".replace(" ","")
-    aln2_ref             = "ATCGATC-GAT".replace(" ","")
-    qual2                =     "AAAAAA ".replace(" ", "")
+    qual1 = "AAAAAA"
+    aln1_seq = "--CGATCC---".replace(" ", "")
+    aln1_ref = "ATCGAT-CGAT".replace(" ", "")
+    aln2_seq = "----ATATGA-".replace(" ", "")
+    aln2_ref = "ATCGATC-GAT".replace(" ", "")
+    qual2 = "AAAAAA ".replace(" ", "")
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -260,18 +261,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "NNCGATCCTGAN"
-        assert ref_seq ==      "ATCGAT-C-GAT"
+        assert aln_seq == "NNCGATCCTGAN"
+        assert ref_seq == "ATCGAT-C-GAT"
         assert score == 58.333
         assert not caching_ok
 
     # insertion at beginning of r1
-    qual1                = "AAAAA"
-    aln1_seq             = "TA-CGA----- ".replace(" ","")
-    aln1_ref             = "-ATCGATCGAT ".replace(" ","")
-    aln2_seq             = " --------AT ".replace(" ","")
-    aln2_ref             = " ATCGATCGAT".replace(" ","")
-    qual2                =          "AA"
+    qual1 = "AAAAA"
+    aln1_seq = "TA-CGA----- ".replace(" ", "")
+    aln1_ref = "-ATCGATCGAT ".replace(" ", "")
+    aln2_seq = " --------AT ".replace(" ", "")
+    aln2_ref = " ATCGATCGAT".replace(" ", "")
+    qual2 = "AA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -284,18 +285,18 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "A-CGANNNAT"
-        assert ref_seq ==      "ATCGATCGAT"
+        assert aln_seq == "A-CGANNNAT"
+        assert ref_seq == "ATCGATCGAT"
         assert score == 60.0
         assert caching_ok
 
     # insertion at end of r2 and beginning of r1
-    qual1                = "AAAAA"
-    aln1_seq             = "TA-CGA-----   ".replace(" ","")
-    aln1_ref             = "-ATCGATCGAT   ".replace(" ","")
-    aln2_seq             = " -----TCGATCCA".replace(" ","")
-    aln2_ref             = " ATCGATCGAT---".replace(" ","")
-    qual2                =       "AAAAAAAA"
+    qual1 = "AAAAA"
+    aln1_seq = "TA-CGA-----   ".replace(" ", "")
+    aln1_ref = "-ATCGATCGAT   ".replace(" ", "")
+    aln2_seq = " -----TCGATCCA".replace(" ", "")
+    aln2_ref = " ATCGATCGAT---".replace(" ", "")
+    qual2 = "AAAAAAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -308,17 +309,17 @@ def test_get_consensus_alignment_from_pairs():
         qual2,
     )
     with check:
-        assert aln_seq ==      "A-CGATCGAT"
-        assert ref_seq ==      "ATCGATCGAT"
+        assert aln_seq == "A-CGATCGAT"
+        assert ref_seq == "ATCGATCGAT"
         assert score == 90.0
         assert caching_ok
 
-    qual1    = '>1>1A@DFAADAGGGGGGGGGGHHHHHHHHHHHHHHHGGHHHHHHHHGGGHHHHHHHHHGHHHHHHHHHHHHGHGGGGGGGGGGHHHHHHHGHHHHHHHHHHHHHHHHHHHHHHHGHHGGGGGHHHHG'
+    qual1 = '>1>1A@DFAADAGGGGGGGGGGHHHHHHHHHHHHHHHGGHHHHHHHHGGGHHHHHHHHHGHHHHHHHHHHHHGHGGGGGGGGGGHHHHHHHGHHHHHHHHHHHHHHHHHHHHHHHGHHGGGGGHHHHG'
     aln1_seq = 'AATGTCCCCCAATGGGAAGTTCATCTGGCACTGCCCACAGGTGAGGAGGTCATGATCCCCTTCTGGAGCTCCCAACGCGGC-----CTGGTTCATCATCTGTAAGAATGGCTTCAAGAGGCTCGGCTGTGGTT'
     aln1_ref = 'AATGTCCCCCAATGGGAAGTTCATCTGGCACTGCCCACAGGTGAGGAGGTCATGATCCCCTTCTGGAGCTCCCAACGGGCCGTGGTCTGGTTCATCATCTGTAAGAATGGCTTCAAGAGGCTCGGCTGTGGTT'
     aln2_seq = 'AACCACAGCC-----GAGCCTCTTGAAGCCATTCTTACAGATGATGAAC-CAGG--CCGCGTTGGGAGCTCCAGAAGGGGATCATGACCT----CCTCACCTGTGGGCAGTGCCAGATGAACTTCCCATTGGGGGACATT'
     aln2_ref = 'AATGTCCCCCAATGGGAAGTTCATCTGGCACTGCCCACAGGTGAGGAGGTCATGATCCCCTTCTGGAGCTCCCAACGGGC--CGTGGTCTGGTTCATCATCTGTAAGAATGGCTTCAAGAGGCTCGGCTGTGGTT-----'
-    qual2    = 'BCCDCCDFDDDDGGGGGGGGGGHHHHHHHHHHHHHHHHHHHHHHHHHGHGGGGGGGHGHGGHHHHHHHHHGGGGGHHHHHHHHHHHHHHHHHHHGGHGHHHHHHHHHHHHHHHHHHHHHHHGGGGGHH'
+    qual2 = 'BCCDCCDFDDDDGGGGGGGGGGHHHHHHHHHHHHHHHHHHHHHHHHHGHGGGGGGGHGHGGHHHHHHHHHGGGGGHHHHHHHHHHHHHHHHHHHGGHGHHHHHHHHHHHHHHHHHHHHHHHGGGGGHH'
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(
         aln1_seq,
@@ -336,28 +337,27 @@ def test_get_consensus_alignment_from_pairs():
         assert score == 86.667
         assert not caching_ok
 
-
     # alternating qualities
-    qual1                = "BABABABABA"
-    aln1_seq             = "ACCAACCAAT".replace(" ","")
-    aln1_ref             = "ATCGATCGAT".replace(" ","")
-    aln2_seq             = "TTGGTTGGTT".replace(" ","")
-    aln2_ref             = "ATCGATCGAT".replace(" ","")
-    qual2                = "ABABABABAB"
+    qual1 = "BABABABABA"
+    aln1_seq = "ACCAACCAAT".replace(" ", "")
+    aln1_ref = "ATCGATCGAT".replace(" ", "")
+    aln2_seq = "TTGGTTGGTT".replace(" ", "")
+    aln2_ref = "ATCGATCGAT".replace(" ", "")
+    qual2 = "ABABABABAB"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ATCGATCGAT")
     check.equal(ref_seq, "ATCGATCGAT")
     check.equal(score, 100)
-    check.is_false(caching_ok) #TODO: Should be false?
+    check.is_false(caching_ok)  # TODO: Should be false?
 
     # large insertion in r1
-    qual1                = "AAAAAA"
-    aln1_seq             = "ACGTGA---------".replace(" ","")
-    aln1_ref             = "A-----TCGATCGAT".replace(" ","")
-    aln2_seq             = "------CGAT".replace(" ","")
-    aln2_ref             = "ATCGATCGAT".replace(" ","")
-    qual2                =       "AAAA"
+    qual1 = "AAAAAA"
+    aln1_seq = "ACGTGA---------".replace(" ", "")
+    aln1_ref = "A-----TCGATCGAT".replace(" ", "")
+    aln2_seq = "------CGAT".replace(" ", "")
+    aln2_ref = "ATCGATCGAT".replace(" ", "")
+    qual2 = "AAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ACGTGANNNNNCGAT")
@@ -366,12 +366,12 @@ def test_get_consensus_alignment_from_pairs():
     check.is_true(caching_ok)
 
     # large insertion in r2
-    qual1                = "AAAAA"
-    aln1_seq             = "ATCGA-----".replace(" ","")
-    aln1_ref             = "ATCGATCGAT".replace(" ","")
-    aln2_seq             = "-----TTAGCT---".replace(" ","")
-    aln2_ref             = "ATCGAT---C-GAT".replace(" ","")
-    qual2                =      "AAAAAA"
+    qual1 = "AAAAA"
+    aln1_seq = "ATCGA-----".replace(" ", "")
+    aln1_ref = "ATCGATCGAT".replace(" ", "")
+    aln2_seq = "-----TTAGCT---".replace(" ", "")
+    aln2_ref = "ATCGAT---C-GAT".replace(" ", "")
+    qual2 = "AAAAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ATCGATTAGCTNNN")
@@ -380,12 +380,12 @@ def test_get_consensus_alignment_from_pairs():
     check.is_true(caching_ok)
 
     # Conflicts with reference
-    qual1                = "AAAAAAAAAA"
-    aln1_seq             = "TAGCTAGCTA".replace(" ","")
-    aln1_ref             = "ATCGATCGAT".replace(" ","")
-    aln2_seq             = "TAGCTAGCTA".replace(" ","")
-    aln2_ref             = "ATCGATCGAT".replace(" ","")
-    qual2                = "AAAAAAAAAA"
+    qual1 = "AAAAAAAAAA"
+    aln1_seq = "TAGCTAGCTA".replace(" ", "")
+    aln1_ref = "ATCGATCGAT".replace(" ", "")
+    aln2_seq = "TAGCTAGCTA".replace(" ", "")
+    aln2_ref = "ATCGATCGAT".replace(" ", "")
+    qual2 = "AAAAAAAAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "TAGCTAGCTA")
@@ -394,26 +394,26 @@ def test_get_consensus_alignment_from_pairs():
     check.is_true(caching_ok)
 
     # Conflicts between reads
-    qual1                = "AAAAAAAAAA"
-    aln1_seq             = "TAGCTAGCTA".replace(" ","")
-    aln1_ref             = "ATCGATCGAT".replace(" ","")
-    aln2_seq             = "ATCGATCGAT".replace(" ","")
-    aln2_ref             = "ATCGATCGAT".replace(" ","")
-    qual2                = "AAAAAAAAAA"
+    qual1 = "AAAAAAAAAA"
+    aln1_seq = "TAGCTAGCTA".replace(" ", "")
+    aln1_ref = "ATCGATCGAT".replace(" ", "")
+    aln2_seq = "ATCGATCGAT".replace(" ", "")
+    aln2_ref = "ATCGATCGAT".replace(" ", "")
+    qual2 = "AAAAAAAAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ATCGATCGAT")
     check.equal(ref_seq, "ATCGATCGAT")
     check.equal(score, 100)
-    check.is_false(caching_ok) #TODO: Should this be false?
+    check.is_false(caching_ok)  # TODO: Should this be false?
 
     # Alternating reads
-    qual1                = "AAAAAAAAAA"
-    aln1_seq             = "AT--AT--AT".replace(" ","")
-    aln1_ref             = "ATCGATCGAT".replace(" ","")
-    aln2_seq             = "--CG--CG--".replace(" ","")
-    aln2_ref             = "ATCGATCGAT".replace(" ","")
-    qual2                = "AAAAAAAAAA"
+    qual1 = "AAAAAAAAAA"
+    aln1_seq = "AT--AT--AT".replace(" ", "")
+    aln1_ref = "ATCGATCGAT".replace(" ", "")
+    aln2_seq = "--CG--CG--".replace(" ", "")
+    aln2_ref = "ATCGATCGAT".replace(" ", "")
+    qual2 = "AAAAAAAAAA"
 
     aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ATCGATCGAT")
@@ -499,7 +499,7 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion():
     aln = 'A' * 23 + '-' * 7 + 'G' * 30
     # represents a 7bp deletion in the middle
     s1inds, _ = CRISPRessoShared.get_relative_coordinates(ref, aln)
-    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(10, 21)), *list(range(35-7, 41-7))]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(10, 21)), *list(range(35 - 7, 41 - 7))]
 
 
 def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_modified():
@@ -509,7 +509,7 @@ def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_modified
     ref = 'A' * 23 + 'T' * 7 + 'G' * 30
     aln = 'A' * 23 + '-' * 7 + 'G' * 30
     s1inds, _ = CRISPRessoShared.get_relative_coordinates(ref, aln)
-    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(10, 23)), *list(range(35-7, 41-7))]
+    assert CRISPRessoCORE.get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, s1inds) == [*list(range(10, 23)), *list(range(35 - 7, 41 - 7))]
 
 
 def test_get_cloned_include_idxs_from_quant_window_coordinates_deletion_end_modified():
@@ -712,17 +712,21 @@ def test_regular_input():
     # Test with typical input
     assert CRISPRessoCORE.get_variant_cache_equal_boundaries(100, 4) == [0, 25, 50, 75, 100]
 
+
 def test_remainder_input():
 #     # Test with typical input
     assert CRISPRessoCORE.get_variant_cache_equal_boundaries(101, 4) == [0, 25, 50, 75, 101]
+
 
 def test_similar_num_reads_input():
 #     # Test with typical input
     assert CRISPRessoCORE.get_variant_cache_equal_boundaries(11, 10) == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11]
 
+
 def test_large_similar_num_reads_input():
 #     # Test with typical input
     assert CRISPRessoCORE.get_variant_cache_equal_boundaries(101, 100) == list(range(0, 100)) + [101]
+
 
 def test_more_processes_than_reads():
 #     # Test with typical input
@@ -731,19 +735,23 @@ def test_more_processes_than_reads():
     with pytest.raises(Exception):
         CRISPRessoCORE.get_variant_cache_equal_boundaries(3, 5)
 
+
 def test_single_process():
     # Test with a single process
     assert CRISPRessoCORE.get_variant_cache_equal_boundaries(50, 1) == [0, 50]
+
 
 def test_zero_sequences():
     # Test with zero unique sequences
     with pytest.raises(Exception):
         CRISPRessoCORE.get_variant_cache_equal_boundaries(0, 3)
 
+
 def test_large_numbers():
     # Test with large number of processes and sequences
     boundaries = CRISPRessoCORE.get_variant_cache_equal_boundaries(10000, 10)
     assert len(boundaries) == 11  # Check that there are 11 boundaries
+
 
 def test_sublist_generation():
     n_processes = 4
@@ -755,11 +763,12 @@ def test_sublist_generation():
     sublists = []
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
-        right_sublist_index = boundaries[i+1]
+        right_sublist_index = boundaries[i + 1]
         sublist = mock_variant_cache[left_sublist_index:right_sublist_index]
         sublists.append(sublist)
     assert [len(sublist) for sublist in sublists] == [25, 25, 25, 25]
     assert [s for sublist in sublists for s in sublist] == mock_variant_cache
+
 
 def test_irregular_sublist_generation():
     n_processes = 4
@@ -771,10 +780,10 @@ def test_irregular_sublist_generation():
     sublists = []
     for i in range(n_processes):
         left_sublist_index = boundaries[i]
-        right_sublist_index = boundaries[i+1]
+        right_sublist_index = boundaries[i + 1]
         sublist = mock_variant_cache[left_sublist_index:right_sublist_index]
         sublists.append(sublist)
-    assert [len(sublist) for sublist in sublists] == [28,28,28,29]
+    assert [len(sublist) for sublist in sublists] == [28, 28, 28, 29]
     assert [s for sublist in sublists for s in sublist] == mock_variant_cache
 
 
@@ -806,6 +815,7 @@ def test_get_bp_subs_one_sub():
     assert bp_substitutions_arr[0][1] == 'A'
     assert bp_substitutions_arr[0][2] == 'C'
 
+
 def test_get_bp_subs_two_subs():
     ref_seq = 'AAA'
     aln_ref_seq = 'AAA'
@@ -817,6 +827,7 @@ def test_get_bp_subs_two_subs():
     assert len(bp_substitutions_arr) == 2
     assert bp_substitutions_arr[0] == (0, 'A', 'C')
     assert bp_substitutions_arr[1] == (1, 'A', 'C')
+
 
 def test_get_bp_subs_insertions():
 
@@ -847,7 +858,6 @@ def test_get_base_edit_target_sequence():
     assert target_seq == 'AAGA'
 
 
-
 def test_get_upset_plot_counts():
     df_alleles = pd.read_csv('tests/test_be_df.txt')
     target_seq = 'AAGA'
@@ -867,9 +877,7 @@ def test_get_upset_plot_counts():
     assert sum(counts_dict['binary_allele_counts'].values()) == 100
 
 
-
 def test_write_base_edit_counts():
-
 
     OUTPUT_DIRECTORY = '.'
     clean_file_prefix = ""
@@ -890,7 +898,6 @@ def test_write_base_edit_counts():
         '10i.TEST.precise_allele_counts.txt',
     ]
 
-
     CRISPRessoCORE.write_base_edit_counts(
         ref_name,
         counts_dict,
@@ -903,8 +910,6 @@ def test_write_base_edit_counts():
             os.remove(filename)
         else:
             assert False
-
-
 
 
 if __name__ == "__main__":

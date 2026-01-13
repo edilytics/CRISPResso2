@@ -1,7 +1,6 @@
 from CRISPResso2 import CRISPRessoBatchCORE
 
 
-
 def test_should_plot_large_plots():
     num_rows = 60
     c2pro_installed = False
@@ -40,5 +39,3 @@ def test_should_plot_large_plots_c2pro_not_installed_use_matplotlib():
     use_matplotlib = True
     large_plot_cutoff = 300
     assert not CRISPRessoBatchCORE.should_plot_large_plots(num_rows, c2pro_installed, use_matplotlib, large_plot_cutoff)
-
-

@@ -25,6 +25,7 @@ def test_get_mismatches():
     )
     assert len(mismatch_cords) == 6
 
+
 def test_get_relative_coordinates():
     s1inds_gap_left, s1inds_gap_right = CRISPRessoShared.get_relative_coordinates('ATCGT', 'TTCGT')
     assert s1inds_gap_left == [0, 1, 2, 3, 4]
@@ -45,6 +46,7 @@ def test_get_n_reads_fastq():
 
     # Clean up: delete the file after the test
     os.remove(f.name)
+
 
 def test_get_n_reads_fastq_gzip():
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.fastq') as f:
@@ -117,6 +119,7 @@ def test_get_n_reads_fastq_100_reads():
     # Clean up: delete the file after the test
     os.remove(f.name)
 
+
 def test_get_n_reads_fastq_no_newline():
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.fastq') as f:
         f.write("@SEQ_ID\n")
@@ -158,7 +161,6 @@ def test_get_relative_coordinates_to_gap():
     assert s1inds_gap_left == [0, 1, 2, 2, 3]
     assert s1inds_gap_right == [0, 1, 2, 3, 3]
 
-
     assert seq_1[0] == seq_2[s1inds_gap_left[0]]
     assert seq_1[1] == seq_2[s1inds_gap_left[1]]
     assert seq_1[2] == seq_2[s1inds_gap_left[2]]
@@ -176,15 +178,18 @@ def test_get_relative_coordinates_from_gap():
     assert s1inds_gap_left == [0, 1, 2, 4]
     assert s1inds_gap_right == [0, 1, 2, 4]
 
+
 def test_get_relative_coordinates_end_gap():
     s1inds_gap_left, s1inds_gap_right = CRISPRessoShared.get_relative_coordinates('ATC--', 'ATCGT')
     assert s1inds_gap_left == [0, 1, 2, 2, 2]
     assert s1inds_gap_right == [0, 1, 2, 3, 3]
 
+
 def test_get_relative_coordinates_multiple_gaps():
     s1inds_gap_left, s1inds_gap_right = CRISPRessoShared.get_relative_coordinates('AT--TC--G--CC', 'ATCGTCGCGTTCC')
     assert s1inds_gap_left == [0, 1, 1, 1, 2, 3, 3, 3, 4, 4, 4, 5, 6]
     assert s1inds_gap_right == [0, 1, 2, 2, 2, 3, 4, 4, 4, 5, 5, 5, 6]
+
 
 def test_get_relative_coordinates_ind_and_dels():
     s1inds_gap_left, s1inds_gap_right = CRISPRessoShared.get_relative_coordinates('ATG--C', 'A-GCTC')
@@ -276,11 +281,12 @@ def test_get_silent_edits_insertion():
     silent_edits = CRISPRessoShared.get_silent_edits(ref_seq, ref_codons, seq, seq_codons)
     assert silent_edits == 'AGST'
 
+
 def test_get_silent_edits_middle_insertion():
     ref_seq = 'AG-S'
     seq = 'AGTS'
     ref_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT')]
-    seq_codons = [('A', 'GCT'), ('G', 'GGT'),  ('T', 'ACT'), ('S', 'AGC')]
+    seq_codons = [('A', 'GCT'), ('G', 'GGT'), ('T', 'ACT'), ('S', 'AGC')]
 
     silent_edits = CRISPRessoShared.get_silent_edits(ref_seq, ref_codons, seq, seq_codons)
     assert silent_edits == 'AGTs'

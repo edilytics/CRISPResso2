@@ -12,7 +12,7 @@ def run_info():
         'results': {
             'refs': {
                 'Reference': {
-                    'sequence':'CGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCACCTGGATCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG',
+                    'sequence': 'CGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCACCTGGATCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG',
                     'sgRNA_orig_sequences': ['GGCCCTTAAAA'],
                     'sgRNA_cut_points': [50],
                     'allele_frequency_files': ['Alleles_frequency_table_around_sgRNA_GGCCCTTAAAA.txt'],
@@ -82,4 +82,3 @@ def test_get_matching_allele_files_multiple_guides(run_info_1, run_info_2):
         ('Alleles_frequency_table_around_sgRNA_GGCCCTTAAAA.txt', 'Alleles_frequency_table_around_sgRNA_GGCCCTTAAAA.txt'),
         ('Alleles_frequency_table_around_sgRNA_AAAAAAAAAAAAAAAAAAA.txt', 'Alleles_frequency_table_around_sgRNA_AAAAAAAAAAAAAAAAAAA.txt'),
     ]
-
