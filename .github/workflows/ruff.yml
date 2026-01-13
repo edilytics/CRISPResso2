@@ -13,6 +13,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+            channels: conda-forge,bioconda,defaults
+            auto-activate-base: false
+            activate-environment: test_env
+            environment-file: .github/envs/test_env.yml
+
       - name: Checkout code
         uses: actions/checkout@v3
 
