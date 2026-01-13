@@ -50,3 +50,39 @@ Homepage = "https://github.com/pinellolab/CRISPResso2"
 package-dir = {"" = "CRISPResso2"}
 packages = ["CRISPResso2", "CRISPResso2.CRISPRessoReports"]
 include-package-data = true
+
+[tool.ruff]
+cache-dir = "/tmp/.ruff_cache"
+line-length = 150
+
+[tool.ruff.lint]
+select = [
+    "F",  # pyflakes
+    "E",  # pycodestyle
+    "W",  # pycodestyle warnings
+    "N",  # pep8-naming
+    "D",  # pydocstyle (docstring conventions)
+    "PL", # pylint rules
+    "B",  # flake8-bugbear (common bugs and design problems)
+    "A",  # flake8-builtins
+    "RUF",# ruff-specific rules
+]
+preview = true
+ignore = [
+    "D100",  # Requires a docstring in public modules
+    "D101",  # Requires a docstring in public classes
+    "D104",  # Requires a docstring in public packages
+    "D105",  # Requires a docstring in magic methods and functions
+    "D203",  # Requires a blank line between the function/method signature and the docstring
+    "D204",  # Requires a blank line after the docstring
+    "D205",  # Requires a blank line after the docstring in multi-line docstrings
+    "D213",  # Requires a multi-line docstring to start at the second line
+    "D400",  # Requires periods in docstrings
+    "D401",  # Requires specific verbage in docstrings
+    "D404",  # Requires first word in docstring to not be "This"
+    "D415",  # Requires punctuation at the end of docstrings
+    "D417",  # Requires argument descriptions in docstrings
+]
+
+[tool.ruff.lint.pylint]
+max-args = 10
