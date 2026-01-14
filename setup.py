@@ -40,13 +40,13 @@ def main():
     ext_modules = [
         Extension(
             "CRISPResso2.CRISPRessoCOREResources",
-            ["CRISPResso2/CRISPRessoCOREResources" + +ext],
+            ["CRISPResso2/CRISPRessoCOREResources" + ext],
             include_dirs=numpy_include_dir,
             extra_compile_args=["-w", "-Ofast"],
         ),
         Extension(
             "CRISPResso2.CRISPResso2Align",
-            ["CRISPResso2/CRISPResso2Align" + +ext],
+            ["CRISPResso2/CRISPResso2Align" + ext],
             include_dirs=numpy_include_dir,
             extra_compile_args=["-w", "-Ofast"],
         ),
