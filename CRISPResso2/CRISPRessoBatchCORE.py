@@ -135,7 +135,8 @@ def main():
         if args.batch_output_folder:
                  OUTPUT_DIRECTORY = os.path.join(os.path.abspath(args.batch_output_folder), output_folder_name)
 
-        _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
+        def _jp(filename):
+            return os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
 
         if args.use_matplotlib or not C2PRO_INSTALLED:
             from CRISPResso2 import CRISPRessoPlot
@@ -154,7 +155,7 @@ def main():
         status_handler = CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoBatch_status.json'))
         logger.addHandler(status_handler)
 
-        with open(log_filename, 'w+') as outfile:
+        with open(log_filename, 'w+', encoding='utf-8') as outfile:
             outfile.write('[Command used]:\n%s\n\n[Execution log]:\n' % ' '.join(sys.argv))
 
         crispresso2Batch_info_file = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso2Batch_info.json')
@@ -270,8 +271,6 @@ def main():
             guides_are_in_amplicon = {}  # dict of whether a guide is in at least one amplicon sequence
             # iterate through amplicons for this run
             for amp_idx, curr_amplicon_seq in enumerate(curr_amplicon_seq_arr):
-                this_include_idxs = []  # mask for bp to include for this amplicon seq, as specified by sgRNA cut points
-                this_sgRNA_intervals = []
                 curr_amplicon_quant_window_coordinates = curr_amplicon_quant_window_coordinates_arr[amp_idx]
                 wrong_nt = CRISPRessoShared.find_wrong_nt(curr_amplicon_seq)
                 if wrong_nt:
@@ -293,8 +292,8 @@ def main():
                     discard_guide_positions_overhanging_amplicon_edge = False
                     if 'discard_guide_positions_overhanging_amplicon_edge' in row:
                         discard_guide_positions_overhanging_amplicon_edge = row.discard_guide_positions_overhanging_amplicon_edge
-                    (this_sgRNA_sequences, this_sgRNA_intervals, this_sgRNA_cut_points, this_sgRNA_plot_cut_points, this_sgRNA_plot_idxs, this_sgRNA_mismatches, this_sgRNA_names, this_sgRNA_include_idxs, this_include_idxs,
-                        this_exclude_idxs) = CRISPRessoShared.get_amplicon_info_for_guides(curr_amplicon_seq, guides, guide_mismatches, guide_names, guide_qw_centers,
+                    (this_sgRNA_sequences, _this_sgRNA_intervals, _this_sgRNA_cut_points, _this_sgRNA_plot_cut_points, _this_sgRNA_plot_idxs, _this_sgRNA_mismatches, _this_sgRNA_names, _this_sgRNA_include_idxs, _this_include_idxs,
+                        _this_exclude_idxs) = CRISPRessoShared.get_amplicon_info_for_guides(curr_amplicon_seq, guides, guide_mismatches, guide_names, guide_qw_centers,
                         guide_qw_sizes, curr_amplicon_quant_window_coordinates, row.exclude_bp_from_left, row.exclude_bp_from_right, row.plot_window_size, guide_plot_cut_points, discard_guide_positions_overhanging_amplicon_edge)
                     for guide_seq in this_sgRNA_sequences:
                         guides_are_in_amplicon[guide_seq] = 1
@@ -874,7 +873,7 @@ def main():
         crispresso2_info['results']['general_plots']['nuc_conv_plot_names'] = nuc_conv_plot_names
 
         # summarize amplicon modifications
-        with open(_jp('CRISPRessoBatch_quantification_of_editing_frequency.txt'), 'w') as outfile:
+        with open(_jp('CRISPRessoBatch_quantification_of_editing_frequency.txt'), 'w', encoding='utf-8') as outfile:
             wrote_header = False
             for idx, row in batch_params.iterrows():
                 batch_name = CRISPRessoShared.slugify(row["name"])
@@ -884,7 +883,7 @@ def main():
                     continue
 
                 amplicon_modification_file = os.path.join(folder_name, run_data['running_info']['quant_of_editing_freq_filename'])
-                with open(amplicon_modification_file, 'r') as infile:
+                with open(amplicon_modification_file, 'r', encoding='utf-8') as infile:
                     file_head = infile.readline()
                     if not wrote_header:
                         outfile.write('Batch\t' + file_head)
@@ -893,7 +892,7 @@ def main():
                         outfile.write(batch_name + "\t" + line)
 
         # summarize frameshift and splicing site mods
-        with open(_jp('CRISPRessoBatch_quantification_of_frameshift_splicing.txt'), 'w') as outfile:
+        with open(_jp('CRISPRessoBatch_quantification_of_frameshift_splicing.txt'), 'w', encoding='utf-8') as outfile:
             outfile.write("\t".join(['Batch', 'Reference', 'total_reads', 'modified_frameshift', 'modified_non_frameshift', 'non_modified_non_frameshift', 'splicing_sites_modified', 'splice_sites_unmodified']) + "\n")
             for idx, row in batch_params.iterrows():
                 batch_name = CRISPRessoShared.slugify(row["name"])
@@ -912,7 +911,7 @@ def main():
                     outfile.write("\t".join([str(x) for x in [batch_name, ref_name, count_total, count_modified_frameshift, count_modified_non_frameshift, count_non_modified_non_frameshift, count_splicing_sites_modified, count_splicing_sites_unmodified]]) + "\n")
 
         # summarize alignment
-        with open(_jp('CRISPRessoBatch_mapping_statistics.txt'), 'w') as outfile:
+        with open(_jp('CRISPRessoBatch_mapping_statistics.txt'), 'w', encoding='utf-8') as outfile:
             wrote_header = False
             for idx, row in batch_params.iterrows():
                 batch_name = CRISPRessoShared.slugify(row["name"])
@@ -922,7 +921,7 @@ def main():
                 if run_data is None:
                     continue
                 amplicon_modification_file = os.path.join(folder_name, run_data['running_info']['mapping_stats_filename'])
-                with open(amplicon_modification_file, 'r') as infile:
+                with open(amplicon_modification_file, 'r', encoding='utf-8') as infile:
                     file_head = infile.readline()
                     if not wrote_header:
                         outfile.write('Batch\t' + file_head)

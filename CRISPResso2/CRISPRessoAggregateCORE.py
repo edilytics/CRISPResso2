@@ -87,7 +87,8 @@ ___________________________________
         output_folder_name = 'CRISPRessoAggregate_on_%s' % args.name
         OUTPUT_DIRECTORY = os.path.abspath(output_folder_name)
 
-        _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
+        def _jp(filename):
+            return os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
 
         try:
              info('Creating Folder %s' % OUTPUT_DIRECTORY)
@@ -99,7 +100,7 @@ ___________________________________
         logger.addHandler(logging.FileHandler(log_filename))
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoAggregate_status.json')))
 
-        with open(log_filename, 'w+') as outfile:
+        with open(log_filename, 'w+', encoding='utf-8') as outfile:
               outfile.write('[Command used]:\n%s\n\n[Execution log]:\n' % ' '.join(sys.argv))
 
         crispresso2Aggregate_info_file = os.path.join(
@@ -289,7 +290,7 @@ ___________________________________
             crispresso2_info['results']['general_plots']['summary_plot_labels'] = {}
             crispresso2_info['results']['general_plots']['summary_plot_datas'] = {}
 
-            with open(_jp('CRISPRessoAggregate_amplicon_information.txt'), 'w') as outfile:
+            with open(_jp('CRISPRessoAggregate_amplicon_information.txt'), 'w', encoding='utf-8') as outfile:
                 outfile.write("\t".join(['Amplicon Name', 'Number of sources', 'Amplicon sources', 'Amplicon sequence']) + "\n")
                 for amplicon in all_amplicons:
                     outfile.write("\t".join([amplicon_names[amplicon], str(amplicon_counts[amplicon]), ';'.join(amplicon_sources[amplicon]), amplicon]) + "\n")
@@ -499,12 +500,12 @@ ___________________________________
                                     if newend == 0 or newstart == len(sgRNA_plot_idxs):
                                         continue
                                     # otherwise, correct partial overlaps
-                                    elif newstart == None and newend == None:
+                                    elif newstart is None and newend is None:
                                         newstart = 0
                                         newend = len(include_idxs) - 1
-                                    elif newstart == None:
+                                    elif newstart is None:
                                         newstart = 0
-                                    elif newend == None:
+                                    elif newend is None:
                                         newend = len(include_idxs) - 1
                                     # and add it to the list
                                     sub_sgRNA_intervals.append((newstart, newend))
@@ -726,13 +727,13 @@ ___________________________________
             # summarize amplicon modifications
             debug('Summarizing amplicon modifications...', {'percent_complete': 92})
             samples_quantification_summary_by_amplicon_filename = _jp('CRISPRessoAggregate_quantification_of_editing_frequency_by_amplicon.txt')  # this file has separate lines for each amplicon in each run
-            with open(samples_quantification_summary_by_amplicon_filename, 'w') as outfile:
+            with open(samples_quantification_summary_by_amplicon_filename, 'w', encoding='utf-8') as outfile:
                 wrote_header = False
                 for crispresso2_folder in crispresso2_folders:
                     run_data = crispresso2_folder_infos[crispresso2_folder]
                     run_name = crispresso2_folder_names[crispresso2_folder]
                     amplicon_modification_file = os.path.join(crispresso2_folder, run_data['running_info']['quant_of_editing_freq_filename'])
-                    with open(amplicon_modification_file, 'r') as infile:
+                    with open(amplicon_modification_file, 'r', encoding='utf-8') as infile:
                         file_head = infile.readline()
                         if not wrote_header:
                             outfile.write('Folder\t' + file_head)
@@ -830,13 +831,13 @@ ___________________________________
 
             # summarize alignment
             debug('Summarizing alignment...', {'percent_complete': 96})
-            with open(_jp('CRISPRessoAggregate_mapping_statistics.txt'), 'w') as outfile:
+            with open(_jp('CRISPRessoAggregate_mapping_statistics.txt'), 'w', encoding='utf-8') as outfile:
                 wrote_header = False
                 for crispresso2_folder in crispresso2_folders:
                     run_data = crispresso2_folder_infos[crispresso2_folder]
                     run_name = crispresso2_folder_names[crispresso2_folder]
                     mapping_file = os.path.join(crispresso2_folder, run_data['running_info']['mapping_stats_filename'])
-                    with open(mapping_file, 'r') as infile:
+                    with open(mapping_file, 'r', encoding='utf-8') as infile:
                         file_head = infile.readline()
                         if not wrote_header:
                             outfile.write('Folder\t' + file_head)

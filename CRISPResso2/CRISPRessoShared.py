@@ -170,7 +170,7 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
     # Adjusting the path to point directly to the args.json file
     json_path = current_dir / 'args.json'
 
-    with open(json_path, 'r') as json_file:
+    with open(json_path, 'r', encoding='utf-8') as json_file:
         args_dict = json.load(json_file)
         args_dict = args_dict["CRISPResso_args"]
     type_mapper = {
@@ -179,7 +179,7 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
         "float": float,
     }
 
-    for key, value in args_dict.items():
+    for _key, value in args_dict.items():
         tools = value.get('tools', [])  # Default to empty list if 'tools' is not found
         if tool in tools:
             action = value.get('action')  # Use None as default if 'action' is not found
@@ -497,7 +497,7 @@ def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
     return the amino acid read sequence with silent edit amino acids as lower case chars.
 
     for example:
-    
+
     ref_seq = 'AG-S'
     seq = 'AGTS'
     ref_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT')]
@@ -595,7 +595,7 @@ def clean_filename(filename):
 
 def check_file(filename):
     try:
-        with open(filename):
+        with open(filename, encoding='utf-8'):
             pass
     except IOError:
         files_in_curr_dir = os.listdir('.')
@@ -637,7 +637,7 @@ def force_symlink(src, dst):
 
 def parse_count_file(fileName):
     if os.path.exists(fileName):
-        with open(fileName) as infile:
+        with open(fileName, encoding='utf-8') as infile:
             lines = infile.readlines()
             ampSeq = lines[0].rstrip().split("\t")
             ampSeq.pop(0)  # get rid of 'Amplicon' at the beginning of line
@@ -656,7 +656,7 @@ def parse_count_file(fileName):
 
 def parse_alignment_file(fileName):
     if os.path.exists(fileName):
-        with open(fileName) as infile:
+        with open(fileName, encoding='utf-8') as infile:
             lines = infile.readlines()
             ampSeq = lines[0].rstrip().split("\t")
             ampSeq.pop(0)  # get rid of 'Amplicon' at the beginning of line
@@ -702,7 +702,7 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
                             raise InputFileFormatException('File %s is not in fastq format! Line %d does not start with + \n%s: %s' % (file_path, line_num, line_num, line))
         else:
             # Read uncompressed file
-            with open(file_path, 'r') as file:
+            with open(file_path, 'r', encoding='utf-8') as file:
                 for line_num, line in enumerate(file):
                     if line_num >= max_lines_to_check:
                         break
@@ -745,7 +745,7 @@ def check_output_folder(output_folder):
         raise OutputFolderIncompleteException(
             'The folder %s is not a valid CRISPResso2 output folder. Cannot find summary file %s.' % (
             output_folder, run_file))
-    with open(run_file) as fh:
+    with open(run_file, encoding='utf-8') as fh:
         run_data = json.load(fh)
 
     amplicon_info = {}
@@ -753,7 +753,7 @@ def check_output_folder(output_folder):
 
     quantification_file = os.path.join(output_folder, run_data['running_info']['quant_of_editing_freq_filename'])
     if os.path.exists(quantification_file):
-        with open(quantification_file) as quant_file:
+        with open(quantification_file, encoding='utf-8') as quant_file:
             head_line = quant_file.readline()
             head_line_els = head_line.split("\t")
             for line in quant_file:
@@ -920,7 +920,7 @@ def load_crispresso_info(
     if not os.path.isfile(crispresso_info_file):
         raise Exception('Cannot open CRISPResso info file at ' + crispresso_info_file)
     try:
-        with open(crispresso_info_file) as fh:
+        with open(crispresso_info_file, encoding='utf-8') as fh:
             crispresso2_info = json.load(fh, cls=CRISPRessoJSONDecoder)
             return crispresso2_info
     except json.JSONDecodeError as e:
@@ -947,7 +947,7 @@ def write_crispresso_info(crispresso_output_file, crispresso2_info):
     Nothing
 
     """
-    with open(crispresso_output_file, 'w') as fh:
+    with open(crispresso_output_file, 'w', encoding='utf-8') as fh:
         json.dump(crispresso2_info, fh, cls=CRISPRessoJSONEncoder, indent=2)
 
 
@@ -999,7 +999,7 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
         if fastq_r1.endswith('.gz'):
             fastq_handle = gzip.open(fastq_r1, 'rt')
         else:
-            fastq_handle = open(fastq_r1)
+            fastq_handle = open(fastq_r1, encoding='utf-8')
 
         try:
             o1 = gzip.open(output_r1, 'wt')
@@ -1118,7 +1118,7 @@ def check_if_failed_run(folder_name, info):
 
         return True, f"CRISPResso failed for this {unit}! Please check your input files and parameters."
     else:
-        with open(status_info) as fh:
+        with open(status_info, encoding='utf-8') as fh:
             try:
                 status_dict = json.load(fh)
                 if status_dict['percent_complete'] != 100.0:
@@ -1129,7 +1129,7 @@ def check_if_failed_run(folder_name, info):
             except Exception:
                 pass
 
-        with open(status_info) as fh:
+        with open(status_info, encoding='utf-8') as fh:
             try:
                 file_contents = fh.read()
                 search_result = re.search(r'(\d+\.\d+)% (.+)', file_contents)
@@ -1179,7 +1179,7 @@ def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_comma
 
     # for the remainder of the amplicons, test them before adding
     for i in range(1, len(seq_lines)):
-        count, seq = seq_lines[i].strip().split()
+        _count, seq = seq_lines[i].strip().split()
         last_count, last_seq = seq_lines[i - 1].strip().split()
         # if this allele is present in at least XX% of the samples
         #        print('debug 509 testing ' + str(seq_lines[i]) + ' with ' + str(count) + ' out of consididered ' + str(number_of_reads_to_consider) + ' min freq: ' + str(min_freq_to_consider))
@@ -1188,11 +1188,11 @@ def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_comma
             this_amplicon_max_pct = 0  # keep track of similarity to most-similar already-found amplicons
             for amp_seq in this_amplicon_seq_arr:
                 ref_incentive = np.zeros(len(amp_seq) + 1, dtype=int)
-                fws1, fws2, fwscore = CRISPResso2Align.global_align(seq, amp_seq, matrix=aln_matrix,
+                _fws1, _fws2, fwscore = CRISPResso2Align.global_align(seq, amp_seq, matrix=aln_matrix,
                                                                     gap_incentive=ref_incentive,
                                                                     gap_open=needleman_wunsch_gap_open,
                                                                     gap_extend=needleman_wunsch_gap_extend, )
-                rvs1, rvs2, rvscore = CRISPResso2Align.global_align(reverse_complement(seq), amp_seq, matrix=aln_matrix,
+                _rvs1, _rvs2, rvscore = CRISPResso2Align.global_align(reverse_complement(seq), amp_seq, matrix=aln_matrix,
                                                                     gap_incentive=ref_incentive,
                                                                     gap_open=needleman_wunsch_gap_open,
                                                                     gap_extend=needleman_wunsch_gap_extend, )
@@ -1262,7 +1262,7 @@ def guess_guides(amplicon_sequence, fastq_r1, fastq_r2, number_of_reads_to_consi
         count, seq = seq_lines[i].strip().split()
         count = int(count)
         tot_count += count
-        fws1, fws2, fwscore = CRISPResso2Align.global_align(seq, amplicon_sequence, matrix=aln_matrix,
+        fws1, fws2, _fwscore = CRISPResso2Align.global_align(seq, amplicon_sequence, matrix=aln_matrix,
                                                             gap_incentive=gap_incentive,
                                                             gap_open=needleman_wunsch_gap_open,
                                                             gap_extend=needleman_wunsch_gap_extend, )
@@ -1363,16 +1363,16 @@ def force_merge_pairs(r1_filename, r2_filename, output_filename):
     if r1_filename.endswith('.gz'):
         f1 = gzip.open(r1_filename, 'rt')
     else:
-        f1 = open(r1_filename, 'r')
+        f1 = open(r1_filename, 'r', encoding='utf-8')
     if r2_filename.endswith('.gz'):
         f2 = gzip.open(r2_filename, 'rt')
     else:
-        f2 = open(r2_filename, 'r')
+        f2 = open(r2_filename, 'r', encoding='utf-8')
 
     if output_filename.endswith('.gz'):
         f_out = gzip.open(output_filename, 'wt')
     else:
-        f_out = open(output_filename, 'w')
+        f_out = open(output_filename, 'w', encoding='utf-8')
 
     lineCount = 0
     id1 = f1.readline()
@@ -1384,9 +1384,9 @@ def force_merge_pairs(r1_filename, r2_filename, output_filename):
         qual1 = f1.readline()
         qual1 = qual1.strip()
 
-        id2 = f2.readline()
+        f2.readline()
         seq2 = reverse_complement(f2.readline().strip()) + "\n"
-        plus2 = f2.readline()
+        f2.readline()
         qual2 = f2.readline()
 
         f_out.write(id1 + seq1 + seq2 + plus1 + qual1 + qual2)
@@ -1439,7 +1439,7 @@ def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_
     if fastq_filename.endswith('.gz'):
         fastq_handle = gzip.open(fastq_filename, 'rt')
     else:
-        fastq_handle = open(fastq_filename)
+        fastq_handle = open(fastq_filename, encoding='utf-8')
 
     try:
         fastq_splitted_outfile_r1 = gzip.open(output_filename_r1, 'wt')
@@ -1553,14 +1553,14 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
         gap_incentive[cut_idx] = 1
     except:
         pass
-    aligned_seq, reference_seq, score = CRISPResso2Align.global_align(
+    aligned_seq, reference_seq, _score = CRISPResso2Align.global_align(
         aligned_seq,
         reference_seq,
         matrix=CRISPResso2Align.read_matrix(matrix_path),
         gap_incentive=gap_incentive,
     )
 
-    aa_ref_positions = CRISPRessoCOREResources.find_indels_substitutions(
+    CRISPRessoCOREResources.find_indels_substitutions(
         aligned_seq, reference_seq, range(len(reference_seq))
     )
 
@@ -1595,7 +1595,7 @@ def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_
 
     edits_series = pd.Series(dtype='object')
     row_ind = 0
-    for idx, row in df_alleles_around_cut.iterrows():
+    for idx, _row in df_alleles_around_cut.iterrows():
         silent_edit_inds = []
         for i, c in enumerate(idx):
             if c.islower():
@@ -1665,7 +1665,6 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
 
     window_around_cut = max(1, plot_window_size)
 
-    seen_cut_points = {}  # keep track of cut points in case 2 gudes cut at same position (so they can get different names)
     seen_guide_names = {}  # keep track of guide names (so we don't assign a guide the same name as another guide)
     for guide_idx, current_guide_seq in enumerate(guides):
         if current_guide_seq == '':
@@ -1901,7 +1900,7 @@ def get_alignment_coordinates(to_sequence, from_sequence, aln_matrix, needleman_
 
     """
     this_gap_incentive = np.zeros(len(from_sequence) + 1, dtype=int)
-    fws1, fws2, fwscore = CRISPResso2Align.global_align(to_sequence, from_sequence, matrix=aln_matrix,
+    fws1, fws2, _fwscore = CRISPResso2Align.global_align(to_sequence, from_sequence, matrix=aln_matrix,
                                                         gap_open=needleman_wunsch_gap_open,
                                                         gap_extend=needleman_wunsch_gap_extend,
                                                         gap_incentive=this_gap_incentive)
@@ -2056,8 +2055,7 @@ C)|     \
 
 
 def get_crispresso_header(description, header_str):
-    """Creates the CRISPResso header string with the header_str between two crispresso mugs
-    """
+    """Creates the CRISPResso header string with the header_str between two crispresso mugs"""
     term_width = 80
     try:
         term_width = os.get_terminal_size().columns
@@ -2074,9 +2072,9 @@ def get_crispresso_header(description, header_str):
 
         header_lines = header_str.splitlines()
         while len(header_lines) < len(logo_lines):
-            header_lines = [""] + header_lines
+            header_lines = ["", *header_lines]
         while len(header_lines) > len(logo_lines):
-            logo_lines = [""] + logo_lines
+            logo_lines = ["", *logo_lines]
 
         max_header_width = max([len(x) for x in header_lines])
 
@@ -2230,7 +2228,7 @@ def check_custom_config(args):
 
     if args.config_file:
         try:
-            with open(args.config_file, "r") as json_file:
+            with open(args.config_file, "r", encoding='utf-8') as json_file:
                 custom_config = json.load(json_file)
 
             if 'guardrails' in custom_config.keys():
@@ -2417,7 +2415,7 @@ class TotalReadsGuardrail:
 
         """
         if total_reads < self.minimum:
-            self.message = self.message + " Total reads: {}.".format(total_reads)
+            self.message += " Total reads: {}.".format(total_reads)
             self.messageHandler.display_warning('TotalReadsGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2453,7 +2451,7 @@ class OverallReadsAlignedGuardrail:
         if total_reads == 0:
             return
         if (n_read_aligned / total_reads) <= self.cutoff:
-            self.message = self.message + " Total reads: {}, Aligned reads: {}.".format(total_reads, n_read_aligned)
+            self.message += " Total reads: {}, Aligned reads: {}.".format(total_reads, n_read_aligned)
             self.messageHandler.display_warning('OverallReadsAlignedGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2528,7 +2526,7 @@ class LowRatioOfModsInWindowToOutGuardrail:
         if total_mods == 0:
             return
         if ((mods_in_window / total_mods) <= self.cutoff):
-            self.message = self.message + " Total modifications: {}, Modifications in window: {}, Modifications outside window: {}.".format(total_mods, mods_in_window, mods_outside_window)
+            self.message += " Total modifications: {}, Modifications in window: {}, Modifications outside window: {}.".format(total_mods, mods_in_window, mods_outside_window)
             self.messageHandler.display_warning('LowRatioOfModsInWindowToOutGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2564,7 +2562,7 @@ class HighRateOfModificationAtEndsGuardrail:
         if total_reads == 0:
             return
         if (irregular_reads / total_reads) >= self.percent:
-            self.message = self.message + " Total reads: {}, Irregular reads: {}.".format(total_reads, irregular_reads)
+            self.message += " Total reads: {}, Irregular reads: {}.".format(total_reads, irregular_reads)
             self.messageHandler.display_warning('HighRateOfModificationAtEndsGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2600,7 +2598,7 @@ class HighRateOfSubstitutionsOutsideWindowGuardrail:
         if global_subs == 0:
             return
         if ((subs_outside_window / global_subs) >= self.cutoff):
-            self.message = self.message + " Total substitutions: {}, Substitutions outside window: {}.".format(global_subs, subs_outside_window)
+            self.message += " Total substitutions: {}, Substitutions outside window: {}.".format(global_subs, subs_outside_window)
             self.messageHandler.display_warning('HighRateOfSubstitutionsOutsideWindowGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 
@@ -2639,7 +2637,7 @@ class HighRateOfSubstitutionsGuardrail:
         if total_mods == 0:
             return
         if ((global_subs / total_mods) >= self.cutoff):
-            self.message = self.message + " Total modifications: {}, Substitutions: {}.".format(int(total_mods), global_subs)
+            self.message += " Total modifications: {}, Substitutions: {}.".format(int(total_mods), global_subs)
             self.messageHandler.display_warning('HighRateOfSubstitutionsGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 

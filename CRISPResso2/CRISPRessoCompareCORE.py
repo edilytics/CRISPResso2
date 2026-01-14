@@ -54,7 +54,8 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 
 def normalize_name(name, output_folder_1, output_folder_2):
-    get_name_from_folder = lambda x: os.path.basename(os.path.abspath(x)).replace('CRISPResso_on_', '')
+    def get_name_from_folder(x):
+            return os.path.basename(os.path.abspath(x)).replace('CRISPResso_on_', '')
     if not name:
         return '{0}_VS_{1}'.format(
             get_name_from_folder(output_folder_1),
@@ -121,8 +122,8 @@ def main():
             warn('Invalid argument combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True.')
             args.place_report_in_output_folder = True
         # check that the CRISPResso output is present and fill amplicon_info
-        quantification_file_1, amplicon_names_1, amplicon_info_1 = CRISPRessoShared.check_output_folder(args.crispresso_output_folder_1)
-        quantification_file_2, amplicon_names_2, amplicon_info_2 = CRISPRessoShared.check_output_folder(args.crispresso_output_folder_2)
+        _quantification_file_1, amplicon_names_1, amplicon_info_1 = CRISPRessoShared.check_output_folder(args.crispresso_output_folder_1)
+        _quantification_file_2, amplicon_names_2, amplicon_info_2 = CRISPRessoShared.check_output_folder(args.crispresso_output_folder_2)
 
         run_info_1 = CRISPRessoShared.load_crispresso_info(args.crispresso_output_folder_1)
 
@@ -150,7 +151,8 @@ def main():
         if args.output_folder:
             OUTPUT_DIRECTORY = os.path.join(os.path.abspath(args.output_folder), OUTPUT_DIRECTORY)
 
-        _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
+        def _jp(filename):
+                return os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
         log_filename = _jp('CRISPRessoCompare_RUNNING_LOG.txt')
 
         try:
@@ -164,7 +166,7 @@ def main():
         logger.addHandler(logging.FileHandler(log_filename))
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoCompare_status.json')))
 
-        with open(log_filename, 'w+') as outfile:
+        with open(log_filename, 'w+', encoding='utf-8') as outfile:
             outfile.write('[Command used]:\nCRISPRessoCompare %s\n\n[Execution log]:\n' % ' '.join(sys.argv))
 
         crispresso2Compare_info_file = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso2Compare_info.json')
@@ -215,8 +217,8 @@ def main():
             except:
                 raise DifferentAmpliconLengthException('Different amplicon lengths for the two amplicons.')
             len_amplicon = profile_1.shape[0]
-            effect_vector_any_1 = profile_1[:, 1]
-            effect_vector_any_2 = profile_2[:, 1]
+            profile_1[:, 1]
+            profile_2[:, 1]
 
             cut_points = run_info_1['results']['refs'][amplicon_name]['sgRNA_cut_points']
             sgRNA_intervals = run_info_1['results']['refs'][amplicon_name]['sgRNA_intervals']
@@ -376,17 +378,16 @@ def main():
 
                 # find unmodified reference for comparison (if it exists)
                 ref_seq_around_cut = ""
-                if len(df1.loc[df1['Reference_Sequence'].str.contains('-') == False]) > 0:
-                    ref_seq_around_cut = df1.loc[df1['Reference_Sequence'].str.contains('-') == False]['Reference_Sequence'].iloc[0]
+                if len(df1.loc[~df1['Reference_Sequence'].str.contains('-')]) > 0:
+                    ref_seq_around_cut = df1.loc[~df1['Reference_Sequence'].str.contains('-')]['Reference_Sequence'].iloc[0]
                 # otherwise figure out which sgRNA was used for this comparison
-                elif len(df2.loc[df2['Reference_Sequence'].str.contains('-') == False]) > 0:
-                    ref_seq_around_cut = df2.loc[df2['Reference_Sequence'].str.contains('-') == False]['Reference_Sequence'].iloc[0]
+                elif len(df2.loc[~df2['Reference_Sequence'].str.contains('-')]) > 0:
+                    ref_seq_around_cut = df2.loc[~df2['Reference_Sequence'].str.contains('-')]['Reference_Sequence'].iloc[0]
                 else:
-                    seq_len = df2[df2['Unedited'] == True]['Reference_Sequence'].iloc[0]
+                    seq_len = df2[df2['Unedited']]['Reference_Sequence'].iloc[0]
                     for sgRNA_interval, cut_point in zip(sgRNA_intervals, cut_points):
                         sgRNA_seq = consensus_sequence[sgRNA_interval[0]:sgRNA_interval[1]]
                         if sgRNA_seq in allele_file_1:
-                            this_sgRNA_seq = sgRNA_seq
                             this_cut_point = cut_point
                             ref_seq_around_cut = consensus_sequence[max(0, this_cut_point - args.offset_around_cut_to_plot + 1):min(seq_len, cut_point + args.offset_around_cut_to_plot + 1)]
                             break
@@ -422,7 +423,7 @@ def main():
 
         debug('Calculating significant base counts...', {'percent_complete': 95})
         sig_counts_filename = _jp('CRISPRessoCompare_significant_base_counts.txt')
-        with open(sig_counts_filename, 'w') as fout:
+        with open(sig_counts_filename, 'w', encoding='utf-8') as fout:
             fout.write('Amplicon\tModification\tsig_base_count\tsig_base_count_quant_window\n')
             for amplicon_name in amplicon_names_in_both:
                 for mod in ['Insertions', 'Deletions', 'Substitutions', 'All_modifications']:

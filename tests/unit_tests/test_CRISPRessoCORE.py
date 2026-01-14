@@ -415,7 +415,7 @@ def test_get_consensus_alignment_from_pairs():
     aln2_ref = "ATCGATCGAT".replace(" ", "")
     qual2 = "AAAAAAAAAA"
 
-    aln_seq, aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
+    aln_seq, _aln_qual, ref_seq, score, caching_ok = CRISPRessoCORE.get_consensus_alignment_from_pairs(aln1_seq, aln1_ref, calc_score(aln1_seq, aln1_ref), qual1, aln2_seq, aln2_ref, calc_score(aln2_seq, aln2_ref), qual2)
     check.equal(aln_seq, "ATCGATCGAT")
     check.equal(ref_seq, "ATCGATCGAT")
     check.equal(score, 100)
@@ -725,7 +725,7 @@ def test_similar_num_reads_input():
 
 def test_large_similar_num_reads_input():
 #     # Test with typical input
-    assert CRISPRessoCORE.get_variant_cache_equal_boundaries(101, 100) == list(range(0, 100)) + [101]
+    assert CRISPRessoCORE.get_variant_cache_equal_boundaries(101, 100) == [*list(range(0, 100)), 101]
 
 
 def test_more_processes_than_reads():
@@ -860,7 +860,6 @@ def test_get_base_edit_target_sequence():
 
 def test_get_upset_plot_counts():
     df_alleles = pd.read_csv('tests/test_be_df.txt')
-    target_seq = 'AAGA'
     bp_substitutions_arr = [(3, 'A', 'G')]
 
     wt_ref_name = 'TEST'
@@ -881,7 +880,9 @@ def test_write_base_edit_counts():
 
     OUTPUT_DIRECTORY = '.'
     clean_file_prefix = ""
-    _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, clean_file_prefix + filename)
+
+    def _jp(filename):
+        return os.path.join(OUTPUT_DIRECTORY, clean_file_prefix + filename)
     ref_name = 'TEST'
     bp_substitutions_arr = [(3, 'A', 'G')]
     counts_dict = CRISPRessoCORE.get_upset_plot_counts(
@@ -909,7 +910,7 @@ def test_write_base_edit_counts():
         if os.path.exists(filename):
             os.remove(filename)
         else:
-            assert False
+            raise AssertionError()
 
 
 if __name__ == "__main__":

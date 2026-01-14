@@ -83,12 +83,12 @@ def plot_ambiguous_alleles_tables_from_folder(crispresso_output_folder, fig_file
         sgRNA_sequences = refs[ref_name]['sgRNA_sequences']
         sgRNA_cut_points = refs[ref_name]['sgRNA_cut_points']
         sgRNA_plot_cut_points = refs[ref_name]['sgRNA_plot_cut_points']
-        sgRNA_intervals = refs[ref_name]['sgRNA_intervals']
+        refs[ref_name]['sgRNA_intervals']
         sgRNA_names = refs[ref_name]['sgRNA_names']
         sgRNA_mismatches = refs[ref_name]['sgRNA_mismatches']
         sgRNA_plot_idxs = refs[ref_name]['sgRNA_plot_idxs']
 
-        reference_seq = refs[ref_name]['sequence']
+        refs[ref_name]['sequence']
 
         for ind, sgRNA in enumerate(sgRNA_sequences):
             sgRNA_label = sgRNA  # for file names
@@ -97,7 +97,7 @@ def plot_ambiguous_alleles_tables_from_folder(crispresso_output_folder, fig_file
 
             cut_point = sgRNA_cut_points[ind]
             plot_cut_point = sgRNA_plot_cut_points[ind]
-            plot_idxs = sgRNA_plot_idxs[ind]
+            sgRNA_plot_idxs[ind]
             plot_half_window = max(1, crispresso2_info['running_info']['args'].plot_window_size)
             ref_seq_around_cut = refs[ref_name]['sequence'][cut_point - plot_half_window + 1:cut_point + plot_half_window + 1]
 

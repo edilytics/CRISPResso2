@@ -108,10 +108,10 @@ def main():
         CRISPRessoShared.check_file(args.metadata)
 
         meta_params = pd.DataFrame(columns=['name', 'guide_seq', 'amplicon_seq'])
-        with open(args.metadata) as metadata_file:
+        with open(args.metadata, encoding="utf-8") as metadata_file:
             metadata = json.load(metadata_file)
 
-            exp = metadata['Experiment']
+            metadata['Experiment']
             for guide in data['Experiment']:
                 print('Guide: ' + guide['name'])
                 print('Sequence: ' + guide['sequence'])
@@ -195,8 +195,8 @@ def main():
                     if 'discard_guide_positions_overhanging_amplicon_edge' in row:
                         discard_guide_positions_overhanging_amplicon_edge = row.discard_guide_positions_overhanging_amplicon_edge
 
-                    (this_sgRNA_sequences, this_sgRNA_intervals, this_sgRNA_cut_points, this_sgRNA_plot_cut_points, this_sgRNA_plot_idxs, this_sgRNA_mismatches, this_sgRNA_names, this_sgRNA_include_idxs, this_include_idxs,
-                        this_exclude_idxs) = CRISPRessoShared.get_amplicon_info_for_guides(curr_amplicon_seq, guides, guide_mismatches, guide_names, guide_qw_centers,
+                    (this_sgRNA_sequences, this_sgRNA_intervals, _this_sgRNA_cut_points, _this_sgRNA_plot_cut_points, _this_sgRNA_plot_idxs, _this_sgRNA_mismatches, _this_sgRNA_names, _this_sgRNA_include_idxs, this_include_idxs,
+                        _this_exclude_idxs) = CRISPRessoShared.get_amplicon_info_for_guides(curr_amplicon_seq, guides, guide_mismatches, guide_names, guide_qw_centers,
                         guide_qw_sizes, row.quantification_window_coordinates, row.exclude_bp_from_left, row.exclude_bp_from_right, row.plot_window_size, guide_plot_cut_points, discard_guide_positions_overhanging_amplicon_edge)
                     for guide_seq in this_sgRNA_sequences:
                         guides_are_in_amplicon[guide_seq] = 1
@@ -218,7 +218,8 @@ def main():
         if args.meta_output_folder:
                  OUTPUT_DIRECTORY = os.path.join(os.path.abspath(args.meta_output_folder), output_folder_name)
 
-        _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
+        def _jp(filename):
+            return os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
 
         try:
             info('Creating Folder %s' % OUTPUT_DIRECTORY, {'percent_complete': 0})
@@ -230,7 +231,7 @@ def main():
         logger.addHandler(logging.FileHandler(log_filename))
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoMeta_status.json')))
 
-        with open(log_filename, 'w+') as outfile:
+        with open(log_filename, 'w+', encoding="utf-8") as outfile:
             outfile.write('[Command used]:\n%s\n\n[Execution log]:\n' % ' '.join(sys.argv))
 
         crispresso2Meta_info_file = os.path.join(OUTPUT_DIRECTORY, 'CRISPResso2Meta_info.json')
@@ -305,12 +306,11 @@ def main():
                 suffix_counter += 1
             seen_names[amplicon_names[amplicon]] = 1
 
-        save_png = True
         if args.suppress_report:
-            save_png = False
+            pass
 
         # summarize amplicon modifications
-        with open(_jp('CRISPRessoBatch_quantification_of_editing_frequency.txt'), 'w') as outfile:
+        with open(_jp('CRISPRessoBatch_quantification_of_editing_frequency.txt'), 'w', encoding="utf-8") as outfile:
             wrote_header = False
             for idx, row in meta_params.iterrows():
                 metaName = CRISPRessoShared.slugify(row["name"])
@@ -320,7 +320,7 @@ def main():
                     continue
 
                 amplicon_modification_file = os.path.join(folder_name, run_data['running_info']['quant_of_editing_freq_filename'])
-                with open(amplicon_modification_file, 'r') as infile:
+                with open(amplicon_modification_file, 'r', encoding="utf-8") as infile:
                     file_head = infile.readline()
                     if not wrote_header:
                         outfile.write('Batch\t' + file_head)
@@ -329,7 +329,7 @@ def main():
                         outfile.write(metaName + "\t" + line)
 
         # summarize alignment
-        with open(_jp('CRISPRessoBatch_mapping_statistics.txt'), 'w') as outfile:
+        with open(_jp('CRISPRessoBatch_mapping_statistics.txt'), 'w', encoding="utf-8") as outfile:
             wrote_header = False
             for idx, row in meta_params.iterrows():
                 metaName = CRISPRessoShared.slugify(row["name"])
@@ -339,7 +339,7 @@ def main():
                 if run_data is None:
                     continue
                 amplicon_modification_file = os.path.join(folder_name, run_data['running_info']['mapping_stats_filename'])
-                with open(amplicon_modification_file, 'r') as infile:
+                with open(amplicon_modification_file, 'r', encoding="utf-8") as infile:
                     file_head = infile.readline()
                     if not wrote_header:
                         outfile.write('Batch\t' + file_head)

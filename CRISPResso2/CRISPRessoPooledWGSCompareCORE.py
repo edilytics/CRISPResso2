@@ -197,7 +197,8 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
         )
 
         # create outputfolder and initialize the log
-        get_name_from_folder = lambda x: os.path.basename(os.path.abspath(x)).replace('CRISPRessoPooled_on_', '').replace('CRISPRessoWGS_on_', '')
+        def get_name_from_folder(x):
+            return os.path.basename(os.path.abspath(x)).replace('CRISPRessoPooled_on_', '').replace('CRISPRessoWGS_on_', '')
 
         if not args.name:
             database_id = '{0}_VS_{1}'.format(
@@ -218,7 +219,8 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
                 os.path.abspath(args.output_folder), OUTPUT_DIRECTORY,
             )
 
-        _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
+        def _jp(filename):
+            return os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
         log_filename = _jp('CRISPRessoPooledWGSCompare_RUNNING_LOG.txt')
 
         try:
@@ -232,7 +234,7 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
         logger.addHandler(logging.FileHandler(log_filename))
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoPooledWGSCompare_status.json')))
 
-        with open(log_filename, 'w+') as outfile:
+        with open(log_filename, 'w+', encoding='utf-8') as outfile:
             outfile.write(
                 '[Command used]:\nCRISPRessoPooledWGSCompare {0}\n\n[Execution log]:\n'.format(
                     ' '.join(sys.argv),
@@ -251,9 +253,8 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
         crispresso2_info['results']['general_plots']['summary_plot_labels'] = {}
         crispresso2_info['results']['general_plots']['summary_plot_datas'] = {}
 
-        save_png = True
         if args.suppress_report:
-            save_png = False
+            pass
 
         # load data and calculate the difference
         df_quant_1 = pd.read_csv(quantification_summary_file_1, sep='\t')
@@ -339,12 +340,12 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
             sig_counts_filename = run_info['running_info']['sig_counts_report_location']
             this_sig_filepath = os.path.join(processed_region_folder, sig_counts_filename)
             if os.path.exists(this_sig_filepath):
-                with open(this_sig_filepath, 'r') as fin:
+                with open(this_sig_filepath, 'r', encoding='utf-8') as fin:
                     header_string = fin.readline()
                     for line in fin:
                         sig_count_summary_lines.append(region + "\t" + line)
         sig_count_summary_file = _jp("CRISPRessoPooledWGSCompare_significant_base_count_summary.txt")
-        with open(sig_count_summary_file, 'w') as fout:
+        with open(sig_count_summary_file, 'w', encoding='utf-8') as fout:
             fout.write('Sample\t' + header_string)
             fout.writelines(sig_count_summary_lines)
 

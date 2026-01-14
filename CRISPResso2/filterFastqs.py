@@ -9,6 +9,7 @@ import io
 import os
 import datetime
 import numpy
+import sys
 
 
 def main():
@@ -60,7 +61,7 @@ def filterFastqs(fastq_r1=None, fastq_r2=None, fastq_r1_out=None, fastq_r2_out=N
     if f1_out_filename.endswith('.gz'):
         f1_out = gzip.open(f1_out_filename, 'wt')
     else:
-        f1_out = open(f1_out_filename, 'w')
+        f1_out = open(f1_out_filename, 'w', encoding='utf-8')
 
     if fastq_r2:
         if fastq_r2.endswith('.gz'):
@@ -77,7 +78,7 @@ def filterFastqs(fastq_r1=None, fastq_r2=None, fastq_r1_out=None, fastq_r2_out=N
         if f2_out_filename.endswith('.gz'):
             f2_out = gzip.open(f2_out_filename, 'wt')
         else:
-            f2_out = open(f2_out_filename, 'w')
+            f2_out = open(f2_out_filename, 'w', encoding='utf-8')
     # END CREATION OF FILEHANDLES##
 
     if not fastq_r2:
@@ -99,7 +100,7 @@ def filterFastqs(fastq_r1=None, fastq_r2=None, fastq_r1_out=None, fastq_r2_out=N
         elif min_bp_qual_or_N:
             run_mBPN(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N)
         else:
-            exit('Finished -- No modifications requested')
+            sys.exit('Finished -- No modifications requested')
     elif min_bp_qual_in_read:
         if min_av_read_qual:
             if min_bp_qual_or_N:
@@ -118,7 +119,7 @@ def filterFastqs(fastq_r1=None, fastq_r2=None, fastq_r1_out=None, fastq_r2_out=N
     elif min_bp_qual_or_N:
         run_mBPN_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N)
     else:
-        exit('Finished -- No modifications requested')
+        sys.exit('Finished -- No modifications requested')
 
     endTime = datetime.datetime.now()
     timeDiff = endTime - startTime

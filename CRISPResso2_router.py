@@ -15,21 +15,21 @@ if len(sys.argv) == 1:
     sys.exit(1)
 
 if sys.argv[1] == 'CRISPResso':
-    sb.call(["CRISPResso"] + sys.argv[2:])
+    sb.call(["CRISPResso", *sys.argv[2:]])
 elif sys.argv[1] == 'CRISPRessoBatch':
-    sb.call(["CRISPRessoBatch"] + sys.argv[2:])
+    sb.call(["CRISPRessoBatch", *sys.argv[2:]])
 elif sys.argv[1] == 'CRISPRessoCompare':
-    sb.call(["CRISPRessoCompare"] + sys.argv[2:])
+    sb.call(["CRISPRessoCompare", *sys.argv[2:]])
 elif sys.argv[1] == 'CRISPRessoPooled':
-    sb.call(["CRISPRessoPooled"] + sys.argv[2:])
+    sb.call(["CRISPRessoPooled", *sys.argv[2:]])
 elif sys.argv[1] == 'CRISPRessoWGS':
-    sb.call(["CRISPRessoWGS"] + sys.argv[2:])
+    sb.call(["CRISPRessoWGS", *sys.argv[2:]])
 elif sys.argv[1] == 'CRISPRessoPooledWGSCompare':
-    sb.call(["CRISPRessoPooledWGSCompare"] + sys.argv[2:])
+    sb.call(["CRISPRessoPooledWGSCompare", *sys.argv[2:]])
 elif sys.argv[1] == 'CRISPRessoAggregate':
-    sb.call(["CRISPRessoAggregate"] + sys.argv[2:])
+    sb.call(["CRISPRessoAggregate", *sys.argv[2:]])
 elif sys.argv[1] == 'License':
-    with open("LICENSE.txt", 'r') as fin:
+    with open("LICENSE.txt", 'r', encoding='utf-8') as fin:
         print(fin.read())
 else:
     print(usage)

@@ -107,7 +107,7 @@ def count_high_quality_bases(file, ref_name, base_pos_in_ref, original_base, tar
     with gzip.open(file, 'rt') as f:
         while True:
             id_line = f.readline()
-            seq_line = f.readline()
+            f.readline()
             plus_line = f.readline()
             qual_line = f.readline()
 

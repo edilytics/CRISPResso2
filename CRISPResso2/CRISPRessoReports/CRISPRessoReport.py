@@ -16,8 +16,7 @@ else:
 
 
 def get_jinja_loader(root, logger):
-    """Get the Jinja2 environment for rendering templates.
-    """
+    """Get the Jinja2 environment for rendering templates."""
     undefined_logger = make_logging_undefined(logger=logger)
     if C2PRO_INSTALLED:
         return Environment(
@@ -124,8 +123,7 @@ def add_fig_if_exists(fig, fig_name, fig_root, fig_title, fig_caption, fig_data,
 
 
 def assemble_figs(run_data, crispresso_folder):
-    """Helper function create the data structre for the figures
-    """
+    """Helper function create the data structre for the figures"""
     figures = {'names': {}, 'locs': {}, 'titles': {}, 'captions': {}, 'datas': {}, 'htmls': {}, 'sgRNA_based_names': {}}
     d3_nuc_quilt_names = []
 
@@ -190,8 +188,7 @@ def assemble_figs(run_data, crispresso_folder):
 
 
 def make_report(run_data, crispresso_report_file, crispresso_folder, _root, logger):
-    """Writes an HMTL report for a CRISPResso run
-    """
+    """Writes an HMTL report for a CRISPResso run"""
     data = assemble_figs(run_data, crispresso_folder)
 
     report_display_name = ""
@@ -223,8 +220,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _root, logg
 
 
 def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info, batch_folder, _root, logger):
-    """Makes a report for a CRIPSRessoBatch run
-    """
+    """Makes a report for a CRIPSRessoBatch run"""
     batch_names = crispresso2_info['results']['completed_batch_arr']
     failed_runs = crispresso2_info['results']['failed_batch_arr']
     failed_runs_desc = crispresso2_info['results']['failed_batch_arr_desc']
@@ -376,8 +372,7 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
 
 
 def make_pooled_report_from_folder(crispresso_report_file, crispresso2_info, folder, _root, logger):
-    """Makes a report for a CRISPRessoPooled run
-    """
+    """Makes a report for a CRISPRessoPooled run"""
     names_arr = crispresso2_info['results']['good_region_names']
     output_title = 'CRISPResso Pooled Output'
     if crispresso2_info['running_info']['args'].name != '':
@@ -386,8 +381,7 @@ def make_pooled_report_from_folder(crispresso_report_file, crispresso2_info, fol
 
 
 def make_compare_report_from_folder(crispresso_report_file, crispresso2_info, folder, _root, logger):
-    """Makes a report for a CRISPRessoCompare run
-    """
+    """Makes a report for a CRISPRessoCompare run"""
     names_arr = []
     output_title = 'CRISPResso Compare Output'
     if crispresso2_info['running_info']['args'].name != '':
@@ -406,8 +400,7 @@ def make_meta_report_from_folder(crispresso_report_file, crispresso2_info, folde
 
 
 def make_wgs_report_from_folder(crispresso_report_file, crispresso2_info, folder, _root, logger):
-    """Makes a report for a CRISPRessoWGS run
-    """
+    """Makes a report for a CRISPRessoWGS run"""
     names_arr = crispresso2_info['results']['good_region_names']
     output_title = 'CRISPResso WGS Output'
     if crispresso2_info['running_info']['args'].name != '':

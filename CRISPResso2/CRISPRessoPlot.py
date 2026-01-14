@@ -39,7 +39,8 @@ setMatplotlibDefaults()
 
 
 def get_nuc_color(nuc, alpha):
-    get_color = lambda x, y, z: (x / 255.0, y / 255.0, z / 255.0, alpha)
+    def get_color(x, y, z):
+        return (x / 255.0, y / 255.0, z / 255.0, alpha)
     if nuc == "A":
         return get_color(127, 201, 127)
     elif nuc == "T":
@@ -81,7 +82,8 @@ def get_color_lookup(nucs, alpha, custom_colors=None):
             colorLookup[nuc] = get_nuc_color(nuc, alpha)
         return colorLookup
     else:
-        get_color = lambda x, y, z: (x / 255.0, y / 255.0, z / 255.0, alpha)
+        def get_color(x, y, z):
+            return (x / 255.0, y / 255.0, z / 255.0, alpha)
         colors = {}
         for nuc in nucs:
             if nuc == 'INS':
@@ -353,7 +355,7 @@ def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom
 #    sampleLabs = list(nuc_pct_df.iloc[[((nSamples-1)-x)*nNucs for x in range(0,nSamples)],0]))
 #    print(mod_pct_df)
 #    sampleReadCounts = list(nuc_pct_df.iloc[[((nSamples-1)-x)*nNucs for x in range(0,nSamples)],0]))
-    ax.set_yticklabels(['Reference'] + list(nuc_pct_df.iloc[[((nSamples - 1) - x) * nNucs for x in range(0, nSamples)], 0]), va='center')
+    ax.set_yticklabels(['Reference', *list(nuc_pct_df.iloc[[(nSamples - 1 - x) * nNucs for x in range(0, nSamples)], 0])], va='center')
 
     plot_y_start = ref_y_start - 0.1
 
@@ -903,11 +905,7 @@ def plot_modification_frequency(
         all_substitution_count_vectors, lw=3, label='Substitutions', color=custom_colors['Substitution']
     )
 
-    y_max = max(
-        max(all_insertion_count_vectors),
-        max(all_deletion_count_vectors),
-        max(all_substitution_count_vectors),
-    ) * 1.1
+    y_max = max(*all_insertion_count_vectors, *all_deletion_count_vectors, *all_substitution_count_vectors) * 1.1
 
     if cut_points:
         added_legend = False
@@ -1055,12 +1053,7 @@ def plot_quantification_window_locations(
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
-    y_max = max(
-        max(insertion_count_vectors),
-        max(deletion_count_vectors),
-        max(substitution_count_vectors),
-        1,
-    ) * 1.1
+    y_max = max(*insertion_count_vectors, *deletion_count_vectors, *substitution_count_vectors, 1) * 1.1
 
     # shade quantification window
     if len(include_idxs_list) > 1:
@@ -1309,7 +1302,7 @@ def plot_position_dependent_indels(
     ax2.set_xlabel('Reference amplicon position (bp)')
     ax2.set_ylabel('Average deletion length')
 
-    ymin, ymax = ax2.yaxis.get_view_interval()
+    _ymin, _ymax = ax2.yaxis.get_view_interval()
     ax2.set_ylim(ymin=0, ymax=max(1, y_max))
     ax2.set_xlim(0, ref_len - 1)
     ax2.set_title(plot_titles['del'])
@@ -1362,12 +1355,7 @@ def plot_global_modifications_reference(
     ref1_all_deletion_positions = ref1_all_deletion_count_vectors
     ref1_all_substitution_positions = ref1_all_substitution_count_vectors
 
-    y_max = max(
-        max(ref1_all_insertion_positions),
-        max(ref1_all_deletion_positions),
-        max(ref1_all_substitution_positions),
-        1,
-    ) * 1.1
+    y_max = max(*ref1_all_insertion_positions, *ref1_all_deletion_positions, *ref1_all_substitution_positions, 1) * 1.1
 
     ax.plot(ref1_all_insertion_positions, linewidth=3, label='Insertions', color=custom_colors['Insertion'])
     ax.plot(ref1_all_deletion_positions, linewidth=3, label='Deletions', color=custom_colors['Deletion'])
@@ -1381,7 +1369,7 @@ def plot_global_modifications_reference(
     ref1_cut_points = ref1['sgRNA_cut_points']
     ref1_plot_cut_points = ref1['sgRNA_plot_cut_points']
     ref1_sgRNA_intervals = ref1['sgRNA_intervals']
-    ref1_include_idxs_list = sorted(list(ref1['include_idxs']))
+    sorted(list(ref1['include_idxs']))
     # shade quantification window
     if len(include_idxs_list) > 1:
         lastStart = include_idxs_list[0]
@@ -1554,7 +1542,7 @@ def plot_frameshift_analysis(
     fig = plt.figure(figsize=(12, 14))
     ax1 = plt.subplot2grid((6, 3), (0, 0), colspan=3, rowspan=5)
 
-    patches, texts, autotexts = ax1.pie(
+    _patches, _texts, _autotexts = ax1.pie(
         [
             modified_frameshift,
             modified_non_frameshift,
@@ -1724,8 +1712,8 @@ def plot_frameshift_frequency(
         labelbottom=True,  # labels along the bottom edge are off
     )
     ax2.yaxis.tick_left()
-    xmin, xmax = ax2.xaxis.get_view_interval()
-    ymin, ymax = ax2.yaxis.get_view_interval()
+    _xmin, _xmax = ax2.xaxis.get_view_interval()
+    _ymin, _ymax = ax2.yaxis.get_view_interval()
     ax2.set_xticklabels(
         map(str, [idx for idx in range(-30, 31) if (idx % 3 == 0)]),
         rotation='vertical',
@@ -1766,7 +1754,7 @@ def plot_global_frameshift_analysis(
 ):
     fig, ax = plt.subplots(figsize=(12, 12))
 
-    patches, texts, autotexts = ax.pie(
+    _patches, _texts, _autotexts = ax.pie(
         [
             global_modified_frameshift,
             global_modified_non_frameshift,
@@ -1867,8 +1855,8 @@ def plot_global_frameshift_in_frame_mutations(
         labelbottom=True,  # labels along the bottom edge are off)
     )
     ax2.yaxis.tick_left()
-    xmin, xmax = ax2.xaxis.get_view_interval()
-    ymin, ymax = ax2.yaxis.get_view_interval()
+    _xmin, _xmax = ax2.xaxis.get_view_interval()
+    _ymin, _ymax = ax2.yaxis.get_view_interval()
     ax2.set_xticklabels(
         map(str, [idx for idx in range(-30, 31) if (idx % 3 == 0)]),
         rotation='vertical',
@@ -1906,7 +1894,7 @@ def plot_impact_on_splice_sites(
     **kwargs,
 ):
     fig, ax = plt.subplots(figsize=(12, 12))
-    patches, texts, autotexts = ax.pie(
+    _patches, _texts, _autotexts = ax.pie(
         [
             global_splicing_sites_modified,
             (global_count_total - global_splicing_sites_modified),
@@ -1984,11 +1972,7 @@ def plot_non_coding_mutations(
         color=custom_colors['Substitution']
     )
 
-    y_max = max(
-        max(insertion_count_vectors_noncoding),
-        max(deletion_count_vectors_noncoding),
-        max(substitution_count_vectors_noncoding),
-    ) * 1.1
+    y_max = max(*insertion_count_vectors_noncoding, *deletion_count_vectors_noncoding, *substitution_count_vectors_noncoding) * 1.1
 
     # shade quantification window
     if len(include_idxs_list) > 1:
@@ -2113,7 +2097,7 @@ def plot_potential_splice_sites(
     :param save_also_png: Boolean indicating whether to save the plot as a PNG file (in addition to pdf).
     """
     fig, ax = plt.subplots(figsize=(12, 12))
-    patches, texts, autotexts = ax.pie(
+    _patches, _texts, _autotexts = ax.pie(
         [
             splicing_sites_modified,
             (count_total - splicing_sites_modified),
@@ -2376,7 +2360,7 @@ def plot_conversion_map(nuc_pct_df, conversion_nuc_from, conversion_nuc_to, fig_
         x_start = pos_ind
         x_end = pos_ind + 1
         for i in range(nSamples):  # iterate over all samples
-            sample_row_start = nNucs * i
+            nNucs * i
             y_start = nSamples - i
             conversion_pct = nuc_pct_conversion_df.iloc[i, pos_ind]
             ax.add_patch(
@@ -2428,7 +2412,7 @@ def plot_conversion_map(nuc_pct_df, conversion_nuc_from, conversion_nuc_to, fig_
     ax.tick_params(top=False, bottom=False, left=False, right=False, labelleft=True, labelbottom=False)
 
     ax.set_yticks([ref_y_start + ref_y_height / 2.0] + [x + 0.5 for x in range(1, nSamples + 1)])
-    ax.set_yticklabels(['Reference'] + list(nuc_pct_df.iloc[[((nSamples - 1) - x) * nNucs for x in range(0, nSamples)], 0]), va='center')
+    ax.set_yticklabels(['Reference', *list(nuc_pct_df.iloc[[(nSamples - 1 - x) * nNucs for x in range(0, nSamples)], 0])], va='center')
 
     ax.set_xlim([2, amp_len + 3])
     ax.set_ylim([ref_y_height - 0.2, nSamples + 1.2])
@@ -2486,7 +2470,7 @@ def plot_subs_across_ref(ref_len, ref_name, ref_count, all_substitution_base_vec
     pT = ax.bar(ind, all_substitution_base_vectors[ref_name + "_T"], color=color_lookup['T'], bottom=all_substitution_base_vectors[ref_name + "_A"] + all_substitution_base_vectors[ref_name + "_C"] + all_substitution_base_vectors[ref_name + "_G"])
     pN = ax.bar(ind, all_substitution_base_vectors[ref_name + "_N"], color=color_lookup['N'], bottom=all_substitution_base_vectors[ref_name + "_A"] + all_substitution_base_vectors[ref_name + "_C"] + all_substitution_base_vectors[ref_name + "_G"] + all_substitution_base_vectors[ref_name + "_T"])
     tots = all_substitution_base_vectors[ref_name + "_N"] + all_substitution_base_vectors[ref_name + "_A"] + all_substitution_base_vectors[ref_name + "_C"] + all_substitution_base_vectors[ref_name + "_G"] + all_substitution_base_vectors[ref_name + "_T"]
-    y_max = max(15, (max(max(tots), 1)) * 1.1)  # max to avoid ylim of 0,0 which makes python freak out
+    y_max = max(15, (max(*tots, 1)) * 1.1)  # max to avoid ylim of 0,0 which makes python freak out
     ax.set_ylim(0, y_max)  # max to avoid ylim of 0,0 which makes python freak out
     ax.set_xlim([0, ref_len])
 
@@ -2590,7 +2574,7 @@ def plot_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root=Non
     :param fig_filename_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
     :param save_also_png: whether to save the plot as a png as well as pdf
     """
-    fig, ax = plt.subplots(figsize=(len(df_nuc_freq.columns), 4))
+    _fig, ax = plt.subplots(figsize=(len(df_nuc_freq.columns), 4))
 #                sns_plot = sns.heatmap(df_nuc_freq,vmin=0,vmax=tot_aln_reads,cmap="YlGnBu",square=True).get_figure()
     sns.heatmap(df_nuc_freq, vmin=0, vmax=tot_aln_reads, cmap="YlGnBu", square=True, ax=ax)
     ax.set_title(plot_title)
@@ -3124,9 +3108,6 @@ def plot_amino_acid_heatmap(
         plt.close(fig)
         return
 
-    sgRNA_rows = []
-    num_sgRNA_rows = 0
-
     fig = plt.figure(figsize=(plot_aa_len * 0.3, (N_ROWS + 1) * 0.6))
     gs1 = gridspec.GridSpec(N_ROWS + 1, N_COLUMNS)
     gs2 = gridspec.GridSpec(N_ROWS + 1, N_COLUMNS)
@@ -3206,7 +3187,9 @@ def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
     -is_reference: list of booleans for whether the read is equal to the reference
     """
     dna_to_numbers = {'-': 0, 'A': 1, 'T': 2, 'C': 3, 'G': 4, 'N': 5}
-    seq_to_numbers = lambda seq: [dna_to_numbers[x] for x in seq]
+
+    def seq_to_numbers(seq):
+        return [dna_to_numbers[x] for x in seq]
     X = []
     annot = []
     y_labels = []
@@ -3262,7 +3245,9 @@ def prep_alleles_table_compare(df_alleles, sample_name_1, sample_name_2, MAX_N_R
     -per_element_annot_kws: annotations for each cell (e.g. bold for substitutions, etc.)
     """
     dna_to_numbers = {'-': 0, 'A': 1, 'T': 2, 'C': 3, 'G': 4, 'N': 5}
-    seq_to_numbers = lambda seq: [dna_to_numbers[x] for x in seq]
+
+    def seq_to_numbers(seq):
+        return [dna_to_numbers[x] for x in seq]
 
     X = []
     annot = []
@@ -3354,7 +3339,9 @@ def plot_alleles_heatmap(
             INDEL_color = custom_colors['N'] + hex_alpha
 
     dna_to_numbers = {'-': 0, 'A': 1, 'T': 2, 'C': 3, 'G': 4, 'N': 5}
-    seq_to_numbers = lambda seq: [dna_to_numbers[x] for x in seq]
+
+    def seq_to_numbers(seq):
+        return [dna_to_numbers[x] for x in seq]
 
     cmap = colors_mpl.ListedColormap([INDEL_color, A_color, T_color, C_color, G_color, INDEL_color])
 
@@ -3545,7 +3532,9 @@ def plot_alleles_heatmap_hist(reference_seq, X, annot, y_labels, insertion_dict,
             INDEL_color = custom_colors['N']
 
     dna_to_numbers = {'-': 0, 'A': 1, 'T': 2, 'C': 3, 'G': 4, 'N': 5}
-    seq_to_numbers = lambda seq: [dna_to_numbers[x] for x in seq]
+
+    def seq_to_numbers(seq):
+        return [dna_to_numbers[x] for x in seq]
 
     cmap = colors_mpl.ListedColormap([INDEL_color, A_color, T_color, C_color, G_color, INDEL_color])
 
@@ -3564,13 +3553,13 @@ def plot_alleles_heatmap_hist(reference_seq, X, annot, y_labels, insertion_dict,
     N_ROWS = len(X)
     N_COLUMNS = plot_nuc_len
 
-    fig = plt.figure(figsize=(plot_nuc_len * 0.3, (N_ROWS + 1) * 0.6))
+    plt.figure(figsize=(plot_nuc_len * 0.3, (N_ROWS + 1) * 0.6))
     gs = gridspec.GridSpec(2, 2, width_ratios=[1, N_ROWS], height_ratios=[N_COLUMNS, 1])
 
     # ax_hm_ref heatmap for the reference
     ax_hm_ref = plt.subplot(gs[0])
     ax_hm = plt.subplot(gs[2])
-    ax_bar = plt.subplot(gs[3])
+    plt.subplot(gs[3])
 
     custom_heatmap(ref_seq_hm, annot=ref_seq_annot_hm, annot_kws={'size': 16}, cmap=cmap, fmt='s', ax=ax_hm_ref, vmin=0, vmax=5, square=True)
     custom_heatmap(X, annot=np.array(annot), annot_kws={'size': 16}, cmap=cmap, fmt='s', ax=ax_hm, vmin=0, vmax=5, square=True, per_element_annot_kws=per_element_annot_kws)
@@ -3783,7 +3772,7 @@ def plot_alleles_table_from_file(alleles_file_name, fig_filename_root=None, cust
     df_alleles = pd.read_table(alleles_file_name)
     df_alleles = df_alleles.reset_index().set_index('Aligned_Sequence')
 
-    rows_include_reference_seq = df_alleles.loc[df_alleles['Reference_Sequence'].str.contains('-') == False]
+    rows_include_reference_seq = df_alleles.loc[~df_alleles['Reference_Sequence'].str.contains('-')]
     if len(rows_include_reference_seq) > 0:
         reference_seq = rows_include_reference_seq['Reference_Sequence'].iloc[0]
     else:
@@ -3849,12 +3838,12 @@ def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=
         sgRNA_sequences = refs[ref_name]['sgRNA_sequences']
         sgRNA_cut_points = refs[ref_name]['sgRNA_cut_points']
         sgRNA_plot_cut_points = refs[ref_name]['sgRNA_plot_cut_points']
-        sgRNA_intervals = refs[ref_name]['sgRNA_intervals']
+        refs[ref_name]['sgRNA_intervals']
         sgRNA_names = refs[ref_name]['sgRNA_names']
         sgRNA_mismatches = refs[ref_name]['sgRNA_mismatches']
         sgRNA_plot_idxs = refs[ref_name]['sgRNA_plot_idxs']
 
-        reference_seq = refs[ref_name]['sequence']
+        refs[ref_name]['sequence']
 
         for ind, sgRNA in enumerate(sgRNA_sequences):
             alleles_filename = os.path.join(crispresso_output_folder, crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'][ind])
@@ -3867,7 +3856,7 @@ def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=
 
             cut_point = sgRNA_cut_points[ind]
             plot_cut_point = sgRNA_plot_cut_points[ind]
-            plot_idxs = sgRNA_plot_idxs[ind]
+            sgRNA_plot_idxs[ind]
             plot_half_window = max(1, crispresso2_info['running_info']['args'].plot_window_size)
             ref_seq_around_cut = refs[ref_name]['sequence'][cut_point - plot_half_window + 1:cut_point + plot_half_window + 1]
 
@@ -3877,7 +3866,7 @@ def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=
             for (int_start, int_end) in refs[ref_name]['sgRNA_intervals']:
                 new_sgRNA_intervals += [(int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1)]
 
-            X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = prep_alleles_table(df_alleles, ref_seq_around_cut, MAX_N_ROWS, MIN_FREQUENCY)
+            X, annot, y_labels, insertion_dict, per_element_annot_kws, _is_reference = prep_alleles_table(df_alleles, ref_seq_around_cut, MAX_N_ROWS, MIN_FREQUENCY)
 
             new_fig_filename_root = fig_filename_root + "_" + ref_name + "_" + sgRNA_label
             if fig_filename_root is None:
@@ -3961,12 +3950,12 @@ def plot_nucleotide_quilt_from_folder(crispresso_output_folder, fig_filename_roo
         sgRNA_sequences = refs[ref_name]['sgRNA_sequences']
         sgRNA_cut_points = refs[ref_name]['sgRNA_cut_points']
         sgRNA_plot_cut_points = refs[ref_name]['sgRNA_plot_cut_points']
-        sgRNA_intervals = refs[ref_name]['sgRNA_intervals']
+        refs[ref_name]['sgRNA_intervals']
         sgRNA_names = refs[ref_name]['sgRNA_names']
         sgRNA_mismatches = refs[ref_name]['sgRNA_mismatches']
         sgRNA_plot_idxs = refs[ref_name]['sgRNA_plot_idxs']
 
-        reference_seq = refs[ref_name]['sequence']
+        refs[ref_name]['sequence']
 
         nucleotide_pct_file = os.path.join(crispresso_output_folder, crispresso2_info['results']['refs'][ref_name]['nuc_pct_filename'])
 
@@ -3989,16 +3978,15 @@ def plot_nucleotide_quilt_from_folder(crispresso_output_folder, fig_filename_roo
         mod_pct_df = mod_pct_df.copy()
         mod_pct_df.insert(0, 'Batch', ref_name)
 
-        for ind, sgRNA in enumerate(sgRNA_sequences):
-            sgRNA_label = sgRNA  # for file names
+        for ind, _sgRNA in enumerate(sgRNA_sequences):
             if sgRNA_names[ind] != "":
-                sgRNA_label = sgRNA_names[ind]
+                sgRNA_names[ind]
 
             cut_point = sgRNA_cut_points[ind]
-            plot_cut_point = sgRNA_plot_cut_points[ind]
-            plot_idxs = sgRNA_plot_idxs[ind]
+            sgRNA_plot_cut_points[ind]
+            sgRNA_plot_idxs[ind]
             plot_half_window = max(1, crispresso2_info['running_info']['args'].plot_window_size)
-            ref_seq_around_cut = refs[ref_name]['sequence'][cut_point - plot_half_window + 1:cut_point + plot_half_window + 1]
+            refs[ref_name]['sequence'][cut_point - plot_half_window + 1:cut_point + plot_half_window + 1]
 
             new_sgRNA_intervals = []
             # adjust coordinates of sgRNAs
@@ -4107,13 +4095,12 @@ def plot_unmod_mod_pcts(df_summary_quantification, fig_filename_root=None, save_
 
 
 def plot_reads_total(df_summary_quantification, fig_filename_root=None, save_png=False, cutoff=None, **kwargs):
-    """Plots a horizontal barplot for summarizing number of reads aligned to each sample
-    """
+    """Plots a horizontal barplot for summarizing number of reads aligned to each sample"""
     df = df_summary_quantification.fillna(0)[::-1]
     fig_len = int(3 + df.shape[0] * .5)
     fig, ax = plt.subplots(figsize=(12, fig_len))
     xs = range(df.shape[0])
-    p1 = ax.barh(xs, df['Reads_total'])
+    ax.barh(xs, df['Reads_total'])
     ax.set_ylabel('Sample')
     ax.set_xlabel('Number of reads')
     names = [((name[:20] + "..") if len(name) > 18 else name) for name in df['Name'].values]
@@ -4176,7 +4163,7 @@ def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
     ax.set_xticks(np.arange(len(sizes)))
     ax.set_xticklabels(labels)
     ax.set_ylabel('Sequences % (no.)')
-    y_label_values = np.round(np.linspace(0, max(N_READS_INPUT, max(ax.get_yticks())), 6))
+    y_label_values = np.round(np.linspace(0, max(N_READS_INPUT, *ax.get_yticks()), 6))
 
     ax.set_yticks(y_label_values)
     ax.set_yticklabels(['%.1f%% (%.0f)' % (100 * cnt / N_READS_INPUT, cnt) for cnt in y_label_values])
@@ -4251,7 +4238,7 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
 
     plt.figure(figsize=(12, 12))
     ax = plt.subplot(111)
-    patches, texts, autotexts = ax.pie(sizes, labels=labels, autopct='%1.2f%%')
+    _patches, _texts, _autotexts = ax.pie(sizes, labels=labels, autopct='%1.2f%%')
 
     plt.axis('off')
     plt.axis("equal")
@@ -4309,7 +4296,7 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
 
 def plot_class_dsODN_piechart(sizes, labels, plot_root=None, save_also_png=False, **kwargs):
     fig, ax = plt.subplots(figsize=(12, 12))
-    patches, texts, autotexts = ax.pie(sizes, labels=labels, autopct='%1.2f%%')
+    _patches, _texts, _autotexts = ax.pie(sizes, labels=labels, autopct='%1.2f%%')
 
     ax.set_axis_off()
     ax.set_aspect('equal')
@@ -4349,9 +4336,8 @@ def plot_quantification_comparison_barchart(
     bar_width = 0.35
 
     opacity = 0.4
-    error_config = {'ecolor': '0.3'}
 
-    rects1 = ax1.bar(
+    ax1.bar(
         index,
         means_sample_1,
         bar_width,
@@ -4360,7 +4346,7 @@ def plot_quantification_comparison_barchart(
         label=sample_1_name,
     )
 
-    rects2 = ax1.bar(
+    ax1.bar(
         index + bar_width,
         means_sample_2,
         bar_width,
@@ -4486,7 +4472,7 @@ def plot_quantification_positions(
                     lw=2,
                     label='Predicted cleavage position',
                 )
-                plots = plots + plot_cleavage
+                plots += plot_cleavage
             else:
                 ax1.plot(
                     [cut_point, cut_point],
@@ -4519,7 +4505,7 @@ def plot_quantification_positions(
                     c=(0, 0, 0, 0.15),
                     label='sgRNA',
                 )
-                plots = plots + p2
+                plots += p2
             else:
                 ax1.plot(
                     [sgRNA_int[0], sgRNA_int[1]],
@@ -4561,7 +4547,7 @@ def plot_quantification_positions(
 
 def plot_combination_upset(fig_root, ref_name, bp_substitutions_arr, binary_allele_counts, save_also_png=False):
     header_arr = []
-    for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_substitutions_arr):
+    for _ind, (ref_ind, ref_base, mod_base) in enumerate(bp_substitutions_arr):
         header_arr.append(str(ref_ind) + ':' + ref_base + '->' + mod_base)
     header_arr.append('has_indel')
     header_arr.append('cat_counts')
@@ -4576,7 +4562,7 @@ def plot_combination_upset(fig_root, ref_name, bp_substitutions_arr, binary_alle
         arr_for_upset.append(binary_allele_counts[ref_comb])
         df_by_combination_items.append(arr_for_upset)
     for i, col in enumerate(header_arr):
-        if col in ['has_indel', 'cat_counts']:
+        if col in {'has_indel', 'cat_counts'}:
             continue
         if len(col) > 8:
             header_arr[i] = col[:8] + '...'

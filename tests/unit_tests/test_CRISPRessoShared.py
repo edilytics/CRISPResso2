@@ -33,7 +33,7 @@ def test_get_relative_coordinates():
 
 
 def test_get_n_reads_fastq():
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.fastq') as f:
+    with tempfile.NamedTemporaryFile(encoding='utf-8', mode='w+', delete=False, suffix='.fastq') as f:
         f.write("@SEQ_ID\n")
         f.write("GATTACA\n")
         f.write("+\n")
@@ -49,7 +49,7 @@ def test_get_n_reads_fastq():
 
 
 def test_get_n_reads_fastq_gzip():
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.fastq') as f:
+    with tempfile.NamedTemporaryFile(encoding='utf-8', mode='w+', delete=False, suffix='.fastq') as f:
         f.write("@SEQ_ID\n")
         f.write("GATTACA\n")
         f.write("+\n")
@@ -70,7 +70,7 @@ def test_get_n_reads_fastq_gzip():
 
 
 def test_get_n_reads_fastq_three_extra_newlines():
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.fastq') as f:
+    with tempfile.NamedTemporaryFile(encoding='utf-8', mode='w+', delete=False, suffix='.fastq') as f:
         f.write("@SEQ_ID\n")
         f.write("GATTACA\n")
         f.write("+\n")
@@ -87,7 +87,7 @@ def test_get_n_reads_fastq_three_extra_newlines():
 
 
 def test_get_n_reads_fastq_four_extra_newlines():
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.fastq') as f:
+    with tempfile.NamedTemporaryFile(encoding='utf-8', mode='w+', delete=False, suffix='.fastq') as f:
         f.write("@SEQ_ID\n")
         f.write("GATTACA\n")
         f.write("+\n")
@@ -104,8 +104,8 @@ def test_get_n_reads_fastq_four_extra_newlines():
 
 
 def test_get_n_reads_fastq_100_reads():
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.fastq') as f:
-        for i in range(100):
+    with tempfile.NamedTemporaryFile(encoding='utf-8', mode='w+', delete=False, suffix='.fastq') as f:
+        for _i in range(100):
             f.write("@SEQ_ID\n")
             f.write("GATTACA\n")
             f.write("+\n")
@@ -121,7 +121,7 @@ def test_get_n_reads_fastq_100_reads():
 
 
 def test_get_n_reads_fastq_no_newline():
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.fastq') as f:
+    with tempfile.NamedTemporaryFile(encoding='utf-8', mode='w+', delete=False, suffix='.fastq') as f:
         f.write("@SEQ_ID\n")
         f.write("GATTACA\n")
         f.write("+\n")
@@ -137,7 +137,7 @@ def test_get_n_reads_fastq_no_newline():
 
 
 def test_get_n_reads_fastq_empty_file():
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.fastq') as f:
+    with tempfile.NamedTemporaryFile(encoding='utf-8', mode='w+', delete=False, suffix='.fastq') as f:
         f.flush()  # Flush the content to disk
         os.fsync(f.fileno())  # Ensure all internal buffers associated with the file are written to disk
 

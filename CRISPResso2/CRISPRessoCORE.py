@@ -64,7 +64,7 @@ def which(program):
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-    fpath, fname = os.path.split(program)
+    fpath, _fname = os.path.split(program)
     if fpath:
         if is_exe(program):
             return program
@@ -120,7 +120,8 @@ def check_program(binary_name, download_url=None, version_flag=None, version_reg
             sys.exit(1)
 
 
-check_fastp = lambda: check_program('fastp', download_url='http://opengene.org/fastp/fastp', version_flag='--version', version_regex=r'fastp (\d+)\.(\d+)\.(\d+)', version=(0, 19, 8))
+def check_fastp():
+    return check_program('fastp', download_url='http://opengene.org/fastp/fastp', version_flag='--version', version_regex=r'fastp (\d+)\.(\d+)\.(\d+)', version=(0, 19, 8))
 
 
 def get_avg_read_length_fastq(fastq_filename):
@@ -234,7 +235,7 @@ def get_upset_plot_counts(df_alleles, bp_substitutions_arr, wt_ref_name):
     other_base_counts = [0] * len(bp_substitutions_arr)
 
     # iterate all alleles in input allele table
-    for idx, allele in df_alleles.iterrows():
+    for _idx, allele in df_alleles.iterrows():
         total_alleles += 1
         total_alleles_reads += allele['#Reads']
 
@@ -352,25 +353,25 @@ def write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp):
 
     prefix = '10i.' + ref_name
 
-    with open(_jp(prefix + '.binary_allele_counts.txt'), 'w') as fout:
+    with open(_jp(prefix + '.binary_allele_counts.txt'), 'w', encoding='utf-8') as fout:
         sorted_binary_allele_counts = sorted(counts_dict['binary_allele_counts'].keys(), key=lambda x: counts_dict['binary_allele_counts'][x], reverse=True)
         fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
         for allele_str in sorted_binary_allele_counts:
             fout.write(allele_str + '\t' + str(counts_dict['binary_allele_counts'][allele_str]) + '\n')
 
-    with open(_jp(prefix + '.category_allele_counts.txt'), 'w') as fout:
+    with open(_jp(prefix + '.category_allele_counts.txt'), 'w', encoding='utf-8') as fout:
         sorted_category_allele_counts = sorted(counts_dict['category_allele_counts'].keys(), key=lambda x: counts_dict['category_allele_counts'][x], reverse=True)
         fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
         for allele_str in sorted_category_allele_counts:
             fout.write(allele_str + '\t' + str(counts_dict['category_allele_counts'][allele_str]) + '\n')
 
-    with open(_jp(prefix + '.precise_allele_counts.txt'), 'w') as fout:
+    with open(_jp(prefix + '.precise_allele_counts.txt'), 'w', encoding='utf-8') as fout:
         sorted_precise_allele_counts = sorted(counts_dict['precise_allele_counts'].keys(), key=lambda x: counts_dict['precise_allele_counts'][x], reverse=True)
         fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
         for allele_str in sorted_precise_allele_counts:
             fout.write(allele_str + '\t' + str(counts_dict['precise_allele_counts'][allele_str]) + '\n')
 
-    with open(_jp(prefix + '.arrays.txt'), 'w') as fout:
+    with open(_jp(prefix + '.arrays.txt'), 'w', encoding='utf-8') as fout:
         fout.write('Class\t' + "\t".join([str(x) for x in bp_substitutions_arr]) + '\n')
         fout.write('total_counts\t' + "\t".join([str(x) for x in counts_dict['total_counts']]) + '\n')
         fout.write('reference_counts\t' + "\t".join([str(x) for x in counts_dict['reference_base_counts']]) + '\n')
@@ -379,7 +380,7 @@ def write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp):
         fout.write('insertion_counts\t' + "\t".join([str(x) for x in counts_dict['insertion_base_counts']]) + '\n')
         fout.write('other_counts\t' + "\t".join([str(x) for x in counts_dict['other_base_counts']]) + '\n')
 
-    with open(_jp(prefix + '.counts.txt'), 'w') as fout:
+    with open(_jp(prefix + '.counts.txt'), 'w', encoding='utf-8') as fout:
         target_name = 'Target'
         fout.write("\t".join([ref_name, ref_name + "_indels", target_name, target_name + "_indels", "other", "other_indels"]) + '\n')
         fout.write("\t".join([str(x) for x in [counts_dict['total_reference_noindel_reads'], counts_dict['total_reference_indel_reads'], counts_dict['total_target_noindel_reads'], counts_dict['total_target_indel_reads'], counts_dict['total_other_noindel_reads'], counts_dict['total_other_indel_reads']]]) + '\n')
@@ -519,7 +520,6 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
     aln_scores = []
     best_match_score = -1
     best_unfiltered_score = -1
-    best_unfiltered_name = None
     best_match_s1s = []
     best_match_s2s = []
     best_match_names = []
@@ -563,9 +563,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
 
 #                print "for " + ref_name + " got fws1: " + str(fws1) + " and fws2: " + str(fws2) + " score: " +str(fwscore)
         ref_aln_details.append((ref_name, s1, s2, score))
-        if score > best_unfiltered_score:
-            best_unfiltered_score = score
-            best_unfiltered_name = ref_name
+        best_unfiltered_score = max(best_unfiltered_score, score)
         aln_scores.append(score)
 
         # reads are matched to the reference to which they best align. The 'min_aln_score' is calculated using only the changes in 'include_idxs'
@@ -886,7 +884,6 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
     aln_scores = []
     best_match_score = -1
     best_unfiltered_score = -1
-    best_unfiltered_name = None
     best_match_s1s = []
     best_match_s2s = []
     best_match_names = []
@@ -933,9 +930,7 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
                 s2 = rvs2
                 score = rvscore
 
-            if score > best_unfiltered_score:
-                best_unfiltered_score = score
-                best_unfiltered_name = ref_name
+            best_unfiltered_score = max(best_unfiltered_score, score)
 
 #                print "for " + ref_name + " got fws1: " + str(fws1) + " and fws2: " + str(fws2) + " score: " +str(fwscore)
         aln_scores.append(score)
@@ -1064,7 +1059,7 @@ def get_variant_cache_equal_boundaries(num_unique_sequences, n_processes):
     # Determine roughly equal segment size for each process
     segment_size = num_unique_sequences // n_processes
 
-    for i in range(n_processes - 1):
+    for _i in range(n_processes - 1):
         boundaries.append(boundaries[-1] + segment_size)
     boundaries.append(num_unique_sequences)
     return boundaries
@@ -1096,7 +1091,7 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
     """
     variant_file_path = os.path.join(variants_dir, f"variants_{process_id}.tsv")
     variant_lines = ""
-    with open(variant_file_path, 'w') as file:
+    with open(variant_file_path, 'w', encoding='utf-8') as file:
         file.truncate()  # Ensures tsv file is empty before writing to it
         for index, fastq_seq in enumerate(seq_list):
             if args.crispresso_merge:  # If using CRISPResso to merge the passed in function is get_new_variant_object_from_paired
@@ -1171,12 +1166,12 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         if fastq1_filename.endswith('.gz'):
             fastq1_file = gzip.open(fastq1_filename, 'rt')
         else:
-            fastq1_file = open(fastq1_filename)
+            fastq1_file = open(fastq1_filename, encoding='utf-8')
 
         if fastq2_filename.endswith('.gz'):
             fastq2_file = gzip.open(fastq2_filename, 'rt')
         else:
-            fastq2_file = open(fastq2_filename)
+            fastq2_file = open(fastq2_filename, encoding='utf-8')
         # Reading through the fastq file and enriching variantCache as a dictionary with the following:
             # Key: the unique DNA sequence from the fastq file
             # Value: an integer that represents how many times we've seen this specific read
@@ -1189,11 +1184,11 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                 info("Iterating over fastq file to identify reads; %d reads identified." % (num_reads))
             # read through fastq in sets of 4
             fastq1_seq = fastq1_file.readline().strip()
-            fastq1_plus = fastq1_file.readline()
+            fastq1_file.readline()
             fastq1_qual = fastq1_file.readline().strip()
 
             fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_file.readline().strip())
-            fastq2_plus = fastq2_file.readline()
+            fastq2_file.readline()
             fastq2_qual = fastq2_file.readline().strip()[::-1]
             fastq_read_key = fastq1_seq + '+' + fastq2_seq
             fastq_quals = fastq1_qual + ' ' + fastq2_qual
@@ -1261,7 +1256,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                 # Ensure the file is a .tsv before processing
                 if file_path.endswith(".tsv"):
                     try:
-                        with open(file_path, 'r') as file:
+                        with open(file_path, 'r', encoding='utf-8') as file:
                             for index, line in enumerate(file):
                                 # Each line contains a sequence followed by a JSON string
                                 parts = line.strip().split('\t')
@@ -1328,23 +1323,23 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
             if fastq1_filename.endswith('.gz'):
                 fastq1_file = gzip.open(fastq1_filename, 'rt')
             else:
-                fastq1_file = open(fastq1_filename)
+                fastq1_file = open(fastq1_filename, encoding='utf-8')
 
             if fastq2_filename.endswith('.gz'):
                 fastq2_file = gzip.open(fastq2_filename, 'rt')
             else:
-                fastq2_file = open(fastq2_filename)
+                fastq2_file = open(fastq2_filename, encoding='utf-8')
 
             fastq1_id = fastq1_file.readline()
             fastq2_id = fastq2_file.readline()
             while (fastq1_id and fastq2_id):
                 # read through fastq in sets of 4
                 fastq1_seq = fastq1_file.readline().strip()
-                fastq1_plus = fastq1_file.readline()
+                fastq1_file.readline()
                 fastq1_qual = fastq1_file.readline().strip()
 
                 fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_file.readline().strip())
-                fastq2_plus = fastq2_file.readline()
+                fastq2_file.readline()
                 fastq2_qual = fastq2_file.readline().strip()[::-1]
                 fastq_read_key = fastq1_seq + '+' + fastq2_seq
                 if fastq_read_key in re_aln:
@@ -1398,15 +1393,15 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         if fastq1_filename.endswith('.gz'):
             fastq1_handle = gzip.open(fastq1_filename, 'rt')
         else:
-            fastq1_handle = open(fastq1_filename)
+            fastq1_handle = open(fastq1_filename, encoding='utf-8')
 
         if fastq2_filename.endswith('.gz'):
             fastq2_handle = gzip.open(fastq2_filename, 'rt')
         else:
-            fastq2_handle = open(fastq2_filename)
+            fastq2_handle = open(fastq2_filename, encoding='utf-8')
 
         if args.fastq_output:
-            fastq_write_out_handle = open(fastq_write_out_file, 'w')
+            fastq_write_out_handle = open(fastq_write_out_file, 'w', encoding='utf-8')
 
         not_aln = {}  # cache for reads that don't align
         while (True):
@@ -1418,11 +1413,11 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
             elif not fastq1_id or not fastq2_id:
                 error("The two fastq files are not the same length. Please check your input files.")
             fastq1_seq = fastq1_handle.readline().strip()
-            fastq1_plus = fastq1_handle.readline()
+            fastq1_handle.readline()
             fastq1_qual = fastq1_handle.readline().strip()
 
             fastq2_seq = CRISPRessoShared.reverse_complement(fastq2_handle.readline().strip())
-            fastq2_plus = fastq2_handle.readline()
+            fastq2_handle.readline()
             fastq2_qual = fastq2_handle.readline().strip()[::-1]
 
             if (N_TOT_READS % 10000 == 0):
@@ -1452,7 +1447,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                     sub_inds = []
                     edit_strings = []
 
-                    for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                    for _idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                         payload = new_variant['variant_' + best_match_name]
 
                         del_inds.append([str(x[0][0]) + "(" + str(x[1]) + ")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
@@ -1502,7 +1497,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                         sub_inds = []
                         edit_strings = []
 
-                        for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                        for _idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                             payload = new_variant['variant_' + best_match_name]
 
                             del_inds.append([str(x[0][0]) + "(" + str(x[1]) + ")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
@@ -1693,7 +1688,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
     not_aligned_variants = {}
 
     if fastq_filename.endswith('.gz'):
-        fastq_input_opener = lambda x: gzip.open(x, 'rt')
+        def fastq_input_opener(x):
+            return gzip.open(x, 'rt')
     else:
         fastq_input_opener = open
 
@@ -1709,8 +1705,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                 info("Iterating over fastq file to identify reads; %d reads identified." % (num_reads))
             # read through fastq in sets of 4
             fastq_seq = fastq_handle.readline().strip()
-            fastq_plus = fastq_handle.readline().strip()
-            fastq_qual = fastq_handle.readline()
+            fastq_handle.readline().strip()
+            fastq_handle.readline()
             if fastq_seq in variantCache:
                 # if the read has already been seen, we increment its value by 1 to track number of copies
                 variantCache[fastq_seq] += 1
@@ -1781,7 +1777,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                 # Ensure the file is a .tsv before processing
                 if file_path.endswith(".tsv"):
                     try:
-                        with open(file_path, 'r') as file:
+                        with open(file_path, 'r', encoding='utf-8') as file:
                             for index, line in enumerate(file):
                                 # Each line contains a sequence followed by a JSON string
                                 parts = line.strip().split('\t')
@@ -1898,7 +1894,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
         pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
     output_sam = output_bam + ".sam"
-    with open(output_sam, "w") as sam_out:
+    with open(output_sam, "w", encoding='utf-8') as sam_out:
         # first, write header to sam
         proc = sb.Popen(['samtools', 'view', '-H', bam_filename], stdout=sb.PIPE, stderr=sb.PIPE, encoding='utf-8')
         for line in proc.stdout:
@@ -1985,8 +1981,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                 # Ensure the file is a .tsv before processing
                 if file_path.endswith(".tsv"):
                     try:
-                        with open(file_path, 'r') as file:
-                            for index, line in enumerate(file):
+                        with open(file_path, 'r', encoding='utf-8') as file:
+                            for _index, line in enumerate(file):
                                 # Each line contains a sequence followed by a JSON string
                                 parts = line.strip().split('\t')
                                 if len(parts) == 2:
@@ -2009,7 +2005,6 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     not_aln[seq] = new_variant
                                     not_aln[seq]['crispresso_sam_optional_fields'] = crispresso_sam_optional_fields
                                 else:
-                                    class_names = []
                                     ins_inds = []
                                     del_inds = []
                                     sub_inds = []
@@ -2079,7 +2074,6 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                 else:
                     N_COMPUTED_ALN += 1
                     N_CACHED_ALN += (variant_count - 1)
-                    class_names = []
                     ins_inds = []
                     del_inds = []
                     sub_inds = []
@@ -2161,7 +2155,8 @@ def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, 
     info("Reads processed, now annotating fastq_output file: %s" % (fastq_output))
 
     if fastq_input.endswith('.gz'):
-        fastq_input_opener = lambda x: gzip.open(x, 'rt')
+        def fastq_input_opener(x):
+            return gzip.open(x, 'rt')
     else:
         fastq_input_opener = open
 
@@ -2191,7 +2186,7 @@ def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, 
             sub_inds = []
             edit_strings = []
 
-            for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+            for _idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                 payload = new_variant['variant_' + best_match_name]
 
                 del_inds.append([str(x[0][0]) + "(" + str(x[1]) + ")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
@@ -2250,16 +2245,17 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
 
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
-    aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
+    CRISPResso2Align.read_matrix(aln_matrix_loc)
 
     if fastq_input.endswith('.gz'):
-        fastq_input_opener = lambda x: gzip.open(x, 'rt')
+        def fastq_input_opener(x):
+            return gzip.open(x, 'rt')
     else:
         fastq_input_opener = open
 
     sam_out = bam_output + ".sam"
 
-    with open(sam_out, 'wt') as sam_out_handle, fastq_input_opener(fastq_input) as fastq_input_handle:
+    with open(sam_out, 'wt', encoding='utf-8') as sam_out_handle, fastq_input_opener(fastq_input) as fastq_input_handle:
         # write sam output header
         sam_out_handle.write(bam_header)
 
@@ -2267,7 +2263,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         while (fastq_id):
             # read through fastq in sets of 4
             fastq_seq = fastq_input_handle.readline().strip()
-            fastq_plus = fastq_input_handle.readline().strip()
+            fastq_input_handle.readline().strip()
             fastq_qual = fastq_input_handle.readline().strip()
 
             # if the sequence has been seen and can't be aligned, skip it
@@ -2300,7 +2296,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
                 sub_inds = []
                 edit_strings = []
 
-                for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                for _idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                     payload = new_variant['variant_' + best_match_name]
 
                     del_inds.append([str(x[0][0]) + "(" + str(x[1]) + ")" for x in zip(payload['deletion_coordinates'], payload['deletion_sizes'])])
@@ -2410,8 +2406,11 @@ def normalize_name(name, fastq_r1, fastq_r2, bam_input):
         The normalized name.
 
     """
-    get_name_from_fasta = lambda x: os.path.basename(x).replace('.fastq', '').replace('.gz', '').replace('.fq', '')
-    get_name_from_bam = lambda x: os.path.basename(x).replace('.bam', '')
+    def get_name_from_fasta(x):
+        return os.path.basename(x).replace('.fastq', '').replace('.gz', '').replace('.fq', '')
+
+    def get_name_from_bam(x):
+        return os.path.basename(x).replace('.bam', '')
 
     if not name:
         if fastq_r2:
@@ -2533,7 +2532,9 @@ def main():
             if not clean_file_prefix.endswith("."):
                 clean_file_prefix += "."
         # handy function to put a file in the output directory
-        _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, clean_file_prefix + filename)
+
+        def _jp(filename):
+            return os.path.join(OUTPUT_DIRECTORY, clean_file_prefix + filename)
         log_filename = _jp('CRISPResso_RUNNING_LOG.txt')
         crispresso_cmd_to_write = ' '.join(sys.argv)
         try:
@@ -2546,7 +2547,7 @@ def main():
         finally:
             logger.addHandler(logging.FileHandler(log_filename))
 
-            with open(log_filename, 'w+') as outfile:
+            with open(log_filename, 'w+', encoding='utf-8') as outfile:
                 outfile.write('CRISPResso version %s\n[Command used]:\n%s\n\n[Execution log]:\n' % (CRISPRessoShared.__version__, crispresso_cmd_to_write))
 
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPResso_status.json')))
@@ -2629,7 +2630,7 @@ def main():
                 if previous_run_data['running_info']['version'] == CRISPRessoShared.__version__:
                     args_are_same = True
                     for arg in vars(args):
-                        if arg == "no_rerun" or arg == "debug" or arg == "n_processes" or arg == "verbosity":
+                        if arg in {"no_rerun", "debug", "n_processes", "verbosity"}:
                             continue
                         if arg not in vars(previous_run_data['running_info']['args']):
                             info('Comparing current run to previous run: old run had argument ' + str(arg) + ' \nRerunning.')
@@ -2779,7 +2780,7 @@ def main():
 
             if len(guides) == 0:
                 for amplicon_seq in amplicon_seq_arr:
-                    (potential_guide, is_base_editor) = CRISPRessoShared.guess_guides(
+                    (potential_guide, _is_base_editor) = CRISPRessoShared.guess_guides(
                                     amplicon_sequence=amplicon_seq,
                                     fastq_r1=auto_fastq_r1,
                                     fastq_r2=auto_fastq_r2,
@@ -2908,7 +2909,7 @@ def main():
             # setting refs['Prime-edited']['sequence']
             # first, align the extension seq to the reference amplicon
             # we're going to consider the first reference only (so if multiple alleles exist at the editing position, this may get messy)
-            best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, amplicon_seq_arr[0], aln_matrix, args.prime_editing_gap_open_penalty, args.prime_editing_gap_extend_penalty)
+            _best_aln_seq, _best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, amplicon_seq_arr[0], aln_matrix, args.prime_editing_gap_open_penalty, args.prime_editing_gap_extend_penalty)
             new_ref = s2[0:best_aln_start] + prime_editing_extension_seq_dna + s2[best_aln_end:]
             if args.debug:
                 info('Alignment between extension sequence and reference sequence: \n' + s1 + '\n' + s2)
@@ -3068,7 +3069,7 @@ def main():
                 else:
                     rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
                     rc_this_amp_seq = CRISPRessoShared.reverse_complement(this_amp_seq)
-                    best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq, aln_matrix, prime_editing_gap_open, prime_editing_gap_extend)
+                    best_aln_seq, _best_aln_score, best_aln_mismatches, _best_aln_start, _best_aln_end, _s1, _s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq, aln_matrix, prime_editing_gap_open, prime_editing_gap_extend)
                     match = re.search(best_aln_seq, rc_ref0_seq)
                     r0_start_loc = match.start()
                     r0_end_loc = match.end()
@@ -3329,7 +3330,6 @@ def main():
                     info("Using exons positions from %s as template for other references" % ref_name)
                 clone_ref_name = ref_name
                 clone_ref_idx = idx
-                clone_has_exon_positions = True
                 if cut_points:
                     clone_has_cut_points = True
                 break
@@ -3404,7 +3404,7 @@ def main():
                         this_sgRNA_intervals.append((s1inds[sgRNA_interval_start], s1inds[sgRNA_interval_end]))
 
                         sgRNA_cut_point_this = s1inds[refs[clone_ref_name]['sgRNA_cut_points'][idx]]
-                        sgRNA_seq_clone = refs[clone_ref_name]['sequence'][sgRNA_interval_start:sgRNA_interval_end + 1]
+                        refs[clone_ref_name]['sequence'][sgRNA_interval_start:sgRNA_interval_end + 1]
                         sgRNA_seq_this = refs[ref_name]['sequence'][s1inds[sgRNA_interval_start]:s1inds[sgRNA_interval_end] + 1]
                         sgRNA_seq_orig_seq = refs[clone_ref_name]['sgRNA_orig_sequences'][idx]
                         fw_mismatches = CRISPRessoShared.get_mismatches(sgRNA_seq_this, sgRNA_seq_orig_seq, aln_matrix, args.needleman_wunsch_gap_open, args.needleman_wunsch_gap_extend)
@@ -3503,7 +3503,7 @@ def main():
         if args.bam_output:
             if args.bowtie2_index == '':
                 bam_output_ref_fa = _jp('CRISPResso_output.fa')
-                with open(bam_output_ref_fa, 'w') as fa_out:
+                with open(bam_output_ref_fa, 'w', encoding='utf-8') as fa_out:
                     for ref_name in ref_names:
                         refs[ref_name]['aln_genome'] = 'None'
                         refs[ref_name]['aln_chr'] = ref_name
@@ -3527,7 +3527,7 @@ def main():
                 files_to_remove.append(filename_aligned_amplicons_sam)
                 files_to_remove.append(filename_amplicon_seqs_fasta)
 
-                with open(filename_amplicon_seqs_fasta, 'w') as fastas:
+                with open(filename_amplicon_seqs_fasta, 'w', encoding='utf-8') as fastas:
                     for ref_name in ref_names:
                         ref_seq = refs[ref_name]['sequence']
                         fastas.write('>%s\n%s\n' % (ref_name, ref_seq))
@@ -3539,7 +3539,7 @@ def main():
                     raise CRISPRessoShared.BadParameterException('Bowtie2 failed to align amplicons to the genome, please check the output file and log here: %s.' % filename_aligned_amplicons_sam_log)
 
                 bam_header = ''
-                with open(filename_aligned_amplicons_sam) as aln:
+                with open(filename_aligned_amplicons_sam, encoding='utf-8') as aln:
                     for line in aln.readlines():
                         if line.startswith('@'):
                             bam_header += line
@@ -3798,7 +3798,6 @@ def main():
 
         # initialize
         N_TOTAL = 0
-        N_DISCARDED = 0
 
         counts_total = {}
         counts_modified = {}
@@ -4049,7 +4048,7 @@ def main():
                 if not args.ignore_insertions:
                     inserted_n_dicts[ref_name][variant_payload['insertion_n']] += variant_count
                     insertion_count_vectors[ref_name][variant_payload['insertion_positions']] += variant_count
-                    this_effective_len = this_effective_len + variant_payload['insertion_n']
+                    this_effective_len += variant_payload['insertion_n']
                     if variant_payload['insertion_n'] > 0:
                          counts_insertion[ref_name] += variant_count
                          this_has_insertions = True
@@ -4059,7 +4058,7 @@ def main():
                 if not args.ignore_deletions:
                     deleted_n_dicts[ref_name][variant_payload['deletion_n']] += variant_count
                     deletion_count_vectors[ref_name][variant_payload['deletion_positions']] += variant_count
-                    this_effective_len = this_effective_len - variant_payload['deletion_n']
+                    this_effective_len -= variant_payload['deletion_n']
                     if variant_payload['deletion_n'] > 0:
                          counts_deletion[ref_name] += variant_count
                          this_has_deletions = True
@@ -4117,14 +4116,14 @@ def main():
                     splicing_positions = refs[ref_name]['splicing_positions']
                     insertion_coordinates = variant_payload['insertion_coordinates']
                     insertion_sizes = variant_payload['insertion_sizes']
-                    all_insertion_positions = variant_payload['all_insertion_positions']
-                    all_insertion_left_positions = variant_payload['all_insertion_left_positions']
+                    variant_payload['all_insertion_positions']
+                    variant_payload['all_insertion_left_positions']
                     insertion_positions = variant_payload['insertion_positions']
                     deletion_coordinates = variant_payload['deletion_coordinates']
                     deletion_sizes = variant_payload['deletion_sizes']
-                    all_deletion_positions = variant_payload['all_deletion_positions']
+                    variant_payload['all_deletion_positions']
                     deletion_positions = variant_payload['deletion_positions']
-                    all_substitution_positions = variant_payload['all_substitution_positions']
+                    variant_payload['all_substitution_positions']
                     substitution_positions = variant_payload['substitution_positions']
 
                     length_modified_positions_exons = []
@@ -4138,7 +4137,7 @@ def main():
                         if refs[ref_name]['contains_coding_seq']:
                             if set(exon_positions).intersection((ins_start, ins_end)):  # check that we are inserting in one exon
                                 current_read_exons_modified = True
-                                set1 = set(exon_positions).intersection((ins_start, ins_end))
+                                set(exon_positions).intersection((ins_start, ins_end))
                                 length_modified_positions_exons.append((insertion_sizes[idx_ins]))
 
                     for idx_del, (del_start, del_end) in enumerate(deletion_coordinates):
@@ -4277,7 +4276,7 @@ def main():
                     continue  # for ambiguous reads, don't add indels to reference totals
 
                 # align this variant to ref1 sequence
-                ref_aln_name, s1, s2, score = variantCache[variant]['ref_aln_details'][0]
+                _ref_aln_name, s1, s2, _score = variantCache[variant]['ref_aln_details'][0]
                 if args.use_legacy_insertion_quantification:
                     payload = CRISPRessoCOREResources.find_indels_substitutions_legacy(s1, s2, refs[ref1_name]['include_idxs'])
                 else:
@@ -4383,9 +4382,9 @@ def main():
             refs[ref_name]['min_cut'] = min_cut
             refs[ref_name]['max_cut'] = max_cut
 
-            max_mut = max(15, max(substituted_n_dicts[ref_name].keys() or [0]))  # the or bit is for when there are no keys
-            max_ins = max(15, max(inserted_n_dicts[ref_name].keys() or [0]))
-            max_del = max(15, max(deleted_n_dicts[ref_name].keys() or [0]))
+            max_mut = max(15, *(substituted_n_dicts[ref_name].keys() or [0]))  # the or bit is for when there are no keys
+            max_ins = max(15, *(inserted_n_dicts[ref_name].keys() or [0]))
+            max_del = max(15, *(deleted_n_dicts[ref_name].keys() or [0]))
 
             x_bins_mut = np.arange(max_mut + 1)
             y_values_mut = np.array([substituted_n_dicts[ref_name][x] for x in x_bins_mut])
@@ -4401,12 +4400,12 @@ def main():
             refs[ref_name]['y_values_del'] = y_values_del
             refs[ref_name]['x_bins_del'] = x_bins_del
 
-            min_eff_len = min(ref_len - 15, min(effective_len_dicts[ref_name].keys() or [0]))
-            max_eff_len = max(ref_len + 15, max(effective_len_dicts[ref_name].keys() or [0]))
+            min_eff_len = min(ref_len - 15, *(effective_len_dicts[ref_name].keys() or [0]))
+            max_eff_len = max(ref_len + 15, *(effective_len_dicts[ref_name].keys() or [0]))
             hlengths = np.arange(min_eff_len, max_eff_len + 1)
 
             hdensity = np.array([effective_len_dicts[ref_name][x] for x in hlengths])
-            hlengths = hlengths - ref_len
+            hlengths -= ref_len
             center_index = np.where(hlengths == 0)[0][0]
 
             refs[ref_name]['hdensity'] = hdensity
@@ -4463,7 +4462,7 @@ def main():
 
         if args.dump:
             ref_info_file_name = _jp('CRISPResso_reference_info.txt')
-            ref_info_file = open(ref_info_file_name, 'w')
+            ref_info_file = open(ref_info_file_name, 'w', encoding='utf-8')
             refString = ('name' + "\t" +
                 'sequence' + "\t" +
                 'sequence_length' + "\t" +
@@ -4567,7 +4566,7 @@ def main():
         crispresso2_info['running_info']['allele_frequency_table_zip_filename'] = os.path.basename(allele_frequency_table_zip_filename)
 
         if args.crispresso1_mode:
-            with open(_jp('Quantification_of_editing_frequency.txt'), 'w+') as outfile:
+            with open(_jp('Quantification_of_editing_frequency.txt'), 'w+', encoding='utf-8') as outfile:
                 outfile.write("Quantification of editing frequency:\n")
                 for ref_name in ref_names:
                     n_unmod = counts_unmodified[ref_name]
@@ -4584,7 +4583,7 @@ def main():
                 outfile.write('Total Aligned:%d reads ' % N_TOTAL)
 
         quant_of_editing_freq_filename = _jp('CRISPResso_quantification_of_editing_frequency.txt')
-        with open(quant_of_editing_freq_filename, 'w+') as outfile:
+        with open(quant_of_editing_freq_filename, 'w+', encoding='utf-8') as outfile:
             outfile.write('Amplicon\tUnmodified%\tModified%\tReads_in_input\tReads_aligned_all_amplicons\tReads_aligned\tUnmodified\tModified\tDiscarded\tInsertions\tDeletions\tSubstitutions\tOnly Insertions\tOnly Deletions\tOnly Substitutions\tInsertions and Deletions\tInsertions and Substitutions\tDeletions and Substitutions\tInsertions Deletions and Substitutions\n')
             for ref_name in ref_names:
                 n_aligned = counts_total[ref_name]
@@ -4617,11 +4616,11 @@ def main():
 
         # write statistics
         if args.crispresso1_mode:
-            with open(_jp('Mapping_statistics.txt'), 'w+') as outfile:
+            with open(_jp('Mapping_statistics.txt'), 'w+', encoding='utf-8') as outfile:
                 outfile.write('READS IN INPUTS:%d\nREADS AFTER PREPROCESSING:%d\nREADS ALIGNED:%d\n' % (N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL))
 
         mapping_stats_filename = _jp('CRISPResso_mapping_statistics.txt')
-        with open(mapping_stats_filename, 'w+') as outfile:
+        with open(mapping_stats_filename, 'w+', encoding='utf-8') as outfile:
             outfile.write('READS IN INPUTS\tREADS AFTER PREPROCESSING\tREADS ALIGNED\tN_COMPUTED_ALN\tN_CACHED_ALN\tN_COMPUTED_NOTALN\tN_CACHED_NOTALN\n')
             outfile.write("\t".join([str(x) for x in [N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL, aln_stats['N_COMPUTED_ALN'], aln_stats['N_CACHED_ALN'], aln_stats['N_COMPUTED_NOTALN'], aln_stats['N_CACHED_NOTALN']]]) + "\n")
         crispresso2_info['running_info']['alignment_stats'] = aln_stats
@@ -4632,7 +4631,7 @@ def main():
             np.savetxt(filename, np.vstack([(np.arange(len(vector)) + 1), vector]).T, fmt=['%d', '%.18e'], delimiter='\t', newline='\n', header='amplicon position\teffect', footer='', comments='# ')
 
         def save_count_vectors_to_file(vectors, vectorNames, refSeq, filename):
-            outfile = open(filename, "w")
+            outfile = open(filename, "w", encoding='utf-8')
             outfile.write("Sequence\t" + "\t".join(list(refSeq)) + "\n")  # first row: reference sequence
             for vector, vectorName in zip(vectors, vectorNames):
                 outfile.write(vectorName + "\t" + "\t".join([str(x) for x in vector]) + "\n")  # next, vectors are printed
@@ -4729,13 +4728,13 @@ def main():
                 NON_MODIFIED_NON_FRAMESHIFT = counts_non_modified_non_frameshift[ref_name]
                 SPLICING_SITES_MODIFIED = counts_splicing_sites_modified[ref_name]
                 frameshift_analysis_filename = _jp(ref_plot_name + 'Frameshift_analysis.txt')
-                with open(frameshift_analysis_filename, 'w+') as outfile:
+                with open(frameshift_analysis_filename, 'w+', encoding='utf-8') as outfile:
                         outfile.write('Frameshift analysis:\n\tNoncoding mutation:%d reads\n\tIn-frame mutation:%d reads\n\tFrameshift mutation:%d reads\n' % (NON_MODIFIED_NON_FRAMESHIFT, MODIFIED_NON_FRAMESHIFT, MODIFIED_FRAMESHIFT))
                 crispresso2_info['results']['refs'][ref_name]['frameshift_analysis_filename'] = os.path.basename(frameshift_analysis_filename)
                 crispresso2_info['results']['refs'][ref_name]['frameshift_analysis_filename_caption'] = "A text file describing the number of noncoding, in-frame, and frameshift mutations. This report file is produced when the amplicon contains a coding sequence."
 
                 splice_sites_analysis_filename = _jp(ref_plot_name + 'Splice_sites_analysis.txt')
-                with open(splice_sites_analysis_filename, 'w+') as outfile:
+                with open(splice_sites_analysis_filename, 'w+', encoding='utf-8') as outfile:
                         outfile.write('Splice sites analysis:\n\tUnmodified:%d reads\n\tPotential splice sites modified:%d reads\n' % (counts_total[ref_name] - SPLICING_SITES_MODIFIED, SPLICING_SITES_MODIFIED))
                 crispresso2_info['results']['refs'][ref_name]['splice_sites_analysis_filename'] = os.path.basename(splice_sites_analysis_filename)
                 crispresso2_info['results']['refs'][ref_name]['splice_sites_analysis_filename_caption'] = "A text file describing the number of splicing sites that are unmodified and modified. This file report is produced when the amplicon contains a coding sequence."
@@ -4760,11 +4759,11 @@ def main():
 
             if args.dump:
                 if refs[ref_name]['sgRNA_cut_points']:
-                    with open(_jp(ref_plot_name + 'Cut_points.json'), 'w') as fh:
+                    with open(_jp(ref_plot_name + 'Cut_points.json'), 'w', encoding='utf-8') as fh:
                         json.dump(refs[ref_name]['sgRNA_cut_points'], fh)
 
                 if refs[ref_name]['sgRNA_intervals']:
-                    with open(_jp(ref_plot_name + 'sgRNA_intervals.json'), 'w') as fh:
+                    with open(_jp(ref_plot_name + 'sgRNA_intervals.json'), 'w', encoding='utf-8') as fh:
                         json.dump(refs[ref_name]['sgRNA_intervals'], fh)
 
             hdensity = refs[ref_name]['hdensity']
@@ -4921,8 +4920,8 @@ def main():
             # 1d for dsODN
             if args.dsODN != "":
                 # (1b) a piechart of classes
-                n_contain_dsODN = df_alleles[df_alleles['contains dsODN'] == True]['#Reads'].sum()
-                n_not_contain_dsODN = df_alleles[df_alleles['contains dsODN'] == False]['#Reads'].sum()
+                n_contain_dsODN = df_alleles[df_alleles['contains dsODN']]['#Reads'].sum()
+                n_not_contain_dsODN = df_alleles[~df_alleles['contains dsODN']]['#Reads'].sum()
                 labels = ['Contains dsODN\n(' + str(n_contain_dsODN) + " reads)",
                     'No dsODN\n(' + str(n_not_contain_dsODN) + ' reads)']
                 sizes = [100 * n_contain_dsODN / float(N_TOTAL),
@@ -5051,7 +5050,7 @@ def main():
                     mod_pcts.append(np.concatenate((['Substitutions'], np.array(all_substitution_count_vectors[ref_name]).astype(float) / tot)))
                     mod_pcts.append(np.concatenate((['All_modifications'], np.array(all_indelsub_count_vectors[ref_name]).astype(float) / tot)))
                     mod_pcts.append(np.concatenate((['Total'], [counts_total[ref_name]] * refs[ref_name]['sequence_length'])))
-                    colnames = ['Modification'] + list(ref_seq)
+                    colnames = ['Modification', *list(ref_seq)]
                     modification_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(mod_pcts, columns=colnames), {'Modification'})
 
                     nuc_df_for_plot = df_nuc_pct_all.reset_index().rename(columns={'index': 'Nucleotide'})
@@ -5273,10 +5272,9 @@ def main():
                 # (4) another graph with the frequency that each nucleotide within the amplicon was modified in any way (perhaps would consider insertion as modification of the flanking nucleotides);
                 # Indels location Plots
 
-                n_this_category_modified = 0
                 modifiedName = ref_name + "_MODIFIED"
                 if modifiedName in class_counts:
-                    n_this_category_modified = class_counts[modifiedName]
+                    class_counts[modifiedName]
 
                 y_max = max(all_indelsub_count_vectors[ref_name]) * 1.1
                 plot_root = _jp(
@@ -5453,7 +5451,7 @@ def main():
                         tot = float(counts_total[ref_name_for_hdr])
                         for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
                             nuc_pcts.append(np.concatenate(([ref_name_for_hdr, nuc], np.array(ref1_all_base_count_vectors[ref_name_for_hdr + "_" + nuc]).astype(float) / tot)))
-                    colnames = ['Batch', 'Nucleotide'] + list(refs[ref_names_for_hdr[0]]['sequence'])
+                    colnames = ['Batch', 'Nucleotide', *list(refs[ref_names_for_hdr[0]]['sequence'])]
                     hdr_nucleotide_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(nuc_pcts, columns=colnames), {'Batch', 'Nucleotide'})
 
                     mod_pcts = []
@@ -5465,7 +5463,7 @@ def main():
                         mod_pcts.append(np.concatenate(([ref_name_for_hdr, 'Substitutions'], np.array(ref1_all_substitution_count_vectors[ref_name_for_hdr]).astype(float) / tot)))
                         mod_pcts.append(np.concatenate(([ref_name_for_hdr, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name_for_hdr]).astype(float) / tot)))
                         mod_pcts.append(np.concatenate(([ref_name_for_hdr, 'Total'], [counts_total[ref_name_for_hdr]] * refs[ref_names_for_hdr[0]]['sequence_length'])))
-                    colnames = ['Batch', 'Modification'] + list(refs[ref_names_for_hdr[0]]['sequence'])
+                    colnames = ['Batch', 'Modification', *list(refs[ref_names_for_hdr[0]]['sequence'])]
                     hdr_modification_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(mod_pcts, columns=colnames), {'Batch', 'Modification'})
 
                     sgRNA_intervals = refs[ref_names_for_hdr[0]]['sgRNA_intervals']
@@ -5521,8 +5519,8 @@ def main():
                 exon_intervals = refs[ref_name]['exon_intervals']
                 exon_len_mods = refs[ref_name]['exon_len_mods']
                 count_total = counts_total[ref_name]
-                count_modified = counts_modified[ref_name]
-                count_unmodified = counts_unmodified[ref_name]
+                counts_modified[ref_name]
+                counts_unmodified[ref_name]
 
                 if not args.suppress_plots:
                     if MODIFIED_FRAMESHIFT + MODIFIED_NON_FRAMESHIFT + NON_MODIFIED_NON_FRAMESHIFT > 0:
@@ -5640,7 +5638,6 @@ def main():
                         'save_also_png': save_png,
                         'quantification_window_idxs': include_idxs_list,
                         'custom_colors': custom_config['colors'],
-                        'ref_name': ref_name,
                     }
                     debug('Plotting substitutions across reference for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_subs_across_ref, plot_10a_input)
@@ -5784,7 +5781,7 @@ def main():
             crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'] = []
             crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'] = []
 
-            for sgRNA_ind, sgRNA_seq in enumerate(sgRNA_sequences):
+            for sgRNA_ind, _sgRNA_seq in enumerate(sgRNA_sequences):
                 cut_point = sgRNA_cut_points[sgRNA_ind]
                 plot_cut_point = sgRNA_plot_cut_points[sgRNA_ind]
                 sgRNA_name = sgRNA_names[sgRNA_ind]
@@ -6031,7 +6028,7 @@ def main():
                                 raise Exception('Alignment matrix file not found at ' + aln_matrix_loc)
                             aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
 
-                        aln_target_seq, aln_ref_seq, aln_score = CRISPResso2Align.global_align(
+                        aln_target_seq, aln_ref_seq, _aln_score = CRISPResso2Align.global_align(
                             target_seq,
                             ref_seq,
                             matrix=aln_matrix,
@@ -6131,7 +6128,6 @@ def main():
             global_count_total = 0
             global_count_modified = 0
             global_count_unmodified = 0
-            global_exon_len_mods = []
 
             for ref_name in ref_names:
                 if refs[ref_name]['contains_coding_seq']:  # PERFORM FRAMESHIFT ANALYSIS
@@ -6264,7 +6260,7 @@ def main():
                     tot = float(counts_total[ref_name])
                     for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
                         nuc_pcts.append(np.concatenate(([ref_name, nuc], np.array(ref1_all_base_count_vectors[ref_name + "_" + nuc]).astype(float) / tot)))
-                colnames = ['Batch', 'Nucleotide'] + list(refs[ref_names[0]]['sequence'])
+                colnames = ['Batch', 'Nucleotide', *list(refs[ref_names[0]]['sequence'])]
                 pe_nucleotide_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(nuc_pcts, columns=colnames), {'Batch', 'Nucleotide'})
 
                 mod_pcts = []
@@ -6276,7 +6272,7 @@ def main():
                     mod_pcts.append(np.concatenate(([ref_name, 'Substitutions'], np.array(ref1_all_substitution_count_vectors[ref_name]).astype(float) / tot)))
                     mod_pcts.append(np.concatenate(([ref_name, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name]).astype(float) / tot)))
                     mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]] * refs[ref_names[0]]['sequence_length'])))
-                colnames = ['Batch', 'Modification'] + list(refs[ref_names[0]]['sequence'])
+                colnames = ['Batch', 'Modification', *list(refs[ref_names[0]]['sequence'])]
                 pe_modification_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(mod_pcts, columns=colnames), {'Batch', 'Modification'})
 
                 sgRNA_intervals = refs[ref_names[0]]['sgRNA_intervals']
@@ -6309,14 +6305,14 @@ def main():
                 crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_captions'] = []
                 crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_datas'] = []
 
-                pe_sgRNA_sequences = refs[ref_names[0]]['sgRNA_sequences']
+                refs[ref_names[0]]['sgRNA_sequences']
                 pe_sgRNA_orig_sequences = refs[ref_names[0]]['sgRNA_orig_sequences']
                 pe_sgRNA_cut_points = refs[ref_names[0]]['sgRNA_cut_points']
-                pe_sgRNA_plot_cut_points = refs[ref_names[0]]['sgRNA_plot_cut_points']
-                pe_sgRNA_intervals = refs[ref_names[0]]['sgRNA_intervals']
+                refs[ref_names[0]]['sgRNA_plot_cut_points']
+                refs[ref_names[0]]['sgRNA_intervals']
                 pe_sgRNA_names = refs[ref_names[0]]['sgRNA_names']
-                pe_sgRNA_plot_idxs = refs[ref_names[0]]['sgRNA_plot_idxs']
-                pe_sgRNA_mismatches = refs[ref_names[0]]['sgRNA_mismatches']
+                refs[ref_names[0]]['sgRNA_plot_idxs']
+                refs[ref_names[0]]['sgRNA_mismatches']
                 pe_ref_len = refs[ref_names[0]]['sequence_length']
                 pe_include_idxs_list = refs[ref_names[0]]['include_idxs']
 

@@ -25,7 +25,7 @@ def reconstitute_reads(crispresso_output_folder, fastq_output_file):
     if 'Reference_Sequence' not in df_alleles.columns:
         raise Exception('Cannot parse allele frequency table, missing Reference_Sequence column.')
 
-    with open(fastq_output_file, "wt") as fout:
+    with open(fastq_output_file, "wt", encoding='utf-8') as fout:
         allele_count = 0
         read_count = 0
         for _, allele_row in df_alleles.iterrows():

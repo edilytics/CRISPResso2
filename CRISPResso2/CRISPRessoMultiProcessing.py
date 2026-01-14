@@ -16,6 +16,7 @@ import pandas as pd
 import traceback
 
 from CRISPResso2.CRISPRessoShared import PlotException
+import sys
 
 
 def get_max_processes():
@@ -115,7 +116,7 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor='region', c
     try:
         completed = 0
         if int_n_processes == 1:
-            for idx, cmd in enumerate(crispresso_cmds):
+            for idx, _cmd in enumerate(crispresso_cmds):
                 ret_vals[idx] = run_crispresso(crispresso_cmds, descriptor, idx)
                 completed += 1
                 percent_complete += percent_complete_step
@@ -141,7 +142,7 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor='region', c
         pool.terminate()
         logger.warn('Caught SIGINT. Program Terminated')
         raise Exception('CRISPResso2 Terminated')
-        exit(0)
+        sys.exit(0)
     except Exception as e:
         print('CRISPResso2 failed')
         raise e
@@ -196,7 +197,7 @@ def run_pandas_apply_parallel(input_df, input_function_chunk, n_processes=1):
         pool.terminate()
         logging.warn('Caught SIGINT. Program Terminated')
         raise Exception('CRISPResso2 Terminated')
-        exit(0)
+        sys.exit(0)
     except Exception as e:
         print('CRISPResso2 failed')
         raise e
@@ -234,7 +235,7 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
             pool.terminate()
             logging.warn('Caught SIGINT. Program Terminated')
             raise Exception('CRISPResso2 Terminated')
-            exit(0)
+            sys.exit(0)
         except Exception as e:
             print('CRISPResso2 failed')
             raise e
@@ -276,7 +277,7 @@ def run_parallel_commands(commands_arr, n_processes=1, descriptor='CRISPResso2',
         pool.terminate()
         logging.warn('Caught SIGINT. Program Terminated')
         raise Exception('CRISPResso2 Terminated')
-        exit(0)
+        sys.exit(0)
     except Exception as e:
         print('CRISPResso2 failed')
         raise e

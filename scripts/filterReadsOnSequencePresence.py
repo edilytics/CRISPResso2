@@ -35,21 +35,21 @@ def main():
     if args.fastq_r1.endswith('.gz'):
         f1_in = gzip.open(args.fastq_r1, 'rt')
     else:
-        f1_in = open(args.fastq_r1, 'rt')
+        f1_in = open(args.fastq_r1, 'rt', encoding="utf-8")
     if fastq_r1_out.endswith('.gz'):
         f1_out = gzip.open(fastq_r1_out, 'wt')
     else:
-        f1_out = open(fastq_r1_out, 'w')
+        f1_out = open(fastq_r1_out, 'w', encoding="utf-8")
 
     if args.fastq_r2:
         if args.fastq_r2.endswith('.gz'):
             f2_in = gzip.open(args.fastq_r2, 'rt')
         else:
-            f2_in = open(args.fastq_r2, 'rt')
+            f2_in = open(args.fastq_r2, 'rt', encoding="utf-8")
         if fastq_r2_out.endswith('.gz'):
             f2_out = gzip.open(fastq_r2_out, 'wt')
         else:
-            f2_out = open(fastq_r2_out, 'w')
+            f2_out = open(fastq_r2_out, 'w', encoding="utf-8")
     # END CREATION OF FILEHANDLES##
 
     print('Fastq R1: %s' % args.fastq_r1)

@@ -41,8 +41,8 @@ def count_sgRNA_specific_edits(crispresso_output_folder):
     read_alleles_count = 0  # all alleles read
     reference_count = defaultdict(int)  # counts of modification at reference level
     reference_modified_count = defaultdict(int)
-    total_counts = defaultdict(int)
-    modified_counts = defaultdict(int)
+    defaultdict(int)
+    defaultdict(int)
     for idx, row in df_alleles.iterrows():
         read_alleles_count += row['#Reads']
         this_reference_name = row['Reference_Name']

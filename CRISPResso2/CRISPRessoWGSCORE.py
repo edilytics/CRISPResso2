@@ -61,7 +61,7 @@ def which(program):
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-    fpath, fname = os.path.split(program)
+    fpath, _fname = os.path.split(program)
     if fpath:
         if is_exe(program):
             return program
@@ -113,7 +113,7 @@ def find_overlapping_genes(row, df_genes):
                                      (row.bpstart <= df_genes.txEnd)]
     genes_overlapping = []
 
-    for idx_g, row_g in df_genes_overlapping.iterrows():
+    for _idx_g, row_g in df_genes_overlapping.iterrows():
         if 'name' in row_g.keys() and 'name2' in row_g.keys():
             genes_overlapping.append('%s (%s)' % (row_g.name2, row_g['name']))
         elif '#name' in row_g.keys() and 'name2' in row_g.keys():
@@ -143,7 +143,7 @@ def get_reference_positions(pos, cigar, full_length=True):
         l, op = c
         l = int(l)
 
-        if op == 'S' or op == 'I':
+        if op in {'S', 'I'}:
             if full_length:
                 for i in range(0, l):
                     positions.append(None)
@@ -151,7 +151,7 @@ def get_reference_positions(pos, cigar, full_length=True):
             for i in range(pos, pos + l):
                 positions.append(i)
             pos += l
-        elif op == 'D' or op == 'N':
+        elif op in {'D', 'N'}:
             pos += l
 
     return positions
@@ -217,7 +217,7 @@ def get_n_reads_fastq(fastq_filename):
 def extract_reads(row, samtools_exclude_flags):
     if row.sequence:
         # create place-holder fastq files
-        open(row.fastq_file_trimmed_reads_in_region, 'w+').close()
+        open(row.fastq_file_trimmed_reads_in_region, 'w+', encoding='utf-8').close()
 
         region = '%s:%d-%d' % (row.chr_id, row.bpstart, row.bpend - 1)
 
@@ -263,7 +263,8 @@ def normalize_name(name, bam_file):
         The normalized name.
 
     """
-    get_name_from_bam = lambda x: os.path.basename(x).replace('.bam', '')
+    def get_name_from_bam(x):
+            return os.path.basename(x).replace('.bam', '')
 
     if not name:
         return get_name_from_bam(bam_file)
@@ -289,7 +290,7 @@ def main():
             error(traceback.format_exc())
     try:
         start_time = datetime.now()
-        start_time_string = start_time.strftime('%Y-%m-%d %H:%M:%S')
+        start_time.strftime('%Y-%m-%d %H:%M:%S')
 
         # if no args are given, print a simplified help message
         if len(sys.argv) == 1:
@@ -335,7 +336,8 @@ def main():
         if args.output_folder:
             OUTPUT_DIRECTORY = os.path.join(os.path.abspath(args.output_folder), OUTPUT_DIRECTORY)
 
-        _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
+        def _jp(filename):
+                return os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
         try:
             info('Creating Folder %s' % OUTPUT_DIRECTORY)
             os.makedirs(OUTPUT_DIRECTORY)
@@ -400,7 +402,7 @@ def main():
             crispresso_cmd_to_write = ' '.join(cmd_copy)  # clean command doesn't show the absolute path to the executable or other files
         crispresso2_info['running_info']['command_used'] = crispresso_cmd_to_write
 
-        with open(log_filename, 'w+') as outfile:
+        with open(log_filename, 'w+', encoding='utf-8') as outfile:
             outfile.write('CRISPResso version %s\n[Command used]:\n%s\n\n[Execution log]:\n' % (CRISPRessoShared.__version__, crispresso_cmd_to_write))
 
         # keep track of args to see if it is possible to skip computation steps on rerun
@@ -411,7 +413,7 @@ def main():
                 if previous_run_data['running_info']['version'] == CRISPRessoShared.__version__:
                     args_are_same = True
                     for arg in vars(args):
-                        if arg == "no_rerun" or arg == "debug" or arg == "n_processes" or arg == "verbosity":
+                        if arg in {"no_rerun", "debug", "n_processes", "verbosity"}:
                             continue
                         if arg not in vars(previous_run_data['running_info']['args']):
                             info('Comparing current run to previous run: old run had argument ' + str(arg) + ' \nRerunning.')
@@ -568,7 +570,7 @@ def main():
         df_regions['reference_file'] = args.reference_file
 
         report_reads_aligned_filename = _jp('REPORT_READS_ALIGNED_TO_SELECTED_REGIONS_WGS.txt')
-        num_rows_without_fastq = len(df_regions[df_regions.row_fastq_exists == False])
+        num_rows_without_fastq = len(df_regions[~df_regions.row_fastq_exists])
 
         if can_finish_incomplete_run and num_rows_without_fastq == 0 and os.path.isfile(report_reads_aligned_filename) and 'generation_of_fastq_files_for_each_amplicon' in crispresso2_info['running_info']['finished_steps']:
             info('Skipping generation of fastq files for each amplicon.')
