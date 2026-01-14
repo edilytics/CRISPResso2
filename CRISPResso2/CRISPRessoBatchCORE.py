@@ -267,8 +267,8 @@ def main():
 
             if not has_input:
                 raise CRISPRessoShared.BadParameterException(
-                    "At least one fastq file must be given as a command line parameter or 
-                        or be specified in the batch settings file with the heading 'fastq_r1' (fastq_r1 on row %s '%s' is invalid)"
+                    "At least one fastq file must be given as a command line parameter or "
+                    "be specified in the batch settings file with the heading 'fastq_r1' (fastq_r1 on row %s '%s' is invalid)"
                     % (int(idx) + 1, row.fastq_r1)
                 )
 
@@ -278,8 +278,8 @@ def main():
             curr_amplicon_seq_str = row.amplicon_seq
             if curr_amplicon_seq_str is None:
                 raise CRISPRessoShared.BadParameterException(
-                    "Amplicon sequence must be given as a command line parameter or 
-                        or be specified in the batch settings file with the heading 'amplicon_seq' (Amplicon seq on row %s '%s' is invalid)"
+                    "Amplicon sequence must be given as a command line parameter or "
+                    "be specified in the batch settings file with the heading 'amplicon_seq' (Amplicon seq on row %s '%s' is invalid)"
                     % (int(idx) + 1, curr_amplicon_seq_str)
                 )
 

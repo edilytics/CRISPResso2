@@ -278,9 +278,9 @@ def main():
                     + "-v, --version         show program's version number and exit\n"
                     + "-r1 FASTQ_R1          Input fastq file R1 (default: None)\n"
                     + "-r2 FASTQ_R2          Input fastq file R2 (default: None)\n"
-                    + 
+                    +
                         + "-f AMPLICONS_FILE     Tab-separated file containing information for each amplicon, including at least columns for the amplicon_name and amplicon_seq (default: None)\n"
-                    + 
+                    +
                         + "-x GENOME_ROOT        Folder that contains the bowtie2-indexed genome for optional unbiased alignment of reads (default: None, reads are only aligned to provided amplicon sequences)\n"
                     + "-n NAME, --name NAME  Name for the analysis (default: name based on input file name)\n"
                 )
@@ -407,13 +407,13 @@ def main():
         elif args.bowtie2_index and args.amplicons_file:
             RUNNING_MODE = "AMPLICONS_AND_GENOME"
             info(
-                "Amplicon description file and 
-                    and bowtie2 reference genome index files provided. The analysis will be performed using the reads that are aligned to the genome only where the provided amplicons align and not to other genomic regions."
+                "Amplicon description file and "
+                "bowtie2 reference genome index files provided. The analysis will be performed using the reads that are aligned to the genome only where the provided amplicons align and not to other genomic regions."
             )
         else:
             error(
-                "Please provide the amplicons description file (-f or 
-                    or --amplicons_file option) or the bowtie2 reference genome index file (-x or --bowtie2_index option) or both."
+                "Please provide the amplicons description file (-f or "
+                "--amplicons_file option) or the bowtie2 reference genome index file (-x or --bowtie2_index option) or both."
             )
             sys.exit(1)
 
@@ -593,12 +593,6 @@ def main():
             else:
                 info("Merging paired sequences with fastp...")
                 fastp_cmd = "{command} -i {r1} -I {r2} --merge --merged_out {out_merged} --unpaired1 {unpaired1} --unpaired2 {unpaired2} --overlap_len_require " + "{min_overlap} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1".format(
-                    command=args.fastp_command,
-                    r1=args.fastq_r1,
-                    r2=args.fastq_r2,
-                    out_merged=processed_output_filename,
-                    unpaired1=not_combined_1_filename,
-                    unpaired2=not_combined_2_filename,
                     min_overlap=args.min_paired_end_reads_overlap,
                     num_threads=n_processes_for_pooled,
                     json_report=_jp("fastp_report.json"),
@@ -789,8 +783,8 @@ def main():
                 )
 
             # check to see that no sequences and their reverse complements are present
-            amp_seqs = df_template.amplicon_seq.values  # Beware, this is a numpy array of dtype str and 
-                and if you add these arrays amp_seqs + rc_amp_seqs, it will concat the strings, not the arrays....
+            # Beware, this is a numpy array of dtype str and if you add these arrays amp_seqs + rc_amp_seqs, it will concat the strings, not the arrays....
+            amp_seqs = df_template.amplicon_seq.values
             rc_amp_seqs = [CRISPRessoShared.reverse_complement(amp_seq) for amp_seq in amp_seqs]
             for seq in amp_seqs:
                 if seq in rc_amp_seqs:
@@ -1016,10 +1010,10 @@ def main():
                         option_values=this_run_args_from_amplicons_file,
                     )
 
+                    # remove the CRISPResso command from the beginning and replace with args.crispresso_command (in case the args.crispresso_command contains spaces)
                     crispresso_cmd = (
                         args.crispresso_command + " " + " ".join(crispresso_cmd.split()[1:])
-                    )  # remove the CRISPResso command from the beginning and 
-                        and replace with args.crispresso_command (in case the args.crispresso_command contains spaces)
+                    )
 
                     debug("CRISPResso command for %s: %s" % (idx, crispresso_cmd))
                     crispresso_cmds.append(crispresso_cmd)
@@ -1690,10 +1684,10 @@ def main():
                         crispresso_cmd = CRISPRessoShared.overwrite_crispresso_options(
                             cmd=crispresso_cmd, option_names_to_overwrite=crispresso_options_for_pooled, option_values=args, tool="Core"
                         )
+                        # remove the CRISPResso command from the beginning and replace with args.crispresso_command (in case the args.crispresso_command contains spaces)
                         crispresso_cmd = (
                             args.crispresso_command + " " + " ".join(crispresso_cmd.split()[1:])
-                        )  # remove the CRISPResso command from the beginning and 
-                            and replace with args.crispresso_command (in case the args.crispresso_command contains spaces)
+                        )
                         debug("CRISPResso command for %s: %s" % (this_run_display_name, crispresso_cmd))
 
                         crispresso_cmds.append(crispresso_cmd)
@@ -1937,8 +1931,9 @@ def main():
                 with open(top_unaligned_filename, "w", encoding="utf-8") as outfile:
                     outfile.write(top_unaligned)
                 warn(
-                    "Perhaps one or 
-                        or more of the given amplicon sequences were incomplete or incorrect. Below is a list of the most frequent unaligned reads (in the first 10000 unaligned reads). Check this list to see if an amplicon is among these reads.\n%s"
+                    "Perhaps one or more of the given amplicon sequences were incomplete or incorrect. "
+                    "Below is a list of the most frequent unaligned reads (in the first 10000 unaligned reads). "
+                    "Check this list to see if an amplicon is among these reads.\n%s"
                     % top_unaligned
                 )
 
