@@ -1273,7 +1273,7 @@ def get_variant_cache_equal_boundaries(num_unique_sequences, n_processes):
 
     """
     if num_unique_sequences < n_processes:
-        raise Exception(
+        raise ValueError(
             "The number of unique sequences is less than the number of processes. Please reduce the number of processes."
         )
 
