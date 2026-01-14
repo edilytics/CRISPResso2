@@ -23,6 +23,7 @@ from CRISPResso2 import CRISPRessoShared
 
 
 def setMatplotlibDefaults():
+    """Set default matplotlib parameters for CRISPResso2 plots."""
     font = {'size': 22}
     matplotlib.rc('font', **font)
     matplotlib.use('AGG')
@@ -39,6 +40,7 @@ setMatplotlibDefaults()
 
 
 def get_nuc_color(nuc, alpha):
+    """Get the color for a nucleotide with the specified alpha transparency."""
     def get_color(x, y, z):
         return (x / 255.0, y / 255.0, z / 255.0, alpha)
     if nuc == "A":
@@ -76,6 +78,7 @@ def get_nuc_color(nuc, alpha):
 
 
 def get_color_lookup(nucs, alpha, custom_colors=None):
+    """Create a color lookup dictionary for nucleotides with optional custom colors."""
     if custom_colors is None:
         colorLookup = {}
         for nuc in nucs:
@@ -95,6 +98,7 @@ def get_color_lookup(nucs, alpha, custom_colors=None):
 
 
 def get_amino_acid_color_dict(scheme='clustal'):
+    """Get a color dictionary for amino acids based on the specified color scheme."""
     if scheme == 'clustal':
         return {
             '*': '#FF0000',  # Assuming this is a stop codon or wildcard, you can choose an appropriate color.
@@ -177,7 +181,7 @@ def get_amino_acid_color_dict(scheme='clustal'):
 
 
 def get_amino_acid_colors(scheme):
-
+    """Get a list of amino acid colors with alpha channel based on the specified scheme."""
     # this will preserve the order of the amino acids
     amino_acids = [
         '*', 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
@@ -198,6 +202,7 @@ def get_amino_acid_colors(scheme):
 
 
 def amino_acids_to_numbers(seq):
+    """Convert an amino acid sequence to a list of numeric codes for plotting."""
     amino_acids = [
         '*', 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
         'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', '', '-'
@@ -207,6 +212,7 @@ def amino_acids_to_numbers(seq):
 
 
 def hex_to_rgb(value):
+    """Convert a hex color value to RGB tuple."""
     value = value.lstrip('#')
     lv = len(value)
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
@@ -280,7 +286,10 @@ def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom
                             patches.Rectangle((x_start, y_start), x_end - x_start, obs_pct, facecolor=color_lookup[curr_nuc], edgecolor='w')
                             )
                         if pct > min_text_pct and pct < max_text_pct:
-                            ax.text(x_start + 0.55, y_start + obs_pct / 2.0, format(pct * 100, '.1f'), horizontalalignment='center', verticalalignment='center', rotation=90)
+                            ax.text(
+                                x_start + 0.55, y_start + obs_pct / 2.0, format(pct * 100, '.1f'),
+                                horizontalalignment='center', verticalalignment='center', rotation=90
+                            )
                         y_start += obs_pct
 
     else:  # shade unchanged bases
@@ -308,7 +317,10 @@ def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom
                                 )
 
                         if pct > min_text_pct and pct < max_text_pct:
-                            ax.text(x_start + 0.55, y_start + obs_pct / 2.0, format(pct * 100, '.1f'), horizontalalignment='center', verticalalignment='center', rotation=90)
+                            ax.text(
+                                x_start + 0.55, y_start + obs_pct / 2.0, format(pct * 100, '.1f'),
+                                horizontalalignment='center', verticalalignment='center', rotation=90
+                            )
                         y_start += obs_pct
 
     mod_pct_df_indexed = mod_pct_df.set_index([group_column, 'Modification'])
@@ -330,7 +342,10 @@ def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom
                     patches.Rectangle((x_start, y_start), x_end - x_start, obs_pct, facecolor=color_lookup['INS'], edgecolor='w')
                     )
                 if ins_pct > min_text_pct and ins_pct < max_text_pct:
-                    ax.text(x_start + 0.15, y_start + obs_pct / 2.0, format(ins_pct * 100, '.1f'), horizontalalignment='center', verticalalignment='center', rotation=90)
+                    ax.text(
+                        x_start + 0.15, y_start + obs_pct / 2.0, format(ins_pct * 100, '.1f'),
+                        horizontalalignment='center', verticalalignment='center', rotation=90
+                    )
 
     # draw black box around each sample
     for i in range(nSamples):
@@ -379,7 +394,10 @@ def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom
                 lastIdx = q_list[idx]
             else:
                 ax.add_patch(
-                    patches.Rectangle((2 + lastStart, q_win_y_start), 1 + (lastIdx - lastStart), q_win_y_height, fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2)
+                    patches.Rectangle(
+                        (2 + lastStart, q_win_y_start), 1 + (lastIdx - lastStart), q_win_y_height,
+                        fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2
+                    )
                     )
                 lastStart = q_list[idx]
                 lastIdx = q_list[idx]
@@ -661,7 +679,8 @@ def plot_amplicon_modifications(
     save_also_png=False,
     **kwargs,
 ):
-    """Plots the combined indel/substitution counts for all amplicons in a single plot. Modifications outside the quantification window are also shown.
+    """Plots the combined indel/substitution counts for all amplicons in a single plot.
+    Modifications outside the quantification window are also shown.
 
     :param all_indelsub_count_vectors: List of count vectors for each amplicon
     :param include_idxs_list: List of indices included in the quantification window
@@ -1216,7 +1235,8 @@ def plot_position_dependent_indels(
 ):
     """Plots the position dependent insertion size (left) and deletion size (right) across the reference amplicon.
 
-    :param insertion_length_vectors: List of average insertion lengths per position. insertion_length_vector[amplicon_name][position] = average insertion length at position.
+    :param insertion_length_vectors: List of average insertion lengths per position.
+    insertion_length_vector[amplicon_name][position] = average insertion length at position.
     :param deletion_length_vectors: List of average deletion lengths per position.
     :param cut_points: List of predicted cleavage positions.
     :param plot_cut_points: Boolean list indicating whether to plot each cut point.
@@ -1507,7 +1527,8 @@ def plot_frameshift_analysis(
     save_also_png=False,
     **kwargs,
 ):
-    """Plot 5: Plot a pie chart to plot_root showing classification of reads with regard to coding region for a specific reference sequence, also including a diagram of where the coding region is within the amplicon.
+    """Plot 5: Plot a pie chart to plot_root showing classification of reads with regard to coding region for a specific reference sequence,
+    also including a diagram of where the coding region is within the amplicon.
 
     Parameters
     ----------
@@ -1658,7 +1679,7 @@ def plot_frameshift_frequency(
 ):
     fig, ax = plt.subplots(1, 2, figsize=(22, 10))
     ax1 = ax[0]
-    x, y = map(np.array, zip(*[a for a in hists_frameshift.items()]))
+    x, y = map(np.array, zip(*[a for a in hists_frameshift.items()], strict=False))
     if sum(hists_frameshift.values()) != 0:
         y = y / float(sum(hists_frameshift.values())) * 100
     ax1.bar(x - 0.1, y)
@@ -1698,7 +1719,7 @@ def plot_frameshift_frequency(
     hist_inframe_0 = deepcopy(hists_inframe)
     hist_inframe_0[0] = 0
     ax2 = ax[1]
-    x, y = map(np.array, zip(*[a for a in hist_inframe_0.items()]))
+    x, y = map(np.array, zip(*[a for a in hist_inframe_0.items()], strict=False))
     if sum(hist_inframe_0.values()) > 0:
         y = y / float(sum(hist_inframe_0.values())) * 100
     ax2.bar(x - 0.1, y, color=(0, 1, 1, 0.2))
@@ -1798,7 +1819,7 @@ def plot_global_frameshift_in_frame_mutations(
     """
     fig, axs = plt.subplots(2, 1, figsize=(22, 10))
     ax1 = axs[0]
-    x, y = map(np.array, zip(*[a for a in global_hists_frameshift.items()]))
+    x, y = map(np.array, zip(*[a for a in global_hists_frameshift.items()], strict=False))
     if sum(global_hists_frameshift.values()) != 0:
         y = y / float(sum(global_hists_frameshift.values())) * 100
     ax1.bar(x - 0.1, y)
@@ -1840,7 +1861,7 @@ def plot_global_frameshift_in_frame_mutations(
     global_hists_inframe_no_0 = deepcopy(global_hists_inframe)
     global_hists_inframe_no_0[0] = 0
     ax2 = axs[1]
-    x, y = map(np.array, zip(*[a for a in global_hists_inframe_no_0.items()]))
+    x, y = map(np.array, zip(*[a for a in global_hists_inframe_no_0.items()], strict=False))
     if sum(global_hists_inframe_no_0.values()) > 0:
         y = y / float(sum(global_hists_inframe_no_0.values())) * 100
     ax2.bar(x - 0.1, y, color=(0, 1, 1, 0.2))
@@ -2201,7 +2222,8 @@ def add_sgRNA_to_ax(ax, sgRNA_intervals, sgRNA_y_start, sgRNA_y_height, amp_len,
     sgRNA_y_start: y coordinate of sgRNA(s)
     sgRNA_y_height: y height of sgRNA(s)
     amp_len: length of amplicon
-    x_offset: amount to move sgRNAs in x direction -- if labels or annotations are to the left of the plot, this may have to be non-zero. e.g. if the reference starts at x=2, set this to 2
+    x_offset: amount to move sgRNAs in x direction -- if labels or annotations are to the left of the plot,
+    this may have to be non-zero. e.g. if the reference starts at x=2, set this to 2
     sgRNA_mismatches: array (for each sgRNA_interval) of locations in sgRNA where there are mismatches
     sgRNA_names: array (for each sgRNA_interval) of names of sgRNAs (otherwise empty)
     sgRNA_rows: which row to plot the sgRNA on so they don't overlap (y-axis-wise)
@@ -2226,7 +2248,13 @@ def add_sgRNA_to_ax(ax, sgRNA_intervals, sgRNA_y_start, sgRNA_y_height, amp_len,
             continue
         this_sgRNA_y_start = sgRNA_y_start + this_sgRNA_y_height * sgRNA_rows[idx]
         ax.add_patch(
-            patches.Rectangle((x_offset + this_sgRNA_start, this_sgRNA_y_start), 1 + this_sgRNA_end - this_sgRNA_start, this_sgRNA_y_height, facecolor=(0, 0, 0, 0.15), clip_on=clip_on)
+            patches.Rectangle(
+                (x_offset + this_sgRNA_start, this_sgRNA_y_start),
+                1 + this_sgRNA_end - this_sgRNA_start,
+                this_sgRNA_y_height,
+                facecolor=(0, 0, 0, 0.15),
+                clip_on=clip_on
+            )
             )
 
         # if plot has trimmed the sgRNA, add a mark
@@ -2257,14 +2285,21 @@ def add_sgRNA_to_ax(ax, sgRNA_intervals, sgRNA_y_start, sgRNA_y_height, amp_len,
             if (label_at_zero and x_offset + this_sgRNA_start < len(sgRNA_names[idx]) * 0.66):
                 ax.text(0, this_sgRNA_y_start + this_sgRNA_y_height / 2, sgRNA_names[idx] + " ", horizontalalignment='left', verticalalignment='center', fontsize=font_size)
             else:
-                ax.text(x_offset + this_sgRNA_start, this_sgRNA_y_start + this_sgRNA_y_height / 2, sgRNA_names[idx] + " ", horizontalalignment='right', verticalalignment='center', fontsize=font_size)
+                ax.text(
+                    x_offset + this_sgRNA_start, this_sgRNA_y_start + this_sgRNA_y_height / 2,
+                    sgRNA_names[idx] + " ",
+                    horizontalalignment='right', verticalalignment='center', fontsize=font_size
+                )
             label_left_sgRNA = False  # already labeled at least one sgRNA
 
     if min_sgRNA_x is not None and label_left_sgRNA:
         if (label_at_zero and x_offset + min_sgRNA_x < 5):
             ax.text(0, this_sgRNA_y_start + this_sgRNA_y_height / 2, 'sgRNA ', horizontalalignment='left', verticalalignment='center', fontsize=font_size)
         else:
-            ax.text(x_offset + min_sgRNA_x, this_sgRNA_y_start + this_sgRNA_y_height / 2, 'sgRNA ', horizontalalignment='right', verticalalignment='center', fontsize=font_size)
+            ax.text(
+                x_offset + min_sgRNA_x, this_sgRNA_y_start + this_sgRNA_y_height / 2, 'sgRNA ',
+                horizontalalignment='right', verticalalignment='center', fontsize=font_size
+            )
 
 
 def plot_conversion_map(nuc_pct_df, conversion_nuc_from, conversion_nuc_to, fig_filename_root=None, custom_colors=None, save_also_png=False, plotPct=0.9,
@@ -2320,8 +2355,10 @@ def plot_conversion_map(nuc_pct_df, conversion_nuc_from, conversion_nuc_to, fig_
     if sum(from_nuc_indices) == 1:  # if only one row where nuc_pct_conversion is from_nuc...
         max_pct_conversion = float(nuc_pct_conversion_df.iloc[:, from_nuc_indices].max())
     elif sum(from_nuc_indices) > 1:  # if multiple rows
-        max_pct_conversion = nuc_pct_conversion_df.iloc[:, from_nuc_indices].max().max()  # one max returns column-based max, second takes max of those
-    if (max_pct_conversion < 0.01):  # the min conversion perctent is 0.01. The legend axis are rounded to the nearest 0.01, so if this lower limit isn't set, the max will appear as 0.00%
+        # one max returns column-based max, second takes max of those
+        max_pct_conversion = nuc_pct_conversion_df.iloc[:, from_nuc_indices].max().max()
+    # the min conversion perctent is 0.01. The legend axis are rounded to the nearest 0.01, so if this lower limit isn't set, the max will appear as 0.00%
+    if (max_pct_conversion < 0.01):
         max_pct_conversion = 0.02
     if conversion_scale_max:
         max_pct_conversion = conversion_scale_max
@@ -2401,7 +2438,10 @@ def plot_conversion_map(nuc_pct_df, conversion_nuc_from, conversion_nuc_to, fig_
                 lastIdx = q_list[idx]
             else:
                 ax.add_patch(
-                    patches.Rectangle((2 + lastStart, q_win_y_start), 1 + (lastIdx - lastStart), q_win_y_height, fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2)
+                    patches.Rectangle(
+                        (2 + lastStart, q_win_y_start), 1 + (lastIdx - lastStart), q_win_y_height,
+                        fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2
+                    )
                     )
                 lastStart = q_list[idx]
                 lastIdx = q_list[idx]
@@ -2617,7 +2657,10 @@ def plot_log_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root
                 lastIdx = q_list[idx]
             else:
                 ax.add_patch(
-                    patches.Rectangle((2 + lastStart, q_win_y_start), 1 + (lastIdx - lastStart), q_win_y_height, fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2)
+                    patches.Rectangle(
+                        (2 + lastStart, q_win_y_start), 1 + (lastIdx - lastStart), q_win_y_height,
+                        fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2
+                    )
                     )
                 lastStart = q_list[idx]
                 lastIdx = q_list[idx]
@@ -2912,7 +2955,7 @@ class Custom_HeatMapper(sns.matrix._HeatMapper):
 
         for x, y, m, color, val, per_element_dict in zip(xpos.flat, ypos.flat,
                                        mesh.get_array().flat, mesh.get_facecolors(),
-                                       self.annot_data.flat, self.per_element_annot_kws.flat):
+                                       self.annot_data.flat, self.per_element_annot_kws.flat, strict=False):
             # print per_element_dict
             if m is not np.ma.masked:
                 l = sns.utils.relative_luminance(color)
@@ -3037,7 +3080,7 @@ def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
         to_append[idxs_sub] = {'weight': 'bold', 'color': 'black', 'size': 16}
         per_element_annot_kws.append(to_append)
 
-    for i, (x, a) in enumerate(zip(X, annot)):
+    for i, (x, a) in enumerate(zip(X, annot, strict=False)):
         X[i] = x + amino_acids_to_numbers([''] * (len(reference_seq) - len(a)))
         annot[i] = a + [''] * (len(reference_seq) - len(a))
 
@@ -4068,13 +4111,13 @@ def plot_unmod_mod_pcts(df_summary_quantification, fig_filename_root=None, save_
         max_val = max(df['Reads_total'])
         space_val = max_val * 0.02
         pct_labels = []
-        for mod_pct, num_reads in zip(df['Modified%'], df['Reads_aligned']):
+        for mod_pct, num_reads in zip(df['Modified%'], df['Reads_aligned'], strict=False):
             if np.isreal(num_reads) and num_reads > cutoff:
                 pct_labels.append(str(round(mod_pct, 2)) + "%")
             else:
                 pct_labels.append("")
 
-        for rect, label in zip(p2.patches, pct_labels):
+        for rect, label in zip(p2.patches, pct_labels, strict=False):
             ax.text(rect.get_x() + rect.get_width() + space_val, rect.get_y() + rect.get_height() / 2.0, label, ha='left', va='center')
 
         # plt.legend((p0[0], p1[0], p2[0]), ('Total Reads', 'Unmodified', 'Modified'),loc='center', bbox_to_anchor=(0.5, -0.22),ncol=1, fancybox=True, shadow=True)
@@ -4376,7 +4419,7 @@ def plot_quantification_comparison_barchart(
     ax2.set_xticks(index)
     ax2.set_xticklabels(('Unmodified', 'Modified'))
 
-    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values()):
+    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values(), strict=False):
         spine1.set_visible(False)
         spine2.set_visible(False)
 
@@ -4532,7 +4575,7 @@ def plot_quantification_positions(
         fancybox=True,
         shadow=False,
     )
-    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values()):
+    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values(), strict=False):
         spine1.set_visible(False)
         spine2.set_visible(False)
 

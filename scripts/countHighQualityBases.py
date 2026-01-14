@@ -104,7 +104,7 @@ def count_high_quality_bases(file, ref_name, base_pos_in_ref, original_base, tar
     count_other_base_highQual = 0
     count_other_base_lowQual = 0
 
-    with gzip.open(file, 'rt') as f:
+    with gzip.open(file, "rt") as f:
         while True:
             id_line = f.readline()
             f.readline()
@@ -117,12 +117,12 @@ def count_high_quality_bases(file, ref_name, base_pos_in_ref, original_base, tar
             count_total_reads += 1
 
             plus_line_dict = get_dict_from_plus_line(plus_line)
-            if 'ALN' not in plus_line_dict:
+            if "ALN" not in plus_line_dict:
                 raise Exception("ALN not in plus line: " + plus_line)
-            if plus_line_dict['ALN'] != ref_name:
+            if plus_line_dict["ALN"] != ref_name:
                 count_unaligned += 1
             else:
-                ref_details = get_ref_details_from_aln_details(plus_line_dict['ALN_DETAILS'])
+                ref_details = get_ref_details_from_aln_details(plus_line_dict["ALN_DETAILS"])
                 if ref_name in ref_details:
                     read_aln = ref_details[ref_name][0]  # sequence of read aligned to ref (includes gaps)
                     ref_aln = ref_details[ref_name][1]  # sequence of ref aligned to read (includes gaps)

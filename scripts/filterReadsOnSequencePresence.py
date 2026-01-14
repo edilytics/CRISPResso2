@@ -9,10 +9,22 @@ def main():
     parser.add_argument("--fastq_r2", type=str, help="Fastq R2 to filter", default=None)
     parser.add_argument("--fastq_r1_out", type=str, help="Fastq R1 output file to contain filtered reads", default=None)
     parser.add_argument("--fastq_r2_out", type=str, help="Fastq R2 output file to contain filtered reads", default=None)
-    parser.add_argument("--include_seq", type=str, help="Sequence that must be present in every read. Reads without this sequence will be filtered out. " +
-        "This argument may be specified multiple times, and reads must contain at least one of these sequences", default=[], action='append')
-    parser.add_argument("--exclude_seq", type=str, help="Sequence that must NOT be present in every read. Reads with this sequence will be filtered out. " +
-        "This argument may be specified multiple times, and read must not contain any of these sequences", default=[], action='append')
+    parser.add_argument(
+        "--include_seq",
+        type=str,
+        help="Sequence that must be present in every read. Reads without this sequence will be filtered out. "
+        + "This argument may be specified multiple times, and reads must contain at least one of these sequences",
+        default=[],
+        action="append",
+    )
+    parser.add_argument(
+        "--exclude_seq",
+        type=str,
+        help="Sequence that must NOT be present in every read. Reads with this sequence will be filtered out. "
+        + "This argument may be specified multiple times, and read must not contain any of these sequences",
+        default=[],
+        action="append",
+    )
 
     args = parser.parse_args()
 
@@ -21,44 +33,44 @@ def main():
 
     fastq_r1_out = args.fastq_r1_out
     if fastq_r1_out is None:
-        fastq_r1_out = args.fastq_r1.replace('.fastq', '').replace('.fq', '').replace('.gz', '') + ".filtered.fq"
-        if args.fastq_r1.endswith('.gz'):
+        fastq_r1_out = args.fastq_r1.replace(".fastq", "").replace(".fq", "").replace(".gz", "") + ".filtered.fq"
+        if args.fastq_r1.endswith(".gz"):
             fastq_r1_out += ".gz"
 
     fastq_r2_out = args.fastq_r2_out
     if args.fastq_r2 is not None and fastq_r2_out is None:
-        fastq_r2_out = args.fastq_r2.replace('.fastq', '').replace('.fq', '').replace('.gz', '') + ".filtered.fq"
-        if args.fastq_r2.endswith('.gz'):
+        fastq_r2_out = args.fastq_r2.replace(".fastq", "").replace(".fq", "").replace(".gz", "") + ".filtered.fq"
+        if args.fastq_r2.endswith(".gz"):
             fastq_r2_out += ".gz"
 
     # CREATION OF FILEHANDLES##
-    if args.fastq_r1.endswith('.gz'):
-        f1_in = gzip.open(args.fastq_r1, 'rt')
+    if args.fastq_r1.endswith(".gz"):
+        f1_in = gzip.open(args.fastq_r1, "rt")
     else:
-        f1_in = open(args.fastq_r1, 'rt', encoding="utf-8")
-    if fastq_r1_out.endswith('.gz'):
-        f1_out = gzip.open(fastq_r1_out, 'wt')
+        f1_in = open(args.fastq_r1, "rt", encoding="utf-8")
+    if fastq_r1_out.endswith(".gz"):
+        f1_out = gzip.open(fastq_r1_out, "wt")
     else:
-        f1_out = open(fastq_r1_out, 'w', encoding="utf-8")
+        f1_out = open(fastq_r1_out, "w", encoding="utf-8")
 
     if args.fastq_r2:
-        if args.fastq_r2.endswith('.gz'):
-            f2_in = gzip.open(args.fastq_r2, 'rt')
+        if args.fastq_r2.endswith(".gz"):
+            f2_in = gzip.open(args.fastq_r2, "rt")
         else:
-            f2_in = open(args.fastq_r2, 'rt', encoding="utf-8")
-        if fastq_r2_out.endswith('.gz'):
-            f2_out = gzip.open(fastq_r2_out, 'wt')
+            f2_in = open(args.fastq_r2, "rt", encoding="utf-8")
+        if fastq_r2_out.endswith(".gz"):
+            f2_out = gzip.open(fastq_r2_out, "wt")
         else:
-            f2_out = open(fastq_r2_out, 'w', encoding="utf-8")
+            f2_out = open(fastq_r2_out, "w", encoding="utf-8")
     # END CREATION OF FILEHANDLES##
 
-    print('Fastq R1: %s' % args.fastq_r1)
-    print('Fastq R2: %s' % args.fastq_r2)
-    print('Fastq R1 out: %s' % fastq_r1_out)
-    print('Fastq R2 out: %s' % fastq_r2_out)
+    print("Fastq R1: %s" % args.fastq_r1)
+    print("Fastq R2: %s" % args.fastq_r2)
+    print("Fastq R1 out: %s" % fastq_r1_out)
+    print("Fastq R2 out: %s" % fastq_r2_out)
 
-    print('Include seq: %s' % args.include_seq)
-    print('Exclude seq: %s' % args.exclude_seq)
+    print("Include seq: %s" % args.include_seq)
+    print("Exclude seq: %s" % args.exclude_seq)
 
     read_read_count = 0
     read_written_count = 0
@@ -100,7 +112,7 @@ def main():
                 f1_out.write("%s\n%s\n%s\n%s\n" % (r1_id_line, r1_seq_line, r1_plus_line, r1_qual_line))
                 f2_out.write("%s\n%s\n%s\n%s\n" % (r2_id_line, r2_seq_line, r2_plus_line, r2_qual_line))
 
-        print('Printed %s/%s reads to %s and %s' % (read_written_count, read_read_count, fastq_r1_out, fastq_r2_out))
+        print("Printed %s/%s reads to %s and %s" % (read_written_count, read_read_count, fastq_r1_out, fastq_r2_out))
 
     else:
         while True:
@@ -131,12 +143,12 @@ def main():
             if include_read and not exclude_read:
                 read_written_count += 1
                 f1_out.write("%s\n%s\n%s\n%s" % (r1_id_line, r1_seq_line, r1_plus_line, r1_qual_line))
-        print('Printed %s/%s reads to %s' % (read_written_count, read_read_count, fastq_r1_out))
+        print("Printed %s/%s reads to %s" % (read_written_count, read_read_count, fastq_r1_out))
 
     for seq in args.include_seq:
-        print('Reads containing included sequence %s: %s' % (seq, read_include_count[seq]))
+        print("Reads containing included sequence %s: %s" % (seq, read_include_count[seq]))
     for seq in args.exclude_seq:
-        print('Reads containing excluded sequence %s: %s' % (seq, read_exclude_count[seq]))
+        print("Reads containing excluded sequence %s: %s" % (seq, read_exclude_count[seq]))
 
 
 if __name__ == "__main__":

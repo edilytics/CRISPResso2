@@ -13,6 +13,7 @@ import sys
 
 
 def main():
+    """Main entry point for the filterFastqs script."""
     parser = argparse.ArgumentParser(description='Filter fastqs for quality')
     parser.add_argument('--fastq_r1', required=True)
     parser.add_argument('--fastq_r2')
@@ -28,6 +29,32 @@ def main():
 
 
 def filterFastqs(fastq_r1=None, fastq_r2=None, fastq_r1_out=None, fastq_r2_out=None, min_bp_qual_in_read=None, min_av_read_qual=None, min_bp_qual_or_N=None, debug=False):
+    """Filter FASTQ files based on quality thresholds for minimum base pair quality, average read quality, and low quality to N conversion.
+
+    Parameters
+    ----------
+    fastq_r1 : str, optional
+        Path to input R1 FASTQ file.
+    fastq_r2 : str, optional
+        Path to input R2 FASTQ file.
+    fastq_r1_out : str, optional
+        Path to output R1 FASTQ file.
+    fastq_r2_out : str, optional
+        Path to output R2 FASTQ file.
+    min_bp_qual_in_read : int, optional
+        Minimum base pair quality threshold for a read to be kept.
+    min_av_read_qual : int, optional
+        Minimum average read quality threshold.
+    min_bp_qual_or_N : int, optional
+        Quality threshold below which bases are converted to N.
+    debug : bool, optional
+        Enable debug output.
+
+    Returns
+    -------
+    None
+
+    """
     if (debug):
         print('--fastq_r1:' + str(fastq_r1))
         print('--fastq_r2:' + str(fastq_r2))
@@ -127,6 +154,22 @@ def filterFastqs(fastq_r1=None, fastq_r2=None, fastq_r1_out=None, fastq_r2_out=N
 
 
 def run_mBPN(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter single-end FASTQ by converting low quality bases to N.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input FASTQ file handle.
+    f1_out : file
+        Output FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality (unused in this function).
+    min_av_read_qual : int
+        Minimum average read quality (unused in this function).
+    min_bp_qual_or_N : int
+        Quality threshold below which bases are converted to N.
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     while idLine:
         seqLine = f1_in.readline().rstrip()
@@ -140,6 +183,22 @@ def run_mBPN(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_o
 
 
 def run_mRQ(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter single-end FASTQ by minimum average read quality.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input FASTQ file handle.
+    f1_out : file
+        Output FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality (unused in this function).
+    min_av_read_qual : int
+        Minimum average read quality threshold.
+    min_bp_qual_or_N : int
+        Quality threshold (unused in this function).
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     while idLine:
         seqLine = f1_in.readline().rstrip().decode('utf-8')
@@ -153,6 +212,22 @@ def run_mRQ(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or
 
 
 def run_mBP(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter single-end FASTQ by minimum base pair quality in read.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input FASTQ file handle.
+    f1_out : file
+        Output FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality threshold for a read to be kept.
+    min_av_read_qual : int
+        Minimum average read quality (unused in this function).
+    min_bp_qual_or_N : int
+        Quality threshold (unused in this function).
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     while idLine:
         seqLine = f1_in.readline().rstrip().decode('utf-8')
@@ -166,6 +241,22 @@ def run_mBP(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or
 
 
 def run_mBP_mRQ(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter single-end FASTQ by both minimum base pair quality and average read quality.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input FASTQ file handle.
+    f1_out : file
+        Output FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality threshold for a read to be kept.
+    min_av_read_qual : int
+        Minimum average read quality threshold.
+    min_bp_qual_or_N : int
+        Quality threshold (unused in this function).
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     while idLine:
         seqLine = f1_in.readline().rstrip().decode('utf-8')
@@ -181,6 +272,22 @@ def run_mBP_mRQ(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qua
 
 
 def run_mBP_mBPN(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter single-end FASTQ by minimum base pair quality and convert low quality bases to N.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input FASTQ file handle.
+    f1_out : file
+        Output FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality threshold for a read to be kept.
+    min_av_read_qual : int
+        Minimum average read quality (unused in this function).
+    min_bp_qual_or_N : int
+        Quality threshold below which bases are converted to N.
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     while idLine:
         seqLine = f1_in.readline().rstrip()
@@ -196,6 +303,22 @@ def run_mBP_mBPN(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qu
 
 
 def run_mRQ_mBPN(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter single-end FASTQ by minimum average read quality and convert low quality bases to N.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input FASTQ file handle.
+    f1_out : file
+        Output FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality (unused in this function).
+    min_av_read_qual : int
+        Minimum average read quality threshold.
+    min_bp_qual_or_N : int
+        Quality threshold below which bases are converted to N.
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     while idLine:
         seqLine = f1_in.readline().rstrip()
@@ -211,6 +334,22 @@ def run_mRQ_mBPN(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qu
 
 
 def run_mBP_mRQ_mBPN(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter single-end FASTQ by minimum base pair quality, average read quality, and convert low quality bases to N.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input FASTQ file handle.
+    f1_out : file
+        Output FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality threshold for a read to be kept.
+    min_av_read_qual : int
+        Minimum average read quality threshold.
+    min_bp_qual_or_N : int
+        Quality threshold below which bases are converted to N.
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     while idLine:
         seqLine = f1_in.readline().rstrip()
@@ -229,6 +368,26 @@ def run_mBP_mRQ_mBPN(f1_in, f1_out, min_bp_qual_in_read, min_av_read_qual, min_b
 
 # PAIRED
 def run_mBPN_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter paired-end FASTQ by converting low quality bases to N in both reads.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input R1 FASTQ file handle.
+    f1_out : file
+        Output R1 FASTQ file handle.
+    f2_in : file
+        Input R2 FASTQ file handle.
+    f2_out : file
+        Output R2 FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality (unused in this function).
+    min_av_read_qual : int
+        Minimum average read quality (unused in this function).
+    min_bp_qual_or_N : int
+        Quality threshold below which bases are converted to N.
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     idLine2 = f2_in.readline().rstrip().decode('utf-8')
     while idLine:
@@ -253,6 +412,26 @@ def run_mBPN_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read
 
 
 def run_mRQ_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter paired-end FASTQ by minimum average read quality in both reads.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input R1 FASTQ file handle.
+    f1_out : file
+        Output R1 FASTQ file handle.
+    f2_in : file
+        Input R2 FASTQ file handle.
+    f2_out : file
+        Output R2 FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality (unused in this function).
+    min_av_read_qual : int
+        Minimum average read quality threshold.
+    min_bp_qual_or_N : int
+        Quality threshold (unused in this function).
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     idLine2 = f2_in.readline().rstrip().decode('utf-8')
     while idLine:
@@ -275,6 +454,26 @@ def run_mRQ_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_
 
 
 def run_mBP_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter paired-end FASTQ by minimum base pair quality in both reads.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input R1 FASTQ file handle.
+    f1_out : file
+        Output R1 FASTQ file handle.
+    f2_in : file
+        Input R2 FASTQ file handle.
+    f2_out : file
+        Output R2 FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality threshold for a read to be kept.
+    min_av_read_qual : int
+        Minimum average read quality (unused in this function).
+    min_bp_qual_or_N : int
+        Quality threshold (unused in this function).
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     idLine2 = f2_in.readline().rstrip().decode('utf-8')
     while idLine:
@@ -298,6 +497,26 @@ def run_mBP_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_
 
 
 def run_mBP_mRQ_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter paired-end FASTQ by both minimum base pair quality and average read quality in both reads.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input R1 FASTQ file handle.
+    f1_out : file
+        Output R1 FASTQ file handle.
+    f2_in : file
+        Input R2 FASTQ file handle.
+    f2_out : file
+        Output R2 FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality threshold for a read to be kept.
+    min_av_read_qual : int
+        Minimum average read quality threshold.
+    min_bp_qual_or_N : int
+        Quality threshold (unused in this function).
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     idLine2 = f2_in.readline().rstrip().decode('utf-8')
     while idLine:
@@ -323,6 +542,26 @@ def run_mBP_mRQ_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_r
 
 
 def run_mBP_mBPN_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter paired-end FASTQ by minimum base pair quality and convert low quality bases to N in both reads.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input R1 FASTQ file handle.
+    f1_out : file
+        Output R1 FASTQ file handle.
+    f2_in : file
+        Input R2 FASTQ file handle.
+    f2_out : file
+        Output R2 FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality threshold for a read to be kept.
+    min_av_read_qual : int
+        Minimum average read quality (unused in this function).
+    min_bp_qual_or_N : int
+        Quality threshold below which bases are converted to N.
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     idLine2 = f2_in.readline().rstrip().decode('utf-8')
     while idLine:
@@ -349,6 +588,26 @@ def run_mBP_mBPN_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_
 
 
 def run_mRQ_mBPN_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter paired-end FASTQ by minimum average read quality and convert low quality bases to N in both reads.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input R1 FASTQ file handle.
+    f1_out : file
+        Output R1 FASTQ file handle.
+    f2_in : file
+        Input R2 FASTQ file handle.
+    f2_out : file
+        Output R2 FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality (unused in this function).
+    min_av_read_qual : int
+        Minimum average read quality threshold.
+    min_bp_qual_or_N : int
+        Quality threshold below which bases are converted to N.
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     idLine2 = f2_in.readline().rstrip().decode('utf-8')
     while idLine:
@@ -375,6 +634,26 @@ def run_mRQ_mBPN_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_
 
 
 def run_mBP_mRQ_mBPN_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min_av_read_qual, min_bp_qual_or_N):
+    """Filter paired-end FASTQ by minimum base pair quality, average read quality, and convert low quality bases to N in both reads.
+
+    Parameters
+    ----------
+    f1_in : file
+        Input R1 FASTQ file handle.
+    f1_out : file
+        Output R1 FASTQ file handle.
+    f2_in : file
+        Input R2 FASTQ file handle.
+    f2_out : file
+        Output R2 FASTQ file handle.
+    min_bp_qual_in_read : int
+        Minimum base pair quality threshold for a read to be kept.
+    min_av_read_qual : int
+        Minimum average read quality threshold.
+    min_bp_qual_or_N : int
+        Quality threshold below which bases are converted to N.
+
+    """
     idLine = f1_in.readline().rstrip().decode('utf-8')
     idLine2 = f2_in.readline().rstrip().decode('utf-8')
     while idLine:

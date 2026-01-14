@@ -4,7 +4,6 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 (c) 2018 The General Hospital Corporation. All Rights Reserved.
 """
 
-
 import logging
 import multiprocessing as mp
 import signal
@@ -34,16 +33,19 @@ def run_crispresso(crispresso_cmds, descriptor, idx):
     crispresso_cmd = crispresso_cmds[idx]
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
 
-    logger.info('Running CRISPResso on %s #%d/%d: %s' % (descriptor, idx, len(crispresso_cmds), crispresso_cmd))
+    logger.info("Running CRISPResso on %s #%d/%d: %s" % (descriptor, idx, len(crispresso_cmds), crispresso_cmd))
 
     return_value = sb.call(crispresso_cmd, shell=True)
 
     if return_value == 137:
-        logger.warn('CRISPResso was killed by your system (return value %d) on %s #%d: "%s"\nPlease reduce the number of processes (-p) and run again.' % (return_value, descriptor, idx, crispresso_cmd))
+        logger.warn(
+            'CRISPResso was killed by your system (return value %d) on %s #%d: "%s"\nPlease reduce the number of processes (-p) and run again.'
+            % (return_value, descriptor, idx, crispresso_cmd)
+        )
     elif return_value != 0:
         logger.warn('CRISPResso command failed (return value %d) on %s #%d: "%s"' % (return_value, descriptor, idx, crispresso_cmd))
     else:
-        logger.info('Finished CRISPResso %s #%d' % (descriptor, idx))
+        logger.info("Finished CRISPResso %s #%d" % (descriptor, idx))
     return return_value
 
 
@@ -52,7 +54,7 @@ def wrapper(func, args):
     return (idx, func(args))
 
 
-def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor='region', continue_on_fail=False, start_end_percent=None, logger=None):
+def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor="region", continue_on_fail=False, start_end_percent=None, logger=None):
     """Run multiple CRISPResso commands in parallel.
 
     Parameters
@@ -122,7 +124,7 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor='region', c
                 percent_complete += percent_complete_step
                 logger.info(
                     "Completed {0}/{1} runs".format(completed, len(crispresso_cmds)),
-                    {'percent_complete': percent_complete},
+                    {"percent_complete": percent_complete},
                 )
         else:
             for idx, res in pool.imap_unordered(p_wrapper, enumerate(idxs)):
@@ -131,20 +133,24 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor='region', c
                 percent_complete += percent_complete_step
                 logger.info(
                     "Completed {0}/{1} runs".format(completed, len(crispresso_cmds)),
-                    {'percent_complete': percent_complete},
+                    {"percent_complete": percent_complete},
                 )
         for idx, ret in enumerate(ret_vals):
             if ret == 137:
-                raise Exception('CRISPResso %s #%d was killed by your system. Please decrease the number of processes (-p) and run again.' % (descriptor, idx))
+                raise Exception(
+                    "CRISPResso %s #%d was killed by your system. Please decrease the number of processes (-p) and run again." % (descriptor, idx)
+                )
             if ret != 0 and not continue_on_fail:
-                raise Exception('CRISPResso %s #%d failed. For more information, try running the command: "%s"' % (descriptor, idx, crispresso_cmds[idx]))
+                raise Exception(
+                    'CRISPResso %s #%d failed. For more information, try running the command: "%s"' % (descriptor, idx, crispresso_cmds[idx])
+                )
     except KeyboardInterrupt:
         pool.terminate()
-        logger.warn('Caught SIGINT. Program Terminated')
-        raise Exception('CRISPResso2 Terminated')
+        logger.warn("Caught SIGINT. Program Terminated")
+        raise Exception("CRISPResso2 Terminated")
         sys.exit(0)
     except Exception as e:
-        print('CRISPResso2 failed')
+        print("CRISPResso2 failed")
         raise e
     else:
         plural = descriptor + "s"
@@ -195,11 +201,11 @@ def run_pandas_apply_parallel(input_df, input_function_chunk, n_processes=1):
         df_new = pd.concat(results)
     except KeyboardInterrupt:
         pool.terminate()
-        logging.warn('Caught SIGINT. Program Terminated')
-        raise Exception('CRISPResso2 Terminated')
+        logging.warn("Caught SIGINT. Program Terminated")
+        raise Exception("CRISPResso2 Terminated")
         sys.exit(0)
     except Exception as e:
-        print('CRISPResso2 failed')
+        print("CRISPResso2 failed")
         raise e
     else:
         pool.close()
@@ -217,7 +223,7 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
         try:
             results = input_function(input_array)
         except Exception as e:
-            print('CRISPResso2 failed')
+            print("CRISPResso2 failed")
             raise e
         return results
     else:
@@ -228,16 +234,16 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
         signal.signal(signal.SIGINT, original_sigint_handler)
         try:
             n = int(max(10, len(input_array) / n_processes))  # don't parallelize unless at least 10 tasks
-            input_chunks = [input_array[i * n:(i + 1) * n] for i in range((len(input_array) + n - 1) // n)]
+            input_chunks = [input_array[i * n : (i + 1) * n] for i in range((len(input_array) + n - 1) // n)]
             r = pool.map_async(input_function, input_chunks)
             results = r.get(60 * 60 * 60)  # Without the timeout this blocking call ignores all signals.
         except KeyboardInterrupt:
             pool.terminate()
-            logging.warn('Caught SIGINT. Program Terminated')
-            raise Exception('CRISPResso2 Terminated')
+            logging.warn("Caught SIGINT. Program Terminated")
+            raise Exception("CRISPResso2 Terminated")
             sys.exit(0)
         except Exception as e:
-            print('CRISPResso2 failed')
+            print("CRISPResso2 failed")
             raise e
         else:
             pool.close()
@@ -249,7 +255,7 @@ def run_subprocess(cmd):
     return sb.call(cmd, shell=True)
 
 
-def run_parallel_commands(commands_arr, n_processes=1, descriptor='CRISPResso2', continue_on_fail=False):
+def run_parallel_commands(commands_arr, n_processes=1, descriptor="CRISPResso2", continue_on_fail=False):
     """input: commands_arr: list of shell commands to run
     descriptor: string to print out to user describing run
     """
@@ -259,7 +265,7 @@ def run_parallel_commands(commands_arr, n_processes=1, descriptor='CRISPResso2',
         for idx, command in enumerate(commands_arr):
             return_value = run_subprocess(command)
             if return_value != 0 and not continue_on_fail:
-                raise Exception(f'{descriptor} #{idx} was failed')
+                raise Exception(f"{descriptor} #{idx} was failed")
         return
 
     # handle signals -- bug in python 2.7 (https://stackoverflow.com/questions/11312525/catch-ctrlc-sigint-and-exit-multiprocesses-gracefully-in-python)
@@ -270,16 +276,16 @@ def run_parallel_commands(commands_arr, n_processes=1, descriptor='CRISPResso2',
         ret_vals = res.get(60 * 60 * 60)  # Without the timeout this blocking call ignores all signals.
         for idx, ret in enumerate(ret_vals):
             if ret == 137:
-                raise Exception('%s #%d was killed by your system. Please decrease the number of processes (-p) and run again.' % (descriptor, idx))
+                raise Exception("%s #%d was killed by your system. Please decrease the number of processes (-p) and run again." % (descriptor, idx))
             if ret != 0 and not continue_on_fail:
-                raise Exception('%s #%d failed' % (descriptor, idx))
+                raise Exception("%s #%d failed" % (descriptor, idx))
     except KeyboardInterrupt:
         pool.terminate()
-        logging.warn('Caught SIGINT. Program Terminated')
-        raise Exception('CRISPResso2 Terminated')
+        logging.warn("Caught SIGINT. Program Terminated")
+        raise Exception("CRISPResso2 Terminated")
         sys.exit(0)
     except Exception as e:
-        print('CRISPResso2 failed')
+        print("CRISPResso2 failed")
         raise e
     else:
         pool.close()
@@ -318,6 +324,6 @@ def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool,
     except Exception as e:
         if halt_on_plot_fail:
             logger.critical("Plot error, halting execution \n")
-            raise PlotException(f'There was an error generating plot {plot_func.__name__}.')
+            raise PlotException(f"There was an error generating plot {plot_func.__name__}.")
         logger.warn(f"Plot error {e}, skipping plot \n")
         logger.debug(traceback.format_exc())

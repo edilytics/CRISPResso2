@@ -37,7 +37,7 @@ def render_partial(template_name, renderer=None, markup=True, **data):
     """Renders a partial template and returns the result. If `markup` is True, the result is wrapped in a `Markup` object."""
     if renderer is None:
         if flask is None:
-            raise PartialsException('No renderer specified')
+            raise PartialsException("No renderer specified")
         renderer = flask.render_template
 
     if markup:

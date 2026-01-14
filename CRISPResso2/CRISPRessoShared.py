@@ -32,6 +32,7 @@ from CRISPResso2 import CRISPRessoCOREResources
 
 
 def read_version():
+    """Read and return the CRISPResso2 package version."""
     return importlib.metadata.version('CRISPResso2')
 
 
@@ -137,6 +138,7 @@ class LogStreamHandler(logging.StreamHandler):
 
 
 def set_console_log_level(logger, level, debug=False):
+    """Set the console log level for the specified logger based on the level and debug flag."""
     for handler in logger.handlers:
         if isinstance(handler, LogStreamHandler):
             if level >= 4 or debug:
@@ -161,6 +163,7 @@ class CustomHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
 
 def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
+    """Create and return an argument parser for the specified CRISPResso tool with parameters from args.json."""
     parser = argparse.ArgumentParser(description=parser_title, formatter_class=CustomHelpFormatter)
     parser.add_argument('--version', action='version', version='%(prog)s ' + __version__)
 
@@ -204,6 +207,7 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
 
 
 def get_core_crispresso_options():
+    """Get a set of all core CRISPResso command-line option names."""
     parser = getCRISPRessoArgParser("Core")
     crispresso_options = set()
     d = parser.__dict__['_option_string_actions']
@@ -215,6 +219,7 @@ def get_core_crispresso_options():
 
 
 def get_crispresso_options_lookup(tool):
+    """Create a dictionary mapping abbreviated parameter names to full parameter names for the specified tool."""
     # dict to lookup abbreviated params
     #    crispresso_options_lookup = {
     #    'r1':'fastq_r1',
@@ -384,22 +389,27 @@ nt_complement = dict({'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', '_': '_'
 
 
 def reverse_complement(seq):
+    """Return the reverse complement of a DNA sequence."""
     return "".join([nt_complement[c] for c in seq.upper()[-1::-1]])
 
 
 def reverse(seq):
+    """Return the reverse of a DNA sequence."""
     return "".join(c for c in seq.upper()[-1::-1])
 
 
 def find_wrong_nt(sequence):
+    """Find nucleotides in a sequence that are not A, T, C, G, or N."""
     return list(set(sequence.upper()).difference({'A', 'T', 'C', 'G', 'N'}))
 
 
 def capitalize_sequence(x):
+    """Convert a sequence to uppercase, handling null values."""
     return str(x).upper() if not pd.isnull(x) else x
 
 
 def slugify(value):
+    """Convert a string to a filesystem-safe slug by normalizing unicode and replacing special characters."""
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
     value = re.sub(rb'[\s\'*"/\\\[\]:;|,<>?]', b'_', value).strip()
     value = re.sub(rb'_{2,}', b'_', value)
@@ -481,6 +491,7 @@ def get_amino_acids_from_nucs(seq):
 
 
 def insert_indels(seq, seq_codons):
+    """Insert indels into a sequence based on codon information."""
     indel_inds = []
     for i, c in enumerate(seq):
         if c == '-':
@@ -529,7 +540,7 @@ def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
     ref_codons = insert_indels(ref_seq, ref_codons)
     seq_codons = insert_indels(seq, seq_codons)
 
-    for i, ((r, r_codon), (s, s_codon)) in enumerate(zip(ref_codons, seq_codons)):
+    for i, ((r, r_codon), (s, s_codon)) in enumerate(zip(ref_codons, seq_codons, strict=False)):
         if r == '-' or s == '-':
             continue
         if r != s:
@@ -586,6 +597,7 @@ def get_ref_length_from_cigar(cigar_string):
 ######
 
 def clean_filename(filename):
+    """Clean a filename by removing or replacing invalid filesystem characters."""
     # get a clean name that we can use for a filename
     validFilenameChars = "+-_.%s%s" % (string.ascii_letters, string.digits)
     filename = slugify(str(filename).replace(' ', '_'))
@@ -594,6 +606,7 @@ def clean_filename(filename):
 
 
 def check_file(filename):
+    """Check if a file exists and raise an exception if it doesn't."""
     try:
         with open(filename, encoding='utf-8'):
             pass
@@ -621,6 +634,7 @@ def check_file(filename):
 
 
 def force_symlink(src, dst):
+    """Create a symbolic link, removing the destination if it exists and is different."""
     if os.path.exists(dst) and os.path.samefile(src, dst):
         return
 
@@ -636,6 +650,7 @@ def force_symlink(src, dst):
 
 
 def parse_count_file(fileName):
+    """Parse a count file and return its contents as a dictionary."""
     if os.path.exists(fileName):
         with open(fileName, encoding='utf-8') as infile:
             lines = infile.readlines()
@@ -655,6 +670,7 @@ def parse_count_file(fileName):
 
 
 def parse_alignment_file(fileName):
+    """Parse an alignment file and return its contents as a dictionary."""
     if os.path.exists(fileName):
         with open(fileName, encoding='utf-8') as infile:
             lines = infile.readlines()
@@ -693,7 +709,10 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
 
                     if line_num % 4 == 0:
                         if not line.startswith('@'):
-                            raise InputFileFormatException('File %s is not in fastq format! Line %d does not start with @ \n%s: %s' % (file_path, line_num, line_num, line))
+                            raise InputFileFormatException(
+                                'File %s is not in fastq format! Line %d does not start with @ \n%s: %s' %
+                                (file_path, line_num, line_num, line)
+                            )
                     elif line_num % 4 == 1 or line_num % 4 == 3:
                         if len(line.strip()) == 0:
                             raise InputFileFormatException('File %s is not in fastq format! Line %d is empty \n%s: %s' % (file_path, line_num, line_num, line))
@@ -709,7 +728,10 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
 
                     if line_num % 4 == 0:
                         if not line.startswith('@'):
-                            raise InputFileFormatException('File %s is not in fastq format! Line %d does not start with @ \n%s: %s' % (file_path, line_num, line_num, line))
+                            raise InputFileFormatException(
+                                'File %s is not in fastq format! Line %d does not start with @ \n%s: %s' %
+                                (file_path, line_num, line_num, line)
+                            )
                     elif line_num % 4 == 1 or line_num % 4 == 3:
                         if len(line.strip()) == 0:
                             raise InputFileFormatException('File %s is not in fastq format! Line %d is empty \n%s: %s' % (file_path, line_num, line_num, line))
@@ -726,6 +748,7 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
 
 
 def get_n_reads_fastq(fastq_filename):
+    """Get the number of reads in a FASTQ file."""
     if not os.path.exists(fastq_filename) or os.path.getsize(fastq_filename) == 0:
         return 0
     p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '') + "cat < %s | grep -c ." % fastq_filename, shell=True, stdout=sb.PIPE)
