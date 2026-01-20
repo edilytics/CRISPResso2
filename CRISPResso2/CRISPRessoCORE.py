@@ -4545,7 +4545,7 @@ def main():
 
         if args.vcf_output:
             # TODO add this path to crispresso2_info
-            vcf_path = os.path.join(OUTPUT_DIRECTORY, "amplicon_variants.vcf")
+            vcf_path = os.path.join(OUTPUT_DIRECTORY, "CRISPResso_output.vcf")
             CRISPRessoUtilities.write_vcf_file(df_alleles, ref_names, args, vcf_path)
 
         crispresso2Cols = ["Aligned_Sequence", "Reference_Sequence", "Reference_Name", "Read_Status", "n_deleted", "n_inserted", "n_mutated", "#Reads", "%Reads"]
