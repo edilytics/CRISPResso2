@@ -5,7 +5,7 @@ import pytest
 
 # Adjust the import path if your module name is different
 from CRISPResso2 import CRISPRessoShared
-from CRISPResso2 import CRISPRessoUtilities as utilities
+from CRISPResso2.writers import vcf
 
 # ----------------------------- _alt_seq_from_edit -----------------------------
 
@@ -39,7 +39,7 @@ from CRISPResso2 import CRISPRessoUtilities as utilities
 )
 def test_alt_seq_from_edit_happy(ref_seq, edit_type, alt_edit, expected):
     """Tests whether _alt_seq_from_edit produces the expected ALT sequence given alt_edit from alt_map."""
-    assert utilities._alt_seq_from_edit(ref_seq, edit_type, alt_edit) == expected
+    assert vcf._alt_seq_from_edit(ref_seq, edit_type, alt_edit) == expected
 
 
 @pytest.mark.parametrize(
@@ -55,7 +55,7 @@ def test_alt_seq_from_edit_happy(ref_seq, edit_type, alt_edit, expected):
 def test_alt_seq_from_edit_errors(ref_seq, edit_type, alt_edit):
     """Tests whether _alt_seq_from_edit properly raises exceptions on invalid input."""
     with pytest.raises(CRISPRessoShared.BadParameterException):
-        utilities._alt_seq_from_edit(ref_seq, edit_type, alt_edit)
+        vcf._alt_seq_from_edit(ref_seq, edit_type, alt_edit)
 
 # ----------------------------- _write_vcf_line -----------------------------
 
@@ -100,14 +100,14 @@ def test_alt_seq_from_edit_errors(ref_seq, edit_type, alt_edit):
 )
 def test_write_vcf_line(desc, chrom, pos, ref_seq, alt_edits, num_reads, ref_names, expected):
     """Testing that _write_vcf_line produces the expected VCF line when given a set of inputs."""
-    line = utilities._write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads, ref_names)
+    line = vcf._write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads, ref_names)
     assert line == expected
 
 
 @pytest.mark.parametrize("bad_num_reads", [0, None, -5])
 def test_write_vcf_line_bad_denominator_raises(bad_num_reads):
     with pytest.raises(CRISPRessoShared.BadParameterException):
-        utilities._write_vcf_line("1", 10, "A", [("sub", "T", 1)], bad_num_reads, [])
+        vcf._write_vcf_line("1", 10, "A", [("sub", "T", 1)], bad_num_reads, [])
 
 
 # ----------------------------- vcf_lines_from_alt_map -----------------------------
@@ -120,7 +120,7 @@ def test_vcf_lines_from_alt_map_header_and_ordering_no_samples():
         ("1", 10): {"ref_seq": "A",   "alt_edits": [("sub", "T", 3)]},     # ALT=T
     }
     temp_vcf_path = os.path.join(os.path.dirname(__file__), "temp_test_no_samples.vcf")
-    count = utilities.vcf_lines_from_alt_map(alt_map, num_reads=10, ref_names=[], vcf_path=temp_vcf_path)
+    count = vcf.vcf_lines_from_alt_map(alt_map, num_reads=10, ref_names=[], vcf_path=temp_vcf_path)
     # Header (4 lines prepended to all CRISPResso vcf files)
     lines = []
     with open(temp_vcf_path, "r") as f:
@@ -150,7 +150,7 @@ def test_vcf_lines_from_alt_map_header_and_ordering_with_samples():
     }
     temp_vcf_path = os.path.join(os.path.dirname(__file__), "temp_test_with_samples.vcf")
     lines = []
-    count = utilities.vcf_lines_from_alt_map(alt_map, num_reads=10, ref_names=["Ref1", "Ref2"], vcf_path=temp_vcf_path)
+    count = vcf.vcf_lines_from_alt_map(alt_map, num_reads=10, ref_names=["Ref1", "Ref2"], vcf_path=temp_vcf_path)
     with open(temp_vcf_path, "r") as f:
         lines = [line.strip() for line in f if line.strip()]
     assert lines[3] == "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tRef1\tRef2"
@@ -178,7 +178,7 @@ def _stub_alt_map():
 )
 def test_write_vcf_file_smoke(tmp_path, monkeypatch, ref_names, coords_str, expected_record_count):
     # Monkeypatch build_alt_map so this test doesn't depend on upstream logic.
-    monkeypatch.setattr(utilities, "build_alt_map", lambda df, amplicon_positions: _stub_alt_map())
+    monkeypatch.setattr(vcf, "build_alt_map", lambda df, amplicon_positions: _stub_alt_map())
 
     # Minimal df_alleles: only '#Reads' is used for denominator
     import pandas as pd
@@ -187,7 +187,7 @@ def test_write_vcf_file_smoke(tmp_path, monkeypatch, ref_names, coords_str, expe
     args = SimpleNamespace(amplicon_coordinates=coords_str)
     out_path = tmp_path / "test.vcf"
 
-    num_vcf_rows = utilities.write_vcf_file(df, ref_names, args, str(out_path))
+    num_vcf_rows = vcf.write_vcf_file(df, ref_names, args, str(out_path))
     lines = []
     with open(out_path, "r") as f:
         for line in f:

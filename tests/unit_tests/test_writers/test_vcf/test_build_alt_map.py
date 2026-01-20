@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from CRISPResso2.CRISPRessoCOREResources import find_indels_substitutions
-from CRISPResso2 import CRISPRessoUtilities as utilities
+from CRISPResso2.writers import vcf
 
 # ----------------------------- helpers -----------------------------
 
@@ -127,7 +127,7 @@ def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
 )
 def test_build_alt_map_mixed(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    alt_map = utilities.build_alt_map(df, amplicon_positions)
+    alt_map = vcf.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(alt_map) == _normalize_alt_map(expected)
 
 
@@ -159,7 +159,7 @@ def test_build_alt_map_mixed(rows, amplicon_positions, expected):
 )
 def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = utilities.build_alt_map(df, amplicon_positions)
+    out = vcf.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
 
@@ -220,7 +220,7 @@ def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
 )
 def test_build_alt_map_deletions(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = utilities.build_alt_map(df, amplicon_positions)
+    out = vcf.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
 
@@ -252,7 +252,7 @@ def test_build_alt_map_deletions(rows, amplicon_positions, expected):
 )
 def test_build_alt_map_deletion_end_at_len_raises(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = utilities.build_alt_map(df, amplicon_positions)
+    out = vcf.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
 
@@ -263,7 +263,7 @@ def test_build_alt_map_deletion_start_at_zero_should_anchor_correctly():
     """
     df = create_df_alleles(make_del(0, 3, reads=1))  # delete first 3 bases
     amplicon_positions = {"Reference": (1, 1)}
-    out = utilities.build_alt_map(df, amplicon_positions)
+    out = vcf.build_alt_map(df, amplicon_positions)
     expected = {
         (1, 1): {
             "ref_seq": REF_SEQ[0:4],
@@ -282,7 +282,7 @@ def test_build_alt_map_deletion_start():
     )
 
     amplicon_positions = {"Reference": (1, 1)}
-    alt_map = utilities.build_alt_map(df, amplicon_positions)
+    alt_map = vcf.build_alt_map(df, amplicon_positions)
 
     assert alt_map[(1, 1)] == {
         'ref_seq': 'GA',
@@ -290,7 +290,7 @@ def test_build_alt_map_deletion_start():
     }
 
 
-    vcf_line = utilities._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
+    vcf_line = vcf._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
     assert 'GA\tA' in vcf_line
 
 
@@ -327,7 +327,7 @@ def test_build_alt_map_multi_deletion_start():
     )
 
     amplicon_positions = {"Reference": (1, 1)}
-    alt_map = utilities.build_alt_map(df, amplicon_positions)
+    alt_map = vcf.build_alt_map(df, amplicon_positions)
 
     assert alt_map[(1, 1)] == {
         'ref_seq': 'AACCTTGG',
@@ -342,7 +342,7 @@ def test_build_alt_map_multi_deletion_start():
         ],
     }
 
-    vcf_line = utilities._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
+    vcf_line = vcf._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
     assert 'AACCTTGG\tG,GG,TGG,TTGG,CTTGG,CCTTGG,ACCTTGG' in vcf_line
 
 
@@ -381,7 +381,7 @@ def test_build_alt_map_multi_deletion_start_and_middle():
     )
 
     amplicon_positions = {"Reference": (1, 1)}
-    alt_map = utilities.build_alt_map(df, amplicon_positions)
+    alt_map = vcf.build_alt_map(df, amplicon_positions)
 
     assert alt_map[(1, 1)] == {
         'ref_seq': 'AACCTTGG',
@@ -396,7 +396,7 @@ def test_build_alt_map_multi_deletion_start_and_middle():
         ],
     }
 
-    vcf_line = utilities._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
+    vcf_line = vcf._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
     assert 'AACCTTGG\tG,GG,TGG,TTGG,ACTTGG,CCTTGG,ACCTTGG' in vcf_line
 
 
@@ -428,7 +428,7 @@ def test_build_alt_map_multi_deletion_start_and_middle():
 )
 def test_build_alt_map_insertions(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = utilities.build_alt_map(df, amplicon_positions)
+    out = vcf.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
 
@@ -438,7 +438,7 @@ def test_upsert_edit_del_and_ins():
             'ref_seq': 'AT', 'alt_edits': [['delete', 'T', 2]]
         },
     }
-    utilities._upsert_edit(alt_map, ('chrX', 10), 'AT', 'insert', 'TT', 2)
+    vcf._upsert_edit(alt_map, ('chrX', 10), 'AT', 'insert', 'TT', 2)
     assert alt_map[('chrX', 10)] == {'ref_seq': 'AT', 'alt_edits': [['delete', 'T', 2], ['insert', 'TT', 2]]}
 
 
@@ -463,7 +463,7 @@ def test_upsert_edit_del_and_ins():
 )
 def test_build_alt_map_multi_amplicon_and_offsets(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = utilities.build_alt_map(df, amplicon_positions)
+    out = vcf.build_alt_map(df, amplicon_positions)
     assert _normalize_alt_map(out) == _normalize_alt_map(expected)
 
 
@@ -479,7 +479,7 @@ def test_build_alt_map_multi_amplicon_and_offsets(rows, amplicon_positions, expe
 )
 def test_build_alt_map_skips_unmodified(rows, amplicon_positions, expected_size):
     df = create_df_alleles(*rows)
-    out = utilities.build_alt_map(df, amplicon_positions)
+    out = vcf.build_alt_map(df, amplicon_positions)
     assert len(out) == expected_size
 
 # ----------------------------- ensuring that insertions are keyed by right anchor -----------------------------
@@ -504,7 +504,7 @@ def test_build_alt_map_fidelity_like_real_row():
         }
     }
 
-    out = utilities.build_alt_map(df, amplicon_positions)
+    out = vcf.build_alt_map(df, amplicon_positions)
 
     def _normalize(m):
         return {
@@ -524,14 +524,14 @@ def test_aln_to_alt_map_ins_del_same_pos():
 
     df = create_df_alleles((ref1, aln1), (ref2, aln2))
     amplicon_positions = {"Reference": (1, 1)}
-    alt_map = utilities.build_alt_map(df, amplicon_positions)
+    alt_map = vcf.build_alt_map(df, amplicon_positions)
 
     assert list(alt_map.keys()) == [(1, 2)]
     assert alt_map[(1, 2)] == {'ref_seq': 'ATG', 'alt_edits': [['delete', 'TG', 1], ['insert', 'TT', 1]]}
 
     temp_vcf_path = 'aln_to_alt_map_ins_del_same_pos.vcf'
     num_reads = 5
-    num_vcf_rows = utilities.vcf_lines_from_alt_map(alt_map, num_reads, ['Reference'], temp_vcf_path)
+    num_vcf_rows = vcf.vcf_lines_from_alt_map(alt_map, num_reads, ['Reference'], temp_vcf_path)
     assert num_vcf_rows == len(alt_map)
 
     with open(temp_vcf_path) as fh:
@@ -547,7 +547,7 @@ def test_aln_to_alt_map_ins_then_del():
 
     df = create_df_alleles((ref1, aln1))
     amplicon_positions = {'Reference': (1, 1)}
-    alt_map = utilities.build_alt_map(df, amplicon_positions)
+    alt_map = vcf.build_alt_map(df, amplicon_positions)
 
     assert list(alt_map.keys()) == [(1, 8), (1, 5)]
     assert alt_map[(1, 5)] == {'ref_seq': 'T', 'alt_edits': [['insert', 'CCC', 1]]}
@@ -584,7 +584,7 @@ def test_aln_to_alt_map_to_vcf():
     )
 
     amplicon_positions = {"Reference": (1, 1)}
-    alt_map = utilities.build_alt_map(df, amplicon_positions)
+    alt_map = vcf.build_alt_map(df, amplicon_positions)
 
     # deletion at position 7 (1-based) in each example above, should occur 5 times
     assert alt_map[(1, 6)] == {'ref_seq': 'GT', 'alt_edits': [['delete', 'T', 5]]}
@@ -601,7 +601,7 @@ def test_aln_to_alt_map_to_vcf():
 
     temp_vcf_path = 'aln_to_alt_map_to_vcf.vcf'
     num_reads = 5
-    num_vcf_rows = utilities.vcf_lines_from_alt_map(alt_map, num_reads, ['Reference'], temp_vcf_path)
+    num_vcf_rows = vcf.vcf_lines_from_alt_map(alt_map, num_reads, ['Reference'], temp_vcf_path)
     assert num_vcf_rows == len(alt_map)
 
     with open(temp_vcf_path, 'r') as fh:

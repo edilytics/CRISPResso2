@@ -27,8 +27,8 @@ from functools import partial
 from multiprocessing import Process
 from contextlib import nullcontext
 
-from CRISPResso2 import (CRISPRessoCOREResources, CRISPRessoShared,
-                         CRISPRessoUtilities)
+from CRISPResso2 import CRISPRessoCOREResources, CRISPRessoShared
+from CRISPResso2.writers import vcf
 from CRISPResso2.CRISPRessoCOREResources import ResultsSlotsDict
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
@@ -4546,7 +4546,7 @@ def main():
         if args.vcf_output:
             # TODO add this path to crispresso2_info
             vcf_path = os.path.join(OUTPUT_DIRECTORY, "CRISPResso_output.vcf")
-            CRISPRessoUtilities.write_vcf_file(df_alleles, ref_names, args, vcf_path)
+            vcf.write_vcf_file(df_alleles, ref_names, args, vcf_path)
 
         crispresso2Cols = ["Aligned_Sequence", "Reference_Sequence", "Reference_Name", "Read_Status", "n_deleted", "n_inserted", "n_mutated", "#Reads", "%Reads"]
 
