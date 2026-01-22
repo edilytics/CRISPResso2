@@ -7,10 +7,11 @@ import argparse
 import os
 import pandas as pd
 import zipfile
-from CRISPResso2 import CRISPRessoShared
+from CRISPResso2 import CRISPRessoShared, CRISPRessoPlot
 
 
 def main():
+    """Main function to plot custom allele plots."""
     parser = argparse.ArgumentParser(description="Plot custom allele plots")
     parser.add_argument("-f", "--CRISPResso2_folder", type=str, help="CRISPResso output folder containing finished analysis", required=True)
     parser.add_argument("-o", "--output_root", type=str, help="Plot output root (should not include '.pdf' or '.png')", required=True)
@@ -199,7 +200,7 @@ def plot_alleles_tables_from_folder(
         else:
             for ind, sgRNA in enumerate(sgRNA_sequences):
                 sgRNA_label = sgRNA  # for file names
-                if sgRNA_names[ind] != "":
+                if sgRNA_names[ind]:
                     sgRNA_label = sgRNA_names[ind]
 
                 cut_point = sgRNA_cut_points[ind]

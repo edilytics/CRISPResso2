@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# ruff: noqa: PLC0415, E402, E722
 """Description:
 Setup script for CRISPResso2 -- Software pipeline for the analysis of genome editing outcomes from deep sequencing data
 @status:  beta
@@ -12,7 +13,6 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 """
 
 from setuptools import setup, Extension
-from io import open
 
 # Use build_ext from Cython if found
 command_classes = {}
@@ -35,7 +35,8 @@ import re
 
 
 def main():
-    version = re.search(r'^version\s*=\s*"(.*)"', open("pyproject.toml").read(), re.M).group(1)
+    """Main function to setup the CRISPResso2 package."""
+    version = re.search(r'^version\s*=\s*"(.*)"', open("pyproject.toml", encoding="utf-8").read(), re.M).group(1)
 
     ext_modules = [
         Extension(

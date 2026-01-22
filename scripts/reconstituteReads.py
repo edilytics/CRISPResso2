@@ -7,14 +7,17 @@ from CRISPResso2 import CRISPRessoShared
 
 
 def reconstitute_reads(crispresso_output_folder, fastq_output_file):
+    """Reconstitute reads from CRISPResso2 allele frequency table, producing a fastq file for reanalysis."""
     print('Processing ' + crispresso_output_folder)
     crispresso2_info = CRISPRessoShared.load_crispresso_info(crispresso_output_folder)
 
-    total_aligned_reads = crispresso2_info['running_info']['alignment_stats']['N_CACHED_ALN'] + crispresso2_info['running_info']['alignment_stats']['N_COMPUTED_ALN']
+    total_aligned_reads = (crispresso2_info['running_info']['alignment_stats']['N_CACHED_ALN'] + 
+        crispresso2_info['running_info']['alignment_stats']['N_COMPUTED_ALN'])
 
     z = zipfile.ZipFile(os.path.join(crispresso_output_folder, crispresso2_info['running_info']['allele_frequency_table_zip_filename']))
     zf = z.open(crispresso2_info['running_info']['allele_frequency_table_filename'])
-    df_alleles = pd.read_csv(zf, sep="\t")  # use pandas to open because sometimes there's a quoted newline for long lines in the file that pandas writes??
+    # use pandas to open because sometimes there's a quoted newline for long lines in the file that pandas writes??
+    df_alleles = pd.read_csv(zf, sep="\t")
 
     if df_alleles.shape[0] == 0:
         raise Exception('No alleles found in allele frequency table.')

@@ -54,6 +54,11 @@ include-package-data = true
 [tool.ruff]
 cache-dir = "/tmp/.ruff_cache"
 line-length = 150
+exclude = [
+    "tests",
+    "tests/",
+    "**/tests/**",
+]
 
 [tool.ruff.lint]
 select = [
@@ -84,6 +89,7 @@ ignore = [
     "D417",  # Requires argument descriptions in docstrings
     "N802",  # Requires function names to be all lowercase
     "N806",  # Requires variables to be all lowercase
+    "N803",  # Requires passed variables to be all lowercase
 ]
 
 [tool.ruff.lint.pylint]
