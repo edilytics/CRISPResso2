@@ -715,10 +715,16 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
                             )
                     elif line_num % 4 == 1 or line_num % 4 == 3:
                         if len(line.strip()) == 0:
-                            raise InputFileFormatException('File %s is not in fastq format! Line %d is empty \n%s: %s' % (file_path, line_num, line_num, line))
+                            raise InputFileFormatException(
+                                'File %s is not in fastq format! Line %d is empty \n%s: %s'
+                                % (file_path, line_num, line_num, line)
+                            )
                     elif line_num % 4 == 2:
                         if not line.startswith('+'):
-                            raise InputFileFormatException('File %s is not in fastq format! Line %d does not start with + \n%s: %s' % (file_path, line_num, line_num, line))
+                            raise InputFileFormatException(
+                                'File %s is not in fastq format! Line %d does not start '
+                                'with + \n%s: %s' % (file_path, line_num, line_num, line)
+                            )
         else:
             # Read uncompressed file
             with open(file_path, 'r', encoding='utf-8') as file:
@@ -729,15 +735,21 @@ def assert_fastq_format(file_path, max_lines_to_check=100):
                     if line_num % 4 == 0:
                         if not line.startswith('@'):
                             raise InputFileFormatException(
-                                'File %s is not in fastq format! Line %d does not start with @ \n%s: %s' %
-                                (file_path, line_num, line_num, line)
+                                'File %s is not in fastq format! Line %d does not start '
+                                'with @ \n%s: %s' % (file_path, line_num, line_num, line)
                             )
                     elif line_num % 4 == 1 or line_num % 4 == 3:
                         if len(line.strip()) == 0:
-                            raise InputFileFormatException('File %s is not in fastq format! Line %d is empty \n%s: %s' % (file_path, line_num, line_num, line))
+                            raise InputFileFormatException(
+                                'File %s is not in fastq format! Line %d is empty \n%s: %s'
+                                % (file_path, line_num, line_num, line)
+                            )
                     elif line_num % 4 == 2:
                         if not line.startswith('+'):
-                            raise InputFileFormatException('File %s is not in fastq format! Line %d does not start with + \n%s: %s' % (file_path, line_num, line_num, line))
+                            raise InputFileFormatException(
+                                'File %s is not in fastq format! Line %d does not start '
+                                'with + \n%s: %s' % (file_path, line_num, line_num, line)
+                            )
 
         return True
 
@@ -998,7 +1010,15 @@ def get_command_output(command):
             break
 
 
-def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, split_interleaved_input=False, debug=False):
+def get_most_frequent_reads(
+    fastq_r1,
+    fastq_r2,
+    number_of_reads_to_consider,
+    fastp_command,
+    min_paired_end_reads_overlap,
+    split_interleaved_input=False,
+    debug=False,
+):
     """Get the most frequent amplicon from a fastq file (or after merging a r1 and r2 fastq file).
 
     Note: only works on paired end or single end reads (not interleaved)
@@ -1077,7 +1097,11 @@ def get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fas
                 num_reads=number_of_reads_to_consider * 4,
             ),
             awk="awk -v OFS=\"\\n\" -v FS=\"\\t\" '{{print($1,$3,$5,$7,$2,$4,$6,$8)}}'",
-            fastp='{fastp_command} --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering --stdin --interleaved_in --merge {min_overlap_param} --stdout 2>/dev/null'.format(
+            fastp=(
+                '{fastp_command} --disable_adapter_trimming --disable_trim_poly_g '
+                '--disable_quality_filtering --disable_length_filtering --stdin '
+                '--interleaved_in --merge {min_overlap_param} --stdout 2>/dev/null'
+            ).format(
                 fastp_command=fastp_command,
                 min_overlap_param=min_overlap_param,
             ),
@@ -1170,7 +1194,19 @@ def check_if_failed_run(folder_name, info):
         return False, ""
 
 
-def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, aln_matrix, needleman_wunsch_gap_open, needleman_wunsch_gap_extend, split_interleaved_input=False, min_freq_to_consider=0.2, amplicon_similarity_cutoff=0.95):
+def guess_amplicons(
+    fastq_r1,
+    fastq_r2,
+    number_of_reads_to_consider,
+    fastp_command,
+    min_paired_end_reads_overlap,
+    aln_matrix,
+    needleman_wunsch_gap_open,
+    needleman_wunsch_gap_extend,
+    split_interleaved_input=False,
+    min_freq_to_consider=0.2,
+    amplicon_similarity_cutoff=0.95,
+):
     """Guesses the amplicons used in an experiment by examining the most frequent read (giant caveat -- most frequent read should be unmodified)
     input:
     fastq_r1: path to fastq r1 (can be gzipped)
@@ -1189,7 +1225,14 @@ def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_comma
     list of putative amplicons
 
     """
-    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, split_interleaved_input=split_interleaved_input)
+    seq_lines = get_most_frequent_reads(
+        fastq_r1,
+        fastq_r2,
+        number_of_reads_to_consider,
+        fastp_command,
+        min_paired_end_reads_overlap,
+        split_interleaved_input=split_interleaved_input,
+    )
 
     curr_amplicon_id = 1
 
@@ -1205,7 +1248,9 @@ def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_comma
         _count, seq = seq_lines[i].strip().split()
         last_count, last_seq = seq_lines[i - 1].strip().split()
         # if this allele is present in at least XX% of the samples
-        #        print('debug 509 testing ' + str(seq_lines[i]) + ' with ' + str(count) + ' out of consididered ' + str(number_of_reads_to_consider) + ' min freq: ' + str(min_freq_to_consider))
+        # print('debug 509 testing ' + str(seq_lines[i]) + ' with ' + str(count)
+        #       + ' out of consididered ' + str(number_of_reads_to_consider)
+        #       + ' min freq: ' + str(min_freq_to_consider))
         if float(last_count) / float(number_of_reads_to_consider) > min_freq_to_consider:
             this_amplicon_seq_arr = amplicon_seq_arr[:]
             this_amplicon_max_pct = 0  # keep track of similarity to most-similar already-found amplicons
@@ -1262,7 +1307,14 @@ def guess_guides(amplicon_sequence, fastq_r1, fastq_r2, number_of_reads_to_consi
     or (None, None)
 
     """
-    seq_lines = get_most_frequent_reads(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_command, min_paired_end_reads_overlap, split_interleaved_input=split_interleaved_input)
+    seq_lines = get_most_frequent_reads(
+        fastq_r1,
+        fastq_r2,
+        number_of_reads_to_consider,
+        fastp_command,
+        min_paired_end_reads_overlap,
+        split_interleaved_input=split_interleaved_input,
+    )
 
     amp_len = len(amplicon_sequence)
     gap_incentive = np.zeros(amp_len + 1, dtype=int)
@@ -1521,7 +1573,16 @@ def get_base_edit_dataframe_around_cut(df_alleles, conversion_nuc_inds):
 
 def get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right):
     cut_idx = row['ref_positions'].index(cut_point)
-    return row['Aligned_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1], row['Reference_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1], row['Read_Status'] == 'UNMODIFIED', row['n_deleted'], row['n_inserted'], row['n_mutated'], row['#Reads'], row['%Reads']
+    return (
+        row['Aligned_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1],
+        row['Reference_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1],
+        row['Read_Status'] == 'UNMODIFIED',
+        row['n_deleted'],
+        row['n_inserted'],
+        row['n_mutated'],
+        row['#Reads'],
+        row['%Reads'],
+    )
 
 
 def get_dataframe_around_cut_asymmetrical(df_alleles, cut_point, plot_left, plot_right, collapse_by_sequence=True):
@@ -1530,10 +1591,20 @@ def get_dataframe_around_cut_asymmetrical(df_alleles, cut_point, plot_left, plot
     ref1 = df_alleles['Reference_Sequence'].iloc[0]
     ref1 = ref1.replace('-', '')
 
-    df_alleles_around_cut = pd.DataFrame(list(df_alleles.apply(lambda row: get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right), axis=1).values),
-                    columns=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated', '#Reads', '%Reads'])
+    df_alleles_around_cut = pd.DataFrame(
+        list(df_alleles.apply(
+            lambda row: get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right),
+            axis=1,
+        ).values),
+        columns=[
+            'Aligned_Sequence', 'Reference_Sequence', 'Unedited',
+            'n_deleted', 'n_inserted', 'n_mutated', '#Reads', '%Reads',
+        ],
+    )
 
-    df_alleles_around_cut = df_alleles_around_cut.groupby(['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
+    df_alleles_around_cut = df_alleles_around_cut.groupby(
+        ['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated'],
+    ).sum().reset_index().set_index('Aligned_Sequence')
 
     df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
     df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
@@ -1608,10 +1679,22 @@ def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_
     if df_alleles.shape[0] == 0:
         return df_alleles
 
-    df_alleles_around_cut = pd.DataFrame(list(df_alleles.apply(lambda row: get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point), axis=1).values),
-                    columns=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated', '#Reads', '%Reads'])
+    df_alleles_around_cut = pd.DataFrame(
+        list(df_alleles.apply(
+            lambda row: get_amino_acid_row(
+                row, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point,
+            ),
+            axis=1,
+        ).values),
+        columns=[
+            'Aligned_Sequence', 'Reference_Sequence', 'Unedited',
+            'n_deleted', 'n_inserted', 'n_mutated', '#Reads', '%Reads',
+        ],
+    )
 
-    df_alleles_around_cut = df_alleles_around_cut.groupby(['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
+    df_alleles_around_cut = df_alleles_around_cut.groupby(
+        ['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated'],
+    ).sum().reset_index().set_index('Aligned_Sequence')
 
     df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
     df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
@@ -1647,12 +1730,15 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
     guide_names : a list of names for each guide
     quantification_window_centers : a list of positions where quantification is centered for each guide
     quantification_window_sizes : a list of lengths of quantification windows extending from quantification_window_center for each guide
-    quantification_window_coordinates: if given, these override quantification_window_center and quantification_window_size for setting quantification window. These are specific for this amplicon.
+    quantification_window_coordinates: if given, these override quantification_window_center and
+        quantification_window_size for setting quantification window. These are specific for this amplicon.
     exclude_bp_from_left : these bp are excluded from the quantification window
     exclude_bp_from_right : these bp are excluded from the quantification window
     plot_window_size : length of window extending from quantification_window_center to plot
     guide_plot_cut_points : whether or not to add cut point to plot (prime editing flaps don't have cut points)
-    discard_guide_positions_overhanging_amplicon_edge : if True, for guides that align to multiple positions, guide positions will be discarded if plotting around those regions would included bp that extend beyond the end of the amplicon.
+    discard_guide_positions_overhanging_amplicon_edge : if True, for guides that align to multiple positions,
+        guide positions will be discarded if plotting around those regions would included bp that extend beyond
+        the end of the amplicon.
 
     Returns:
     this_sgRNA_sequences : list of sgRNAs that are in this amplicon
@@ -1789,8 +1875,11 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
                         theseCoords) + "' is longer than the sequence length (" + str(ref_seq_length) + ")")
                 coordinate_include_idxs.extend(range(start, end))
             else:
-                raise NTException("Cannot parse analysis window coordinate '" + str(coord) + "' in '" + str(
-                    theseCoords) + "'. Coordinates must be given in the form start-end e.g. 5-10 . Please check the --analysis_window_coordinate parameter.")
+                raise NTException(
+                    "Cannot parse analysis window coordinate '" + str(coord) + "' in '" + str(theseCoords) +
+                    "'. Coordinates must be given in the form start-end e.g. 5-10 . "
+                    "Please check the --analysis_window_coordinate parameter."
+                )
         given_include_idxs = coordinate_include_idxs
         this_include_idxs = coordinate_include_idxs
         this_sgRNA_include_idxs = [[]] * len(this_sgRNA_include_idxs)
@@ -1815,10 +1904,14 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
     if len(this_include_idxs) == 0:
         if len(pre_exclude_include_idxs) > 0:
             raise BadParameterException(
-                'The quantification window around the sgRNA is excluded. Please decrease the exclude_bp_from_right and exclude_bp_from_left parameters.')
+                'The quantification window around the sgRNA is excluded. '
+                'Please decrease the exclude_bp_from_right and exclude_bp_from_left parameters.'
+            )
         else:
             raise BadParameterException(
-                'The entire sequence has been excluded. Please enter a longer amplicon, or decrease the exclude_bp_from_right and exclude_bp_from_left parameters')
+                'The entire sequence has been excluded. Please enter a longer amplicon, or '
+                'decrease the exclude_bp_from_right and exclude_bp_from_left parameters'
+            )
 
     if this_sgRNA_cut_points and plot_window_size > 0:
         for cut_p in this_sgRNA_cut_points:
@@ -1837,7 +1930,11 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
     this_include_idxs = np.sort(list(this_include_idxs))
     this_exclude_idxs = np.sort(list(this_exclude_idxs))
 
-    return this_sgRNA_sequences, this_sgRNA_intervals, this_sgRNA_cut_points, this_sgRNA_plot_cut_points, this_sgRNA_plot_idxs, this_sgRNA_mismatches, this_sgRNA_names, this_sgRNA_include_idxs, this_include_idxs, this_exclude_idxs
+    return (
+        this_sgRNA_sequences, this_sgRNA_intervals, this_sgRNA_cut_points, this_sgRNA_plot_cut_points,
+        this_sgRNA_plot_idxs, this_sgRNA_mismatches, this_sgRNA_names, this_sgRNA_include_idxs,
+        this_include_idxs, this_exclude_idxs,
+    )
 
 
 def set_guide_array(vals, guides, property_name):
@@ -1937,7 +2034,8 @@ def get_mismatches(seq_1, seq_2, aln_matrix, needleman_wunsch_gap_open, needlema
     params:
     seq_1: sequence to compare
     seq_2: sequence to compare against
-    aln_matrix: matrix specifying alignment substitution scores in the NCBI format. Can be read by: aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
+    aln_matrix: matrix specifying alignment substitution scores in the NCBI format.
+        Can be read by: aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
     needleman_wunsch_gap_open: needleman wunsch gap open penalty
     needleman_wunsch_gap_extend: needleman wunsch gap extend penalty
 
@@ -2000,8 +2098,10 @@ def get_best_aln_pos_and_mismatches(guide_seq, within_amp_seq, aln_matrix, needl
 
 
 def get_sgRNA_mismatch_vals(seq1, seq2, start_loc, end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r):
-    """Given coordinates between one sequence and the other, given a start and end position, finds the locations of mismatches between the sequences between the start and end positions
-    the sgRNA (as defined between start_loc and end_loc) is a substring of one of the samples, but the entire seqs are aligned to avoid any funny partial alignments
+    """Given coordinates between one sequence and the other, given a start and end position,
+    finds the locations of mismatches between the sequences between the start and end positions
+    the sgRNA (as defined between start_loc and end_loc) is a substring of one of the samples,
+    but the entire seqs are aligned to avoid any funny partial alignments
     seq1 : first sequence to compare
     seq2 : second sequence to compare
     start_loc : location to start comparison
@@ -2116,9 +2216,17 @@ def get_crispresso_header(description, header_str):
             output_line = (pad_string + logo_lines[i].ljust(max_logo_width) + pad_string).center(
                 term_width) + "\n" + output_line
 
+    version_note = (
+        '[Note that as of version 2.3.0 FLASh and Trimmomatic have been replaced by fastp for read merging '
+        'and trimming. Accordingly, the --flash_command and --trimmomatic_command parameters have been replaced '
+        'with --fastp_command. Also, --trimmomatic_options_string has been replaced with --fastp_options_string.\n\n'
+        'Also in version 2.3.2, when running CRISPRessoPooled in mixed-mode (amplicon file and genome are provided) '
+        'the default behavior will be as if the --demultiplex_only_at_amplicons parameter is provided. '
+        'This change means that reads and amplicons do not need to align to the exact locations.]'
+    )
     output_line += '\n' + ('[CRISPResso version ' + __version__ + ']').center(term_width) + '\n' + (
-        '[Note that as of version 2.3.0 FLASh and Trimmomatic have been replaced by fastp for read merging and trimming. Accordingly, the --flash_command and --trimmomatic_command parameters have been replaced with --fastp_command. Also, --trimmomatic_options_string has been replaced with --fastp_options_string.\n\nAlso in version 2.3.2, when running CRISPRessoPooled in mixed-mode (amplicon file and genome are provided) the default behavior will be as if the --demultiplex_only_at_amplicons parameter is provided. This change means that reads and amplicons do not need to align to the exact locations.]').center(
-        term_width) + "\n" + ('[For support contact k.clement@utah.edu or support@edilytics.com]').center(term_width) + "\n"
+        version_note).center(term_width) + "\n" + (
+        '[For support contact k.clement@utah.edu or support@edilytics.com]').center(term_width) + "\n"
 
     description_str = ""
     for str in description:
@@ -2212,7 +2320,8 @@ def check_custom_config(args):
     Returns
     -------
     config : dict
-        A dict with a 'colors' key that contains hex color values for different report items as well as a 'guardrails' key that contains the guardrail values.
+        A dict with a 'colors' key that contains hex color values for different report items
+        as well as a 'guardrails' key that contains the guardrail values.
 
     """
     config = {
@@ -2343,7 +2452,9 @@ def safety_check(crispresso2_info, aln_stats, guardrails):
     highRateOfModificationAtEndsGuardrail = HighRateOfModificationAtEndsGuardrail(messageHandler, guardrails['modifications_at_ends'])
     highRateOfModificationAtEndsGuardrail.safety((aln_stats['N_CACHED_ALN'] + aln_stats['N_COMPUTED_ALN']), aln_stats['N_READS_IRREGULAR_ENDS'])
 
-    highRateOfSubstitutionsOutsideWindowGuardrail = HighRateOfSubstitutionsOutsideWindowGuardrail(messageHandler, guardrails['outside_window_max_sub_rate'])
+    highRateOfSubstitutionsOutsideWindowGuardrail = HighRateOfSubstitutionsOutsideWindowGuardrail(
+        messageHandler, guardrails['outside_window_max_sub_rate'],
+    )
     highRateOfSubstitutionsOutsideWindowGuardrail.safety(aln_stats['N_GLOBAL_SUBS'], aln_stats['N_SUBS_OUTSIDE_WINDOW'])
 
     highRateOfSubstitutions = HighRateOfSubstitutionsGuardrail(messageHandler, guardrails['max_rate_of_subs'])
@@ -2512,7 +2623,12 @@ class DisproportionateReadsAlignedGuardrail:
         expected_per_amplicon = n_read_aligned / len(reads_aln_amplicon.keys())
         for amplicon, aligned in reads_aln_amplicon.items():
             if aligned <= (expected_per_amplicon * self.cutoff) or aligned >= (expected_per_amplicon * (1 - self.cutoff)):
-                amplicon_message = self.message + amplicon + ", Percent of aligned reads aligned to this amplicon: {}%.".format(round((aligned / n_read_aligned) * 100, 2))
+                amplicon_message = (
+                    self.message + amplicon +
+                    ", Percent of aligned reads aligned to this amplicon: {}%.".format(
+                        round((aligned / n_read_aligned) * 100, 2),
+                    )
+                )
                 self.messageHandler.display_warning('DisproportionateReadsAlignedGuardrail', amplicon_message)
                 self.messageHandler.report_warning(amplicon_message)
 
@@ -2549,7 +2665,10 @@ class LowRatioOfModsInWindowToOutGuardrail:
         if total_mods == 0:
             return
         if ((mods_in_window / total_mods) <= self.cutoff):
-            self.message += " Total modifications: {}, Modifications in window: {}, Modifications outside window: {}.".format(total_mods, mods_in_window, mods_outside_window)
+            self.message += (
+                " Total modifications: {}, Modifications in window: {}, "
+                "Modifications outside window: {}.".format(total_mods, mods_in_window, mods_outside_window)
+            )
             self.messageHandler.display_warning('LowRatioOfModsInWindowToOutGuardrail', self.message)
             self.messageHandler.report_warning(self.message)
 

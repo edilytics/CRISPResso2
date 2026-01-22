@@ -25,10 +25,27 @@ def main():
 
     args = parser.parse_args()
 
-    filterFastqs(args.fastq_r1, args.fastq_r2, args.fastq_r1_out, args.fastq_r2_out, args.min_bp_qual_in_read, args.min_av_read_qual, args.min_bp_qual_or_N)
+    filterFastqs(
+        args.fastq_r1,
+        args.fastq_r2,
+        args.fastq_r1_out,
+        args.fastq_r2_out,
+        args.min_bp_qual_in_read,
+        args.min_av_read_qual,
+        args.min_bp_qual_or_N,
+    )
 
 
-def filterFastqs(fastq_r1=None, fastq_r2=None, fastq_r1_out=None, fastq_r2_out=None, min_bp_qual_in_read=None, min_av_read_qual=None, min_bp_qual_or_N=None, debug=False):
+def filterFastqs(
+    fastq_r1=None,
+    fastq_r2=None,
+    fastq_r1_out=None,
+    fastq_r2_out=None,
+    min_bp_qual_in_read=None,
+    min_av_read_qual=None,
+    min_bp_qual_or_N=None,
+    debug=False,
+):
     """Filter FASTQ files based on quality thresholds for minimum base pair quality, average read quality, and low quality to N conversion.
 
     Parameters
@@ -677,7 +694,11 @@ def run_mBP_mRQ_mBPN_pair(f1_in, f1_out, f2_in, f2_out, min_bp_qual_in_read, min
                 f1_out.write("%s\n%s\n%s\n%s\n" % (idLine, npSeqLine.tostring().decode('utf-8'), plusLine.decode('utf-8'), qualLine.decode('utf-8')))
                 npSeqLine2 = numpy.frombuffer(seqLine2, 'c').copy()
                 npSeqLine2[npQualLine2 < min_bp_qual_or_N] = 'N'
-                f2_out.write("%s\n%s\n%s\n%s\n" % (idLine2, npSeqLine2.tostring().decode('utf-8'), plusLine2.decode('utf-8'), qualLine2.decode('utf-8')))
+                f2_out.write(
+                    "%s\n%s\n%s\n%s\n"
+                    % (idLine2, npSeqLine2.tostring().decode('utf-8'),
+                       plusLine2.decode('utf-8'), qualLine2.decode('utf-8'))
+                )
         idLine = f1_in.readline().rstrip().decode('utf-8')
         idLine2 = f2_in.readline().rstrip().decode('utf-8')
 

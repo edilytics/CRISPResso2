@@ -27,7 +27,9 @@ def get_ref_details_from_aln_details(aln_details):
     """Get the reference details from the 'ALN_DETAILS' element of the 3rd line (plus line) of a CRISPResso-annotated fastq file
 
     Args:
-        aln_details (str): The ALN_DETAILS element consisting of the reference name, read sequence alignment, reference sequence alignment, and alignment score for each reference
+        aln_details (str): The ALN_DETAILS element consisting of the reference name,
+            read sequence alignment, reference sequence alignment, and alignment
+            score for each reference
 
     Returns:
         dict: dictionary of ref_name > read_seq_alignment, ref_seq_alignment, aln_score
@@ -45,9 +47,12 @@ def get_ref_details_from_aln_details(aln_details):
 
 
 def get_ref_coordinates_from_aln(read_aln, ref_aln):
-    """Get the reference coordinates from the read and reference alignments
-    So if we want to check the base at the 5th base in the reference, we would go to the ref_pos_in_aln[5]th position in the alignment
-    If we want to get the base in the read corresponding to the 5th base in the reference, we would go to the ref_pos_in_read[5]th position in the read
+    """Get the reference coordinates from the read and reference alignments.
+
+    So if we want to check the base at the 5th base in the reference, we would
+    go to the ref_pos_in_aln[5]th position in the alignment. If we want to get
+    the base in the read corresponding to the 5th base in the reference, we
+    would go to the ref_pos_in_read[5]th position in the read
 
     Args:
         read_aln (str): read alignment

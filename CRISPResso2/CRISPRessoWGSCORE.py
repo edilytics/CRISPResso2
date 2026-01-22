@@ -219,7 +219,11 @@ def extract_reads(row, samtools_exclude_flags):
 
         info("Extracting reads in:%s and creating .bam file: %s" % (region, row.bam_file_with_reads_in_region))
 
-        cmd = rf"""samtools view -b -F {samtools_exclude_flags} --reference {row.reference_file} {row.original_bam} {region} > {row.bam_file_with_reads_in_region} """
+        cmd = (
+            rf"samtools view -b -F {samtools_exclude_flags} --reference "
+            rf"{row.reference_file} {row.original_bam} {region} > "
+            rf"{row.bam_file_with_reads_in_region}"
+        )
         sb.call(cmd, shell=True)
 
         cmd = r"""samtools index %s """ % (row.bam_file_with_reads_in_region)
@@ -300,8 +304,10 @@ def main():
                     + "-h, --help            show the full list of arguments\n"
                     + "-v, --version         show program's version number and exit\n"
                     + "-b BAM_FILE           WGS aligned bam file (required)\n"
-                    +
-                        + "-f REGION_FILE        Regions description file. A BED format file containing the regions to analyze, one per line. The required columns are: chr_id(chromosome name), bpstart(start position), bpend(end position). (required)\n"
+                    + "-f REGION_FILE        Regions description file. A BED format file "
+                    "containing the regions to analyze, one per line. The required columns "
+                    "are: chr_id(chromosome name), bpstart(start position), "
+                    "bpend(end position). (required)\n"
                     + "-r REFERENCE_FILE     Reference genome in fasta format (required)\n"
                     + "-n NAME, --name NAME  Name for the analysis (default: name based on input file name)"
                 )
@@ -365,7 +371,9 @@ def main():
 
         if args.zip_output and not args.place_report_in_output_folder:
             logger.warn(
-                "Invalid arguement combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True."
+                "Invalid arguement combination: If zip_output is True then "
+                "place_report_in_output_folder must also be True. "
+                "Setting place_report_in_output_folder to True."
             )
             args.place_report_in_output_folder = True
 
@@ -461,12 +469,14 @@ def main():
                             can_finish_incomplete_run = True
                             if "finished_steps" in previous_run_data["running_info"]:
                                 for key in previous_run_data["running_info"]["finished_steps"].keys():
-                                    crispresso2_info["running_info"]["finished_steps"][key] = previous_run_data["running_info"]["finished_steps"][key]
+                                    prev_steps = previous_run_data["running_info"]["finished_steps"]
+                                    crispresso2_info["running_info"]["finished_steps"][key] = prev_steps[key]
                                     if args.debug:
                                         info("finished: " + key)
                 else:
                     info(
-                        "The no_rerun flag is set, but this analysis will be rerun because the existing run was performed using an old version of CRISPResso ("
+                        "The no_rerun flag is set, but this analysis will be rerun because "
+                        "the existing run was performed using an old version of CRISPResso ("
                         + str(previous_run_data["running_info"]["version"])
                         + ")."
                     )
@@ -699,7 +709,13 @@ def main():
         good_region_names = []
         good_region_display_names = {}
         good_region_folders = {}
-        header = "Name\tUnmodified%\tModified%\tReads_total\tReads_aligned\tUnmodified\tModified\tDiscarded\tInsertions\tDeletions\tSubstitutions\tO" + "nly Insertions\tOnly Deletions\tOnly Substitutions\tInsertions and Deletions\tInsertions and Substitutions\tDeletions and Substitu" + "tions\tInsertions Deletions and Substitutions"
+        header = (
+            "Name\tUnmodified%\tModified%\tReads_total\tReads_aligned\tUnmodified\t"
+            "Modified\tDiscarded\tInsertions\tDeletions\tSubstitutions\t"
+            "Only Insertions\tOnly Deletions\tOnly Substitutions\t"
+            "Insertions and Deletions\tInsertions and Substitutions\t"
+            "Deletions and Substitutions\tInsertions Deletions and Substitutions"
+        )
         header_els = header.split("\t")
         header_el_count = len(header_els)
         empty_line_els = [np.nan] * (header_el_count - 1)
@@ -826,7 +842,9 @@ def main():
             crispresso2_info["results"]["general_plots"]["summary_plot_names"].append(plot_name)
             crispresso2_info["results"]["general_plots"]["summary_plot_titles"][plot_name] = "CRISPRessoWGS Read Allocation Summary"
             crispresso2_info["results"]["general_plots"]["summary_plot_labels"][plot_name] = (
-                "Each bar shows the total number of reads allocated to each amplicon. The vertical line shows the cutoff for analysis, set using the --min_reads_to_use_region parameter."
+                "Each bar shows the total number of reads allocated to each amplicon. "
+                "The vertical line shows the cutoff for analysis, set using the "
+                "--min_reads_to_use_region parameter."
             )
             crispresso2_info["results"]["general_plots"]["summary_plot_datas"][plot_name] = [
                 ("CRISPRessoWGS summary", os.path.basename(samples_quantification_summary_filename))
@@ -844,7 +862,10 @@ def main():
             crispresso2_info["results"]["general_plots"]["summary_plot_names"].append(plot_name)
             crispresso2_info["results"]["general_plots"]["summary_plot_titles"][plot_name] = "CRISPRessoWGS Modification Summary"
             crispresso2_info["results"]["general_plots"]["summary_plot_labels"][plot_name] = (
-                "Each bar shows the total number of reads aligned to each amplicon, divided into the reads that are modified and unmodified. The vertical line shows the cutoff for analysis, set using the --min_reads_to_use_region parameter."
+                "Each bar shows the total number of reads aligned to each amplicon, "
+                "divided into the reads that are modified and unmodified. The vertical "
+                "line shows the cutoff for analysis, set using the "
+                "--min_reads_to_use_region parameter."
             )
             crispresso2_info["results"]["general_plots"]["summary_plot_datas"][plot_name] = [
                 ("CRISPRessoWGS summary", os.path.basename(samples_quantification_summary_filename))

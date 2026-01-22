@@ -56,7 +56,8 @@ def main():
 
         parser.add_argument(
             "--place_report_in_output_folder",
-            help="If true, report will be written inside the CRISPResso output folder. By default, the report will be written one directory up from the report output.",
+            help="If true, report will be written inside the CRISPResso output folder. "
+            "By default, the report will be written one directory up from the report output.",
             action="store_true",
         )
         parser.add_argument("--suppress_report", help="Suppress output report", action="store_true")
@@ -73,8 +74,9 @@ def main():
         parser.add_argument(
             "--n_processes",
             type=str,
-            help="Specify the number of processes to use for analysis.\
-        Please use with caution since increasing this parameter will significantly increase the memory required to run CRISPResso. Can be set to 'max'.",
+            help="Specify the number of processes to use for analysis. "
+            "Please use with caution since increasing this parameter will significantly "
+            "increase the memory required to run CRISPResso. Can be set to 'max'.",
             default="1",
         )
 
@@ -790,9 +792,11 @@ ___________________________________
                                 )
                             )
                             crispresso2_info["results"]["general_plots"]["allele_modification_heatmap_plot_labels"][plot_name] = (
-                                "Each row is a sample and each column is a position in the amplicon sequence." +
-                                f"Each cell shows the percentage of {modification_type.lower()} for the sample at that position relative to the amplicon." +
-                                "Guides for each sample are identified by a black rectangle."
+                                "Each row is a sample and each column is a position in the "
+                                "amplicon sequence. "
+                                + f"Each cell shows the percentage of {modification_type.lower()} "
+                                "for the sample at that position relative to the amplicon. "
+                                + "Guides for each sample are identified by a black rectangle."
                             )
                             crispresso2_info["results"]["general_plots"]["allele_modification_heatmap_plot_datas"][plot_name] = [
                                 (
@@ -831,9 +835,9 @@ ___________________________________
                                 )
                             )
                             crispresso2_info["results"]["general_plots"]["allele_modification_line_plot_labels"][plot_name] = (
-                                "Each line is a sample that indicates the percentage of {0} for the sample at that position relative to the amplicon. Guides are shown by a grey rectangle.".format(
-                                    modification_type.lower()
-                                )
+                                "Each line is a sample that indicates the percentage of {0} for "
+                                "the sample at that position relative to the amplicon. Guides are "
+                                "shown by a grey rectangle.".format(modification_type.lower())
                             )
                             crispresso2_info["results"]["general_plots"]["allele_modification_line_plot_datas"][plot_name] = [
                                 (
@@ -991,7 +995,10 @@ ___________________________________
                 crispresso2_info["results"]["general_plots"]["summary_plot_names"].append(plot_name)
                 crispresso2_info["results"]["general_plots"]["summary_plot_titles"][plot_name] = "CRISPRessoAggregate Modification Summary"
                 crispresso2_info["results"]["general_plots"]["summary_plot_labels"][plot_name] = (
-                    "Each bar shows the total number of reads aligned to each amplicon, divided into the reads that are modified and unmodified. The vertical line shows the cutoff for analysis, set using the --min_reads_for_inclusion parameter."
+                    "Each bar shows the total number of reads aligned to each amplicon, "
+                    "divided into the reads that are modified and unmodified. The vertical "
+                    "line shows the cutoff for analysis, set using the "
+                    "--min_reads_for_inclusion parameter."
                 )
                 crispresso2_info["results"]["general_plots"]["summary_plot_datas"][plot_name] = [
                     ("CRISPRessoAggregate summary", os.path.basename(samples_quantification_summary_filename)),

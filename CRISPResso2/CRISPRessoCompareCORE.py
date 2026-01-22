@@ -128,7 +128,9 @@ def main():
 
         if args.zip_output and not args.place_report_in_output_folder:
             warn(
-                "Invalid argument combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True."
+                "Invalid argument combination: If zip_output is True then "
+                "place_report_in_output_folder must also be True. "
+                "Setting place_report_in_output_folder to True."
             )
             args.place_report_in_output_folder = True
         # check that the CRISPResso output is present and fill amplicon_info
@@ -464,8 +466,13 @@ def main():
                 crispresso2_info["results"]["general_plots"]["summary_plot_names"].append(plot_name)
                 crispresso2_info["results"]["general_plots"]["summary_plot_titles"][plot_name] = "Alleles enriched in " + sample_1_name
                 crispresso2_info["results"]["general_plots"]["summary_plot_labels"][plot_name] = (
-                    "Distribution comparison of alleles. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site. "
-                    + "The proportion and number of reads is shown for each sample on the right, with the values for "
+                    "Distribution comparison of alleles. Nucleotides are indicated by unique "
+                    "colors (A = green; C = red; G = yellow; T = purple). Substitutions are "
+                    "shown in bold font. Red rectangles highlight inserted sequences. "
+                    "Horizontal dashed lines indicate deleted sequences. The vertical dashed "
+                    "line indicates the predicted cleavage site. "
+                    + "The proportion and number of reads is shown for each sample on the "
+                    "right, with the values for "
                     + sample_1_name
                     + " followed by the values for "
                     + sample_2_name
@@ -491,8 +498,13 @@ def main():
                 crispresso2_info["results"]["general_plots"]["summary_plot_names"].append(plot_name)
                 crispresso2_info["results"]["general_plots"]["summary_plot_titles"][plot_name] = "Alleles enriched in " + sample_2_name
                 crispresso2_info["results"]["general_plots"]["summary_plot_labels"][plot_name] = (
-                    "Distribution comparison of alleles. Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site. "
-                    + "The proportion and number of reads is shown for each sample on the right, with the values for "
+                    "Distribution comparison of alleles. Nucleotides are indicated by unique "
+                    "colors (A = green; C = red; G = yellow; T = purple). Substitutions are "
+                    "shown in bold font. Red rectangles highlight inserted sequences. "
+                    "Horizontal dashed lines indicate deleted sequences. The vertical dashed "
+                    "line indicates the predicted cleavage site. "
+                    + "The proportion and number of reads is shown for each sample on the "
+                    "right, with the values for "
                     + sample_1_name
                     + " followed by the values for "
                     + sample_2_name
