@@ -8,6 +8,7 @@ from CRISPResso2 import CRISPRessoShared
 
 
 def count_sgRNA_specific_edits(crispresso_output_folder):
+    """Count edits specific to each sgRNA from a CRISPResso output folder."""
     crispresso2_info = CRISPRessoShared.load_crispresso_info(crispresso_output_folder)
 
     run_version = crispresso2_info["running_info"]["version"]

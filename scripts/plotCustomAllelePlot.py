@@ -51,10 +51,12 @@ def main():
 
 
 def arrStr_to_arr(val):
+    """Convert a string representation of an array to a list of integers."""
     return [int(x) for x in val[1:-1].split(",")]
 
 
 def get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right):
+    """Extract sequence data around a cut point with asymmetric left/right windows."""
     cut_idx = row["ref_positions"].index(cut_point)
     return (
         row["Aligned_Sequence"][cut_idx - plot_left + +1 : cut_idx + plot_right + 1],
@@ -69,6 +71,7 @@ def get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right):
 
 
 def get_dataframe_around_cut_asymmetrical(df_alleles, cut_point, plot_left, plot_right, collapse_by_sequence=True):
+    """Create a dataframe of alleles around a cut point with asymmetric windows."""
     if df_alleles.shape[0] == 0:
         return df_alleles
     ref1 = df_alleles["Reference_Sequence"].iloc[0]

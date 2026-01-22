@@ -19,6 +19,7 @@ import sys
 
 
 def get_max_processes():
+    """Return the number of CPUs available for multiprocessing."""
     return mp.cpu_count()
 
 
@@ -50,6 +51,7 @@ def run_crispresso(crispresso_cmds, descriptor, idx):
 
 
 def wrapper(func, args):
+    """Wrap a function call to return results with their index for ordered collection."""
     idx, args = args
     return (idx, func(args))
 
@@ -252,6 +254,7 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
 
 
 def run_subprocess(cmd):
+    """Execute a shell command and return its exit code."""
     return sb.call(cmd, shell=True)
 
 

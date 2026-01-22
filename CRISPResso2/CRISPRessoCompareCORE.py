@@ -24,6 +24,7 @@ info = logger.info
 
 
 def check_library(library_name):
+    """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
     except:
@@ -32,6 +33,7 @@ def check_library(library_name):
 
 
 def parse_profile(profile_file):
+    """Load and return a modification profile from a file, skipping the header row."""
     return np.loadtxt(profile_file, skiprows=1)
 
 
@@ -58,6 +60,7 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 
 def normalize_name(name, output_folder_1, output_folder_2):
+    """Generate a comparison name from folder names if not provided."""
     def get_name_from_folder(x):
         return os.path.basename(os.path.abspath(x)).replace("CRISPResso_on_", "")
 
@@ -71,6 +74,7 @@ def normalize_name(name, output_folder_1, output_folder_2):
 
 
 def get_matching_allele_files(run_info_1, run_info_2):
+    """Find allele frequency files for matching amplicons between two CRISPResso runs."""
     def get_amplicon_info(run_info):
         return {
             amplicon["sequence"]: {
@@ -103,6 +107,7 @@ def get_matching_allele_files(run_info_1, run_info_2):
 
 
 def main():
+    """Run the CRISPRessoCompare analysis to compare two CRISPResso runs."""
     try:
         parser = CRISPRessoShared.getCRISPRessoArgParser("Compare", parser_title="CRISPRessoCompare Parameters")
 

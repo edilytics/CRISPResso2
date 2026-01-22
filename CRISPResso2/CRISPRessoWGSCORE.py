@@ -36,10 +36,12 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 # Support functions###
 def get_data(path):
+    """Return the full path to a data file within the package data directory."""
     return os.path.join(_ROOT, "data", path)
 
 
 def check_library(library_name):
+    """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
     except:
@@ -48,15 +50,18 @@ def check_library(library_name):
 
 
 def find_wrong_nt(sequence):
+    """Find nucleotides in a sequence that are not A, T, C, G, or N."""
     return list(set(sequence.upper()).difference({"A", "T", "C", "G", "N"}))
 
 
 def capitalize_sequence(x):
+    """Convert a sequence to uppercase, handling null values."""
     return str(x).upper() if not pd.isnull(x) else x
 
 
 # the dependencies are bowtie2 and samtools
 def which(program):
+    """Find and return the full path to a program in the system PATH."""
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
@@ -75,6 +80,7 @@ def which(program):
 
 
 def check_samtools():
+    """Check if samtools is installed and return True if found."""
     cmd_path = which("samtools")
     if cmd_path:
         return True
@@ -85,6 +91,7 @@ def check_samtools():
 
 
 def check_bowtie2():
+    """Check if bowtie2 and bowtie2-inspect are installed and return True if found."""
     cmd_path1 = which("bowtie2")
     cmd_path2 = which("bowtie2-inspect")
 
@@ -101,12 +108,14 @@ def check_bowtie2():
 # if a reference index is provided aligne the reads to it
 # extract region
 def get_region_from_fa(chr_id, bpstart, bpend, uncompressed_reference):
+    """Extract a genomic region sequence from a FASTA file using samtools faidx."""
     region = "%s:%d-%d" % (chr_id, bpstart, bpend - 1)
     p = sb.Popen("samtools faidx %s %s |   grep -v ^\\> | tr -d '\n'" % (uncompressed_reference, region), shell=True, stdout=sb.PIPE)
     return p.communicate()[0].decode("utf-8").upper()
 
 
 def find_overlapping_genes(row, df_genes):
+    """Find genes that overlap with a given genomic region and add them to the row."""
     df_genes_overlapping = df_genes.loc[(df_genes.chrom == row.chr_id) & (df_genes.txStart <= row.bpend) & (row.bpstart <= df_genes.txEnd)]
     genes_overlapping = []
 
@@ -128,10 +137,12 @@ def find_overlapping_genes(row, df_genes):
 
 
 def find_last(mylist, myvalue):
+    """Find and return the index of the last occurrence of a value in a list."""
     return len(mylist) - mylist[::-1].index(myvalue) - 1
 
 
 def get_reference_positions(pos, cigar, full_length=True):
+    """Convert a CIGAR string to a list of reference positions for each base in the read."""
     positions = []
 
     ops = re.findall(r"(\d+)(\w)", cigar)
@@ -205,12 +216,14 @@ np = check_library("numpy")
 
 
 def get_n_reads_fastq(fastq_filename):
+    """Return the number of reads in a FASTQ file (supports gzipped files)."""
     p = sb.Popen(("z" if fastq_filename.endswith(".gz") else "") + "cat < %s | wc -l" % fastq_filename, shell=True, stdout=sb.PIPE)
     n_reads = int(float(p.communicate()[0]) / 4.0)
     return n_reads
 
 
 def extract_reads(row, samtools_exclude_flags):
+    """Extract and trim reads from a BAM file for a specific genomic region."""
     if row.sequence:
         # create place-holder fastq files
         open(row.fastq_file_trimmed_reads_in_region, "w+", encoding="utf-8").close()
@@ -236,6 +249,7 @@ def extract_reads(row, samtools_exclude_flags):
 
 
 def extract_reads_chunk(df, samtools_exclude_flags):
+    """Process a chunk of regions to extract reads from BAM files."""
     new_df = pd.DataFrame(columns=df.columns)
     for i in range(len(df)):
         new_df.loc[i] = extract_reads(df.iloc[i].copy(), samtools_exclude_flags)
@@ -278,6 +292,7 @@ def normalize_name(name, bam_file):
 
 
 def main():
+    """Run the CRISPRessoWGS analysis for whole genome sequencing data."""
     def print_stacktrace_if_debug():
         debug_flag = False
         if "args" in vars() and "debug" in args:

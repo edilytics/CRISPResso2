@@ -1479,7 +1479,7 @@ def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_
 
 
 def get_base_edit_row_around_cut(row, conversion_nuc_from):
-
+    """Extract base editing information at positions containing the target nucleotide."""
     include_inds = [i for i, c in enumerate(row['Reference_Sequence']) if c == conversion_nuc_from]
 
     filtered_aligned_seq = ''.join([row['Aligned_Sequence'][i] for i in include_inds])
@@ -1498,6 +1498,7 @@ def get_base_edit_row_around_cut(row, conversion_nuc_from):
 
 
 def get_base_edit_dataframe_around_cut(df_alleles, conversion_nuc_inds):
+    """Create a dataframe of alleles filtered to positions containing the target nucleotide."""
     if df_alleles.shape[0] == 0:
         return df_alleles
 
@@ -1520,11 +1521,13 @@ def get_base_edit_dataframe_around_cut(df_alleles, conversion_nuc_inds):
 
 
 def get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right):
+    """Extract sequence data around a cut point with asymmetric left/right windows."""
     cut_idx = row['ref_positions'].index(cut_point)
     return row['Aligned_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1], row['Reference_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1], row['Read_Status'] == 'UNMODIFIED', row['n_deleted'], row['n_inserted'], row['n_mutated'], row['#Reads'], row['%Reads']
 
 
 def get_dataframe_around_cut_asymmetrical(df_alleles, cut_point, plot_left, plot_right, collapse_by_sequence=True):
+    """Create a dataframe of alleles around a cut point with asymmetric windows."""
     if df_alleles.shape[0] == 0:
         return df_alleles
     ref1 = df_alleles['Reference_Sequence'].iloc[0]
@@ -1541,6 +1544,7 @@ def get_dataframe_around_cut_asymmetrical(df_alleles, cut_point, plot_left, plot
 
 
 def get_row_around_cut_debug(row, cut_point, offset):
+    """Extract sequence data around a cut point for debugging, including full sequences."""
     cut_idx = row['ref_positions'].index(cut_point)
     # don't check overflow -- it was checked when program started
     return row['Aligned_Sequence'][cut_idx - offset + 1:cut_idx + offset + 1], row['Reference_Sequence'][
@@ -1550,6 +1554,7 @@ def get_row_around_cut_debug(row, cut_point, offset):
 
 
 def get_dataframe_around_cut_debug(df_alleles, cut_point, offset):
+    """Create a debug dataframe of alleles around a cut point including original sequences."""
     df_alleles_around_cut = pd.DataFrame(
         list(df_alleles.apply(lambda row: get_row_around_cut_debug(row, cut_point, offset), axis=1).values),
         columns=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated', '#Reads',
@@ -1564,6 +1569,7 @@ def get_dataframe_around_cut_debug(df_alleles, cut_point, offset):
 
 
 def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point):
+    """Translate and align a sequence row to amino acids for plotting."""
     cut_idx = row['ref_positions'].index(amino_acid_cut_point)
     left_idx = row['ref_positions'].index(plot_left_idx)
     seq_acids_and_codons = get_amino_acids_and_codons(row['Aligned_Sequence'][left_idx::].replace('-', ''))
@@ -1605,6 +1611,7 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
 
 
 def get_amino_acid_dataframe(df_alleles, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point, collapse_by_sequence=True):
+    """Create a dataframe of translated amino acid sequences for allele plotting."""
     if df_alleles.shape[0] == 0:
         return df_alleles
 
@@ -2066,6 +2073,7 @@ def get_quant_window_ranges_from_include_idxs(include_idxs):
 # terminal functions
 ######
 def get_crispresso_logo():
+    """Return the ASCII art CRISPResso logo."""
     return (r'''
      _
     '  )
@@ -2129,6 +2137,7 @@ def get_crispresso_header(description, header_str):
 
 
 def get_crispresso_footer():
+    """Create the CRISPResso footer string with logos."""
     logo = get_crispresso_logo()
     logo_lines = logo.splitlines()
 
@@ -2176,6 +2185,7 @@ def format_cl_text(text, max_chars=None, spaces_to_tab=4):
 
 
 def zip_results(results_folder):
+    """Compress a CRISPResso results folder into a zip archive."""
     path_values = os.path.split(results_folder)
     output_folder = path_values[0]
     folder_id = path_values[1]
@@ -2191,6 +2201,7 @@ def zip_results(results_folder):
 
 
 def is_C2Pro_installed():
+    """Check if CRISPRessoPro is installed and return True if found."""
     try:
         spec = importlib.util.find_spec("CRISPRessoPro")
         if spec is None:

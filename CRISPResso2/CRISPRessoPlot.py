@@ -472,6 +472,7 @@ def plot_indel_size_distribution(
     save_also_png=False,
     **kwargs,
 ):
+    """Plot a histogram showing the distribution of indel sizes."""
     fig, ax = plt.subplots(figsize=(10, 10))
     densityPct_0 = 0.0
     densityPcts = [0.0] * len(hdensity)
@@ -528,6 +529,7 @@ def plot_frequency_deletions_insertions(
     save_also_png=False,
     **kwargs,
 ):
+    """Plot histograms showing the frequency and size distribution of insertions, deletions, and substitutions."""
     y_values_mut = ref['y_values_mut']
     x_bins_mut = ref['x_bins_mut']
     y_values_ins = ref['y_values_ins']
@@ -1677,6 +1679,7 @@ def plot_frameshift_frequency(
     save_also_png=False,
     **kwargs,
 ):
+    """Plot histograms showing the frequency of frameshift and in-frame mutations."""
     fig, ax = plt.subplots(1, 2, figsize=(22, 10))
     ax1 = ax[0]
     x, y = map(np.array, zip(*[a for a in hists_frameshift.items()], strict=False))
@@ -1773,6 +1776,7 @@ def plot_global_frameshift_analysis(
     save_also_png=False,
     **kwargs,
 ):
+    """Plot a pie chart showing the global distribution of frameshift, in-frame, and noncoding mutations."""
     fig, ax = plt.subplots(figsize=(12, 12))
 
     _patches, _texts, _autotexts = ax.pie(
@@ -1914,6 +1918,7 @@ def plot_impact_on_splice_sites(
     save_also_png=False,
     **kwargs,
 ):
+    """Plot a pie chart showing the proportion of reads with potential splice site modifications."""
     fig, ax = plt.subplots(figsize=(12, 12))
     _patches, _texts, _autotexts = ax.pie(
         [
@@ -2148,6 +2153,7 @@ def plot_scaffold_indel_lengths(
     save_also_png=False,
     **kwargs,
 ):
+    """Plot a histogram showing scaffold insertion lengths and gap lengths."""
     colors = ['b', 'g']
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.hist(
@@ -3007,7 +3013,7 @@ def custom_heatmap(data, vmin=None, vmax=None, cmap=None, center=None, robust=Fa
             square=False, ax=None, xticklabels=True, yticklabels=True,
             mask=None,
             **kwargs):
-
+    """Create a customized heatmap with per-element annotation formatting support."""
     # Initialize the plotter object
     plotter = Custom_HeatMapper(data, vmin, vmax, cmap, center, robust, annot, fmt,
                           annot_kws, per_element_annot_kws, cbar, cbar_kws, xticklabels,
@@ -4338,6 +4344,7 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
 
 
 def plot_class_dsODN_piechart(sizes, labels, plot_root=None, save_also_png=False, **kwargs):
+    """Plot a pie chart showing dsODN classification categories."""
     fig, ax = plt.subplots(figsize=(12, 12))
     _patches, _texts, _autotexts = ax.pie(sizes, labels=labels, autopct='%1.2f%%')
 
@@ -4367,6 +4374,7 @@ def plot_quantification_comparison_barchart(
     save_also_png=False,
     **kwargs
 ):
+    """Plot a bar chart comparing modification rates between two samples."""
     fig, axs = plt.subplots(1, 2, figsize=(30, 15))
     n_groups = 2
 
@@ -4449,6 +4457,7 @@ def plot_quantification_positions(
     save_also_png=False,
     **kwargs,
 ):
+    """Plot position-wise modification differences and p-values between two samples."""
     fig, axs = plt.subplots(2, 1, figsize=(20, 10))
     ax1 = axs[0]
 
@@ -4589,6 +4598,7 @@ def plot_quantification_positions(
 
 
 def plot_combination_upset(fig_root, ref_name, bp_substitutions_arr, binary_allele_counts, save_also_png=False):
+    """Plot an UpSet plot showing combinations of base substitutions across alleles."""
     header_arr = []
     for _ind, (ref_ind, ref_base, mod_base) in enumerate(bp_substitutions_arr):
         header_arr.append(str(ref_ind) + ':' + ref_base + '->' + mod_base)

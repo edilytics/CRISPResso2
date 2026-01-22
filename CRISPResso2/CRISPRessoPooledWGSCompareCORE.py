@@ -27,6 +27,7 @@ info = logger.info
 
 
 def check_library(library_name):
+    """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
     except:
@@ -35,6 +36,7 @@ def check_library(library_name):
 
 
 def check_PooledWGS_output_folder(output_folder):
+    """Validate that a folder contains CRISPRessoPooled or CRISPRessoWGS output."""
     quantification_summary_file = os.path.join(
         output_folder,
         "SAMPLES_QUANTIFICATION_SUMMARY.txt",
@@ -63,6 +65,7 @@ CRISPResso_compare_to_call = "CRISPRessoCompare"
 
 
 def main():
+    """Run the CRISPRessoPooledWGSCompare analysis to compare two pooled or WGS runs."""
     try:
         description = [
             "~~~CRISPRessoPooledWGSCompare~~~",

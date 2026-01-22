@@ -30,6 +30,7 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 # Support functions###
 def propagate_options(cmd, options, params, paramInd):
+    """Append command-line options from a parameters dataframe to a command string."""
     ####
     # cmd - the command to run
     # options - list of options to propagate e.g. crispresso options
@@ -63,6 +64,7 @@ def propagate_options(cmd, options, params, paramInd):
 
 
 def check_library(library_name):
+    """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
     except:
@@ -75,6 +77,7 @@ np = check_library("numpy")
 
 
 def main():
+    """Run the CRISPRessoMeta analysis using a metadata file to process multiple samples."""
     try:
         description = ["~~~CRISPRessoMeta~~~", "-Analysis of CRISPR/Cas9 outcomes from deep sequencing data using a metadata file-"]
         meta_string = r"""

@@ -12,6 +12,7 @@ from CRISPResso2 import CRISPRessoShared
 
 
 def main():
+    """Plot allele tables for ambiguous reads from a CRISPResso output folder."""
     parser = argparse.ArgumentParser(description="Plot ambiguous reads")
     parser.add_argument("-f", "--CRISPResso2_folder", type=str, help="CRISPResso output folder to plot ambiguous reads for", required=True)
     parser.add_argument("-o", "--output_root", type=str, help="Plot output root (should not include '.pdf' or '.png')", required=True)
@@ -41,6 +42,7 @@ def main():
 
 
 def arrStr_to_arr(val):
+    """Convert a string representation of an array to a list of integers."""
     return [int(x) for x in val[1:-1].split(",")]
 
 

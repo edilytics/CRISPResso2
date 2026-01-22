@@ -36,10 +36,12 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 # Support functions###
 def get_data(path):
+    """Return the full path to a data file within the package data directory."""
     return os.path.join(_ROOT, "data", path)
 
 
 def check_library(library_name):
+    """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
     except:
@@ -49,6 +51,7 @@ def check_library(library_name):
 
 # the dependencies are bowtie2 and samtools
 def which(program):
+    """Find and return the full path to a program in the system PATH."""
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
@@ -67,7 +70,7 @@ def which(program):
 
 
 def check_samtools():
-    """Assert that samtools is installed"""
+    """Assert that samtools is installed."""
     cmd_path = which("samtools")
     if cmd_path:
         return True
@@ -112,6 +115,7 @@ def print_full_pandas_df(x):
 
 # get n_reads and region data from region fastq file (location is pulled from filename)
 def summarize_region_fastq_chunk(input_arr):
+    """Extract read counts and sequence data from region FASTQ files."""
     ret_val = []
     for input in input_arr:
         #        print('doing region ' + str(input))
@@ -156,6 +160,7 @@ def get_read_length_from_cigar(cigar_string):
 
 
 def get_n_reads_bam(bam_filename):
+    """Return the number of reads in a BAM file using samtools."""
     p = sb.Popen("samtools view -c %s" % bam_filename, shell=True, stdout=sb.PIPE)
     return int(p.communicate()[0])
 
@@ -179,11 +184,13 @@ def calculate_aligned_samtools_exclude_flags(samtools_exclude_flags):
 
 
 def get_n_aligned_bam(bam_filename, samtools_exclude_flags):
+    """Return the number of aligned reads in a BAM file, excluding specified flags."""
     p = sb.Popen(f"samtools view -F {calculate_aligned_samtools_exclude_flags(samtools_exclude_flags)} -c {bam_filename}", shell=True, stdout=sb.PIPE)
     return int(p.communicate()[0])
 
 
 def get_n_aligned_bam_region(bam_filename, chr_name, chr_start, chr_end, samtools_exclude_flags):
+    """Return the number of aligned reads in a specific genomic region of a BAM file."""
     p = sb.Popen(
         f"samtools view -F {calculate_aligned_samtools_exclude_flags(samtools_exclude_flags)} -c {bam_filename} {chr_name}:{chr_start}-{chr_end}",
         shell=True,
@@ -193,6 +200,7 @@ def get_n_aligned_bam_region(bam_filename, chr_name, chr_start, chr_end, samtool
 
 
 def find_overlapping_genes(row, df_genes):
+    """Find genes that overlap with a given genomic region and add them to the row."""
     df_genes_overlapping = df_genes.loc[(df_genes.chrom == row.chr_id) & (df_genes.txStart <= row.bpend) & (row.bpstart <= df_genes.txEnd)]
     genes_overlapping = []
 
@@ -264,6 +272,7 @@ np = check_library("numpy")
 
 
 def main():
+    """Run the CRISPRessoPooled analysis for pooled amplicon sequencing data."""
     try:
         start_time = datetime.now()
         start_time.strftime("%Y-%m-%d %H:%M:%S")

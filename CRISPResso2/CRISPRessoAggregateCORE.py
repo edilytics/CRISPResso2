@@ -39,6 +39,7 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 
 def main():
+    """Run the CRISPRessoAggregate analysis to combine multiple CRISPResso2 runs."""
     try:
         start_time = datetime.now()
         start_time_string = start_time.strftime("%Y-%m-%d %H:%M:%S")

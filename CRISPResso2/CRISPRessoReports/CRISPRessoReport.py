@@ -433,6 +433,7 @@ def make_compare_report_from_folder(crispresso_report_file, crispresso2_info, fo
 
 
 def make_meta_report_from_folder(crispresso_report_file, crispresso2_info, folder, _root, logger):
+    """Generate an HTML report for a CRISPRessoMeta analysis."""
     names_arr = crispresso2_info["meta_names_arr"]
     input_names = crispresso2_info["meta_input_names"]
     output_title = "CRISPresso Meta Output"

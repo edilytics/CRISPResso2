@@ -37,6 +37,7 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 # Support functions###
 def check_library(library_name):
+    """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
     except:
@@ -74,6 +75,7 @@ def should_plot_large_plots(num_rows, c2pro_installed, use_matplotlib, large_plo
 
 
 def main():
+    """Run the CRISPRessoBatch analysis for batch processing of multiple samples."""
     try:
         start_time = datetime.now()
         start_time_string = start_time.strftime("%Y-%m-%d %H:%M:%S")

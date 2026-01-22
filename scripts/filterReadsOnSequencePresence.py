@@ -4,6 +4,7 @@ from collections import defaultdict
 
 
 def main():
+    """Filter FASTQ reads based on the presence or absence of specified sequences."""
     parser = argparse.ArgumentParser(description="Filter reads based on sequence presence")
     parser.add_argument("--fastq_r1", type=str, help="Fastq R1 to filter", required=True)
     parser.add_argument("--fastq_r2", type=str, help="Fastq R2 to filter", default=None)
