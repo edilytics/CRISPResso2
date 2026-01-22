@@ -118,7 +118,9 @@ def main():
 
         if args.zip_output and not args.place_report_in_output_folder:
             warn(
-                "Invalid arguement combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True."
+                "Invalid arguement combination: If zip_output is True then "
+                "place_report_in_output_folder must also be True. "
+                "Setting place_report_in_output_folder to True."
             )
             args.place_report_in_output_folder = True
 
@@ -353,7 +355,9 @@ def main():
             for guide_seq in guides_are_in_amplicon:
                 if guides_are_in_amplicon[guide_seq] != 1:
                     raise CRISPRessoShared.BadParameterException(
-                        "The guide sequence provided on row %d (%s) is not present in any amplicon sequence:%s! \nNOTE: The guide will be ignored for the analysis. Please check your input!"
+                        "The guide sequence provided on row %d (%s) is not present in any "
+                        "amplicon sequence:%s! \nNOTE: The guide will be ignored for the "
+                        "analysis. Please check your input!"
                         % (idx + 1, row.guide_seq, curr_amplicon_seq)
                     )
 
@@ -971,9 +975,11 @@ def main():
                             )
                         )
                         crispresso2_info["results"]["general_plots"]["allele_modification_heatmap_plot_labels"][plot_name] = (
-                            "Each row is a sample and each column is a position in the amplicon sequence. " +
-                            f"Each cell shows the percentage of {modification_type.lower()} for the sample at that position relative to the amplicon. " +
-                            "Guides for each sample are identified by a black rectangle."
+                            "Each row is a sample and each column is a position in the "
+                            "amplicon sequence. "
+                            + f"Each cell shows the percentage of {modification_type.lower()} "
+                            "for the sample at that position relative to the amplicon. "
+                            + "Guides for each sample are identified by a black rectangle."
                         )
                         crispresso2_info["results"]["general_plots"]["allele_modification_heatmap_plot_datas"][plot_name] = [
                             (
@@ -1012,9 +1018,9 @@ def main():
                             )
                         )
                         crispresso2_info["results"]["general_plots"]["allele_modification_line_plot_labels"][plot_name] = (
-                            "Each line is a sample that indicates the percentage of {0} for the sample at that position relative to the amplicon. Guides are shown by a grey rectangle.".format(
-                                modification_type.lower()
-                            )
+                            "Each line is a sample that indicates the percentage of {0} for "
+                            "the sample at that position relative to the amplicon. Guides are "
+                            "shown by a grey rectangle.".format(modification_type.lower())
                         )
                         crispresso2_info["results"]["general_plots"]["allele_modification_line_plot_datas"][plot_name] = [
                             (

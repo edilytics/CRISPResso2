@@ -94,3 +94,7 @@ ignore = [
 
 [tool.ruff.lint.pylint]
 max-args = 10
+
+[tool.ruff.lint.per-file-ignores]
+# Embedded awk scripts have long lines that cannot be easily broken
+"CRISPResso2/CRISPRessoPooledCORE.py" = ["E501"]

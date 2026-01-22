@@ -132,7 +132,11 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
         parser.add_argument(
             "--reported_qvalue_cutoff",
             type=float,
-            help="Q-value cutoff for signifance in tests for differential editing. Each base position is tested (for insertions, deletions, substitu" + "tions, and all modifications) using Fisher's exact test, followed by Bonferonni correction. The number of bases with a significanc" + "e below this threshold in the quantification window are counted and reported in the output summary.",
+            help="Q-value cutoff for signifance in tests for differential editing. "
+            "Each base position is tested (for insertions, deletions, substitutions, "
+            "and all modifications) using Fisher's exact test, followed by Bonferonni "
+            "correction. The number of bases with a significance below this threshold "
+            "in the quantification window are counted and reported in the output summary.",
             default=0.05,
         )
         parser.add_argument(
@@ -149,7 +153,8 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
         )
         parser.add_argument(
             "--place_report_in_output_folder",
-            help="If true, report will be written inside the CRISPResso output folder. By default, the report will be written one directory up from " + "the report output.",
+            help="If true, report will be written inside the CRISPResso output folder. "
+            "By default, the report will be written one directory up from the report output.",
             action="store_true",
         )
         parser.add_argument(
@@ -182,7 +187,9 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
 
         if args.zip_output and not args.place_report_in_output_folder:
             logger.warn(
-                "Invalid arguement combination: If zip_output is True then place_report_in_output_folder must also be True. Setting place_report_in_output_folder to True."
+                "Invalid arguement combination: If zip_output is True then "
+                "place_report_in_output_folder must also be True. "
+                "Setting place_report_in_output_folder to True."
             )
             args.place_report_in_output_folder = True
 

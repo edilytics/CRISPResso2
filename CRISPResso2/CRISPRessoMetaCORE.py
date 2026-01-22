@@ -257,7 +257,9 @@ def main():
             for guide_seq in guides_are_in_amplicon:
                 if guides_are_in_amplicon[guide_seq] != 1:
                     warn(
-                        "\nThe guide sequence provided on row %d (%s) is not present in any amplicon sequence:%s! \nNOTE: The guide will be ignored for the analysis. Please check your input!"
+                        "\nThe guide sequence provided on row %d (%s) is not present in any "
+                        "amplicon sequence:%s! \nNOTE: The guide will be ignored for the "
+                        "analysis. Please check your input!"
                         % (idx + 1, row.guide_seq, curr_amplicon_seq)
                     )
 
