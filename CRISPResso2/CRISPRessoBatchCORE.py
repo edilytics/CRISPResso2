@@ -40,7 +40,7 @@ def check_library(library_name):
     """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
-    except:
+    except ImportError:
         error("You need to install %s module to use CRISPRessoBatch!" % library_name)
         sys.exit(1)
 
@@ -125,7 +125,7 @@ def main():
             args.place_report_in_output_folder = True
 
         batch_folder_name = os.path.splitext(os.path.basename(args.batch_settings))[0]
-        if args.name and args.name != "":
+        if args.name:
             clean_name = CRISPRessoShared.slugify(args.name)
             if args.name != clean_name:
                 warn(
@@ -154,7 +154,7 @@ def main():
         try:
             info("Creating Folder %s" % OUTPUT_DIRECTORY, {"percent_complete": 0})
             os.makedirs(OUTPUT_DIRECTORY)
-        except:
+        except OSError:
             warn("Folder %s already exists." % OUTPUT_DIRECTORY)
 
         log_filename = _jp("CRISPRessoBatch_RUNNING_LOG.txt")
@@ -243,7 +243,7 @@ def main():
         # and clean names
 
         for i in range(batch_count):
-            if batch_params.loc[i, "name"] == "":
+            if not batch_params.loc[i, "name"]:
                 batch_params.at[i, "name"] = i
             batch_params.at[i, "name"] = CRISPRessoShared.clean_filename(batch_params.loc[i, "name"])
 
@@ -257,15 +257,15 @@ def main():
             # check parameters for batch input for each batch
             # Check presence of input fastq/bam files
             has_input = False
-            if "fastq_r1" in row and row.fastq_r1 != "":
+            if "fastq_r1" in row and row.fastq_r1:
                 CRISPRessoShared.check_file(row.fastq_r1)
                 has_input = True
 
-            if "fastq_r2" in row and row.fastq_r2 != "":
+            if "fastq_r2" in row and row.fastq_r2:
                 CRISPRessoShared.check_file(row.fastq_r2)
                 has_input = True
 
-            if "input_bam" in row and row.input_bam != "":
+            if "input_bam" in row and row.input_bam:
                 CRISPRessoShared.check_file(row.input_bam)
                 has_input = True
 
@@ -291,9 +291,9 @@ def main():
             curr_amplicon_seq_arr = str(curr_amplicon_seq_str).split(",")
             curr_amplicon_quant_window_coordinates_arr = [None] * len(curr_amplicon_seq_arr)
             if row.quantification_window_coordinates is not None:
-                for idx, coords in enumerate(row.quantification_window_coordinates.strip("'").strip('"').split(",")):
-                    if coords != "":
-                        curr_amplicon_quant_window_coordinates_arr[idx] = coords
+                for coord_idx, coords in enumerate(row.quantification_window_coordinates.strip("'").strip('"').split(",")):
+                    if coords:
+                        curr_amplicon_quant_window_coordinates_arr[coord_idx] = coords
 
             # assert that guides are in the amplicon sequences and that quantification windows are within the amplicon sequences
             guides_are_in_amplicon = {}  # dict of whether a guide is in at least one amplicon sequence
@@ -566,7 +566,7 @@ def main():
                         % (batch_amplicon_name, folder_name, ampSeq_nf, ampSeq_np, ampSeq_cf, amplicon_seq)
                     )
                     continue
-                if consensus_sequence == "":
+                if not consensus_sequence:
                     consensus_sequence = ampSeq_nf
                 if ampSeq_nf != consensus_sequence:
                     info("Skipping the amplicon '%s' in folder '%s'. Amplicon sequences do not match." % (batch_amplicon_name, folder_name))
@@ -592,18 +592,18 @@ def main():
                 amp_found_count += 1
 
                 for nuc in ["A", "T", "C", "G", "N", "-"]:
-                    row = [batch_name, nuc]
-                    row.extend(nuc_freqs[nuc])
-                    nucleotide_frequency_summary.append(row)
+                    nuc_row = [batch_name, nuc]
+                    nuc_row.extend(nuc_freqs[nuc])
+                    nucleotide_frequency_summary.append(nuc_row)
 
                     pct_row = [batch_name, nuc]
                     pct_row.extend(nuc_pcts[nuc])
                     nucleotide_percentage_summary.append(pct_row)
 
                 for mod in ["Insertions", "Insertions_Left", "Deletions", "Substitutions", "All_modifications"]:
-                    row = [batch_name, mod]
-                    row.extend(mod_freqs[mod])
-                    modification_frequency_summary.append(row)
+                    mod_row = [batch_name, mod]
+                    mod_row.extend(mod_freqs[mod])
+                    modification_frequency_summary.append(mod_row)
 
                     pct_row = [batch_name, mod]
                     pct_row.extend(mod_pcts[mod])
@@ -710,11 +710,11 @@ def main():
                             for sgRNA_index, sgRNA_interval in enumerate(consensus_sgRNA_intervals):
                                 newstart = None
                                 newend = None
-                                for idx, i in enumerate(sgRNA_plot_idxs):
+                                for plot_idx, i in enumerate(sgRNA_plot_idxs):
                                     if i <= sgRNA_interval[0]:
-                                        newstart = idx
+                                        newstart = plot_idx
                                     if newend is None and i >= sgRNA_interval[1]:
-                                        newend = idx
+                                        newend = plot_idx
 
                                 # if guide doesn't overlap with plot idxs
                                 if newend == 0 or newstart == len(sgRNA_plot_idxs):
@@ -1178,7 +1178,7 @@ def main():
         )
         info("Analysis Complete!", {"percent_complete": 100})
         if args.zip_output:
-            if args.output_folder == "":
+            if not args.output_folder:
                 path_value = os.path.split(OUTPUT_DIRECTORY)
                 CRISPRessoShared.zip_results(path_value[1])
             else:

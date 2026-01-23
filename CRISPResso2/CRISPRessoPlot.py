@@ -1513,7 +1513,7 @@ def plot_global_modifications_reference(
     )
     ax.set_xlabel(ref_name + ' position (bp)')
 
-    if plot_title is not None and plot_title != '':
+    if plot_title:
         ax.set_title(plot_title)
 
     ax.set_ylim(0, max(1, y_max))
@@ -1654,8 +1654,8 @@ def plot_frameshift_analysis(
                     label='_nolegend_',
                 )
 
-            for idx, sgRNA_int in enumerate(sgRNA_intervals):
-                if not added_sgRNA_legend and idx == 0:
+            for sgRNA_idx, sgRNA_int in enumerate(sgRNA_intervals):
+                if not added_sgRNA_legend and sgRNA_idx == 0:
                     ax2.plot(
                         [sgRNA_int[0], sgRNA_int[1]],
                         [0, 0],
@@ -1715,8 +1715,8 @@ def plot_frameshift_frequency(
         labelbottom=True,  # labels along the bottom edge are off
     )
     ax1.yaxis.tick_left()
-    xmin, xmax = ax1.get_xaxis().get_view_interval()
-    ymin, ymax = ax1.get_yaxis().get_view_interval()
+    _xmin, _xmax = ax1.get_xaxis().get_view_interval()
+    _ymin, _ymax = ax1.get_yaxis().get_view_interval()
     ax1.set_xticklabels(
         map(str, [idx for idx in range(-30, 31) if idx % 3 == 0]),
         rotation='vertical',
@@ -1857,8 +1857,8 @@ def plot_global_frameshift_in_frame_mutations(
         labelbottom=True,  # labels along the bottom edge are off
     )
     ax1.yaxis.tick_left()
-    xmin, xmax = ax1.get_xaxis().get_view_interval()
-    ymin, ymax = ax1.get_yaxis().get_view_interval()
+    _xmin, _xmax = ax1.get_xaxis().get_view_interval()
+    _ymin, _ymax = ax1.get_yaxis().get_view_interval()
     ax1.set_xticklabels(
         map(str, [idx for idx in range(-30, 31) if idx % 3 == 0]),
         rotation='vertical',
@@ -2073,8 +2073,8 @@ def plot_non_coding_mutations(
                     label='_nolegend_',
                 )
 
-            for idx, sgRNA_int in enumerate(sgRNA_intervals):
-                if not added_sgRNA_legend and idx == 0:
+            for sgRNA_idx, sgRNA_int in enumerate(sgRNA_intervals):
+                if not added_sgRNA_legend and sgRNA_idx == 0:
                     ax.plot(
                         [sgRNA_int[0], sgRNA_int[1]],
                         [0, 0],
@@ -2321,7 +2321,7 @@ def add_sgRNA_to_ax(
         if not min_sgRNA_x:
             min_sgRNA_x = this_sgRNA_start
         min_sgRNA_x = min(min_sgRNA_x, this_sgRNA_start)
-        if sgRNA_names is not None and idx < len(sgRNA_names) and sgRNA_names[idx] != "":
+        if sgRNA_names is not None and idx < len(sgRNA_names) and sgRNA_names[idx]:
             if (label_at_zero and x_offset + this_sgRNA_start < len(sgRNA_names[idx]) * 0.66):
                 ax.text(
                     0, this_sgRNA_y_start + this_sgRNA_y_height / 2, sgRNA_names[idx] + " ",
@@ -2649,7 +2649,7 @@ def plot_subs_across_ref(
         legend_patches.append(q_win_patch)
         legend_labels.append('Quantification window')
 
-    if plot_title is not None and plot_title != "":
+    if plot_title:
         ax.set_title(plot_title)
     ax.set_ylabel('% of total bases (Number of substitutions)')
     ax.set_xlabel('Reference position')
@@ -2704,7 +2704,7 @@ def plot_sub_freqs(alt_nuc_counts, plot_title=None, fig_filename_root=None, cust
     ax.bar([5, 6, 7], [c_counts['A'], c_counts['G'], c_counts['T']], color=color_lookup['C'])
     ax.bar([9, 10, 11], [g_counts['A'], g_counts['C'], g_counts['T']], color=color_lookup['G'])
     ax.bar([13, 14, 15], [t_counts['A'], t_counts['C'], t_counts['G']], color=color_lookup['T'])
-    if plot_title is not None and plot_title != "":
+    if plot_title:
         ax.set_title(plot_title)
     ax.set_ylabel('Number of substitutions')
     ax.set_xticks([1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15])
@@ -2885,7 +2885,7 @@ def plot_conversion_at_sel_nucs(
     ax.set_yticks([0.5])
     ax.set_yticklabels([ref_name], va='center')
 
-    if plot_title is not None and plot_title != '':
+    if plot_title:
         ax.set_title(plot_title)
 
     fig.tight_layout()
@@ -2985,7 +2985,7 @@ def plot_conversion_at_sel_nucs_not_include_ref(
     ax.set_yticks([0.5])
     ax.set_yticklabels([ref_name], va='center')
 
-    if plot_title is not None and plot_title != '':
+    if plot_title:
         ax.set_title(plot_title)
 
     if fig_filename_root is None:
@@ -3078,7 +3078,7 @@ def plot_conversion_at_sel_nucs_not_include_ref_scaled(
     ax.set_yticks([0.5])
     ax.set_yticklabels([ref_name], va='center')
 
-    if plot_title is not None and plot_title != '':
+    if plot_title:
         ax.set_title(plot_title)
 
     if fig_filename_root is None:
@@ -3976,7 +3976,7 @@ def plot_alleles_table_prepped(
     None
 
     """
-    if annotate_wildtype_allele != '':
+    if annotate_wildtype_allele:
         for ix, is_ref in enumerate(is_reference):
             if is_ref:
                 y_labels[ix] += annotate_wildtype_allele
@@ -4038,7 +4038,7 @@ def plot_alleles_table(
     X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = prep_alleles_table(
         df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY,
     )
-    if annotate_wildtype_allele != '':
+    if annotate_wildtype_allele:
         for ix, is_ref in enumerate(is_reference):
             if is_ref:
                 y_labels[ix] += annotate_wildtype_allele
@@ -4107,7 +4107,7 @@ def plot_alleles_table_from_file(
     X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = prep_alleles_table(
         df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY,
     )
-    if annotate_wildtype_allele != '':
+    if annotate_wildtype_allele:
         for ix, is_ref in enumerate(is_reference):
             if is_ref:
                 y_labels[ix] += annotate_wildtype_allele
@@ -4194,7 +4194,7 @@ def plot_alleles_tables_from_folder(
             df_alleles = df_alleles.reset_index().set_index('Aligned_Sequence')
 
             sgRNA_label = sgRNA  # for file names
-            if sgRNA_names[ind] != "":
+            if sgRNA_names[ind]:
                 sgRNA_label = sgRNA_names[ind]
 
             cut_point = sgRNA_cut_points[ind]
@@ -4355,7 +4355,7 @@ def plot_nucleotide_quilt_from_folder(
         mod_pct_df.insert(0, 'Batch', ref_name)
 
         for ind, _sgRNA in enumerate(sgRNA_sequences):
-            if sgRNA_names[ind] != "":
+            if sgRNA_names[ind]:
                 sgRNA_names[ind]
 
             cut_point = sgRNA_cut_points[ind]
@@ -4421,7 +4421,7 @@ def plot_amino_acid_table(
     """
     prep_result = prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY)
     X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, is_reference, ref_sequence_amino_acids = prep_result
-    if annotate_wildtype_allele != '':
+    if annotate_wildtype_allele:
         for ix, is_ref in enumerate(is_reference):
             if is_ref:
                 y_labels[ix] += annotate_wildtype_allele
@@ -4641,11 +4641,11 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
     labels = []
     sizes = []
     for class_name in class_counts_order:
-        if expected_hdr_amplicon_seq != "" and class_name == ref_names[0] + "_MODIFIED":
+        if expected_hdr_amplicon_seq and class_name == ref_names[0] + "_MODIFIED":
             labels.append("NHEJ" + "\n(" + str(class_counts[class_name]) + " reads)")
-        elif expected_hdr_amplicon_seq != "" and class_name == "HDR_MODIFIED":
+        elif expected_hdr_amplicon_seq and class_name == "HDR_MODIFIED":
             labels.append("Imperfect HDR" + "\n(" + str(class_counts[class_name]) + " reads)")
-        elif expected_hdr_amplicon_seq != "" and class_name == "HDR_UNMODIFIED":
+        elif expected_hdr_amplicon_seq and class_name == "HDR_UNMODIFIED":
             labels.append("HDR" + "\n(" + str(class_counts[class_name]) + " reads)")
         else:
             display_class_name = class_name

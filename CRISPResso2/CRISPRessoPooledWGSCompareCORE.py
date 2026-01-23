@@ -30,7 +30,7 @@ def check_library(library_name):
     """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
-    except:
+    except ImportError:
         error("You need to install {0} module to use CRISPRessoPooledWGSCompare!".format(library_name))
         sys.exit(1)
 
@@ -243,7 +243,7 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
             info("Creating Folder %s" % OUTPUT_DIRECTORY, {"percent_complete": 0})
             os.makedirs(OUTPUT_DIRECTORY)
             info("Done!")
-        except:
+        except OSError:
             warn("Folder %s already exists." % OUTPUT_DIRECTORY)
 
         log_filename = _jp("CRISPRessoPooledWGSCompare_RUNNING_LOG.txt")

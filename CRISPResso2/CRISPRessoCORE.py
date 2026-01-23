@@ -54,7 +54,7 @@ def check_library(library_name):
     """Check if a Python library is installed and importable."""
     try:
         return __import__(library_name)
-    except:
+    except ImportError:
         error('You need to install %s module to use CRISPResso!' % library_name)
         sys.exit(1)
 
@@ -72,8 +72,8 @@ def which(program):
             return program
     else:
         for path in os.environ["PATH"].split(os.pathsep):
-            path = path.strip('"')
-            exe_file = os.path.join(path, program)
+            clean_path = path.strip('"')
+            exe_file = os.path.join(clean_path, program)
             if is_exe(exe_file):
                 return exe_file
 
@@ -150,10 +150,10 @@ def get_n_reads_bam(bam_filename, bam_chr_loc=""):
     p = sb.Popen(cmd, shell=True, stdout=sb.PIPE)
     try:
         retval = int(float(p.communicate()[0]))
-    except ValueError:
+    except ValueError as e:
         raise CRISPRessoShared.InstallationException(
             'Error when running the command:' + cmd + '\nCheck that samtools is installed correctly.'
-        )
+        ) from e
     return retval
 
 
@@ -365,7 +365,7 @@ def get_base_edit_target_sequence(ref_seq, df_alleles, base_editor_target_ref_sk
             else:
                 logger.debug('Skipping allele ' + str(idx) + ' with sequence ' + allele.Aligned_Sequence)
             seen_nonref_allele_count += 1
-    if target_seq == "":
+    if not target_seq:
         warn('Target reference sequence not found in allele table (all reads were equal to the reference sequence)')
 
     return target_seq
@@ -465,10 +465,10 @@ def split_quant_window_coordinates(quant_window_coordinates):
     coord_re = re.compile(r'^(\d+)-(\d+)$')
     try:
         return [tuple(map(int, coord_re.match(c).groups())) for c in quant_window_coordinates.split('_')]
-    except:
+    except (AttributeError, ValueError) as e:
         raise CRISPRessoShared.BadParameterException(
             "Cannot parse analysis window coordinate '" + str(quant_window_coordinates)
-        )
+        ) from e
 
 
 def get_include_idxs_from_quant_window_coordinates(quant_window_coordinates):
@@ -1422,7 +1422,7 @@ def process_paired_fastq(
     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
 
     pe_scaffold_dna_info = (0, None)  # scaffold start loc, scaffold seq to search
-    if args.prime_editing_pegRNA_scaffold_seq != "":
+    if args.prime_editing_pegRNA_scaffold_seq:
         pe_scaffold_dna_info = get_pe_scaffold_search(
             refs['Prime-edited']['sequence'],
             args.prime_editing_pegRNA_extension_seq,
@@ -1586,10 +1586,10 @@ def process_paired_fastq(
                                                 N_READS_IRREGULAR_ENDS += variant_count
                                 if (index % 50000 == 0 and index > 0):
                                     info("Calculating statistics; %d completed out of %d unique reads" % (index, num_unique_reads))
-                    except FileNotFoundError:
+                    except FileNotFoundError as e:
                         raise CRISPRessoShared.OutputFolderIncompleteException(
                             "Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso"
-                        )
+                        ) from e
                 files_to_remove.append(file_path)
             info("Finished merging and aligning paired reads, now generating statistics...", {'percent_complete': 15})
         else:
@@ -2055,7 +2055,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
     CRISPRessoShared.check_file(aln_matrix_loc)
     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
     pe_scaffold_dna_info = (0, None)  # scaffold start loc, scaffold seq to search
-    if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
+    if args.prime_editing_pegRNA_scaffold_seq and args.prime_editing_pegRNA_extension_seq:
         pe_scaffold_dna_info = get_pe_scaffold_search(
             refs['Prime-edited']['sequence'],
             args.prime_editing_pegRNA_extension_seq,
@@ -2074,8 +2074,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
     with fastq_input_opener(fastq_filename) as fastq_handle:
 
         # Reading through the fastq file and enriching variantCache as a dictionary with the following:
-            # Key: the unique DNA sequence from the fastq file
-            # Value: an integer that represents how many times we've seen this specific read
+        # Key: the unique DNA sequence from the fastq file
+        # Value: an integer that represents how many times we've seen this specific read
         num_reads = 0
         fastq_id = fastq_handle.readline()
         while (fastq_id):
@@ -2204,10 +2204,10 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                                                 N_READS_IRREGULAR_ENDS += variant_count
                                 if (index % 50000 == 0 and index > 0):
                                     info("Calculating statistics; %d completed out of %d unique reads" % (index, num_unique_reads))
-                    except FileNotFoundError:
+                    except FileNotFoundError as e:
                         raise CRISPRessoShared.OutputFolderIncompleteException(
                             "Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso"
-                        )
+                        ) from e
                 files_to_remove.append(file_path)
         else:
             raise CRISPRessoShared.OutputFolderIncompleteException(
@@ -2290,7 +2290,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
 
     pe_scaffold_dna_info = (0, None)  # scaffold start loc, scaffold sequence
-    if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
+    if args.prime_editing_pegRNA_scaffold_seq and args.prime_editing_pegRNA_extension_seq:
         pe_scaffold_dna_info = get_pe_scaffold_search(
             refs['Prime-edited']['sequence'],
             args.prime_editing_pegRNA_extension_seq,
@@ -2310,7 +2310,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             '@PG\tID:crispresso2\tPN:crispresso2\tVN:' + CRISPRessoShared.__version__ +
             '\tCL:"' + crispresso_cmd_to_write + '"\n'
         )
-        if bam_chr_loc != "":
+        if bam_chr_loc:
             proc = sb.Popen(['samtools', 'view', '-F', args.samtools_exclude_flags, bam_filename, bam_chr_loc], stdout=sb.PIPE, encoding='utf-8')
         else:
             proc = sb.Popen(
@@ -2421,7 +2421,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     del_inds = []
                                     sub_inds = []
                                     edit_strings = []
-                                    for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                                    for ref_idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                                         payload = new_variant['variant_' + best_match_name]
 
                                         del_inds.append([
@@ -2494,10 +2494,10 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     if new_variant[match_name]['irregular_ends']:
                                         N_READS_IRREGULAR_ENDS += variant_count
 
-                    except FileNotFoundError:
+                    except FileNotFoundError as e:
                         raise CRISPRessoShared.OutputFolderIncompleteException(
                             "Could not find generated variants file, try deleting output folder, checking input files, and rerunning CRISPResso"
-                        )
+                        ) from e
                 files_to_remove.append(file_path)
             if N_COMPUTED_ALN + N_COMPUTED_NOTALN != num_unique_reads:
                 raise CRISPRessoShared.OutputFolderIncompleteException(
@@ -2505,7 +2505,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                     "number of unique reads found in the bam file. Try rerunning CRISPResso."
                 )
         else:
-        # Single process mode
+            # Single process mode
             for idx, fastq_seq in enumerate(variantCache.keys()):
                 variant_count = variantCache[fastq_seq]
                 N_TOT_READS += variant_count
@@ -2530,7 +2530,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                     sub_inds = []
                     edit_strings = []
 
-                    for idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                    for ref_idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                         payload = new_variant['variant_' + best_match_name]
 
                         del_inds.append([
@@ -2589,7 +2589,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                 )
 
         # Now that we've enriched variantCache with the unique reads, we read through the bam file again to write variants to the output file
-        if bam_chr_loc != "":
+        if bam_chr_loc:
             new_proc = sb.Popen(['samtools', 'view', bam_filename, bam_chr_loc], stdout=sb.PIPE, encoding='utf-8')
         else:
             new_proc = sb.Popen(
@@ -2997,7 +2997,7 @@ def normalize_name(name, fastq_r1, fastq_r2, bam_input):
             return '%s_%s' % (get_name_from_fasta(fastq_r1), get_name_from_fasta(fastq_r2))
         elif fastq_r1:
             return '%s' % get_name_from_fasta(fastq_r1)
-        elif bam_input != '':
+        elif bam_input:
             return '%s' % get_name_from_bam(bam_input)
     else:
         clean_name = CRISPRessoShared.slugify(name)
@@ -3110,7 +3110,7 @@ def main():
                 os.path.abspath(args.output_folder), OUTPUT_DIRECTORY,
             )
         clean_file_prefix = ""
-        if args.file_prefix != "":
+        if args.file_prefix:
             clean_file_prefix = CRISPRessoShared.slugify(args.file_prefix)
             if not clean_file_prefix.endswith("."):
                 clean_file_prefix += "."
@@ -3124,7 +3124,7 @@ def main():
             os.makedirs(OUTPUT_DIRECTORY)
             info('Creating Folder %s' % OUTPUT_DIRECTORY, {'percent_complete': 0})
 #            info('Done!') #crispresso2 doesn't announce that the folder is created... save some electricity here
-        except:
+        except OSError:
             warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
 
         finally:
@@ -3257,7 +3257,7 @@ def main():
             return new.join(li)
         # if bam input, make sure bam is sorted and indexed
         if args.bam_input:
-            if args.bam_chr_loc != "":  # we only need an index if we're accessing specific positions later
+            if args.bam_chr_loc:  # we only need an index if we're accessing specific positions later
                 if os.path.exists(rreplace(args.bam_input, ".bam", ".bai")):
                     info('Index file for input .bam file exists, skipping generation.')
                 elif os.path.exists(args.bam_input + '.bai'):
@@ -3315,7 +3315,7 @@ def main():
                     % (len(guides), len(guide_name_arr))
                 )
             for idx, guide_name in enumerate(guide_name_arr):
-                if guide_name != "":
+                if guide_name:
                     guide_names[idx] = guide_name
 
         guide_qw_centers = CRISPRessoShared.set_guide_array(args.quantification_window_center, guides, 'guide quantification center')
@@ -3353,7 +3353,7 @@ def main():
             check_fastp()
             auto_fastq_r1 = args.fastq_r1  # paths to fastq files for performing auto functions
             auto_fastq_r2 = args.fastq_r2
-            if args.bam_input != "":  # if input is a bam, create temp files with reads for processing here
+            if args.bam_input:  # if input is a bam, create temp files with reads for processing here
                 p = sb.Popen("samtools view -c -f 1 " + args.bam_input + " " + args.bam_chr_loc, shell=True, stdout=sb.PIPE)
                 n_reads_paired = int(float(p.communicate()[0]))
                 if n_reads_paired > 0:
@@ -3471,7 +3471,7 @@ def main():
                 if idx >= len(amplicon_min_alignment_score_arr):
                     amplicon_min_alignment_score_arr.append(this_min_aln_score)
 
-        if args.expected_hdr_amplicon_seq != "":
+        if args.expected_hdr_amplicon_seq:
             if args.expected_hdr_amplicon_seq in amplicon_seq_arr:
                 raise CRISPRessoShared.BadParameterException(
                     "HDR expected amplicon sequence is the same as a reference amplicon. Check the --expected_hdr_amplicon_seq parameter")
@@ -3484,7 +3484,7 @@ def main():
         if args.quantification_window_coordinates is not None:
             # fill in quant window coordinates if they are given for each amplicon, because we're about to add some amplicons
             for idx, coords in enumerate(args.quantification_window_coordinates.strip("'").strip('"').split(",")):
-                if coords != "":
+                if coords:
                     amplicon_quant_window_coordinates_arr[idx] = coords
 
         # Prime editing
@@ -3492,7 +3492,7 @@ def main():
             raise CRISPRessoShared.BadParameterException("An amplicon named 'Prime-edited' must not be provided.")
         prime_editing_extension_seq_dna = ""  # global var for the editing extension sequence for the scaffold quantification below
         prime_editing_edited_amp_seq = ""
-        if args.prime_editing_pegRNA_extension_seq != "":
+        if args.prime_editing_pegRNA_extension_seq:
 #            if args.amplicon_name_arr eq "": #considering changing the name of the default amplicon from 'Reference' to 'Unedited'
 #                amplicon_name_arr[0] = 'Unedited'
             extension_seq_dna_top_strand = args.prime_editing_pegRNA_extension_seq.upper().replace('U', 'T')
@@ -3507,7 +3507,7 @@ def main():
             # compared to the reference. If down the road we want users to be able to give
             # this flexibly, we need to update the scaffold incorporation search in
             # get_new_variant_object as well as in the definition of the quant window
-            if args.prime_editing_pegRNA_spacer_seq == "":
+            if not args.prime_editing_pegRNA_spacer_seq:
                 raise CRISPRessoShared.BadParameterException(
                     'The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) '
                     'is required for prime editing analysis.'
@@ -3611,7 +3611,7 @@ def main():
             if args.debug:
                 info('Alignment between extension sequence and reference sequence: \n' + s1 + '\n' + s2)
 
-            if args.prime_editing_override_prime_edited_ref_seq != "":
+            if args.prime_editing_override_prime_edited_ref_seq:
                 if args.debug:
                     info(
                         'Using provided prime_editing_override_prime_edited_ref_seq\n'
@@ -3709,8 +3709,8 @@ def main():
             # if this is the prime edited sequence, add it directly
             if this_amp_seq == prime_editing_edited_amp_seq:
                 (
-                    best_aln_seq, best_aln_score, best_aln_mismatches,
-                    best_aln_start, best_aln_end, s1, s2,
+                    best_aln_seq, _best_aln_score, best_aln_mismatches,
+                    _best_aln_start, _best_aln_end, _s1, _s2,
                 ) = CRISPRessoShared.get_best_aln_pos_and_mismatches(
                     prime_editing_extension_seq_dna,
                     prime_editing_edited_amp_seq,
@@ -3728,8 +3728,8 @@ def main():
             # otherwise, clone the coordinates from the prime_editing_edited_amp_seq
             else:
                 (
-                    best_aln_seq, best_aln_score, best_aln_mismatches,
-                    best_aln_start, best_aln_end, s1, s2,
+                    best_aln_seq, _best_aln_score, best_aln_mismatches,
+                    _best_aln_start, _best_aln_end, _s1, _s2,
                 ) = CRISPRessoShared.get_best_aln_pos_and_mismatches(
                     prime_editing_extension_seq_dna,
                     prime_editing_edited_amp_seq,
@@ -3771,7 +3771,7 @@ def main():
                 pe_guide_plot_cut_points.append(False)
 
             # now handle the pegRNA spacer seq
-            if args.prime_editing_pegRNA_spacer_seq == "":
+            if not args.prime_editing_pegRNA_spacer_seq:
                 raise CRISPRessoShared.BadParameterException(
                     'The prime editing pegRNA spacer sequence '
                     '(--prime_editing_pegRNA_spacer_seq) is required for prime editing analysis.'
@@ -3793,8 +3793,8 @@ def main():
             # if this is the first sequence, add it directly
             if this_amp_seq == ref0_seq:
                 (
-                    best_aln_seq, best_aln_score, best_aln_mismatches,
-                    best_aln_start, best_aln_end, s1, s2,
+                    best_aln_seq, _best_aln_score, best_aln_mismatches,
+                    _best_aln_start, _best_aln_end, _s1, _s2,
                 ) = CRISPRessoShared.get_best_aln_pos_and_mismatches(
                     pegRNA_spacer_seq,
                     ref0_seq,
@@ -3812,8 +3812,8 @@ def main():
             # otherwise, clone the coordinates from the ref0 amplicon
             else:
                 (
-                    best_aln_seq, best_aln_score, best_aln_mismatches,
-                    best_aln_start, best_aln_end, s1, s2,
+                    best_aln_seq, _best_aln_score, best_aln_mismatches,
+                    _best_aln_start, _best_aln_end, _s1, _s2,
                 ) = CRISPRessoShared.get_best_aln_pos_and_mismatches(
                     pegRNA_spacer_seq,
                     ref0_seq,
@@ -3873,8 +3873,8 @@ def main():
                 if this_amp_seq == ref0_seq:
                     rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
                     (
-                        best_aln_seq, best_aln_score, best_aln_mismatches,
-                        best_aln_start, best_aln_end, s1, s2,
+                        best_aln_seq, _best_aln_score, best_aln_mismatches,
+                        _best_aln_start, _best_aln_end, _s1, _s2,
                     ) = CRISPRessoShared.get_best_aln_pos_and_mismatches(
                         nicking_guide_seq,
                         rc_ref0_seq,
@@ -3967,7 +3967,7 @@ def main():
                 this_min_aln_score = amplicon_min_alignment_score_arr[idx]
 
             this_quant_window_coordinates = None
-            if amplicon_quant_window_coordinates_arr[idx] != "":
+            if amplicon_quant_window_coordinates_arr[idx]:
                 this_quant_window_coordinates = amplicon_quant_window_coordinates_arr[idx]
 
             this_guides = guides[:]
@@ -3985,11 +3985,11 @@ def main():
                 flexi_guide_mismatches = []
                 all_flexiguide_names = args.flexiguide_name.split(",")
                 flexi_guide_names = []
-                for idx, guide in enumerate(args.flexiguide_seq.split(",")):
+                for flexi_idx, guide in enumerate(args.flexiguide_seq.split(",")):
                     # for all amps in forward and reverse complement amps:
                     for amp_seq in [this_seq, CRISPRessoShared.reverse_complement(this_seq)]:
                         ref_incentive = np.zeros(len(amp_seq) + 1, dtype=int)
-                        s1, s2, score = CRISPResso2Align.global_align(
+                        aln_s1, _, _ = CRISPResso2Align.global_align(
                             guide,
                             amp_seq,
                             matrix=aln_matrix,
@@ -3997,10 +3997,10 @@ def main():
                             gap_open=args.flexiguide_gap_open_penalty,
                             gap_extend=args.flexiguide_gap_extend_penalty,
                         )
-                        potential_guide = s1.strip("-")
+                        potential_guide = aln_s1.strip("-")
                         # if length of putative guide is off by less than 2, keep it (allows 1 gap)
                         if abs(len(potential_guide) - len(guide)) < 2:
-                            loc = s1.find(potential_guide)
+                            loc = aln_s1.find(potential_guide)
                             potential_ref = amp_seq[loc:loc + len(potential_guide)]
                             # realign to test for number of mismatches
                             ref_incentive = np.zeros(len(potential_ref) + 1, dtype=int)
@@ -4022,8 +4022,8 @@ def main():
                                 flexi_guide_orig_seqs.append(guide)
                                 flexi_guide_mismatches.append(mismatches)
                                 this_flexiguide_name = ''
-                                if idx < len(all_flexiguide_names) and all_flexiguide_names[idx] != '':
-                                    this_flexiguide_name = all_flexiguide_names[idx]
+                                if flexi_idx < len(all_flexiguide_names) and all_flexiguide_names[flexi_idx]:
+                                    this_flexiguide_name = all_flexiguide_names[flexi_idx]
                                 flexi_guide_names.append(this_flexiguide_name)
 
                 flexi_guide_count = 0
@@ -4100,11 +4100,11 @@ def main():
             )
 
             this_orig_guide_lookup = {}  # dict of new seq to original (input) sequence
-            for idx, guide in enumerate(this_guides):
-                this_orig_guide_lookup[guide.upper()] = this_orig_guide_seqs[idx]
+            for guide_idx, guide in enumerate(this_guides):
+                this_orig_guide_lookup[guide.upper()] = this_orig_guide_seqs[guide_idx]
             this_sgRNA_orig_seqs = []
-            for seq in this_sgRNA_sequences:
-                this_sgRNA_orig_seqs.append(this_orig_guide_lookup[seq])
+            for sgRNA_seq in this_sgRNA_sequences:
+                this_sgRNA_orig_seqs.append(this_orig_guide_lookup[sgRNA_seq])
 
             this_contains_guide = False
             if len(this_sgRNA_sequences) > 0:
@@ -4245,7 +4245,7 @@ def main():
         for idx, ref_name in enumerate(ref_names):
             cut_points = refs[ref_name]['sgRNA_cut_points']
             exon_positions = refs[ref_name]['exon_positions']
-            if cut_points or (idx < len(amplicon_quant_window_coordinates_arr) and amplicon_quant_window_coordinates_arr[idx] != ""):
+            if cut_points or (idx < len(amplicon_quant_window_coordinates_arr) and amplicon_quant_window_coordinates_arr[idx]):
                 if len(ref_names) > 1 and args.debug:
                     info("Using cut points from %s as template for other references" % ref_name)
                 clone_ref_name = ref_name
@@ -4276,7 +4276,7 @@ def main():
                 needs_exon_positions = False
 
                 # if HDR, copy everything from ref 1 so the quantification window will be accurate
-                if ref_name == "HDR" and args.expected_hdr_amplicon_seq != "":
+                if ref_name == "HDR" and args.expected_hdr_amplicon_seq:
                     needs_cut_points = True
                     needs_sgRNA_intervals = True
                     needs_exon_positions = True
@@ -4390,8 +4390,8 @@ def main():
                     refs[ref_name]['contains_guide'] = refs[clone_ref_name]['contains_guide']
 
                 # quantification window coordinates override other options
-                if amplicon_quant_window_coordinates_arr[clone_ref_idx] != "" and amplicon_quant_window_coordinates_arr[this_ref_idx] != '0':
-                    if amplicon_quant_window_coordinates_arr[this_ref_idx] != "":
+                if amplicon_quant_window_coordinates_arr[clone_ref_idx] and amplicon_quant_window_coordinates_arr[this_ref_idx] != '0':
+                    if amplicon_quant_window_coordinates_arr[this_ref_idx]:
                         this_include_idxs = get_include_idxs_from_quant_window_coordinates(amplicon_quant_window_coordinates_arr[this_ref_idx])
                     else:
                         this_include_idxs = get_cloned_include_idxs_from_quant_window_coordinates(
@@ -4445,7 +4445,7 @@ def main():
         # if we're writing a bam, find the alignment location
         bam_header = '@HD\tVN:1.0\tSO:unknown\n'
         if args.bam_output:
-            if args.bowtie2_index == '':
+            if not args.bowtie2_index:
                 bam_output_ref_fa = _jp('CRISPResso_output.fa')
                 with open(bam_output_ref_fa, 'w', encoding='utf-8') as fa_out:
                     for ref_name in ref_names:
@@ -4540,7 +4540,7 @@ def main():
         crispresso2_info['running_info']['start_time_string'] = start_time_string
 
         if args.split_interleaved_input:
-            if args.fastq_r2 != '' or args.bam_input != '':
+            if args.fastq_r2 or args.bam_input:
                 raise CRISPRessoShared.BadParameterException(
                     'The option --split_interleaved_input is available only when a single '
                     'fastq file is specified!'
@@ -4559,9 +4559,9 @@ def main():
                 info('Done!', {'percent_complete': 4})
 
         # Trim and merge reads
-        if args.bam_input != '' and args.trim_sequences:
+        if args.bam_input and args.trim_sequences:
             raise CRISPRessoShared.BadParameterException('Read trimming options are not available with bam input')
-        elif args.fastq_r1 != '' and args.fastq_r2 == '':  # single end reads
+        elif args.fastq_r1 and not args.fastq_r2:  # single end reads
             if not args.trim_sequences:  # no trimming or merging required
                 output_forward_filename = args.fastq_r1
             else:
@@ -4589,7 +4589,7 @@ def main():
 
             processed_output_filename = output_forward_filename
 
-        elif args.fastq_r1 != '' and args.fastq_r2 != '':  # paired end reads
+        elif args.fastq_r1 and args.fastq_r2:  # paired end reads
             not_combined_1_filename = _jp('out.notCombined_1.fastq.gz')
             not_combined_2_filename = _jp('out.notCombined_2.fastq.gz')
             check_fastp()
@@ -4696,7 +4696,7 @@ def main():
             processed_output_filename = args.fastq_r1
 
         if args.min_average_read_quality > 0 or args.min_single_bp_quality > 0 or args.min_bp_quality_or_N > 0:
-            if args.bam_input != '':
+            if args.bam_input:
                 raise CRISPRessoShared.BadParameterException('The read filtering options are not available with bam input')
             info(
                 'Filtering reads with average bp quality < %d and single bp quality < %d '
@@ -4793,7 +4793,7 @@ def main():
 
         info('Done!', {'percent_complete': 20})
 
-        if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
+        if args.prime_editing_pegRNA_scaffold_seq and args.prime_editing_pegRNA_extension_seq:
             # introduce a new ref (that we didn't align to) called 'Scaffold Incorporated' -- copy it from the ref called 'prime-edited'
             new_ref = deepcopy(refs['Prime-edited'])
             new_ref['name'] = "Scaffold-incorporated"
@@ -5080,8 +5080,8 @@ def main():
                     insertion_count_vectors[ref_name][variant_payload['insertion_positions']] += variant_count
                     this_effective_len += variant_payload['insertion_n']
                     if variant_payload['insertion_n'] > 0:
-                         counts_insertion[ref_name] += variant_count
-                         this_has_insertions = True
+                        counts_insertion[ref_name] += variant_count
+                        this_has_insertions = True
 
                 this_has_deletions = False
                 all_deletion_count_vectors[ref_name][variant_payload['all_deletion_positions']] += variant_count
@@ -5090,8 +5090,8 @@ def main():
                     deletion_count_vectors[ref_name][variant_payload['deletion_positions']] += variant_count
                     this_effective_len -= variant_payload['deletion_n']
                     if variant_payload['deletion_n'] > 0:
-                         counts_deletion[ref_name] += variant_count
-                         this_has_deletions = True
+                        counts_deletion[ref_name] += variant_count
+                        this_has_deletions = True
 
                 effective_len_dicts[ref_name][this_effective_len] += variant_count
 
@@ -5102,8 +5102,8 @@ def main():
                     substituted_n_dicts[ref_name][variant_payload['substitution_n']] += variant_count
                     substitution_count_vectors[ref_name][variant_payload['substitution_positions']] += variant_count
                     if variant_payload['substitution_n'] > 0:
-                         counts_substitution[ref_name] += variant_count
-                         this_has_substitutions = True
+                        counts_substitution[ref_name] += variant_count
+                        this_has_substitutions = True
 
                     nucs = ['A', 'T', 'C', 'G', 'N']
                     for nuc in nucs:
@@ -5265,7 +5265,7 @@ def main():
 
         # For HDR work, create a few more arrays, where all reads are aligned to ref1
         # (the first reference) and the indels are computed with regard to ref1
-        if args.expected_hdr_amplicon_seq != "" or args.prime_editing_pegRNA_extension_seq != "":
+        if args.expected_hdr_amplicon_seq or args.prime_editing_pegRNA_extension_seq:
             ref1_name = ref_names[0]
             ref1_len = refs[ref1_name]['sequence_length']
 
@@ -5592,7 +5592,7 @@ def main():
 
         allele_frequency_table_zip_filename = _jp('Alleles_frequency_table.zip')
 
-        if args.dsODN == "":
+        if not args.dsODN:
             if args.write_detailed_allele_table:
                 df_alleles.to_csv(allele_frequency_table_fileLoc, sep='\t', header=True, index=None)
             else:
@@ -6135,7 +6135,7 @@ def main():
                 "Figure 1b: Alignment and editing frequency of reads as determined by the "
                 "percentage and number of sequence reads showing unmodified and modified alleles."
             )
-            if args.expected_hdr_amplicon_seq != "":
+            if args.expected_hdr_amplicon_seq:
                 crispresso2_info['results']['general_plots']['plot_1b_caption'] = (
                     "Figure 1b: Alignment and editing frequency of reads as determined by the "
                     "percentage and number of sequence reads showing unmodified and modified "
@@ -6165,7 +6165,7 @@ def main():
             # to test, run: process_pool.apply_async(CRISPRessoPlot.plot_class_piechart_and_barplot, kwds=plot_1bc_input).get()
 
             # 1d for dsODN
-            if args.dsODN != "":
+            if args.dsODN:
                 # (1b) a piechart of classes
                 n_contain_dsODN = df_alleles[df_alleles['contains dsODN']]['#Reads'].sum()
                 n_not_contain_dsODN = df_alleles[~df_alleles['contains dsODN']]['#Reads'].sum()
@@ -6374,7 +6374,7 @@ def main():
 
                         sgRNA_label = "sgRNA_" + sgRNA  # for file names
                         sgRNA_legend = "sgRNA " + sgRNA  # for legends
-                        if sgRNA_name != "":
+                        if sgRNA_name:
                             sgRNA_label = sgRNA_name
                             sgRNA_legend = sgRNA_name + " (" + sgRNA + ")"
                         sgRNA_label = CRISPRessoShared.slugify(sgRNA_label)
@@ -6472,7 +6472,7 @@ def main():
                     clipped_string += " (Maximum " + str(int(max(hlengths))) + " not shown)"
                 if xmin > min(hlengths):
                     clipped_string += " (Minimum " + str(int(min(hlengths))) + " not shown)"
-                if clipped_string != "":
+                if clipped_string:
                     clipped_string = (
                         " Note that histograms are clipped to show 99% of the data. To show "
                         "all data, run using the parameter '--plot_histogram_outliers'. "
@@ -6570,7 +6570,7 @@ def main():
                 debug('Plotting frequency deletions/insertions for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_frequency_deletions_insertions, plot_3b_input)
 
-                if clipped_string != "":
+                if clipped_string:
                     clipped_string = (
                         " Note that histograms are clipped to show 99% of the data. To show "
                         "all data, run using the parameter '--plot_histogram_outliers'. "
@@ -6768,7 +6768,7 @@ def main():
                 # 4e : for HDR, global modifications with respect to reference 1
                 ###############################################################################################################################################
 
-                if args.expected_hdr_amplicon_seq != "" and (ref_name == ref_names[0] or ref_name == "HDR"):
+                if args.expected_hdr_amplicon_seq and (ref_name == ref_names[0] or ref_name == "HDR"):
                     plot_4e_input = {
                         'ref1_all_insertion_count_vectors': ref1_all_insertion_count_vectors[ref_name],
                         'ref1_all_deletion_count_vectors': ref1_all_deletion_count_vectors[ref_name],
@@ -6827,7 +6827,7 @@ def main():
                 # 4g : for HDR, nuc quilt comparison
                 ###############################################################################################################################################
 
-                if args.expected_hdr_amplicon_seq != "" and ref_name == ref_names[0]:
+                if args.expected_hdr_amplicon_seq and ref_name == ref_names[0]:
                     nuc_pcts = []
                     ref_names_for_hdr = [r for r in ref_names if counts_total[r] > 0]
                     for ref_name_for_hdr in ref_names_for_hdr:
@@ -7315,7 +7315,7 @@ def main():
 
                 sgRNA_label = "sgRNA_" + sgRNA  # for file names
                 sgRNA_legend = "sgRNA " + sgRNA  # for legends
-                if sgRNA_name != "":
+                if sgRNA_name:
                     sgRNA_label = sgRNA_name
                     sgRNA_legend = sgRNA_name + " (" + sgRNA + ")"
                 sgRNA_label = CRISPRessoShared.slugify(sgRNA_label)
@@ -7866,10 +7866,10 @@ def main():
             # end global coding seq plots
 
         # prime editing plots
-        if args.prime_editing_pegRNA_extension_seq != "":
+        if args.prime_editing_pegRNA_extension_seq:
             # count length of scaffold insertions
             scaffold_insertion_sizes_filename = ""
-            if args.prime_editing_pegRNA_scaffold_seq != "":
+            if args.prime_editing_pegRNA_scaffold_seq:
                 # first, define the sequence we are looking for (extension plus the first
                 # base(s) of the scaffold)
                 scaffold_dna_seq = CRISPRessoShared.reverse_complement(
@@ -8024,7 +8024,7 @@ def main():
 
                     sgRNA_label = "sgRNA_" + sgRNA  # for file names
                     sgRNA_legend = "sgRNA " + sgRNA  # for legends
-                    if sgRNA_name != "":
+                    if sgRNA_name:
                         sgRNA_label = sgRNA_name
                         sgRNA_legend = sgRNA_name + " (" + sgRNA + ")"
                     sgRNA_label = CRISPRessoShared.slugify(sgRNA_label)
@@ -8072,7 +8072,7 @@ def main():
                         for ref_name in ref_names_for_pe
                     ])
 
-                if (args.prime_editing_pegRNA_scaffold_seq != "" and
+                if (args.prime_editing_pegRNA_scaffold_seq and
                         df_scaffold_insertion_sizes.shape[0] > 0 and
                         df_scaffold_insertion_sizes['Num_match_scaffold'].max() > 0 and
                         df_scaffold_insertion_sizes['Num_gaps'].max() > 0):

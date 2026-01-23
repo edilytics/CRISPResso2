@@ -28,7 +28,7 @@ def count_sgRNA_specific_edits(crispresso_output_folder):
         modified_counts_by_amplicon[reference_name] = defaultdict(int)
         for idx, guide_name in enumerate(crispresso2_info["results"]["refs"][reference_name]["sgRNA_names"]):
             this_guide_name = guide_name
-            if this_guide_name == "":
+            if not this_guide_name:
                 this_guide_name = crispresso2_info["results"]["refs"][reference_name]["sgRNA_orig_sequences"][idx]
             if this_guide_name in include_idxs[reference_name]:
                 this_guide_name = this_guide_name + "_" + str(crispresso2_info["results"]["refs"][reference_name]["sgRNA_intervals"][idx][0])

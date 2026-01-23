@@ -27,7 +27,7 @@ def check_library(library_name):
     """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
-    except:
+    except ImportError:
         error("You need to install %s module to use CRISPRessoCompare!" % library_name)
         sys.exit(1)
 
@@ -181,7 +181,7 @@ def main():
             info("Creating Folder %s" % OUTPUT_DIRECTORY, {"percent_complete": 0})
             os.makedirs(OUTPUT_DIRECTORY)
             info("Done!")
-        except:
+        except OSError:
             warn("Folder %s already exists." % OUTPUT_DIRECTORY)
 
         log_filename = _jp("CRISPRessoCompare_RUNNING_LOG.txt")
@@ -239,8 +239,8 @@ def main():
 
             try:
                 assert np.all(profile_1[:, 0] == profile_2[:, 0])
-            except:
-                raise DifferentAmpliconLengthException("Different amplicon lengths for the two amplicons.")
+            except AssertionError as e:
+                raise DifferentAmpliconLengthException("Different amplicon lengths for the two amplicons.") from e
             len_amplicon = profile_1.shape[0]
             profile_1[:, 1]
             profile_2[:, 1]

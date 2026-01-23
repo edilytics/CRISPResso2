@@ -230,7 +230,7 @@ def make_report(run_data, crispresso_report_file, crispresso_folder, _root, logg
     data = assemble_figs(run_data, crispresso_folder)
 
     report_display_name = ""
-    if run_data["running_info"]["args"].name != "":
+    if run_data["running_info"]["args"].name:
         report_display_name = run_data["running_info"]["args"].name
 
     # find path between the report and the data (if the report is in another directory vs in the same directory as the data)
@@ -384,7 +384,7 @@ def make_batch_report_from_folder(crispressoBatch_report_file, crispresso2_info,
         run_names.append(display_name)
 
     output_title = "CRISPResso Batch Output"
-    if crispresso2_info["running_info"]["args"].name != "":
+    if crispresso2_info["running_info"]["args"].name:
         output_title += f"<br/>{crispresso2_info['running_info']['args'].name}"
 
     make_multi_report(
@@ -418,7 +418,7 @@ def make_pooled_report_from_folder(crispresso_report_file, crispresso2_info, fol
     """Makes a report for a CRISPRessoPooled run"""
     names_arr = crispresso2_info["results"]["good_region_names"]
     output_title = "CRISPResso Pooled Output"
-    if crispresso2_info["running_info"]["args"].name != "":
+    if crispresso2_info["running_info"]["args"].name:
         output_title += f"<br/>{crispresso2_info['running_info']['args'].name}"
     make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _root, "pooled", logger)
 
@@ -427,7 +427,7 @@ def make_compare_report_from_folder(crispresso_report_file, crispresso2_info, fo
     """Makes a report for a CRISPRessoCompare run"""
     names_arr = []
     output_title = "CRISPResso Compare Output"
-    if crispresso2_info["running_info"]["args"].name != "":
+    if crispresso2_info["running_info"]["args"].name:
         output_title += f"<br/>{crispresso2_info['running_info']['args'].name}"
     make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _root, "compare", logger)
 
@@ -437,7 +437,7 @@ def make_meta_report_from_folder(crispresso_report_file, crispresso2_info, folde
     names_arr = crispresso2_info["meta_names_arr"]
     input_names = crispresso2_info["meta_input_names"]
     output_title = "CRISPresso Meta Output"
-    if crispresso2_info["running_info"]["args"].name != "":
+    if crispresso2_info["running_info"]["args"].name:
         output_title += f"<br/>{crispresso2_info['running_info']['args'].name}"
     make_multi_report_from_folder(
         crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _root, "meta", logger, display_names=input_names
@@ -448,7 +448,7 @@ def make_wgs_report_from_folder(crispresso_report_file, crispresso2_info, folder
     """Makes a report for a CRISPRessoWGS run"""
     names_arr = crispresso2_info["results"]["good_region_names"]
     output_title = "CRISPResso WGS Output"
-    if crispresso2_info["running_info"]["args"].name != "":
+    if crispresso2_info["running_info"]["args"].name:
         output_title += f"<br/>{crispresso2_info['running_info']['args'].name}"
     make_multi_report_from_folder(crispresso2_info, names_arr, output_title, crispresso_report_file, folder, _root, "wgs", logger)
 

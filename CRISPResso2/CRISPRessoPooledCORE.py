@@ -44,7 +44,7 @@ def check_library(library_name):
     """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
-    except:
+    except ImportError:
         error("You need to install %s module to use CRISPRessoPooled!" % library_name)
         sys.exit(1)
 
@@ -61,8 +61,8 @@ def which(program):
             return program
     else:
         for path in os.environ["PATH"].split(os.pathsep):
-            path = path.strip('"')
-            exe_file = os.path.join(path, program)
+            clean_path = path.strip('"')
+            exe_file = os.path.join(clean_path, program)
             if is_exe(exe_file):
                 return exe_file
 
@@ -117,9 +117,9 @@ def print_full_pandas_df(x):
 def summarize_region_fastq_chunk(input_arr):
     """Extract read counts and sequence data from region FASTQ files."""
     ret_val = []
-    for input in input_arr:
-        #        print('doing region ' + str(input))
-        region_fastq, uncompressed_reference = input.split(" ")
+    for input_item in input_arr:
+        #        print('doing region ' + str(input_item))
+        region_fastq, uncompressed_reference = input_item.split(" ")
         # region format: REGION_chr8_1077_1198.fastq.gz
         # But if the chr has underscores, it could look like this:
         #    REGION_chr8_KI270812v1_alt_1077_1198.fastq.gz
@@ -349,7 +349,7 @@ def main():
             info("Creating Folder %s" % OUTPUT_DIRECTORY)
             os.makedirs(OUTPUT_DIRECTORY)
             info("Done!")
-        except:
+        except OSError:
             warn("Folder %s already exists." % OUTPUT_DIRECTORY)
 
         log_filename = _jp("CRISPRessoPooled_RUNNING_LOG.txt")
@@ -374,13 +374,13 @@ def main():
         # check files
         if args.aligned_pooled_bam is not None:
             CRISPRessoShared.check_file(args.aligned_pooled_bam)
-            if args.fastq_r1 != "":
+            if args.fastq_r1:
                 raise CRISPRessoShared.BadParameterException(
                     "Arguments for input fastq cannot be provided when input bam is also "
                     "provided. Please provide either input reads (--fastq_r1) or input bam "
                     "alignemnts (--aligned_pooled_bam), but not both."
                 )
-            if args.bowtie2_index == "":
+            if not args.bowtie2_index:
                 raise CRISPRessoShared.BadParameterException(
                     "The bowtie2 index must be provided when the aligned pooled bam is given "
                     "in order to extract reference sequences for alignment. Please provide "
@@ -390,7 +390,7 @@ def main():
                 raise CRISPRessoShared.BadParameterException("Cannot trim input sequences if input bam is provided.")
 
         elif args.fastq_r1:
-            if args.fastq_r1 == "":
+            if not args.fastq_r1:
                 raise CRISPRessoShared.BadParameterException("")
             CRISPRessoShared.check_file(args.fastq_r1)
             CRISPRessoShared.assert_fastq_format(args.fastq_r1)
@@ -443,7 +443,7 @@ def main():
             sys.exit(1)
 
         bowtie2_options_string = args.bowtie2_options_string
-        if args.bowtie2_options_string == "":
+        if not args.bowtie2_options_string:
             if args.use_legacy_bowtie2_options_string:
                 bowtie2_options_string = "-k 1 --end-to-end -N 0 --np 0"
             else:
@@ -561,7 +561,7 @@ def main():
             # don't trim reads in aligned bams
             pass
         # read filtering (for quality) is done at the individual crispresso run
-        elif args.fastq_r2 == "":  # single end reads
+        elif not args.fastq_r2:  # single end reads
             # check if we need to trim
             if not args.trim_sequences:
                 # create a symbolic link
@@ -780,10 +780,10 @@ def main():
                 for line in amplicons_fin:
                     if line[0] == "#":  # pandas' comment option will strip after comment character in middle of lines.
                         continue
-                    line = line.strip()
-                    if not line:
+                    stripped_line = line.strip()
+                    if not stripped_line:
                         continue
-                    amplicon_rows.append(line.split("\t"))
+                    amplicon_rows.append(stripped_line.split("\t"))
             try:
                 df_template = pd.DataFrame(amplicon_rows, columns=headers)
             except Exception as e:
@@ -857,15 +857,15 @@ def main():
                     cut_points = []
                     guides = row.guide_seq.strip().upper().split(",")
                     guide_qw_centers = CRISPRessoShared.set_guide_array(args.quantification_window_center, guides, "guide quantification center")
-                    for idx, current_guide_seq in enumerate(guides):
+                    for guide_idx, current_guide_seq in enumerate(guides):
                         wrong_nt = CRISPRessoShared.find_wrong_nt(current_guide_seq)
                         if wrong_nt:
                             raise CRISPRessoShared.NTException(
                                 "The sgRNA sequence %s contains wrong characters:%s" % (current_guide_seq, " ".join(wrong_nt))
                             )
 
-                        offset_fw = guide_qw_centers[idx] + len(current_guide_seq) - 1
-                        offset_rc = (-guide_qw_centers[idx]) - 1
+                        offset_fw = guide_qw_centers[guide_idx] + len(current_guide_seq) - 1
+                        offset_rc = (-guide_qw_centers[guide_idx]) - 1
                         cut_points += [m.start() + offset_fw for m in re.finditer(current_guide_seq, row.amplicon_seq)] + [
                             m.start() + offset_rc for m in re.finditer(CRISPRessoShared.reverse_complement(current_guide_seq), row.amplicon_seq)
                         ]
@@ -1069,7 +1069,7 @@ def main():
             failed_batch_arr_desc = []
             for idx, row in df_template.iterrows():
                 cmd = row["crispresso_command"]
-                if cmd == "":
+                if not cmd:
                     continue
                 # Extract the folder name from the CRISPResso command
                 folder_name = row["crispresso_output_folder"]
@@ -1515,7 +1515,7 @@ def main():
                             files_to_match.remove(fastq_filename_region)
                         fastq_region_filenames.append(fastq_filename_region)
 
-                        if N_READS >= args.min_reads_to_use_region and fastq_filename_region != "":
+                        if N_READS >= args.min_reads_to_use_region and fastq_filename_region:
                             info("\nThe amplicon [%s] has enough reads (%d) mapped to it! Running CRISPResso!\n" % (idx, N_READS))
 
                             this_run_args_from_amplicons_file = {}
@@ -1794,7 +1794,7 @@ def main():
             run_data = None
             try:
                 run_data = CRISPRessoShared.load_crispresso_info(_jp(folder_name))
-            except:
+            except Exception:
                 warn("Skipping the folder %s: not enough reads, incomplete, or empty folder." % folder_name)
                 debug("Folder cannot be read at " + _jp(folder_name) + " with error: %s" % traceback.format_exc())
 
@@ -2015,7 +2015,7 @@ def main():
                         os.unlink(file_to_remove)
                     else:
                         os.remove(file_to_remove)
-                except:
+                except OSError:
                     warn("Skipping:%s" % file_to_remove)
 
         if not args.suppress_report and not args.suppress_plots:
@@ -2036,10 +2036,10 @@ def main():
                 run_data = None
                 try:
                     run_data = CRISPRessoShared.load_crispresso_info(sub_folder)
-                except Exception:
+                except Exception as e:
                     raise CRISPRessoShared.OutputFolderIncompleteException(
                         "CRISPResso run %s is not complete. Cannot read CRISPResso2_info.json file." % sub_folder
-                    )
+                    ) from e
                 [run_data["results"]["refs"][ref_name]["sequence"] for ref_name in run_data["results"]["ref_names"]]
                 allele_frequency_table_zip_filename = os.path.join(sub_folder, run_data["running_info"]["allele_frequency_table_zip_filename"])
                 if not os.path.exists(allele_frequency_table_zip_filename):
@@ -2069,7 +2069,7 @@ def main():
                                 for ref_name in run_data["results"]["ref_names"]:
                                     if allele_seq == run_data["results"]["refs"][ref_name]["sequence"]:
                                         this_ref_name = ref_name
-                                if this_ref_name == "":
+                                if not this_ref_name:
                                     this_ref_name = "Alt_" + str(new_allele_idx)
                                     new_allele_idx += 1
                                 this_names.append(this_ref_name)

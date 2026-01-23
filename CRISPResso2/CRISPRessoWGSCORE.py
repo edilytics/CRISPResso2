@@ -44,7 +44,7 @@ def check_library(library_name):
     """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
-    except:
+    except ImportError:
         error("You need to install %s module to use CRISPRessoWGS!" % library_name)
         sys.exit(1)
 
@@ -71,8 +71,8 @@ def which(program):
             return program
     else:
         for path in os.environ["PATH"].split(os.pathsep):
-            path = path.strip('"')
-            exe_file = os.path.join(path, program)
+            clean_path = path.strip('"')
+            exe_file = os.path.join(clean_path, program)
             if is_exe(exe_file):
                 return exe_file
 
@@ -377,7 +377,7 @@ def main():
             info("Creating Folder %s" % OUTPUT_DIRECTORY)
             os.makedirs(OUTPUT_DIRECTORY)
             info("Done!")
-        except:
+        except OSError:
             warn("Folder %s already exists." % OUTPUT_DIRECTORY)
 
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, "CRISPRessoWGS_status.json")))
@@ -523,8 +523,8 @@ def main():
                 df_genes.txEnd = df_genes.txEnd.astype(int)
                 df_genes.txStart = df_genes.txStart.astype(int)
                 df_genes.head()
-            except:
-                raise CRISPRessoShared.BadParameterException("Failed to load the gene annotations file.")
+            except Exception as e:
+                raise CRISPRessoShared.BadParameterException("Failed to load the gene annotations file.") from e
 
         # Load and validate the REGION FILE
         df_regions = pd.read_csv(
@@ -584,15 +584,15 @@ def main():
                 cut_points = []
                 guides = row.sgRNA.strip().upper().split(",")
                 guide_qw_centers = CRISPRessoShared.set_guide_array(args.quantification_window_center, guides, "guide quantification center")
-                for idx, current_guide_seq in enumerate(guides):
+                for guide_idx, current_guide_seq in enumerate(guides):
                     wrong_nt = find_wrong_nt(current_guide_seq)
                     if wrong_nt:
                         raise CRISPRessoShared.NTException(
                             "The sgRNA sequence %s contains wrong characters:%s" % (current_guide_seq, " ".join(wrong_nt))
                         )
 
-                    offset_fw = guide_qw_centers[idx] + len(current_guide_seq) - 1
-                    offset_rc = (-guide_qw_centers[idx]) - 1
+                    offset_fw = guide_qw_centers[guide_idx] + len(current_guide_seq) - 1
+                    offset_rc = (-guide_qw_centers[guide_idx]) - 1
                     cut_points += [m.start() + offset_fw for m in re.finditer(current_guide_seq, row.sequence)] + [
                         m.start() + offset_rc for m in re.finditer(CRISPRessoShared.reverse_complement(current_guide_seq), row.sequence)
                     ]

@@ -49,7 +49,7 @@ def propagate_options(cmd, options, params, paramInd):
                 elif str(val) == "False":
                     pass
                 elif isinstance(val, str):
-                    if val != "":
+                    if val:
                         if " " in val or "-" in val:
                             cmd += ' --%s "%s"' % (option, str(val))  # quotes for options with spaces
                         else:
@@ -67,7 +67,7 @@ def check_library(library_name):
     """Import and return a library, exiting with an error if not installed."""
     try:
         return __import__(library_name)
-    except:
+    except ImportError:
         error("You need to install %s module to use CRISPRessoMeta!" % library_name)
         sys.exit(1)
 
@@ -156,7 +156,7 @@ def main():
         # and clean names
 
         for i in range(meta_count):
-            if meta_params.loc[i, "name"] == "":
+            if not meta_params.loc[i, "name"]:
                 meta_params.at[i, "name"] = i
             meta_params.at[i, "name"] = CRISPRessoShared.clean_filename(meta_params.loc[i, "name"])
 
@@ -179,7 +179,7 @@ def main():
                 )
             CRISPRessoShared.check_file(row.fastq_r1)
 
-            if row.fastq_r2 != "":
+            if row.fastq_r2:
                 CRISPRessoShared.check_file(row.fastq_r2)
 
             if args.auto:
@@ -206,7 +206,7 @@ def main():
 
                 # iterate through guides
                 curr_guide_seq_string = row.guide_seq
-                if curr_guide_seq_string is not None and curr_guide_seq_string != "":
+                if curr_guide_seq_string:
                     guides = curr_guide_seq_string.strip().upper().split(",")
                     for curr_guide_seq in guides:
                         wrong_nt = CRISPRessoShared.find_wrong_nt(curr_guide_seq)
@@ -264,7 +264,7 @@ def main():
                     )
 
         meta_folder_name = os.path.splitext(os.path.basename(args.metadata))[0]
-        if args.name and args.name != "":
+        if args.name:
             meta_folder_name = args.name
 
         output_folder_name = "CRISPRessoMeta_on_%s" % meta_folder_name
@@ -279,7 +279,7 @@ def main():
         try:
             info("Creating Folder %s" % OUTPUT_DIRECTORY, {"percent_complete": 0})
             os.makedirs(OUTPUT_DIRECTORY)
-        except:
+        except OSError:
             warn("Folder %s already exists." % OUTPUT_DIRECTORY)
 
         log_filename = _jp("CRISPRessoMeta_RUNNING_LOG.txt")

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# ruff: noqa: PLC0415, E402, E722
 """Description:
 Setup script for CRISPResso2 -- Software pipeline for the analysis of genome editing outcomes from deep sequencing data
 @status:  beta

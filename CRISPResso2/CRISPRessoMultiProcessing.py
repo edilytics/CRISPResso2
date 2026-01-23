@@ -146,14 +146,14 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor="region", c
                 raise Exception(
                     'CRISPResso %s #%d failed. For more information, try running the command: "%s"' % (descriptor, idx, crispresso_cmds[idx])
                 )
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as e:
         pool.terminate()
         logger.warn("Caught SIGINT. Program Terminated")
-        raise Exception("CRISPResso2 Terminated")
+        raise Exception("CRISPResso2 Terminated") from e
         sys.exit(0)
     except Exception as e:
         print("CRISPResso2 failed")
-        raise e
+        raise
     else:
         plural = descriptor + "s"
         if descriptor.endswith("ch") or descriptor.endswith("sh"):
@@ -201,14 +201,14 @@ def run_pandas_apply_parallel(input_df, input_function_chunk, n_processes=1):
         r = pool.map_async(input_function_chunk, df_split)
         results = r.get(60 * 60 * 60)  # Without the timeout this blocking call ignores all signals.
         df_new = pd.concat(results)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as e:
         pool.terminate()
         logging.warn("Caught SIGINT. Program Terminated")
-        raise Exception("CRISPResso2 Terminated")
+        raise Exception("CRISPResso2 Terminated") from e
         sys.exit(0)
     except Exception as e:
         print("CRISPResso2 failed")
-        raise e
+        raise
     else:
         pool.close()
     pool.join()
@@ -239,14 +239,14 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
             input_chunks = [input_array[i * n : (i + 1) * n] for i in range((len(input_array) + n - 1) // n)]
             r = pool.map_async(input_function, input_chunks)
             results = r.get(60 * 60 * 60)  # Without the timeout this blocking call ignores all signals.
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as e:
             pool.terminate()
             logging.warn("Caught SIGINT. Program Terminated")
-            raise Exception("CRISPResso2 Terminated")
+            raise Exception("CRISPResso2 Terminated") from e
             sys.exit(0)
         except Exception as e:
             print("CRISPResso2 failed")
-            raise e
+            raise
         else:
             pool.close()
         pool.join()
@@ -282,14 +282,14 @@ def run_parallel_commands(commands_arr, n_processes=1, descriptor="CRISPResso2",
                 raise Exception("%s #%d was killed by your system. Please decrease the number of processes (-p) and run again." % (descriptor, idx))
             if ret != 0 and not continue_on_fail:
                 raise Exception("%s #%d failed" % (descriptor, idx))
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as e:
         pool.terminate()
         logging.warn("Caught SIGINT. Program Terminated")
-        raise Exception("CRISPResso2 Terminated")
+        raise Exception("CRISPResso2 Terminated") from e
         sys.exit(0)
     except Exception as e:
         print("CRISPResso2 failed")
-        raise e
+        raise
     else:
         pool.close()
     pool.join()
@@ -327,6 +327,6 @@ def run_plot(plot_func, plot_args, num_processes, process_futures, process_pool,
     except Exception as e:
         if halt_on_plot_fail:
             logger.critical("Plot error, halting execution \n")
-            raise PlotException(f"There was an error generating plot {plot_func.__name__}.")
+            raise PlotException(f"There was an error generating plot {plot_func.__name__}.") from e
         logger.warn(f"Plot error {e}, skipping plot \n")
         logger.debug(traceback.format_exc())

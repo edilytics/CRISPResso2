@@ -276,7 +276,7 @@ def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, 
         if option:
             if option in option_values:
                 if paramInd is None:
-                    if type(option_values) == dict:
+                    if isinstance(option_values, dict):
                         val = option_values[option]
                     else:
                         val = getattr(option_values, option)
@@ -289,7 +289,7 @@ def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, 
                 elif str(val) == "False":
                     setattr(args, option, False)
                 elif isinstance(val, str):
-                    if val != "":
+                    if val:
                         setattr(args, option, str(val))
                 elif isinstance(val, bool):
                     setattr(args, option, val)
@@ -309,18 +309,18 @@ def overwrite_crispresso_options(cmd, option_names_to_overwrite, option_values, 
             if action.nargs == 0:
                 if val:  # if value is true
                     new_cmd += ' --%s' % action.dest
-            elif action.type == bool:  # but just in case...
+            elif action.type is bool:  # but just in case...
                 if val:
                     new_cmd += ' --%s' % action.dest
-            elif action.type == str:
-                if val != "":
+            elif action.type is str:
+                if val:
                     if re.fullmatch(r"[a-zA-Z0-9\._]*", val):  # if the value is alphanumeric, don't have to quote it
                         new_cmd += ' --%s %s' % (action.dest, val)
                     elif val.startswith('"') and val.endswith('"'):
                         new_cmd += ' --%s %s' % (action.dest, val)
                     else:
                         new_cmd += ' --%s "%s"' % (action.dest, val)
-            elif action.type == int:
+            elif action.type is int:
                 new_cmd += ' --%s %s' % (action.dest, val)
 
     return new_cmd
@@ -354,7 +354,7 @@ def propagate_crispresso_options(cmd, options, params, paramInd=None):
         if option:
             if option in params:
                 if paramInd is None:
-                    if type(params) == dict:
+                    if isinstance(params, dict):
                         val = params[option]
                     else:
                         val = getattr(params, option)
@@ -367,7 +367,7 @@ def propagate_crispresso_options(cmd, options, params, paramInd=None):
                 elif str(val) == "False":
                     pass
                 elif isinstance(val, str):
-                    if val != "":
+                    if val:
                         if re.match(r'-\d+$', val):
                             cmd += ' --%s %s' % (option, str(val))
                         elif " " in val or "-" in val:
@@ -610,14 +610,14 @@ def check_file(filename):
     try:
         with open(filename, encoding='utf-8'):
             pass
-    except IOError:
+    except IOError as e:
         files_in_curr_dir = os.listdir('.')
         if len(files_in_curr_dir) > 15:
             files_in_curr_dir = files_in_curr_dir[0:15]
             files_in_curr_dir.append("(Complete listing truncated)")
         dir_string = ""
         file_dir = os.path.dirname(filename)
-        if file_dir == "":
+        if not file_dir:
             dir_string = ""
         elif os.path.isdir(file_dir):
             files_in_file_dir = os.listdir(file_dir)
@@ -630,7 +630,7 @@ def check_file(filename):
 
         raise BadParameterException(
             "The specified file '" + filename + "' cannot be opened.\nAvailable files in current directory:\n\t" + "\n\t".join(
-                files_in_curr_dir) + dir_string)
+                files_in_curr_dir) + dir_string) from e
 
 
 def force_symlink(src, dst):
@@ -959,12 +959,12 @@ def load_crispresso_info(
             crispresso2_info = json.load(fh, cls=CRISPRessoJSONDecoder)
             return crispresso2_info
     except json.JSONDecodeError as e:
-        raise Exception('Cannot parse CRISPResso info file at ' + crispresso_info_file + "\n" + str(e))
+        raise Exception('Cannot parse CRISPResso info file at ' + crispresso_info_file + "\n" + str(e)) from e
     except (AttributeError, EOFError, ImportError, IndexError) as e:
         # secondary errors
-        raise Exception('Cannot parse CRISPResso info file at ' + crispresso_info_file + "\n" + str(e))
+        raise Exception('Cannot parse CRISPResso info file at ' + crispresso_info_file + "\n" + str(e)) from e
     except Exception as e:
-        raise Exception('Cannot parse CRISPResso info file at ' + crispresso_info_file + "\n" + str(e))
+        raise Exception('Cannot parse CRISPResso info file at ' + crispresso_info_file + "\n" + str(e)) from e
 
 
 def write_crispresso_info(crispresso_output_file, crispresso2_info):
@@ -1072,8 +1072,8 @@ def get_most_frequent_reads(
             o1.close()
             o2.close()
             fastq_handle.close()
-        except:
-            raise BadParameterException('Error in splitting read pairs from a single file')
+        except Exception as e:
+            raise BadParameterException('Error in splitting read pairs from a single file') from e
         fastq_r1 = output_r1
         fastq_r2 = output_r2
 
@@ -1239,7 +1239,7 @@ def guess_amplicons(
     amplicon_seq_arr = []
 
     # add most frequent amplicon to the list
-    count, seq = seq_lines[0].strip().split()
+    _count, seq = seq_lines[0].strip().split()
     amplicon_seq_arr.append(seq)
     curr_amplicon_id += 1
 
@@ -1520,8 +1520,8 @@ def split_interleaved_fastq(fastq_filename, output_filename_r1, output_filename_
         fastq_splitted_outfile_r1 = gzip.open(output_filename_r1, 'wt')
         fastq_splitted_outfile_r2 = gzip.open(output_filename_r2, 'wt')
         [fastq_splitted_outfile_r1.write(line) if (i % 8 < 4) else fastq_splitted_outfile_r2.write(line) for i, line in enumerate(fastq_handle)]
-    except:
-        raise BadParameterException('Error in splitting read pairs from a single file')
+    except Exception as e:
+        raise BadParameterException('Error in splitting read pairs from a single file') from e
     finally:
         fastq_handle.close()
         fastq_splitted_outfile_r1.close()
@@ -1651,7 +1651,7 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
     gap_incentive = np.zeros(len(reference_seq) + 1, dtype=int)
     try:
         gap_incentive[cut_idx] = 1
-    except:
+    except IndexError:
         pass
     aligned_seq, reference_seq, _score = CRISPResso2Align.global_align(
         aligned_seq,
@@ -1783,7 +1783,7 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
 
     seen_guide_names = {}  # keep track of guide names (so we don't assign a guide the same name as another guide)
     for guide_idx, current_guide_seq in enumerate(guides):
-        if current_guide_seq == '':
+        if not current_guide_seq:
             continue
         offset_fw = quantification_window_centers[guide_idx] + len(current_guide_seq) - 1
         offset_rc = (-quantification_window_centers[guide_idx]) - 1
@@ -1824,7 +1824,7 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
             if match_count == 1:
                 this_sgRNA_names.append(this_sgRNA_name)
             else:
-                if this_sgRNA_name == "":
+                if not this_sgRNA_name:
                     this_sgRNA_name = current_guide_seq.upper()
                 this_potential_name = this_sgRNA_name + "_" + str(m.start())
                 curr_guide_idx = 1
@@ -1856,7 +1856,7 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
             if match_count == 1:
                 this_sgRNA_names.append(this_sgRNA_name)
             else:
-                if this_sgRNA_name == "":
+                if not this_sgRNA_name:
                     this_sgRNA_name = current_guide_seq.upper()
                 this_potential_name = this_sgRNA_name + "_" + str(m.start())
                 curr_guide_idx = 1
@@ -1964,7 +1964,7 @@ def set_guide_array(vals, guides, property_name):
         return []
 
     for idx, val in enumerate(vals_array):
-        if val != '':
+        if val:
             ret_array[idx] = int(val)
     return ret_array
 
@@ -2190,7 +2190,7 @@ def get_crispresso_header(description, header_str):
     term_width = 80
     try:
         term_width = os.get_terminal_size().columns
-    except:
+    except OSError:
         pass
 
     logo = get_crispresso_logo()
@@ -2237,9 +2237,9 @@ def get_crispresso_header(description, header_str):
         '[For support contact k.clement@utah.edu or support@edilytics.com]').center(term_width) + "\n"
 
     description_str = ""
-    for str in description:
-        str = str.strip()
-        description_str += str.center(term_width) + "\n"
+    for line in description:
+        stripped_line = line.strip()
+        description_str += stripped_line.center(term_width) + "\n"
 
     return "\n" + description_str + output_line
 
@@ -2270,22 +2270,23 @@ def format_cl_text(text, max_chars=None, spaces_to_tab=4):
     if max_chars is None:
         try:
             max_chars = os.get_terminal_size().columns
-        except:
+        except OSError:
             max_chars = 80
 
     broken_lines = []
     for line in text.split('\n'):
         if len(line) > max_chars:
             broken_line = ''
-            while len(line) > max_chars:
+            remaining = line
+            while len(remaining) > max_chars:
                 # Find the last space before max_chars characters
-                last_space_index = line.rfind(' ', spaces_to_tab, max_chars)
+                last_space_index = remaining.rfind(' ', spaces_to_tab, max_chars)
                 if last_space_index == -1:
                     # If no space found, break the line at max_chars characters
                     last_space_index = max_chars
-                broken_line += line[:last_space_index] + '\n'
-                line = ' ' * spaces_to_tab + line[last_space_index:].strip()
-            broken_line += line
+                broken_line += remaining[:last_space_index] + '\n'
+                remaining = ' ' * spaces_to_tab + remaining[last_space_index:].strip()
+            broken_line += remaining
             broken_lines.append(broken_line)
         else:
             broken_lines.append(line)
@@ -2297,7 +2298,7 @@ def zip_results(results_folder):
     path_values = os.path.split(results_folder)
     output_folder = path_values[0]
     folder_id = path_values[1]
-    if output_folder == "":
+    if not output_folder:
         cmd_to_zip = 'zip -m -r {0} {1}'.format(
             folder_id + ".zip", folder_id
         )
@@ -2316,7 +2317,7 @@ def is_C2Pro_installed():
             return False
         else:
             return True
-    except:
+    except ModuleNotFoundError:
         return False
 
 

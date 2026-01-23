@@ -87,6 +87,10 @@ ignore = [
     "D404",  # Requires first word in docstring to not be "This"
     "D415",  # Requires punctuation at the end of docstrings
     "D417",  # Requires argument descriptions in docstrings
+    "E115",  # Expected an indented block (comment)
+    "N812",  # Lowercase imported as non-lowercase - intentional for API consistency (e.g., `from CRISPRessoPro import plot as CRISPRessoPlot`)
+    "N818",  # Exception name should be named with an Error suffix - existing codebase uses Exception suffix consistently
+    "PLC0415",  # Import not at top-level - intentional for conditional imports, lazy loading, and avoiding circular imports
     "N802",  # Requires function names to be all lowercase
     "N806",  # Requires variables to be all lowercase
     "N803",  # Requires passed variables to be all lowercase

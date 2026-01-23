@@ -114,7 +114,7 @@ def plot_ambiguous_alleles_tables_from_folder(
 
         for ind, sgRNA in enumerate(sgRNA_sequences):
             sgRNA_label = sgRNA  # for file names
-            if sgRNA_names[ind] != "":
+            if sgRNA_names[ind]:
                 sgRNA_label = sgRNA_names[ind]
 
             cut_point = sgRNA_cut_points[ind]

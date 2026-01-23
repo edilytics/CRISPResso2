@@ -126,7 +126,7 @@ ___________________________________
         try:
             info("Creating Folder %s" % OUTPUT_DIRECTORY)
             os.makedirs(OUTPUT_DIRECTORY)
-        except:
+        except OSError:
             warn("Folder %s already exists." % OUTPUT_DIRECTORY)
 
         log_filename = _jp("CRISPRessoAggregate_RUNNING_LOG.txt")
@@ -422,7 +422,7 @@ ___________________________________
                             % (run_amplicon_name, crispresso2_folder, ampSeq_nf, ampSeq_np, ampSeq_cf, amplicon_seq)
                         )
                         continue
-                    if consensus_sequence == "":
+                    if not consensus_sequence:
                         consensus_sequence = ampSeq_nf
                     if ampSeq_nf != consensus_sequence:
                         info("Skipping the amplicon '%s' in folder '%s'. Amplicon sequences do not match." % (run_amplicon_name, crispresso2_folder))
@@ -579,11 +579,11 @@ ___________________________________
                                 for sgRNA_interval in consensus_sgRNA_intervals:
                                     newstart = None
                                     newend = None
-                                    for idx, i in enumerate(sgRNA_plot_idxs):
+                                    for plot_idx, i in enumerate(sgRNA_plot_idxs):
                                         if i <= sgRNA_interval[0]:
-                                            newstart = idx
+                                            newstart = plot_idx
                                         if newend is None and i >= sgRNA_interval[1]:
-                                            newend = idx
+                                            newend = plot_idx
 
                                     # if guide doesn't overlap with plot idxs
                                     if newend == 0 or newstart == len(sgRNA_plot_idxs):
