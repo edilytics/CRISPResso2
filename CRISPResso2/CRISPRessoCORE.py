@@ -2324,7 +2324,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
 
         num_unique_reads = len(variantCache.keys())
         info(
-            f"Finished reading fastq file; {num_unique_reads} unique reads found of {num_reads} total reads found."
+            f"Finished reading fastq file; {num_unique_reads} unique reads found of {num_reads} total reads found"
         )
 
     n_processes = 1
