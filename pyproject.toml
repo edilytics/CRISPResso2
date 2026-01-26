@@ -100,6 +100,7 @@ ignore = [
     "PLR0911",  # too-many-return-statements - refactoring would reduce readability
     "PLR6301",  # no-self-use - methods are part of class interfaces (e.g., JSON decoder)
     "PLW1509",  # subprocess-popen-preexec-fn - intentional for signal handling
+    "RUF059",  # unused-unpacked-variable - tuple unpacking pattern is consistent across the codebase
     # These should be fixed but will require a larger refactor
     "PLR0912",  # too-many-branches
     "PLR0913",  # too-many-arguments
