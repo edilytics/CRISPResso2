@@ -11,7 +11,7 @@ def reconstitute_reads(crispresso_output_folder, fastq_output_file):
     print('Processing ' + crispresso_output_folder)
     crispresso2_info = CRISPRessoShared.load_crispresso_info(crispresso_output_folder)
 
-    total_aligned_reads = (crispresso2_info['running_info']['alignment_stats']['N_CACHED_ALN'] + 
+    total_aligned_reads = (crispresso2_info['running_info']['alignment_stats']['N_CACHED_ALN'] +
         crispresso2_info['running_info']['alignment_stats']['N_COMPUTED_ALN'])
 
     z = zipfile.ZipFile(os.path.join(crispresso_output_folder, crispresso2_info['running_info']['allele_frequency_table_zip_filename']))

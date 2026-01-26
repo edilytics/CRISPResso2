@@ -20,7 +20,7 @@ try:
 
     command_classes["build_ext"] = Cython.Distutils.build_ext
     has_cython = True
-except:
+except ImportError:
     has_cython = False
 
 ext = ".pyx" if has_cython else ".c"

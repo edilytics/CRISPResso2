@@ -624,6 +624,12 @@ def main():
                     "--overlap_len_require {min_overlap} --thread {num_threads} "
                     "--json {json_report} --html {html_report} {options} >> {log} 2>&1"
                 ).format(
+                    command=args.fastp_command,
+                    r1=args.fastq_r1,
+                    r2=args.fastq_r2,
+                    out_merged=processed_output_filename,
+                    unpaired1=not_combined_1_filename,
+                    unpaired2=not_combined_2_filename,
                     min_overlap=args.min_paired_end_reads_overlap,
                     num_threads=n_processes_for_pooled,
                     json_report=_jp("fastp_report.json"),
@@ -838,7 +844,7 @@ def main():
             # create clean, distinct run names - this will be used to create file names
             seen_runnames = {}
             run_names = []
-            for idx, row in df_template.iterrows():
+            for idx, _row in df_template.iterrows():
                 this_run_name = CRISPRessoShared.clean_filename(idx)
                 this_index = 0
                 while this_run_name in seen_runnames:
@@ -1098,7 +1104,7 @@ def main():
             else:
                 # write amplicons as fastq for alignment
                 with open(filename_amplicon_seqs_fasta, "w", encoding="utf-8") as fastas:
-                    for idx, row in df_template.iterrows():
+                    for _idx, row in df_template.iterrows():
                         fastas.write(">%s\n%s\n" % (row.run_name, row.amplicon_seq))
 
                 aligner_command = "bowtie2 -x %s -p %s %s -f -U %s --no-hd --no-sq 2> %s > %s " % (
@@ -1151,7 +1157,7 @@ def main():
             df_template.bpend = df_template.bpend.astype(int)
 
             # Check reference is the same otherwise throw a warning
-            for idx, row in df_template.iterrows():
+            for _idx, row in df_template.iterrows():
                 if row.amplicon_seq != row.reference_seq and row.amplicon_seq != CRISPRessoShared.reverse_complement(row.reference_seq):
                     warn(
                         "The amplicon sequence %s provided:\n%s\n\nis different from the reference sequence(both strands):\n\n%s\n\n%s\n"
@@ -1306,7 +1312,7 @@ def main():
 
                     chr_commands = []
                     chr_output_filenames = []
-                    for idx, row in df_template.iterrows():
+                    for _idx, row in df_template.iterrows():
                         chr_output_filename = _jp("MAPPED_REGIONS/REGION_%s_%s_%s.info" % (row.chr_id, row.bpstart, row.bpend))
                         sub_chr_command = (
                             cmd.replace("__REGIONCHR__", str(row.chr_id))
@@ -1670,7 +1676,7 @@ def main():
                 # may be different than run_names if e.g. the chromosome name
                 # contains an emoji.... (don't doubt my premonitions)
                 run_display_names = []
-                for idx, row in df_regions.iterrows():
+                for _idx, row in df_regions.iterrows():
                     this_unclean_name = "REGION_%s_%d_%d" % (row.chr_id, row.bpstart, row.bpend)
                     this_run_name = CRISPRessoShared.clean_filename(this_unclean_name)
                     this_index = 0
@@ -1704,7 +1710,7 @@ def main():
 
                 info("Running CRISPResso on the discovered regions...")
                 crispresso_cmds = []
-                for idx, row in df_regions.iterrows():
+                for _idx, row in df_regions.iterrows():
                     if row.n_reads > args.min_reads_to_use_region:
                         info("\nRunning CRISPResso on: %s-%d-%d..." % (row.chr_id, row.bpstart, row.bpend))
 

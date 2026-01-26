@@ -117,7 +117,7 @@ def main():
             metadata = json.load(metadata_file)
 
             metadata["Experiment"]
-            for guide in data["Experiment"]:
+            for guide in metadata["Experiment"]:
                 print("Guide: " + guide["name"])
                 print("Sequence: " + guide["sequence"])
                 print("Amplicon: " + guide["amplicon"])
@@ -322,7 +322,7 @@ def main():
         amplicon_names = {}
         amplicon_counts = {}
         completed_meta_arr = []
-        for idx, row in meta_params.iterrows():
+        for _idx, row in meta_params.iterrows():
             metaName = CRISPRessoShared.slugify(row["name"])
             folder_name = os.path.join(OUTPUT_DIRECTORY, "CRISPResso_on_%s" % metaName)
             run_data_file = os.path.join(folder_name, "CRISPResso2_info.json")

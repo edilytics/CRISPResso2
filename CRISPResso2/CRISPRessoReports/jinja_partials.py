@@ -33,6 +33,12 @@ except ImportError:
     flask = None
 
 
+class PartialsException(Exception):
+    """Exception raised when there is an error with partial rendering."""
+
+    pass
+
+
 def render_partial(template_name, renderer=None, markup=True, **data):
     """Renders a partial template and returns the result. If `markup` is True, the result is wrapped in a `Markup` object."""
     if renderer is None:

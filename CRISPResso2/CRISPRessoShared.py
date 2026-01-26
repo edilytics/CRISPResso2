@@ -100,6 +100,7 @@ class PlotException(Exception):
 
 class StatusFormatter(logging.Formatter):
     def format(self, record):
+        """Format a log record with percent complete information."""
         record.percent_complete = ''
         if record.args and 'percent_complete' in record.args:
             record.percent_complete = float(record.args['percent_complete'])
@@ -114,6 +115,7 @@ class StatusFormatter(logging.Formatter):
 
 class StatusHandler(logging.FileHandler):
     def __init__(self, filename):
+        """Initialize a file handler that writes JSON-formatted status messages."""
         super().__init__(filename, 'w')
         self.setFormatter(StatusFormatter('{\n  "message": "%(json_message)s",\n  "percent_complete": %(percent_complete)s\n}'))
 
@@ -129,6 +131,7 @@ class StatusHandler(logging.FileHandler):
 
 class LogStreamHandler(logging.StreamHandler):
     def __init__(self, stream=None):
+        """Initialize a stream handler with CRISPResso status formatting."""
         super().__init__(stream)
         self.setFormatter(StatusFormatter(
             '%(levelname)-5s @ %(asctime)s (%(percent_complete).1f%% done):\n\t %(message)s \n',
@@ -201,7 +204,8 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
             else:  # Case when neither 'action' nor 'required' conditions are met
                 # Here, it handles the case where default might be None, which is a valid scenario
                 kwargs = {'help': arg_help, 'type': type_mapper[type_value]}
-                if default is not None: kwargs['default'] = default  # Add 'default' only if it's specified
+                if default is not None:
+                    kwargs['default'] = default  # Add 'default' only if it's specified
                 parser.add_argument(*value['keys'], **kwargs)
     return parser
 
@@ -427,7 +431,7 @@ CIGAR_LOOKUP = {
     ('-', 'A'): 'D', ('-', 'T'): 'D', ('-', 'C'): 'D', ('-', 'G'): 'D', ('-', 'N'): 'D',
     }
 
-cigarUnexplodePattern = re.compile(r'((\w)\2{0,})')
+CIGAR_UNEXPLODE_PATTERN = re.compile(r'((\w)\2{0,})')
 
 CODON_TO_AMINO_ACID = {
     'TTT': 'Phe', 'TTC': 'Phe', 'TTA': 'Leu', 'TTG': 'Leu',
@@ -573,7 +577,7 @@ def unexplode_cigar(exploded_cigar_string):
 
     """
     cigar_els = []
-    for (cigar_str, cigar_char) in re.findall(cigarUnexplodePattern, exploded_cigar_string):
+    for (cigar_str, cigar_char) in re.findall(CIGAR_UNEXPLODE_PATTERN, exploded_cigar_string):
         cigar_els.append(str(len(cigar_str)) + cigar_char)
     return cigar_els
 
@@ -831,6 +835,7 @@ def check_output_folder(output_folder):
 # Thanks https://gist.github.com/simonw/7000493 for this idea
 class CRISPRessoJSONEncoder(json.JSONEncoder):
     def default(self, obj):
+        """Serialize CRISPResso custom types to JSON-compatible formats."""
         if isinstance(obj, CRISPRessoCOREResources.ResultsSlotsDict):
             return {
                 '_type': 'ResultsSlotsDict',
@@ -884,14 +889,16 @@ class CRISPRessoJSONEncoder(json.JSONEncoder):
 
 class CRISPRessoJSONDecoder(json.JSONDecoder):
     def __init__(self, *args, **kwargs):
+        """Initialize a JSON decoder with custom object hooks for CRISPResso types."""
         json.JSONDecoder.__init__(
             self,
-            object_hook=self.object_hook,
             *args,
+            object_hook=self.object_hook,
             **kwargs,
         )
 
     def object_hook(self, obj):
+        """Deserialize JSON objects back to CRISPResso custom types."""
         if '_type' in obj:
             if obj['_type'] == 'ResultsSlotsDict':
                 return CRISPRessoCOREResources.ResultsSlotsDict(**obj['value'])

@@ -8,6 +8,9 @@ import os
 from copy import deepcopy
 import sys
 import traceback
+
+from scipy import stats
+
 from CRISPResso2 import CRISPRessoShared
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
@@ -53,7 +56,6 @@ class DifferentAmpliconLengthException(Exception):
 
 np = check_library("numpy")
 pd = check_library("pandas")
-from scipy import stats
 
 
 _ROOT = os.path.abspath(os.path.dirname(__file__))

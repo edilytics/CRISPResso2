@@ -609,7 +609,7 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
     best_match_names = []
     best_match_strands = []
     ref_aln_details = []
-    for idx, ref_name in enumerate(ref_names):
+    for _idx, ref_name in enumerate(ref_names):
         # get alignment and score from cython
         # score = 100 * #matchedBases / length(including gaps)
         seed_i = 0
@@ -1035,7 +1035,7 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
     best_match_s2s = []
     best_match_names = []
     ref_aln_details = []
-    for idx, ref_name in enumerate(ref_names):
+    for _idx, ref_name in enumerate(ref_names):
         # get alignment and score from cython
         # score = 100 * #matchedBases / length(including gaps)
         seed_i = 0
@@ -1529,8 +1529,8 @@ def process_paired_fastq(
         not_aln = {}  # cache for reads that don't align
         if os.path.exists(variants_dir):
             variant_file_list = []
-            for n_processes in range(n_processes):
-                variant_file_list.append(os.path.join(variants_dir, f"variants_{n_processes}.tsv"))
+            for i in range(n_processes):
+                variant_file_list.append(os.path.join(variants_dir, f"variants_{i}.tsv"))
             # List all files in the directory
             for file_path in variant_file_list:
                 # Ensure the file is a .tsv before processing
@@ -2150,8 +2150,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
         info("Finished processing unique reads, now generating statistics...", {'percent_complete': 15})
         if os.path.exists(variants_dir):
             variant_file_list = []
-            for n_processes in range(n_processes):
-                variant_file_list.append(os.path.join(variants_dir, f"variants_{n_processes}.tsv"))
+            for i in range(n_processes):
+                variant_file_list.append(os.path.join(variants_dir, f"variants_{i}.tsv"))
             # List all files in the directory
             for file_path in variant_file_list:
                 # Ensure the file is a .tsv before processing
@@ -2387,8 +2387,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             info("Finished processing unique reads, now generating statistics...", {'percent_complete': 15})
             variant_file_list = []
             if os.path.exists(variants_dir):
-                for n_processes in range(n_processes):
-                    variant_file_list.append(os.path.join(variants_dir, f"variants_{n_processes}.tsv"))
+                for i in range(n_processes):
+                    variant_file_list.append(os.path.join(variants_dir, f"variants_{i}.tsv"))
             for file_path in variant_file_list:
                 # Ensure the file is a .tsv before processing
                 if file_path.endswith(".tsv"):
@@ -2421,7 +2421,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     del_inds = []
                                     sub_inds = []
                                     edit_strings = []
-                                    for ref_idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                                    for _ref_idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                                         payload = new_variant['variant_' + best_match_name]
 
                                         del_inds.append([
@@ -2530,7 +2530,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                     sub_inds = []
                     edit_strings = []
 
-                    for ref_idx, best_match_name in enumerate(new_variant['aln_ref_names']):
+                    for _ref_idx, best_match_name in enumerate(new_variant['aln_ref_names']):
                         payload = new_variant['variant_' + best_match_name]
 
                         del_inds.append([
@@ -2583,10 +2583,10 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                     N_MODS_OUTSIDE_WINDOW += new_variant[match_name]['mods_outside_window'] * variant_count
                     if new_variant[match_name]['irregular_ends']:
                         N_READS_IRREGULAR_ENDS += variant_count
-            if (idx % 10000 == 0 and idx > 0):
-                info(
-                    f"Processing Reads; {idx} Completed out of {num_unique_reads} Unique Reads"
-                )
+                if (idx % 10000 == 0 and idx > 0):
+                    info(
+                        f"Processing Reads; {idx} Completed out of {num_unique_reads} Unique Reads"
+                    )
 
         # Now that we've enriched variantCache with the unique reads, we read through the bam file again to write variants to the output file
         if bam_chr_loc:
@@ -4362,7 +4362,7 @@ def main():
                     this_include_idxs = []
                     start_val = -1
                     last_val = -1
-                    for idx, val in enumerate(refs[clone_ref_name]['include_idxs']):
+                    for _idx, val in enumerate(refs[clone_ref_name]['include_idxs']):
                         if start_val == -1:
                             start_val = val
                         elif val != last_val + 1:
@@ -4988,7 +4988,7 @@ def main():
                     'all_substitution_positions': variant_payload['all_substitution_positions'],
                     'substitution_positions': variant_payload['substitution_positions'],
                     'substitution_values': variant_payload['substitution_values']
-    			}
+                }
             else:
                 allele_row = {'#Reads': variant_count,
                        'Aligned_Sequence': variant_payload['aln_seq'],
@@ -5001,7 +5001,7 @@ def main():
                        'Aligned_Reference_Names': aln_ref_names_str,
                        'Aligned_Reference_Scores': aln_ref_scores_str,
                        'ref_positions': variant_payload['ref_positions']
-    			}
+                }
             return allele_row
 
         # end get_allele_row() definition
@@ -7009,7 +7009,7 @@ def main():
                         )
                         crispresso2_info['results']['refs'][ref_name]['plot_5_data'] = []
 
-                     # profiles-----------------------------------------------------------------------------------
+                    # profiles-----------------------------------------------------------------------------------
                     plot_root = _jp(
                         '6.' + ref_plot_name + 'Frameshift_in-frame_mutation_profiles',
                     )
@@ -7810,7 +7810,7 @@ def main():
                     )
                     crispresso2_info['results']['general_plots']['plot_5a_data'] = []
 
-                 # profiles-----------------------------------------------------------------------------------
+                # profiles-----------------------------------------------------------------------------------
                 plot_root = _jp('6a.Global_frameshift_in-frame_mutation_profiles')
                 plot_6a_input = {
                     'global_hists_frameshift': global_hists_frameshift,

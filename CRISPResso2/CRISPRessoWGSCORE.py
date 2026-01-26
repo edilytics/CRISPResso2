@@ -148,19 +148,19 @@ def get_reference_positions(pos, cigar, full_length=True):
     ops = re.findall(r"(\d+)(\w)", cigar)
 
     for c in ops:
-        l, op = c
-        l = int(l)
+        length, op = c
+        length = int(length)
 
         if op in {"S", "I"}:
             if full_length:
-                for i in range(0, l):
+                for _i in range(0, length):
                     positions.append(None)
         elif op == "M":
-            for i in range(pos, pos + l):
+            for i in range(pos, pos + length):
                 positions.append(i)
-            pos += l
+            pos += length
         elif op in {"D", "N"}:
-            pos += l
+            pos += length
 
     return positions
 
@@ -557,7 +557,7 @@ def main():
         # create clean, distinct run names - this will be used to create CRISPResso folder names
         seen_runnames = {}
         run_names = []
-        for idx, row in df_regions.iterrows():
+        for idx, _row in df_regions.iterrows():
             this_run_name = CRISPRessoShared.clean_filename(idx)
             this_index = 0
             while this_run_name in seen_runnames:

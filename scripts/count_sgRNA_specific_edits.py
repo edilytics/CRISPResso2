@@ -44,7 +44,7 @@ def count_sgRNA_specific_edits(crispresso_output_folder):
     reference_modified_count = defaultdict(int)
     defaultdict(int)
     defaultdict(int)
-    for idx, row in df_alleles.iterrows():
+    for _idx, row in df_alleles.iterrows():
         read_alleles_count += row["#Reads"]
         this_reference_name = row["Reference_Name"]
         if this_reference_name in include_idxs:  # sometimes (e.g. AMBIGUOUS) reads aren't assigned to a reference, so exclude them here..

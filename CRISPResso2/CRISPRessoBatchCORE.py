@@ -398,7 +398,7 @@ def main():
         completed_batch_arr = []
         failed_batch_arr = []
         failed_batch_arr_desc = []
-        for idx, row in batch_params.iterrows():
+        for _idx, row in batch_params.iterrows():
             batch_name = CRISPRessoShared.slugify(row["name"])
             folder_name = os.path.join(OUTPUT_DIRECTORY, "CRISPResso_on_%s" % batch_name)
             # check if run failed

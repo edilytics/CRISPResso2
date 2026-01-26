@@ -8,7 +8,7 @@ import os
 import pandas as pd
 import zipfile
 
-from CRISPResso2 import CRISPRessoShared
+from CRISPResso2 import CRISPRessoPlot, CRISPRessoShared
 
 
 def main():

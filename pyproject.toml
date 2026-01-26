@@ -88,12 +88,26 @@ ignore = [
     "D415",  # Requires punctuation at the end of docstrings
     "D417",  # Requires argument descriptions in docstrings
     "E115",  # Expected an indented block (comment)
+    "E402",  # Module level import not at top of file - intentional for conditional imports
     "N812",  # Lowercase imported as non-lowercase - intentional for API consistency (e.g., `from CRISPRessoPro import plot as CRISPRessoPlot`)
     "N818",  # Exception name should be named with an Error suffix - existing codebase uses Exception suffix consistently
+    "N999",  # Invalid module name - CRISPResso2 uses established CamelCase module naming convention
     "PLC0415",  # Import not at top-level - intentional for conditional imports, lazy loading, and avoiding circular imports
     "N802",  # Requires function names to be all lowercase
     "N806",  # Requires variables to be all lowercase
     "N803",  # Requires passed variables to be all lowercase
+    "PLC0206",  # dict-index-missing-items - iteration pattern is intentional for modifying dict during iteration
+    "PLR0911",  # too-many-return-statements - refactoring would reduce readability
+    "PLR6301",  # no-self-use - methods are part of class interfaces (e.g., JSON decoder)
+    "PLW1509",  # subprocess-popen-preexec-fn - intentional for signal handling
+    # These should be fixed but will require a larger refactor
+    "PLR0912",  # too-many-branches
+    "PLR0913",  # too-many-arguments
+    "PLR0914",  # too-many-locals
+    "PLR0915",  # too-many-statements
+    "PLR0917",  # too-many-positional-arguments
+    "PLR1702",  # too-many-nested-blocks
+    "PLR2004",  # magic-value-comparison
 ]
 
 [tool.ruff.lint.pylint]
@@ -102,3 +116,5 @@ max-args = 10
 [tool.ruff.lint.per-file-ignores]
 # Embedded awk scripts have long lines that cannot be easily broken
 "CRISPResso2/CRISPRessoPooledCORE.py" = ["E501"]
+# setup.py requires conditional imports for Cython detection
+"setup.py" = ["E402"]

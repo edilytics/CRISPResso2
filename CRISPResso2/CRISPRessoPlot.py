@@ -3093,13 +3093,13 @@ def plot_conversion_at_sel_nucs_not_include_ref_scaled(
 
 # Allele plot
 # We need to customize the seaborn heatmap class and function
-class Custom_HeatMapper(sns.matrix._HeatMapper):
+class CustomHeatMapper(sns.matrix._HeatMapper):
 
     def __init__(self, data, vmin, vmax, cmap, center, robust, annot, fmt,
                  annot_kws, per_element_annot_kws, cbar, cbar_kws,
                  xticklabels=True, yticklabels=True, mask=None):
-
-        super(Custom_HeatMapper, self).__init__(data, vmin, vmax, cmap, center, robust, annot, fmt,
+        """Initialize a custom heatmap with per-element annotation styling support."""
+        super(CustomHeatMapper, self).__init__(data, vmin, vmax, cmap, center, robust, annot, fmt,
                  annot_kws, cbar, cbar_kws,
                  xticklabels, yticklabels, mask)
 
@@ -3121,8 +3121,8 @@ class Custom_HeatMapper(sns.matrix._HeatMapper):
                                        self.annot_data.flat, self.per_element_annot_kws.flat, strict=False):
             # print per_element_dict
             if m is not np.ma.masked:
-                l = sns.utils.relative_luminance(color)
-                text_color = ".15" if l > .408 else "w"
+                luminance = sns.utils.relative_luminance(color)
+                text_color = ".15" if luminance > .408 else "w"
                 annotation = ("{:" + self.fmt + "}").format(str(val))
                 text_kwargs = dict(color=text_color, ha="center", va="center")
                 text_kwargs.update(self.annot_kws)
@@ -3172,7 +3172,7 @@ def custom_heatmap(data, vmin=None, vmax=None, cmap=None, center=None, robust=Fa
             **kwargs):
     """Create a customized heatmap with per-element annotation formatting support."""
     # Initialize the plotter object
-    plotter = Custom_HeatMapper(data, vmin, vmax, cmap, center, robust, annot, fmt,
+    plotter = CustomHeatMapper(data, vmin, vmax, cmap, center, robust, annot, fmt,
                           annot_kws, per_element_annot_kws, cbar, cbar_kws, xticklabels,
                           yticklabels, mask)
 
