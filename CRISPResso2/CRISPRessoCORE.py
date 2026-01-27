@@ -1992,12 +1992,12 @@ def process_paired_fastq(
                         ])
 
                         ins_vals = []
-                        for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes'], strict=False):
+                        for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes']):
                             ins_start = payload['ref_positions'].index(ins_coord[0])
                             ins_vals.append(payload['aln_seq'][ins_start + 1:ins_start + 1 + ins_size])
                         ins_inds.append([
                             str(x[0][0]) + "(" + str(x[1]) + "+" + x[2] + ")"
-                            for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals, strict=False)
+                            for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)
                         ])
 
                         sub_inds.append(payload['substitution_positions'])
@@ -2067,12 +2067,12 @@ def process_paired_fastq(
                         ])
 
                             ins_vals = []
-                            for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes'], strict=False):
+                            for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes']):
                                 ins_start = payload['ref_positions'].index(ins_coord[0])
                                 ins_vals.append(payload['aln_seq'][ins_start + 1:ins_start + 1 + ins_size])
                             ins_inds.append([
                             str(x[0][0]) + "(" + str(x[1]) + "+" + x[2] + ")"
-                            for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals, strict=False)
+                            for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)
                         ])
 
                             sub_inds.append(payload['substitution_positions'])
@@ -2662,12 +2662,12 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                         ])
 
                                         ins_vals = []
-                                        for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes'], strict=False):
+                                        for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes']):
                                             ins_start = payload['ref_positions'].index(ins_coord[0])
                                             ins_vals.append(payload['aln_seq'][ins_start + 1:ins_start + 1 + ins_size])
                                         ins_inds.append([
                                             str(x[0][0]) + "(" + str(x[1]) + "+" + x[2] + ")"
-                                            for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals, strict=False)
+                                            for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)
                                         ])
 
                                         sub_inds.append(payload['substitution_positions'])
@@ -2771,12 +2771,12 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                         ])
 
                         ins_vals = []
-                        for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes'], strict=False):
+                        for ins_coord, ins_size in zip(payload['insertion_coordinates'], payload['insertion_sizes']):
                             ins_start = payload['ref_positions'].index(ins_coord[0])
                             ins_vals.append(payload['aln_seq'][ins_start + 1:ins_start + 1 + ins_size])
                         ins_inds.append([
                             str(x[0][0]) + "(" + str(x[1]) + "+" + x[2] + ")"
-                            for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals, strict=False)
+                            for x in zip(payload['insertion_coordinates'], payload['insertion_sizes'], ins_vals)
                         ])
 
                         sub_inds.append(payload['substitution_positions'])
@@ -3118,7 +3118,7 @@ def process_single_fastq_write_bam_out(
                 first_payload = new_variant['variant_' + first_ref_name]
                 exploded_cigar = ''.join([
                     CRISPRessoShared.CIGAR_LOOKUP[x]
-                    for x in zip(first_payload['aln_seq'], first_payload['aln_ref'], strict=False)
+                    for x in zip(first_payload['aln_seq'], first_payload['aln_ref'])
                 ])
                 sam_cigar_els = CRISPRessoShared.unexplode_cigar(exploded_cigar)
                 sam_cigar = ''.join(sam_cigar_els)
@@ -5683,7 +5683,7 @@ def main():
         def save_count_vectors_to_file(vectors, vectorNames, refSeq, filename):
             outfile = open(filename, "w", encoding='utf-8')
             outfile.write("Sequence\t" + "\t".join(list(refSeq)) + "\n")  # first row: reference sequence
-            for vector, vectorName in zip(vectors, vectorNames, strict=False):
+            for vector, vectorName in zip(vectors, vectorNames):
                 outfile.write(vectorName + "\t" + "\t".join([str(x) for x in vector]) + "\n")  # next, vectors are printed
             outfile.close()
 
@@ -6368,13 +6368,13 @@ def main():
                 if not args.plot_histogram_outliers:
                     sum_cutoff = .99 * hdensity.sum()
                     sum_so_far = 0
-                    for indel_len, indel_count in zip(hlengths, hdensity, strict=False):
+                    for indel_len, indel_count in zip(hlengths, hdensity):
                         sum_so_far += indel_count
                         if sum_so_far > sum_cutoff:
                             xmax = indel_len
                             break
                     sum_so_far = 0
-                    for indel_len, indel_count in zip(hlengths[::-1], hdensity[::-1], strict=False):
+                    for indel_len, indel_count in zip(hlengths[::-1], hdensity[::-1]):
                         sum_so_far += indel_count
                         if sum_so_far > sum_cutoff:
                             xmin = indel_len
@@ -6437,7 +6437,7 @@ def main():
                 if not args.plot_histogram_outliers:
                     sum_cutoff = 0.99 * hdensity.sum()
                     sum_so_far = 0
-                    for indel_len, indel_count in zip(x_bins_ins, y_values_ins, strict=False):
+                    for indel_len, indel_count in zip(x_bins_ins, y_values_ins):
                         sum_so_far += indel_count
                         if sum_so_far > sum_cutoff:
                             xmax_ins = indel_len
@@ -6452,7 +6452,7 @@ def main():
                 if not args.plot_histogram_outliers:
                     sum_cutoff = .99 * hdensity.sum()
                     sum_so_far = 0
-                    for indel_len, indel_count in zip(x_bins_del, y_values_del, strict=False):
+                    for indel_len, indel_count in zip(x_bins_del, y_values_del):
                         sum_so_far += indel_count
                         if sum_so_far > sum_cutoff:
                             xmax_del = indel_len
@@ -6466,7 +6466,7 @@ def main():
                 if not args.plot_histogram_outliers:
                     sum_cutoff = .99 * hdensity.sum()
                     sum_so_far = 0
-                    for mut_num, mut_count in zip(x_bins_mut, y_values_mut, strict=False):
+                    for mut_num, mut_count in zip(x_bins_mut, y_values_mut):
                         sum_so_far += mut_count
                         if sum_so_far > sum_cutoff:
                             xmax_mut = mut_num

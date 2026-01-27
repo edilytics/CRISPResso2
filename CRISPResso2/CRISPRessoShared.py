@@ -544,7 +544,7 @@ def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
     ref_codons = insert_indels(ref_seq, ref_codons)
     seq_codons = insert_indels(seq, seq_codons)
 
-    for i, ((r, r_codon), (s, s_codon)) in enumerate(zip(ref_codons, seq_codons, strict=False)):
+    for i, ((r, r_codon), (s, s_codon)) in enumerate(zip(ref_codons, seq_codons)):
         if r == '-' or s == '-':
             continue
         if r != s:

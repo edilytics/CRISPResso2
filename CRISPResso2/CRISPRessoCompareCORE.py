@@ -102,7 +102,7 @@ def get_matching_allele_files(run_info_1, run_info_2):
                 warn(f"Report 1 has no shared guides with report 2 for amplicon {amplicons_1[sequence_1]['name']}, skipping comparison")
                 continue
             matching_allele_files.extend(
-                (f_1, f_2) for f_1, f_2 in zip(amplicons_1[sequence_1]["allele_files"], amplicons_2[sequence_1]["allele_files"], strict=False)
+                (f_1, f_2) for f_1, f_2 in zip(amplicons_1[sequence_1]["allele_files"], amplicons_2[sequence_1]["allele_files"])
             )
 
     return matching_allele_files
@@ -330,7 +330,7 @@ def main():
 
                 fisher_results = [
                     stats.fisher_exact([[z[0], z[1]], [z[2], z[3]]]) if max(z) > 0 else [np.nan, 1.0]
-                    for z in zip(mod_counts_1, unmod_counts_1, mod_counts_2, unmod_counts_2, strict=False)
+                    for z in zip(mod_counts_1, unmod_counts_1, mod_counts_2, unmod_counts_2)
                 ]
                 oddsratios, pvalues = [a for a, b in fisher_results], [b for a, b in fisher_results]
 
@@ -427,7 +427,7 @@ def main():
                     ref_seq_around_cut = df2.loc[~df2["Reference_Sequence"].str.contains("-")]["Reference_Sequence"].iloc[0]
                 else:
                     seq_len = df2[df2["Unedited"]]["Reference_Sequence"].iloc[0]
-                    for sgRNA_interval, cut_point in zip(sgRNA_intervals, cut_points, strict=False):
+                    for sgRNA_interval, cut_point in zip(sgRNA_intervals, cut_points):
                         sgRNA_seq = consensus_sequence[sgRNA_interval[0] : sgRNA_interval[1]]
                         if sgRNA_seq in allele_file_1:
                             this_cut_point = cut_point

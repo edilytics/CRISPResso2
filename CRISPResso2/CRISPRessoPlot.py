@@ -1701,7 +1701,7 @@ def plot_frameshift_frequency(
     """Plot histograms showing the frequency of frameshift and in-frame mutations."""
     fig, ax = plt.subplots(1, 2, figsize=(22, 10))
     ax1 = ax[0]
-    x, y = map(np.array, zip(*[a for a in hists_frameshift.items()], strict=False))
+    x, y = map(np.array, zip(*[a for a in hists_frameshift.items()]))
     if sum(hists_frameshift.values()) != 0:
         y = y / float(sum(hists_frameshift.values())) * 100
     ax1.bar(x - 0.1, y)
@@ -1741,7 +1741,7 @@ def plot_frameshift_frequency(
     hist_inframe_0 = deepcopy(hists_inframe)
     hist_inframe_0[0] = 0
     ax2 = ax[1]
-    x, y = map(np.array, zip(*[a for a in hist_inframe_0.items()], strict=False))
+    x, y = map(np.array, zip(*[a for a in hist_inframe_0.items()]))
     if sum(hist_inframe_0.values()) > 0:
         y = y / float(sum(hist_inframe_0.values())) * 100
     ax2.bar(x - 0.1, y, color=(0, 1, 1, 0.2))
@@ -1842,7 +1842,7 @@ def plot_global_frameshift_in_frame_mutations(
     """
     fig, axs = plt.subplots(2, 1, figsize=(22, 10))
     ax1 = axs[0]
-    x, y = map(np.array, zip(*[a for a in global_hists_frameshift.items()], strict=False))
+    x, y = map(np.array, zip(*[a for a in global_hists_frameshift.items()]))
     if sum(global_hists_frameshift.values()) != 0:
         y = y / float(sum(global_hists_frameshift.values())) * 100
     ax1.bar(x - 0.1, y)
@@ -1884,7 +1884,7 @@ def plot_global_frameshift_in_frame_mutations(
     global_hists_inframe_no_0 = deepcopy(global_hists_inframe)
     global_hists_inframe_no_0[0] = 0
     ax2 = axs[1]
-    x, y = map(np.array, zip(*[a for a in global_hists_inframe_no_0.items()], strict=False))
+    x, y = map(np.array, zip(*[a for a in global_hists_inframe_no_0.items()]))
     if sum(global_hists_inframe_no_0.values()) > 0:
         y = y / float(sum(global_hists_inframe_no_0.values())) * 100
     ax2.bar(x - 0.1, y, color=(0, 1, 1, 0.2))
@@ -3118,7 +3118,7 @@ class CustomHeatMapper(sns.matrix._HeatMapper):
 
         for x, y, m, color, val, per_element_dict in zip(xpos.flat, ypos.flat,
                                        mesh.get_array().flat, mesh.get_facecolors(),
-                                       self.annot_data.flat, self.per_element_annot_kws.flat, strict=False):
+                                       self.annot_data.flat, self.per_element_annot_kws.flat):
             # print per_element_dict
             if m is not np.ma.masked:
                 luminance = sns.utils.relative_luminance(color)
@@ -3243,7 +3243,7 @@ def prep_amino_acid_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
         to_append[idxs_sub] = {'weight': 'bold', 'color': 'black', 'size': 16}
         per_element_annot_kws.append(to_append)
 
-    for i, (x, a) in enumerate(zip(X, annot, strict=False)):
+    for i, (x, a) in enumerate(zip(X, annot)):
         X[i] = x + amino_acids_to_numbers([''] * (len(reference_seq) - len(a)))
         annot[i] = a + [''] * (len(reference_seq) - len(a))
 
@@ -4480,13 +4480,13 @@ def plot_unmod_mod_pcts(
         max_val = max(df['Reads_total'])
         space_val = max_val * 0.02
         pct_labels = []
-        for mod_pct, num_reads in zip(df['Modified%'], df['Reads_aligned'], strict=False):
+        for mod_pct, num_reads in zip(df['Modified%'], df['Reads_aligned']):
             if np.isreal(num_reads) and num_reads > cutoff:
                 pct_labels.append(str(round(mod_pct, 2)) + "%")
             else:
                 pct_labels.append("")
 
-        for rect, label in zip(p2.patches, pct_labels, strict=False):
+        for rect, label in zip(p2.patches, pct_labels):
             ax.text(
                 rect.get_x() + rect.get_width() + space_val,
                 rect.get_y() + rect.get_height() / 2.0, label, ha='left', va='center',
@@ -4798,7 +4798,7 @@ def plot_quantification_comparison_barchart(
     ax2.set_xticks(index)
     ax2.set_xticklabels(('Unmodified', 'Modified'))
 
-    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values(), strict=False):
+    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values()):
         spine1.set_visible(False)
         spine2.set_visible(False)
 
@@ -4955,7 +4955,7 @@ def plot_quantification_positions(
         fancybox=True,
         shadow=False,
     )
-    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values(), strict=False):
+    for spine1, spine2 in zip(ax1.spines.values(), ax2.spines.values()):
         spine1.set_visible(False)
         spine2.set_visible(False)
 
