@@ -80,7 +80,7 @@ def count_sgRNA_specific_edits(crispresso_output_folder):
     for reference_name in crispresso2_info["results"]["ref_names"]:
         print(
             "Reference: "
-            + +reference_name
+            + reference_name
             + " ("
             + str(reference_modified_count[reference_name])
             + "/"
