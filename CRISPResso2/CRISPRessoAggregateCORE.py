@@ -977,9 +977,13 @@ ___________________________________
                 crispresso2_info["results"]["general_plots"]["summary_plot_names"].append(plot_name)
                 crispresso2_info["results"]["general_plots"]["summary_plot_titles"][plot_name] = "CRISPRessoAggregate Mapping Statistics Summary"
                 crispresso2_info["results"]["general_plots"]["summary_plot_labels"][plot_name] = (
+                    "Each bar shows the total number of reads in each sample. The vertical line "
+                    "shows the cutoff for analysis, set using the --min_reads_for_inclusion parameter."
+                )
+                crispresso2_info["results"]["general_plots"]["summary_plot_datas"][plot_name] = [
                     ("CRISPRessoAggregate summary", os.path.basename(samples_quantification_summary_filename)),
                     ("CRISPRessoAggregate summary by amplicon", os.path.basename(samples_quantification_summary_by_amplicon_filename)),
-                )
+                ]
 
                 plot_root = _jp("CRISPRessoAggregate_quantification_of_editing_frequency")
 
