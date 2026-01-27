@@ -59,7 +59,7 @@ def get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right):
     """Extract sequence data around a cut point with asymmetric left/right windows."""
     cut_idx = row["ref_positions"].index(cut_point)
     return (
-        row["Aligned_Sequence"][cut_idx - plot_left + +1 : cut_idx + plot_right + 1],
+        row["Aligned_Sequence"][cut_idx - plot_left + 1 : cut_idx + plot_right + 1],
         row["Reference_Sequence"][cut_idx - plot_left + 1 : cut_idx + plot_right + 1],
         row["Read_Status"] == "UNMODIFIED",
         row["n_deleted"],
