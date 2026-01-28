@@ -1987,7 +1987,7 @@ def process_paired_fastq(
                             for x in zip(
                                 payload['deletion_coordinates'],
                                 payload['deletion_sizes'],
-                                strict=False,
+
                             )
                         ])
 
@@ -2062,7 +2062,7 @@ def process_paired_fastq(
                             for x in zip(
                                 payload['deletion_coordinates'],
                                 payload['deletion_sizes'],
-                                strict=False,
+
                             )
                         ])
 
@@ -2657,7 +2657,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                             for x in zip(
                                 payload['deletion_coordinates'],
                                 payload['deletion_sizes'],
-                                strict=False,
+
                             )
                         ])
 
@@ -2766,7 +2766,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                             for x in zip(
                                 payload['deletion_coordinates'],
                                 payload['deletion_sizes'],
-                                strict=False,
+
                             )
                         ])
 
@@ -2929,7 +2929,7 @@ def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, 
                     for x in zip(
                         payload['deletion_coordinates'],
                         payload['deletion_sizes'],
-                        strict=False,
+
                     )
                 ])
 
@@ -2937,7 +2937,7 @@ def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, 
                 for ins_coord, ins_size in zip(
                     payload['insertion_coordinates'],
                     payload['insertion_sizes'],
-                    strict=False,
+
                 ):
                     ins_start = payload['ref_positions'].index(ins_coord[0])
                     ins_vals.append(payload['aln_seq'][ins_start + 1:ins_start + 1 + ins_size])
@@ -2947,7 +2947,7 @@ def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, 
                         payload['insertion_coordinates'],
                         payload['insertion_sizes'],
                         ins_vals,
-                        strict=False,
+
                     )
                 ])
 
@@ -3085,7 +3085,7 @@ def process_single_fastq_write_bam_out(
                         for x in zip(
                             payload['deletion_coordinates'],
                             payload['deletion_sizes'],
-                            strict=False,
+
                         )
                     ])
 
@@ -3093,7 +3093,7 @@ def process_single_fastq_write_bam_out(
                     for ins_coord, ins_size in zip(
                         payload['insertion_coordinates'],
                         payload['insertion_sizes'],
-                        strict=False,
+
                     ):
                         ins_start = payload['ref_positions'].index(ins_coord[0])
                         ins_vals.append(payload['aln_seq'][ins_start + 1:ins_start + 1 + ins_size])
@@ -3103,7 +3103,7 @@ def process_single_fastq_write_bam_out(
                             payload['insertion_coordinates'],
                             payload['insertion_sizes'],
                             ins_vals,
-                            strict=False,
+
                         )
                     ])
 
