@@ -60,21 +60,14 @@ def test_alt_seq_from_edit_errors(ref_seq, edit_type, alt_edit):
 # ----------------------------- _write_vcf_line -----------------------------
 
 @pytest.mark.parametrize(
-    "desc,chrom,pos,ref_seq,alt_edits,num_reads,ref_names,expected",
+    "desc,chrom,pos,ref_seq,alt_edits,num_reads,expected",
     [
         (
             "ins_and_sub_no_samples",
             "1", 100, "A",
             [("insert", "GG", 2), ("sub", "T", 3)],
-            10, [],
+            10,
             "1\t100\t.\tA\tT,AGG\t.\tPASS\tAF=0.300,0.200",
-        ),
-        (
-            "ins_and_sub_with_amplicon_names",
-            "1", 100, "A",
-            [("insert", "GG", 2), ("sub", "T", 3)],
-            10, ["AmpA", "AmpB"],
-            "1\t100\t.\tA\tT,AGG\t.\tPASS\tAF=0.300,0.200\tGT\t.\t.",
         ),
         (
             "mixed_with_deletion_context",
@@ -85,29 +78,29 @@ def test_alt_seq_from_edit_errors(ref_seq, edit_type, alt_edit):
                 ("insert", "T",   1),  # ALT=ATGCT
                 ("sub",    "T",   4),  # ALT=TGCT
             ],
-            10, [],
+            10,
             "1\t200\t.\tAGCT\tA,AT,TGCT,ATGCT\t.\tPASS\tAF=0.500,0.200,0.400,0.100",
         ),
         (
             "duplicate_alts_are_aggregated",
             "1", 150, "A",
             [("insert", "GG", 2), ("insert", "GG", 3)],  # same ALT twice -> 5 reads
-            10, [],
+            10,
             "1\t150\t.\tA\tAGG\t.\tPASS\tAF=0.500",
         ),
     ],
     ids=lambda x: x if isinstance(x, str) else None,
 )
-def test_write_vcf_line(desc, chrom, pos, ref_seq, alt_edits, num_reads, ref_names, expected):
+def test_write_vcf_line(desc, chrom, pos, ref_seq, alt_edits, num_reads, expected):
     """Testing that _write_vcf_line produces the expected VCF line when given a set of inputs."""
-    line = vcf._write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads, ref_names)
+    line = vcf._write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads)
     assert line == expected
 
 
 @pytest.mark.parametrize("bad_num_reads", [0, None, -5])
 def test_write_vcf_line_bad_denominator_raises(bad_num_reads):
     with pytest.raises(CRISPRessoShared.BadParameterException):
-        vcf._write_vcf_line("1", 10, "A", [("sub", "T", 1)], bad_num_reads, [])
+        vcf._write_vcf_line("1", 10, "A", [("sub", "T", 1)], bad_num_reads)
 
 
 # ----------------------------- vcf_lines_from_alt_map -----------------------------
@@ -120,7 +113,7 @@ def test_vcf_lines_from_alt_map_header_and_ordering_no_samples():
         ("1", 10): {"ref_seq": "A",   "alt_edits": [("sub", "T", 3)]},     # ALT=T
     }
     temp_vcf_path = os.path.join(os.path.dirname(__file__), "temp_test_no_samples.vcf")
-    count = vcf.vcf_lines_from_alt_map(alt_map, num_reads=10, ref_names=[], vcf_path=temp_vcf_path)
+    count = vcf.vcf_lines_from_alt_map(alt_map, num_reads=10, amplicon_lens={}, vcf_path=temp_vcf_path)
     # Header (4 lines prepended to all CRISPResso vcf files)
     lines = []
     with open(temp_vcf_path, "r") as f:
@@ -143,19 +136,21 @@ def test_vcf_lines_from_alt_map_header_and_ordering_no_samples():
     os.remove(temp_vcf_path)  # clean up
 
 
-def test_vcf_lines_from_alt_map_header_and_ordering_with_samples():
-    """Test both that vcf_lines_from_alt_map produces a correctly inserted edit and the expected header with sample names."""
+def test_vcf_lines_from_alt_map_header_and_ordering_with_contigs():
+    """Test that vcf_lines_from_alt_map produces contig headers and the expected record."""
     alt_map = {
         ("X", 2): {"ref_seq": "A",  "alt_edits": [("insert", "G", 2)]},   # ALT=AG
     }
-    temp_vcf_path = os.path.join(os.path.dirname(__file__), "temp_test_with_samples.vcf")
+    temp_vcf_path = os.path.join(os.path.dirname(__file__), "temp_test_with_contigs.vcf")
     lines = []
-    count = vcf.vcf_lines_from_alt_map(alt_map, num_reads=10, ref_names=["Ref1", "Ref2"], vcf_path=temp_vcf_path)
+    count = vcf.vcf_lines_from_alt_map(alt_map, num_reads=10, amplicon_lens={"Ref1": 100, "Ref2": 200}, vcf_path=temp_vcf_path)
     with open(temp_vcf_path, "r") as f:
         lines = [line.strip() for line in f if line.strip()]
-    assert lines[3] == "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tRef1\tRef2"
-    assert lines[4] == "X\t2\t.\tA\tAG\t.\tPASS\tAF=0.200\tGT\t.\t."
-    assert len(lines) == 5
+    assert lines[3] == "##contig=<ID=Ref1,length=100>"
+    assert lines[4] == "##contig=<ID=Ref2,length=200>"
+    assert lines[5] == "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO"
+    assert lines[6] == "X\t2\t.\tA\tAG\t.\tPASS\tAF=0.200"
+    assert len(lines) == 7
     assert count == 1
     os.remove(temp_vcf_path)
 
@@ -170,13 +165,13 @@ def _stub_alt_map():
     }
 
 @pytest.mark.parametrize(
-    "ref_names,coords_str,expected_record_count",
+    "ref_names,ref_lens,coords_str,expected_record_count,expected_contig_lines",
     [
-        (["RefA"], "1:1", 2),  # 2 records
-        (["RefA", "RefB"], "1:1,1:1",        2),  # header differs but record count same
+        (["RefA"], {"RefA": 100}, "1:1", 2, 1),
+        (["RefA", "RefB"], {"RefA": 100, "RefB": 200}, "1:1,2:1", 2, 2),  # 2 contig lines (different chroms)
     ],
 )
-def test_write_vcf_file_smoke(tmp_path, monkeypatch, ref_names, coords_str, expected_record_count):
+def test_write_vcf_file_smoke(tmp_path, monkeypatch, ref_names, ref_lens, coords_str, expected_record_count, expected_contig_lines):
     # Monkeypatch build_alt_map so this test doesn't depend on upstream logic.
     monkeypatch.setattr(vcf, "build_alt_map", lambda df, amplicon_positions: _stub_alt_map())
 
@@ -187,18 +182,19 @@ def test_write_vcf_file_smoke(tmp_path, monkeypatch, ref_names, coords_str, expe
     args = SimpleNamespace(amplicon_coordinates=coords_str)
     out_path = tmp_path / "test.vcf"
 
-    num_vcf_rows = vcf.write_vcf_file(df, ref_names, args, str(out_path))
+    num_vcf_rows = vcf.write_vcf_file(df, ref_names, ref_lens, args, str(out_path))
     lines = []
     with open(out_path, "r") as f:
         for line in f:
             lines.append(line.strip())
-    # Check: function returns number of lines written (includes 4 header lines)
+    # Check: function returns number of lines written
     assert num_vcf_rows == 2
 
-    # Expect 4 header lines + expected_record_count
-    assert len(lines) == 4 + expected_record_count
+    # Expect 4 base header lines + contig lines + expected_record_count
+    expected_header_lines = 4 + expected_contig_lines
+    assert len(lines) == expected_header_lines + expected_record_count
 
     # First record is POS=10 (after header)
-    assert lines[4].startswith("1\t10\t.\tA\tT\t.\tPASS\tAF=0.300")
+    assert lines[expected_header_lines].startswith("1\t10\t.\tA\tT\t.\tPASS\tAF=0.300")
     # Second record is POS=20
-    assert lines[5].startswith("1\t20\t.\tAG\tA\t.\tPASS\tAF=0.200")
+    assert lines[expected_header_lines + 1].startswith("1\t20\t.\tAG\tA\t.\tPASS\tAF=0.200")

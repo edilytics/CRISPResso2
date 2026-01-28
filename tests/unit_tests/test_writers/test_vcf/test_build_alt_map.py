@@ -290,7 +290,7 @@ def test_build_alt_map_deletion_start():
     }
 
 
-    vcf_line = vcf._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
+    vcf_line = vcf._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df))
     assert 'GA\tA' in vcf_line
 
 
@@ -342,7 +342,7 @@ def test_build_alt_map_multi_deletion_start():
         ],
     }
 
-    vcf_line = vcf._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
+    vcf_line = vcf._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df))
     assert 'AACCTTGG\tG,GG,TGG,TTGG,CTTGG,CCTTGG,ACCTTGG' in vcf_line
 
 
@@ -396,7 +396,7 @@ def test_build_alt_map_multi_deletion_start_and_middle():
         ],
     }
 
-    vcf_line = vcf._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df), 'Reference')
+    vcf_line = vcf._write_vcf_line(1, 1, alt_map[(1, 1)]['ref_seq'], alt_map[(1, 1)]['alt_edits'], len(df))
     assert 'AACCTTGG\tG,GG,TGG,TTGG,ACTTGG,CCTTGG,ACCTTGG' in vcf_line
 
 
@@ -531,7 +531,7 @@ def test_aln_to_alt_map_ins_del_same_pos():
 
     temp_vcf_path = 'aln_to_alt_map_ins_del_same_pos.vcf'
     num_reads = 5
-    num_vcf_rows = vcf.vcf_lines_from_alt_map(alt_map, num_reads, ['Reference'], temp_vcf_path)
+    num_vcf_rows = vcf.vcf_lines_from_alt_map(alt_map, num_reads, {'Reference': 9}, temp_vcf_path)
     assert num_vcf_rows == len(alt_map)
 
     with open(temp_vcf_path) as fh:
@@ -601,7 +601,7 @@ def test_aln_to_alt_map_to_vcf():
 
     temp_vcf_path = 'aln_to_alt_map_to_vcf.vcf'
     num_reads = 5
-    num_vcf_rows = vcf.vcf_lines_from_alt_map(alt_map, num_reads, ['Reference'], temp_vcf_path)
+    num_vcf_rows = vcf.vcf_lines_from_alt_map(alt_map, num_reads, {'Reference': 9}, temp_vcf_path)
     assert num_vcf_rows == len(alt_map)
 
     with open(temp_vcf_path, 'r') as fh:
