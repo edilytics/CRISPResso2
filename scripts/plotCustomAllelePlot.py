@@ -155,7 +155,6 @@ def plot_alleles_tables_from_folder(
         sgRNA_plot_cut_points = refs[ref_name]["sgRNA_plot_cut_points"]
         sgRNA_names = refs[ref_name]["sgRNA_names"]
         sgRNA_mismatches = refs[ref_name]["sgRNA_mismatches"]
-        sgRNA_plot_idxs = refs[ref_name]["sgRNA_plot_idxs"]
 
         if plot_center is not None:
             sgRNA_label = "custom"

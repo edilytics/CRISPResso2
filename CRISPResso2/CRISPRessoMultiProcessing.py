@@ -15,7 +15,6 @@ import pandas as pd
 import traceback
 
 from CRISPResso2.CRISPRessoShared import PlotException
-import sys
 
 
 def get_max_processes():
