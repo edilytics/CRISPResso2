@@ -463,7 +463,7 @@ def test_filterFastqs_single_file_mBP():
 
 def test_filterFastqs_nonexistent_file():
     """Test filterFastqs raises exception for nonexistent file."""
-    with pytest.raises(Exception, match="does not exit"):
+    with pytest.raises(Exception, match="does not exist"):
         filterFastqs.filterFastqs(
             fastq_r1="/nonexistent/path/file.fastq",
             min_bp_qual_or_N=20,
