@@ -364,7 +364,7 @@ def test_get_consensus_alignment_from_pairs():
     check.equal(aln_seq, "ATCGATCGAT")
     check.equal(ref_seq, "ATCGATCGAT")
     check.equal(score, 100)
-    check.is_false(caching_ok)  # TODO: Should be false?
+    check.is_false(caching_ok)
 
     # large insertion in r1
     qual1 = "AAAAAA"
@@ -432,7 +432,7 @@ def test_get_consensus_alignment_from_pairs():
     check.equal(aln_seq, "ATCGATCGAT")
     check.equal(ref_seq, "ATCGATCGAT")
     check.equal(score, 100)
-    check.is_false(caching_ok)  # TODO: Should this be false?
+    check.is_false(caching_ok)
 
     # Alternating reads
     qual1 = "AAAAAAAAAA"
@@ -989,10 +989,811 @@ def test_write_base_edit_counts():
     )
 
     for filename in expected_files:
-        if os.path.exists(filename):
-            os.remove(filename)
+        if os.path.exists(_jp(filename)):
+            os.remove(_jp(filename))
         else:
             raise AssertionError()
+
+
+# =============================================================================
+# Additional edge case tests
+# =============================================================================
+
+
+def test_split_quant_window_coordinates_single_position():
+    """Test split_quant_window_coordinates with single position range."""
+    result = CRISPRessoCORE.split_quant_window_coordinates("5-5")
+    assert result == [(5, 5)]
+
+
+def test_split_quant_window_coordinates_large_range():
+    """Test split_quant_window_coordinates with large range."""
+    result = CRISPRessoCORE.split_quant_window_coordinates("0-1000")
+    assert result == [(0, 1000)]
+
+
+def test_split_quant_window_coordinates_many_ranges():
+    """Test split_quant_window_coordinates with many ranges (underscore-separated)."""
+    result = CRISPRessoCORE.split_quant_window_coordinates("0-10_20-30_40-50")
+    assert len(result) == 3
+    assert result[0] == (0, 10)
+    assert result[1] == (20, 30)
+    assert result[2] == (40, 50)
+
+
+# =============================================================================
+# Tests for which function
+# =============================================================================
+
+
+def test_which_existing_program():
+    """Test which returns path for existing program."""
+    result = CRISPRessoCORE.which("python")
+    assert result is not None
+    assert "python" in result
+
+
+def test_which_nonexistent_program():
+    """Test which returns None for nonexistent program."""
+    result = CRISPRessoCORE.which("nonexistent_program_xyz_12345")
+    assert result is None
+
+
+def test_which_with_path():
+    """Test which with full path."""
+    import sys
+    result = CRISPRessoCORE.which(sys.executable)
+    assert result == sys.executable
+
+
+# =============================================================================
+# Tests for get_refpos_values function
+# =============================================================================
+
+
+def test_get_refpos_values_no_gaps():
+    """Test get_refpos_values with no gaps."""
+    ref_seq = "ATCG"
+    read_seq = "ATCG"
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+    assert result[0] == "A"
+    assert result[1] == "T"
+    assert result[2] == "C"
+    assert result[3] == "G"
+
+
+def test_get_refpos_values_gap_in_ref():
+    """Test get_refpos_values with gap in reference."""
+    ref_seq = "--ATGC"
+    read_seq = "GGATGC"
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+    assert result[0] == "GGA"  # Initial insertions go to position 0
+    assert result[1] == "T"
+    assert result[2] == "G"
+    assert result[3] == "C"
+
+
+def test_get_refpos_values_gap_in_read():
+    """Test get_refpos_values with gap in read."""
+    ref_seq = "ATGC"
+    read_seq = "A-GC"
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+    assert result[0] == "A"
+    assert result[1] == "-"
+    assert result[2] == "G"
+    assert result[3] == "C"
+
+
+def test_get_refpos_values_example_from_docstring():
+    """Test get_refpos_values with example from docstring."""
+    ref_seq = "--A-TGC-"
+    read_seq = "GGAGTCGA"
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+    assert result[0] == "GGAG"
+    assert result[1] == "T"
+    assert result[2] == "C"
+    assert result[3] == "GA"
+
+
+# =============================================================================
+# Tests for get_greater_qual_nuc function
+# =============================================================================
+
+
+def test_get_greater_qual_nuc_same_nucleotides():
+    """Test get_greater_qual_nuc when nucleotides are the same."""
+    nuc, decision_made, qual = CRISPRessoCORE.get_greater_qual_nuc("A", "I", "A", "I", True)
+    assert nuc == "A"
+    assert decision_made is False
+    assert qual == "I"
+
+
+def test_get_greater_qual_nuc_different_quality():
+    """Test get_greater_qual_nuc with different quality scores."""
+    # Higher quality is 'J' (ASCII 74) vs 'I' (ASCII 73)
+    nuc, decision_made, qual = CRISPRessoCORE.get_greater_qual_nuc("A", "J", "T", "I", True)
+    assert nuc == "A"
+    assert decision_made is True
+    assert qual == "J"
+
+
+def test_get_greater_qual_nuc_r2_better():
+    """Test get_greater_qual_nuc when R2 has better quality."""
+    nuc, decision_made, qual = CRISPRessoCORE.get_greater_qual_nuc("A", "I", "T", "J", True)
+    assert nuc == "T"
+    assert decision_made is True
+    assert qual == "J"
+
+
+def test_get_greater_qual_nuc_equal_quality_r1_best():
+    """Test get_greater_qual_nuc with equal quality, R1 has better alignment."""
+    nuc, decision_made, qual = CRISPRessoCORE.get_greater_qual_nuc("A", "I", "T", "I", True)
+    assert nuc == "A"
+    assert decision_made is True
+
+
+def test_get_greater_qual_nuc_equal_quality_r2_best():
+    """Test get_greater_qual_nuc with equal quality, R2 has better alignment."""
+    nuc, decision_made, qual = CRISPRessoCORE.get_greater_qual_nuc("A", "I", "T", "I", False)
+    assert nuc == "T"
+    assert decision_made is True
+
+
+# =============================================================================
+# Tests for normalize_name function
+# =============================================================================
+
+
+def test_normalize_name_provided_name():
+    """Test normalize_name with provided name."""
+    result = CRISPRessoCORE.normalize_name("test_sample", None, None, None)
+    assert result == "test_sample"
+
+
+def test_normalize_name_from_r1():
+    """Test normalize_name derives name from R1 fastq."""
+    result = CRISPRessoCORE.normalize_name(None, "/path/to/sample.fastq.gz", None, None)
+    assert result == "sample"
+
+
+def test_normalize_name_from_r1_r2():
+    """Test normalize_name derives name from R1 and R2 fastq."""
+    result = CRISPRessoCORE.normalize_name(None, "/path/to/sample_R1.fastq", "/path/to/sample_R2.fastq", None)
+    assert result == "sample_R1_sample_R2"
+
+
+def test_normalize_name_from_bam():
+    """Test normalize_name derives name from BAM file."""
+    result = CRISPRessoCORE.normalize_name(None, None, None, "/path/to/sample.bam")
+    assert result == "sample"
+
+
+def test_normalize_name_cleans_special_chars():
+    """Test normalize_name cleans special characters."""
+    result = CRISPRessoCORE.normalize_name("test:sample/with*special", None, None, None)
+    assert ":" not in result
+    assert "/" not in result
+    assert "*" not in result
+
+
+# =============================================================================
+# Tests for to_numeric_ignore_columns function
+# =============================================================================
+
+
+def test_to_numeric_ignore_columns_basic():
+    """Test to_numeric_ignore_columns with basic dataframe."""
+    df = pd.DataFrame({
+        "name": ["a", "b", "c"],
+        "value": ["1", "2", "3"],
+        "count": ["10", "20", "30"]
+    })
+    result = CRISPRessoCORE.to_numeric_ignore_columns(df, {"name"})
+    assert result["value"].dtype in [int, float, "int64", "float64"]
+    assert result["count"].dtype in [int, float, "int64", "float64"]
+    assert result["name"].dtype == object
+
+
+def test_to_numeric_ignore_columns_multiple_ignore():
+    """Test to_numeric_ignore_columns ignoring multiple columns."""
+    df = pd.DataFrame({
+        "name": ["a", "b"],
+        "label": ["x", "y"],
+        "value": ["1", "2"]
+    })
+    result = CRISPRessoCORE.to_numeric_ignore_columns(df, {"name", "label"})
+    assert result["name"].dtype == object
+    assert result["label"].dtype == object
+    assert result["value"].dtype in [int, float, "int64", "float64"]
+
+
+def test_to_numeric_ignore_columns_empty_ignore():
+    """Test to_numeric_ignore_columns with empty ignore set."""
+    df = pd.DataFrame({
+        "a": ["1", "2"],
+        "b": ["3", "4"]
+    })
+    result = CRISPRessoCORE.to_numeric_ignore_columns(df, set())
+    assert result["a"].dtype in [int, float, "int64", "float64"]
+    assert result["b"].dtype in [int, float, "int64", "float64"]
+
+
+# =============================================================================
+# Tests for check_library function
+# =============================================================================
+
+
+def test_check_library_installed():
+    """Test check_library returns module for installed library."""
+    result = CRISPRessoCORE.check_library("os")
+    assert result is not None
+    import os as os_module
+    assert result == os_module
+
+
+def test_check_library_pandas():
+    """Test check_library returns pandas module."""
+    result = CRISPRessoCORE.check_library("pandas")
+    assert result is not None
+
+
+# =============================================================================
+# Tests for get_include_idxs_from_quant_window_coordinates edge cases
+# =============================================================================
+
+
+def test_get_include_idxs_single_position():
+    """Test get_include_idxs with single position range."""
+    result = CRISPRessoCORE.get_include_idxs_from_quant_window_coordinates("5-5")
+    assert result == [5]
+
+
+def test_get_include_idxs_multiple_ranges():
+    """Test get_include_idxs with multiple ranges."""
+    result = CRISPRessoCORE.get_include_idxs_from_quant_window_coordinates("0-2_10-12")
+    assert result == [0, 1, 2, 10, 11, 12]
+
+
+def test_get_include_idxs_large_range():
+    """Test get_include_idxs with large range."""
+    result = CRISPRessoCORE.get_include_idxs_from_quant_window_coordinates("0-100")
+    assert len(result) == 101
+    assert result[0] == 0
+    assert result[-1] == 100
+
+
+# =============================================================================
+# Tests for get_scores_and_counts function
+# =============================================================================
+
+
+def test_get_scores_and_counts_basic():
+    """Test get_scores_and_counts with basic variant dictionary."""
+    variant_dict = {
+        'seq1': {'aln_scores': [95.0, 90.0], 'count': 100},
+        'seq2': {'aln_scores': [80.0], 'count': 50},
+    }
+
+    homology_scores, counts, alleles_data = CRISPRessoCORE.get_scores_and_counts(variant_dict)
+
+    assert len(homology_scores) == 2
+    assert 95.0 in homology_scores
+    assert 80.0 in homology_scores
+    assert sum(counts) == 150
+
+
+def test_get_scores_and_counts_empty():
+    """Test get_scores_and_counts with empty dictionary."""
+    variant_dict = {}
+
+    homology_scores, counts, alleles_data = CRISPRessoCORE.get_scores_and_counts(variant_dict)
+
+    assert len(homology_scores) == 0
+    assert len(counts) == 0
+
+
+def test_get_scores_and_counts_single_entry():
+    """Test get_scores_and_counts with single variant."""
+    variant_dict = {
+        'ATCG': {'aln_scores': [100.0], 'count': 1000},
+    }
+
+    homology_scores, counts, alleles_data = CRISPRessoCORE.get_scores_and_counts(variant_dict)
+
+    assert homology_scores == [100.0]
+    assert counts == [1000]
+
+
+# =============================================================================
+# Tests for get_bp_substitutions function
+# =============================================================================
+
+
+def test_get_bp_substitutions_no_changes():
+    """Test get_bp_substitutions with no substitutions."""
+    ref_seq = 'ATCG'
+    ref_changes_dict = {0: 'A', 1: 'T', 2: 'C', 3: 'G'}
+    ref_positions = [0, 1, 2, 3]
+
+    result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
+
+    assert len(result) == 0
+
+
+def test_get_bp_substitutions_single_sub():
+    """Test get_bp_substitutions with single substitution."""
+    ref_seq = 'ATCG'
+    ref_changes_dict = {0: 'G', 1: 'T', 2: 'C', 3: 'G'}  # A->G at position 0
+    ref_positions = [0, 1, 2, 3]
+
+    result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
+
+    assert len(result) == 1
+    assert result[0] == (0, 'A', 'G')
+
+
+def test_get_bp_substitutions_multiple_subs():
+    """Test get_bp_substitutions with multiple substitutions."""
+    ref_seq = 'ATCG'
+    ref_changes_dict = {0: 'G', 1: 'A', 2: 'C', 3: 'T'}  # Multiple changes
+    ref_positions = [0, 1, 2, 3]
+
+    result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
+
+    assert len(result) == 3  # A->G, T->A, G->T
+
+
+def test_get_bp_substitutions_partial_positions():
+    """Test get_bp_substitutions with partial positions included."""
+    ref_seq = 'ATCG'
+    ref_changes_dict = {0: 'G', 1: 'T', 2: 'C', 3: 'A'}
+    ref_positions = [0, 3]  # Only check positions 0 and 3
+
+    result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
+
+    # Should only find changes at positions 0 and 3
+    assert len(result) == 2
+
+
+# =============================================================================
+# Tests for get_refpos_values - more comprehensive
+# =============================================================================
+
+
+def test_get_refpos_values_insertion_middle():
+    """Test get_refpos_values with insertion in middle."""
+    ref_seq = "AT-CG"
+    read_seq = "ATGCG"
+
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+
+    assert result[0] == "A"
+    assert result[1] == "TG"  # Insertion attached to previous position
+    assert result[2] == "C"
+    assert result[3] == "G"
+
+
+def test_get_refpos_values_deletion():
+    """Test get_refpos_values with deletion."""
+    ref_seq = "ATCG"
+    read_seq = "A--G"
+
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+
+    assert result[0] == "A"
+    assert result[1] == "-"
+    assert result[2] == "-"
+    assert result[3] == "G"
+
+
+def test_get_refpos_values_complex():
+    """Test get_refpos_values with complex alignment."""
+    ref_seq = "A-TC--G"
+    read_seq = "AGTCAAG"
+
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+
+    assert result[0] == "AG"  # A + inserted G
+    assert result[1] == "T"
+    assert result[2] == "CAA"  # C + inserted AA
+    assert result[3] == "G"
+
+
+# =============================================================================
+# Tests for boundary conditions
+# =============================================================================
+
+
+def test_get_variant_cache_equal_boundaries_exact_division():
+    """Test boundaries with exact division."""
+    result = CRISPRessoCORE.get_variant_cache_equal_boundaries(100, 5)
+    assert result == [0, 20, 40, 60, 80, 100]
+
+
+def test_get_variant_cache_equal_boundaries_two_processes():
+    """Test boundaries with two processes."""
+    result = CRISPRessoCORE.get_variant_cache_equal_boundaries(100, 2)
+    assert result == [0, 50, 100]
+
+
+def test_get_variant_cache_equal_boundaries_many_processes():
+    """Test boundaries with many processes."""
+    result = CRISPRessoCORE.get_variant_cache_equal_boundaries(1000, 8)
+    assert len(result) == 9  # n_processes + 1
+
+
+# =============================================================================
+# Tests for normalize_name edge cases
+# =============================================================================
+
+
+def test_normalize_name_empty_inputs():
+    """Test normalize_name with all empty inputs returns None."""
+    result = CRISPRessoCORE.normalize_name(None, None, None, None)
+    assert result is None
+
+
+def test_normalize_name_complex_special_chars():
+    """Test normalize_name handles multiple special characters."""
+    result = CRISPRessoCORE.normalize_name("test:sample/with*[special]chars", None, None, None)
+    # All special chars should be replaced
+    for char in [':', '/', '*', '[', ']']:
+        assert char not in result
+
+
+def test_normalize_name_preserves_underscores():
+    """Test normalize_name preserves underscores."""
+    result = CRISPRessoCORE.normalize_name("test_sample_name", None, None, None)
+    assert "_" in result
+
+
+# =============================================================================
+# Tests for to_numeric_ignore_columns edge cases
+# =============================================================================
+
+
+def test_to_numeric_ignore_columns_all_numeric():
+    """Test to_numeric_ignore_columns with all numeric columns."""
+    df = pd.DataFrame({
+        "a": ["1", "2", "3"],
+        "b": ["4.5", "5.5", "6.5"]
+    })
+
+    result = CRISPRessoCORE.to_numeric_ignore_columns(df, set())
+
+    assert result["a"].dtype in [int, float, "int64", "float64"]
+    assert result["b"].dtype in [int, float, "int64", "float64"]
+
+
+def test_to_numeric_ignore_columns_preserve_strings():
+    """Test to_numeric_ignore_columns preserves string columns in ignore list."""
+    df = pd.DataFrame({
+        "name": ["abc", "def", "ghi"],
+        "value": ["1", "2", "3"]
+    })
+
+    result = CRISPRessoCORE.to_numeric_ignore_columns(df, {"name"})
+
+    assert result["name"].dtype == object
+    assert list(result["name"]) == ["abc", "def", "ghi"]
+
+
+# =============================================================================
+# Tests for which function edge cases
+# =============================================================================
+
+
+def test_which_ls():
+    """Test which finds ls command."""
+    result = CRISPRessoCORE.which("ls")
+    assert result is not None
+
+
+def test_which_bash():
+    """Test which finds bash."""
+    result = CRISPRessoCORE.which("bash")
+    assert result is not None
+
+
+# =============================================================================
+# Tests for get_refpos_values comprehensive
+# =============================================================================
+
+
+def test_get_refpos_values_all_matches():
+    """Test get_refpos_values with all matching positions."""
+    ref_seq = "ATCGATCG"
+    read_seq = "ATCGATCG"
+
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+
+    for i, base in enumerate("ATCGATCG"):
+        assert result[i] == base
+
+
+def test_get_refpos_values_insertion_at_start():
+    """Test get_refpos_values with insertion at start."""
+    ref_seq = "--ATCG"
+    read_seq = "GGATCG"
+
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+
+    # First ref position should have all leading insertions
+    assert "GG" in result[0]
+
+
+def test_get_refpos_values_insertion_at_end():
+    """Test get_refpos_values with insertion at end."""
+    ref_seq = "ATCG--"
+    read_seq = "ATCGGG"
+
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+
+    # Last position should have trailing insertions
+    assert "G" in result[3]
+
+
+def test_get_refpos_values_deletions():
+    """Test get_refpos_values with deletions."""
+    ref_seq = "ATCGATCG"
+    read_seq = "AT--ATCG"
+
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+
+    assert result[2] == "-"
+    assert result[3] == "-"
+
+
+def test_get_refpos_values_mixed_indels():
+    """Test get_refpos_values with mixed insertions and deletions."""
+    ref_seq = "AT-CGATCG"
+    read_seq = "ATG--ATCG"
+
+    result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
+
+    # Check that we got expected length
+    assert len(result) > 0
+
+
+# =============================================================================
+# Tests for consensus alignment edge cases
+# =============================================================================
+
+
+def test_get_greater_qual_nuc_equal_nucs_different_qual():
+    """Test when nucleotides are same but quality differs."""
+    nuc, decision, qual = CRISPRessoCORE.get_greater_qual_nuc("A", "H", "A", "J", True)
+    assert nuc == "A"
+    assert decision is False  # No decision needed since nucs are same
+    assert qual == "J"  # Higher quality
+
+
+def test_get_greater_qual_nuc_different_nucs_equal_qual():
+    """Test when nucleotides differ but quality is equal."""
+    # When equal quality, use is_best_aln_r1 to decide
+    nuc1, decision1, qual1 = CRISPRessoCORE.get_greater_qual_nuc("A", "I", "T", "I", True)
+    nuc2, decision2, qual2 = CRISPRessoCORE.get_greater_qual_nuc("A", "I", "T", "I", False)
+
+    assert nuc1 == "A"  # R1 is best
+    assert nuc2 == "T"  # R2 is best
+    assert decision1 is True
+    assert decision2 is True
+
+
+# =============================================================================
+# Tests for split_quant_window_coordinates comprehensive
+# =============================================================================
+
+
+def test_split_quant_window_coordinates_three_ranges():
+    """Test split_quant_window_coordinates with three ranges."""
+    result = CRISPRessoCORE.split_quant_window_coordinates("1-10_20-30_40-50")
+    assert len(result) == 3
+    assert result == [(1, 10), (20, 30), (40, 50)]
+
+
+def test_split_quant_window_coordinates_large_numbers():
+    """Test split_quant_window_coordinates with large numbers."""
+    result = CRISPRessoCORE.split_quant_window_coordinates("1000-2000")
+    assert result == [(1000, 2000)]
+
+
+def test_split_quant_window_coordinates_zero_start():
+    """Test split_quant_window_coordinates starting at 0."""
+    result = CRISPRessoCORE.split_quant_window_coordinates("0-5")
+    assert result == [(0, 5)]
+
+
+# =============================================================================
+# Tests for check_library
+# =============================================================================
+
+
+def test_check_library_numpy():
+    """Test check_library with numpy."""
+    result = CRISPRessoCORE.check_library("numpy")
+    assert result is not None
+
+
+def test_check_library_sys():
+    """Test check_library with sys module."""
+    result = CRISPRessoCORE.check_library("sys")
+    assert result is not None
+    import sys
+    assert result == sys
+
+
+# =============================================================================
+# Tests for variant cache boundaries
+# =============================================================================
+
+
+def test_get_variant_cache_equal_boundaries_uneven():
+    """Test boundaries with uneven division."""
+    result = CRISPRessoCORE.get_variant_cache_equal_boundaries(17, 4)
+    # Should handle 17 reads across 4 processes
+    assert len(result) == 5  # n+1 boundaries
+    assert result[0] == 0
+    assert result[-1] == 17
+
+
+def test_get_variant_cache_equal_boundaries_prime():
+    """Test boundaries with prime number of reads."""
+    result = CRISPRessoCORE.get_variant_cache_equal_boundaries(37, 4)
+    assert len(result) == 5
+    assert result[-1] == 37
+
+
+def test_get_variant_cache_equal_boundaries_small():
+    """Test boundaries with small number of reads."""
+    result = CRISPRessoCORE.get_variant_cache_equal_boundaries(5, 5)
+    assert result == [0, 1, 2, 3, 4, 5]
+
+
+# =============================================================================
+# Tests for normalize_name comprehensive
+# =============================================================================
+
+
+def test_normalize_name_fastq_extensions():
+    """Test normalize_name handles various fastq extensions."""
+    result = CRISPRessoCORE.normalize_name(None, "/path/sample.fq.gz", None, None)
+    assert "sample" in result
+    assert ".fq" not in result
+    assert ".gz" not in result
+
+
+def test_normalize_name_r1_r2_suffix():
+    """Test normalize_name with R1/R2 suffix files."""
+    result = CRISPRessoCORE.normalize_name(
+        None,
+        "/path/sample_L001_R1_001.fastq.gz",
+        "/path/sample_L001_R2_001.fastq.gz",
+        None
+    )
+    assert "sample" in result
+
+
+def test_normalize_name_unicode():
+    """Test normalize_name handles unicode in name."""
+    result = CRISPRessoCORE.normalize_name("tëst_sämple", None, None, None)
+    # Should have converted/removed unicode
+    assert isinstance(result, str)
+
+
+# =============================================================================
+# Tests for get_bp_substitutions comprehensive
+# =============================================================================
+
+
+def test_get_bp_substitutions_all_match():
+    """Test get_bp_substitutions with all matching positions."""
+    ref_seq = 'ATCG'
+    ref_changes_dict = {0: 'A', 1: 'T', 2: 'C', 3: 'G'}
+    ref_positions = [0, 1, 2, 3]
+
+    result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
+
+    assert result == []
+
+
+def test_get_bp_substitutions_all_different():
+    """Test get_bp_substitutions with all different positions."""
+    ref_seq = 'ATCG'
+    ref_changes_dict = {0: 'T', 1: 'A', 2: 'G', 3: 'C'}  # All swapped
+    ref_positions = [0, 1, 2, 3]
+
+    result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
+
+    assert len(result) == 4
+
+
+def test_get_bp_substitutions_with_insertion():
+    """Test get_bp_substitutions recognizes insertions."""
+    ref_seq = 'ATCG'
+    ref_changes_dict = {0: 'A', 1: 'TG', 2: 'C', 3: 'G'}  # Insertion at position 1
+    ref_positions = [0, 1, 2, 3]
+
+    result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
+
+    # Position 1 should show as substitution/insertion
+    assert any(sub[0] == 1 for sub in result)
+
+
+# =============================================================================
+# Tests for get_scores_and_counts comprehensive
+# =============================================================================
+
+
+def test_get_scores_and_counts_high_scores():
+    """Test get_scores_and_counts with high alignment scores."""
+    variant_dict = {
+        'perfect': {'aln_scores': [100.0], 'count': 500},
+        'good': {'aln_scores': [95.0, 90.0], 'count': 300},
+    }
+
+    scores, counts, data = CRISPRessoCORE.get_scores_and_counts(variant_dict)
+
+    assert 100.0 in scores
+    assert 95.0 in scores
+    assert sum(counts) == 800
+
+
+def test_get_scores_and_counts_low_scores():
+    """Test get_scores_and_counts with low alignment scores."""
+    variant_dict = {
+        'poor': {'aln_scores': [50.0], 'count': 10},
+    }
+
+    scores, counts, data = CRISPRessoCORE.get_scores_and_counts(variant_dict)
+
+    assert scores == [50.0]
+    assert counts == [10]
+
+
+def test_get_scores_and_counts_returns_alleles_data():
+    """Test get_scores_and_counts returns proper alleles data structure."""
+    variant_dict = {
+        'seq1': {'aln_scores': [90.0], 'count': 100},
+    }
+
+    scores, counts, data = CRISPRessoCORE.get_scores_and_counts(variant_dict)
+
+    assert len(data) == 1
+    assert data[0]['sequence'] == 'seq1'
+    assert data[0]['homology_score'] == 90.0
+    assert data[0]['count'] == 100
+
+
+# =============================================================================
+# Tests for to_numeric_ignore_columns edge cases
+# =============================================================================
+
+
+def test_to_numeric_ignore_columns_float_strings():
+    """Test to_numeric_ignore_columns with float strings."""
+    df = pd.DataFrame({
+        "val": ["1.5", "2.5", "3.5"]
+    })
+
+    result = CRISPRessoCORE.to_numeric_ignore_columns(df, set())
+
+    assert result["val"].dtype == float
+
+
+def test_to_numeric_ignore_columns_mixed_types():
+    """Test to_numeric_ignore_columns with mixed data types."""
+    df = pd.DataFrame({
+        "name": ["a", "b", "c"],
+        "int_val": ["1", "2", "3"],
+        "float_val": ["1.1", "2.2", "3.3"]
+    })
+
+    result = CRISPRessoCORE.to_numeric_ignore_columns(df, {"name"})
+
+    assert result["name"].dtype == object
+    assert result["int_val"].dtype in [int, float, "int64", "float64"]
+    assert result["float_val"].dtype in [float, "float64"]
 
 
 if __name__ == "__main__":
