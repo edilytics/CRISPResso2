@@ -205,7 +205,6 @@ def run_pandas_apply_parallel(input_df, input_function_chunk, n_processes=1):
         pool.terminate()
         logging.warn("Caught SIGINT. Program Terminated")
         raise Exception("CRISPResso2 Terminated") from e
-        sys.exit(0)
     except Exception:
         print("CRISPResso2 failed")
         raise
