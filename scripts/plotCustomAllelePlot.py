@@ -145,7 +145,6 @@ def plot_alleles_tables_from_folder(
     z = zipfile.ZipFile(os.path.join(crispresso_output_folder, crispresso2_info["running_info"]["allele_frequency_table_zip_filename"]))
     zf = z.open(crispresso2_info["running_info"]["allele_frequency_table_filename"])
     df_alleles = pd.read_csv(zf, sep="\t")
-    df_alleles["#Reads"].sum()
     df_alleles["ref_positions"] = df_alleles["ref_positions"].apply(arrStr_to_arr)
 
     ref_names = crispresso2_info["results"]["ref_names"]
@@ -154,12 +153,9 @@ def plot_alleles_tables_from_folder(
         sgRNA_sequences = refs[ref_name]["sgRNA_sequences"]
         sgRNA_cut_points = refs[ref_name]["sgRNA_cut_points"]
         sgRNA_plot_cut_points = refs[ref_name]["sgRNA_plot_cut_points"]
-        refs[ref_name]["sgRNA_intervals"]
         sgRNA_names = refs[ref_name]["sgRNA_names"]
         sgRNA_mismatches = refs[ref_name]["sgRNA_mismatches"]
         sgRNA_plot_idxs = refs[ref_name]["sgRNA_plot_idxs"]
-
-        refs[ref_name]["sequence"]
 
         if plot_center is not None:
             sgRNA_label = "custom"
@@ -208,7 +204,6 @@ def plot_alleles_tables_from_folder(
 
                 cut_point = sgRNA_cut_points[ind]
                 plot_cut_point = sgRNA_plot_cut_points[ind]
-                sgRNA_plot_idxs[ind]
                 ref_seq_around_cut = refs[ref_name]["sequence"][cut_point - plot_left + 1 : cut_point + plot_right + 1]
 
                 df_alleles_around_cut = get_dataframe_around_cut_asymmetrical(df_alleles, cut_point, plot_left, plot_right)

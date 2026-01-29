@@ -84,10 +84,10 @@ def filterFastqs(
     startTime = datetime.datetime.now()
 
     if not os.path.exists(fastq_r1):
-        raise Exception("fastq_r1 file '" + fastq_r1 + "' does not exit.")
+        raise Exception("fastq_r1 file '" + fastq_r1 + "' does not exist.")
 
     if fastq_r2 is not None and not os.path.exists(fastq_r2):
-        raise Exception("fastq_r2 file '" + fastq_r2 + "' does not exit.")
+        raise Exception("fastq_r2 file '" + fastq_r2 + "' does not exist.")
 
     # CREATION OF FILEHANDLES##
     if fastq_r1.endswith('.gz'):
