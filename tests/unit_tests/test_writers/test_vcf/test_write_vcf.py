@@ -106,3 +106,154 @@ def test_write_vcf_file_smoke(tmp_path, monkeypatch, ref_names, ref_lens, coords
 
     assert lines[expected_header_lines].startswith("1\t10\t.\tA\tT\t.\tPASS\tAF=0.300")
     assert lines[expected_header_lines + 1].startswith("1\t20\t.\tAG\tA\t.\tPASS\tAF=0.200")
+
+
+# ----------------------------- _left_normalize_deletion -----------------------------
+
+
+def _simple_ref(seq):
+    """Return (ref_positions, ref_str) for an ungapped reference."""
+    return list(range(len(seq))), seq
+
+
+class TestLeftNormalizeDeletion:
+    """Direct tests for vcf._left_normalize_deletion."""
+
+    def test_no_shift_distinct_bases(self):
+        """ATGC: deleting G(2,3) - base before is T, last deleted is G -> no shift."""
+        rp, rs = _simple_ref("ATGC")
+        assert vcf._left_normalize_deletion(2, 3, rp, rs) == (2, 3)
+
+    def test_single_base_shift(self):
+        """ATCC: deleting C at pos 3 -> shifts left to pos 2 (both C)."""
+        #        0123
+        # ref:   ATCC
+        # base before pos 3 = C(pos 2), last deleted = C(pos 2 after shift) -> shift once
+        # base before pos 2 = T(pos 1), last deleted = C(pos 2) -> stop
+        rp, rs = _simple_ref("ATCC")
+        assert vcf._left_normalize_deletion(3, 4, rp, rs) == (2, 3)
+
+    def test_multi_base_shift(self):
+        """AAAAATG: deleting A at pos 4 -> shifts all the way to pos 0."""
+        #        0123456
+        # ref:   AAAAATG
+        rp, rs = _simple_ref("AAAAATG")
+        assert vcf._left_normalize_deletion(4, 5, rp, rs) == (0, 1)
+
+    def test_multi_base_deletion_shift(self):
+        """ACACACG: deleting AC at (4,6) -> shifts to (0,2)."""
+        #        0123456
+        # ref:   ACACACG
+        # del (4,6) = AC. base before=C(3), last del=C(5) -> equal, shift to (3,5)
+        # del (3,5) = AC. base before=A(2), last del=A(4) -> equal, shift to (2,4)
+        # del (2,4) = AC. base before=C(1), last del=C(3) -> equal, shift to (1,3)
+        # del (1,3) = CA. base before=A(0), last del=A(2) -> equal, shift to (0,2)
+        # start=0, stop
+        rp, rs = _simple_ref("ACACACG")
+        assert vcf._left_normalize_deletion(4, 6, rp, rs) == (0, 2)
+
+    def test_already_at_position_zero(self):
+        """Deletion already at start of sequence - can't shift further."""
+        rp, rs = _simple_ref("ATGC")
+        assert vcf._left_normalize_deletion(0, 1, rp, rs) == (0, 1)
+
+    def test_homopolymer_shifts_to_start(self):
+        """AAAAT: deleting A at pos 3 -> shifts to pos 0."""
+        rp, rs = _simple_ref("AAAAT")
+        assert vcf._left_normalize_deletion(3, 4, rp, rs) == (0, 1)
+
+    def test_partial_homopolymer_shift(self):
+        """TAAAC: deleting A at pos 3 -> shifts to pos 1 (T blocks further)."""
+        rp, rs = _simple_ref("TAAAC")
+        assert vcf._left_normalize_deletion(3, 4, rp, rs) == (1, 2)
+
+    def test_dinucleotide_repeat_multi_del(self):
+        """GATGATGATC: deleting GAT at (6,9) -> shifts to (0,3)."""
+        #        0123456789
+        # ref:   GATGATGATC
+        rp, rs = _simple_ref("GATGATGATC")
+        assert vcf._left_normalize_deletion(6, 9, rp, rs) == (0, 3)
+
+    def test_no_shift_when_boundary_bases_differ(self):
+        """ACGT: deleting CG at (1,3) - base before=A(0), last del=G(2) -> no shift."""
+        rp, rs = _simple_ref("ACGT")
+        assert vcf._left_normalize_deletion(1, 3, rp, rs) == (1, 3)
+
+
+# ----------------------------- _edits_from_deletions left-normalization ----------------------
+
+# The FANC amplicon used in integration tests
+_FANC_AMPLICON = (
+    "CGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATG"
+    "GAATCCCTTCTGCAGCACCTGGATCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGG"
+    "ACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG"
+)
+
+
+def _make_deletion_row(amplicon, del_start, del_end, reads=1):
+    """Build a minimal allele-row dict for a deletion-only read."""
+    ref_positions = list(range(len(amplicon)))
+    return {
+        "ref_positions": ref_positions,
+        "Reference_Sequence": amplicon,
+        "Aligned_Sequence": amplicon,
+        "#Reads": reads,
+        "n_deleted": del_end - del_start,
+        "n_inserted": 0,
+        "n_mutated": 0,
+        "deletion_coordinates": [(del_start, del_end)],
+        "deletion_sizes": [del_end - del_start],
+        "Reference_Name": "Reference",
+        "insertion_coordinates": [],
+        "insertion_sizes": [],
+        "substitution_positions": [],
+    }
+
+
+def test_deletion_left_normalization_two_base_shift():
+    """Deletion (92,94) in FANC amplicon should left-normalize to VCF pos 91, REF=GCA, ALT=G.
+
+    The aligner may right-shift deletions in repetitive regions (here ...CACCT...).
+    Deleting bases 92-93 (AC) produces the same read as deleting 91-92 (CA).
+    VCF spec requires the leftmost representation: anchor=G(pos90), deleted=CA -> REF=GCA, ALT=G.
+    """
+    row = _make_deletion_row(_FANC_AMPLICON, 92, 94)
+    edits = list(vcf._edits_from_deletions(row, "FANC", 1))
+    assert len(edits) == 1
+    chrom, vcf_pos, ref, alt, reads = edits[0]
+    assert chrom == "FANC"
+    assert vcf_pos == 91, f"Expected left-normalized VCF pos 91, got {vcf_pos}"
+    assert ref == "GCA", f"Expected REF=GCA, got {ref}"
+    assert alt == "G", f"Expected ALT=G, got {alt}"
+
+
+def test_deletion_left_normalization_one_base_shift():
+    """Deletion (94,95) in FANC amplicon should left-normalize to VCF pos 93, REF=AC, ALT=A.
+
+    Position 93 and 94 are both 'C', so deleting pos 94 is equivalent to deleting pos 93.
+    VCF spec requires the leftmost: anchor=A(pos92), deleted=C(pos93) -> REF=AC, ALT=A.
+    """
+    row = _make_deletion_row(_FANC_AMPLICON, 94, 95)
+    edits = list(vcf._edits_from_deletions(row, "FANC", 1))
+    assert len(edits) == 1
+    chrom, vcf_pos, ref, alt, reads = edits[0]
+    assert chrom == "FANC"
+    assert vcf_pos == 93, f"Expected left-normalized VCF pos 93, got {vcf_pos}"
+    assert ref == "AC", f"Expected REF=AC, got {ref}"
+    assert alt == "A", f"Expected ALT=A, got {alt}"
+
+
+def test_deletion_no_normalization_needed():
+    """Deletion (90,91) in FANC amplicon needs no left-normalization.
+
+    Position 89=A, 90=G - distinct bases, so deletion at 90 is already leftmost.
+    Expected VCF: anchor=A(pos89), deleted=G(pos90) -> POS=90, REF=AG, ALT=A.
+    """
+    row = _make_deletion_row(_FANC_AMPLICON, 90, 91)
+    edits = list(vcf._edits_from_deletions(row, "FANC", 1))
+    assert len(edits) == 1
+    chrom, vcf_pos, ref, alt, reads = edits[0]
+    assert chrom == "FANC"
+    assert vcf_pos == 90
+    assert ref == "AG"
+    assert alt == "A"

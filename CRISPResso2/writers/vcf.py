@@ -3,6 +3,39 @@ from collections import defaultdict
 from CRISPResso2 import CRISPRessoShared
 
 
+def _left_normalize_deletion(start, end, ref_positions, ref_str):
+    """Left-normalize a deletion so the VCF record is leftmost-aligned.
+
+    The aligner may right-shift deletions in repetitive regions. VCF spec
+    requires the leftmost representation. This shifts the deletion window
+    left while the base just before the deletion equals the last base of
+    the deleted region.
+
+    Parameters
+    ----------
+    start, end : int
+        0-based half-open reference coordinates of the deletion [start, end).
+    ref_positions : list of int
+        Mapping from alignment index to reference position.
+    ref_str : str
+        The aligned reference sequence.
+
+    Returns
+    -------
+    (int, int)
+        Left-normalized (start, end) coordinates.
+    """
+    while start > 0:
+        idx_before = ref_positions.index(start - 1)
+        idx_last = ref_positions.index(end - 1)
+        if ref_str[idx_before] == ref_str[idx_last]:
+            start -= 1
+            end -= 1
+        else:
+            break
+    return start, end
+
+
 def _edits_from_deletions(row, chrom, pos):
     """Yield (chrom, vcf_pos, ref, alt, reads) for each deletion in the row.
 
@@ -15,6 +48,7 @@ def _edits_from_deletions(row, chrom, pos):
     reads = row["#Reads"]
 
     for (start, end) in row["deletion_coordinates"]:
+        start, end = _left_normalize_deletion(start, end, ref_positions, ref_str)
         left_index = max(1, pos + start - 1)
         ref_start = ref_positions.index(start)
         try:
