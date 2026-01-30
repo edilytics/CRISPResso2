@@ -60,47 +60,58 @@ def test_alt_seq_from_edit_errors(ref_seq, edit_type, alt_edit):
 # ----------------------------- _write_vcf_line -----------------------------
 
 @pytest.mark.parametrize(
-    "desc,chrom,pos,ref_seq,alt_edits,num_reads,expected",
+    "desc,chrom,pos,alt_edits,num_reads,expected_lines",
     [
         (
             "ins_and_sub_no_samples",
-            "1", 100, "A",
-            [("insert", "GG", 2), ("sub", "T", 3)],
+            "1", 100,
+            [("insert", "GG", 2, "A"), ("sub", "T", 3, "A")],
             10,
-            "1\t100\t.\tA\tT,AGG\t.\tPASS\tAF=0.300,0.200",
+            [
+                "1\t100\t.\tA\tT\t.\tPASS\tAF=0.300",
+                "1\t100\t.\tA\tAGG\t.\tPASS\tAF=0.200",
+            ],
         ),
         (
             "mixed_with_deletion_context",
-            "1", 200, "AGCT",  # left anchor 'A' + longest deleted span 'GCT'
+            "1", 200,
             [
-                ("delete", "GCT", 5),  # ALT=A
-                ("delete", "GC",  2),  # ALT=AT
-                ("insert", "T",   1),  # ALT=ATGCT
-                ("sub",    "T",   4),  # ALT=TGCT
+                ("delete", "GCT", 5, "AGCT"),  # ALT=A
+                ("delete", "GC",  2, "AGC"),    # ALT=A  (own ref_seq)
+                ("insert", "T",   1, "A"),      # ALT=AT
+                ("sub",    "T",   4, "A"),      # ALT=T
             ],
             10,
-            "1\t200\t.\tAGCT\tA,AT,TGCT,ATGCT\t.\tPASS\tAF=0.500,0.200,0.400,0.100",
+            [
+                # Sorted by (len(alt), alt, len(ref), ref):
+                "1\t200\t.\tAGC\tA\t.\tPASS\tAF=0.200",    # del GC: ref=AGC, alt=A
+                "1\t200\t.\tAGCT\tA\t.\tPASS\tAF=0.500",   # del GCT: ref=AGCT, alt=A
+                "1\t200\t.\tA\tT\t.\tPASS\tAF=0.400",      # sub T: ref=A, alt=T
+                "1\t200\t.\tA\tAT\t.\tPASS\tAF=0.100",     # ins T: ref=A, alt=AT
+            ],
         ),
         (
             "duplicate_alts_are_aggregated",
-            "1", 150, "A",
-            [("insert", "GG", 2), ("insert", "GG", 3)],  # same ALT twice -> 5 reads
+            "1", 150,
+            [("insert", "GG", 2, "A"), ("insert", "GG", 3, "A")],  # same ALT twice -> 5 reads
             10,
-            "1\t150\t.\tA\tAGG\t.\tPASS\tAF=0.500",
+            [
+                "1\t150\t.\tA\tAGG\t.\tPASS\tAF=0.500",
+            ],
         ),
     ],
     ids=lambda x: x if isinstance(x, str) else None,
 )
-def test_write_vcf_line(desc, chrom, pos, ref_seq, alt_edits, num_reads, expected):
-    """Testing that _write_vcf_line produces the expected VCF line when given a set of inputs."""
-    line = vcf._write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads)
-    assert line == expected
+def test_write_vcf_lines(desc, chrom, pos, alt_edits, num_reads, expected_lines):
+    """Testing that _write_vcf_lines produces the expected biallelic VCF lines."""
+    lines = vcf._write_vcf_lines(chrom, pos, alt_edits, num_reads)
+    assert lines == expected_lines
 
 
 @pytest.mark.parametrize("bad_num_reads", [0, None, -5])
-def test_write_vcf_line_bad_denominator_raises(bad_num_reads):
+def test_write_vcf_lines_bad_denominator_raises(bad_num_reads):
     with pytest.raises(CRISPRessoShared.BadParameterException):
-        vcf._write_vcf_line("1", 10, "A", [("sub", "T", 1)], bad_num_reads)
+        vcf._write_vcf_lines("1", 10, [("sub", "T", 1, "A")], bad_num_reads)
 
 
 # ----------------------------- vcf_lines_from_alt_map -----------------------------
@@ -109,8 +120,8 @@ def test_vcf_lines_from_alt_map_header_and_ordering_no_samples():
     """Tests that vcf_lines_from_alt_map produces the expected header and ordering of records."""
     # Two edits on chrom "1", positions 10 then 20
     alt_map = {
-        ("1", 20): {"ref_seq": "AG",  "alt_edits": [("delete", "G", 2)]},  # ALT=A
-        ("1", 10): {"ref_seq": "A",   "alt_edits": [("sub", "T", 3)]},     # ALT=T
+        ("1", 20): {"alt_edits": [("delete", "G", 2, "AG")]},  # ALT=A
+        ("1", 10): {"alt_edits": [("sub", "T", 3, "A")]},      # ALT=T
     }
     temp_vcf_path = os.path.join(os.path.dirname(__file__), "temp_test_no_samples.vcf")
     count = vcf.vcf_lines_from_alt_map(alt_map, num_reads=10, amplicon_lens={}, vcf_path=temp_vcf_path)
@@ -139,7 +150,7 @@ def test_vcf_lines_from_alt_map_header_and_ordering_no_samples():
 def test_vcf_lines_from_alt_map_header_and_ordering_with_contigs():
     """Test that vcf_lines_from_alt_map produces contig headers and the expected record."""
     alt_map = {
-        ("X", 2): {"ref_seq": "A",  "alt_edits": [("insert", "G", 2)]},   # ALT=AG
+        ("X", 2): {"alt_edits": [("insert", "G", 2, "A")]},   # ALT=AG
     }
     temp_vcf_path = os.path.join(os.path.dirname(__file__), "temp_test_with_contigs.vcf")
     lines = []
@@ -158,10 +169,10 @@ def test_vcf_lines_from_alt_map_header_and_ordering_with_contigs():
 # ----------------------------- write_vcf_file (orchestrator) -----------------------------
 
 def _stub_alt_map():
-    # Two records to be emitted
+    # Two records to be emitted (biallelic: one line per edit)
     return {
-        ("1", 10): {"ref_seq": "A",   "alt_edits": [("sub", "T", 3)]},
-        ("1", 20): {"ref_seq": "AG",  "alt_edits": [("delete", "G", 2)]},
+        ("1", 10): {"alt_edits": [("sub", "T", 3, "A")]},
+        ("1", 20): {"alt_edits": [("delete", "G", 2, "AG")]},
     }
 
 @pytest.mark.parametrize(

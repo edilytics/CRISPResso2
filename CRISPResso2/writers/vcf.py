@@ -112,10 +112,14 @@ def _process_substitutions(row, chrom, pos, alt_map):
 
 
 def _upsert_edit(alt_map, key, ref_seq_for_key, edit_type, alt_edit, reads):
-    """Helper function to upsert an edit into alt_map[key], always keeping the longest ref_seq seen at this key."""
+    """Helper function to upsert an edit into alt_map[key].
+
+    Each alt_edit entry stores its own ref_seq as a 4th element:
+        [edit_type, alt_edit, reads, ref_seq]
+    """
     entry = alt_map.get(key)
     if entry is None:
-        alt_map[key] = {"ref_seq": ref_seq_for_key, "alt_edits": [[edit_type, alt_edit, reads]]}
+        alt_map[key] = {"alt_edits": [[edit_type, alt_edit, reads, ref_seq_for_key]]}
         return
 
     # Merge rule
@@ -126,18 +130,14 @@ def _upsert_edit(alt_map, key, ref_seq_for_key, edit_type, alt_edit, reads):
                 existing[2] += reads
                 break
         else:
-            entry["alt_edits"].append([edit_type, alt_edit, reads])
+            entry["alt_edits"].append([edit_type, alt_edit, reads, ref_seq_for_key])
     else:
         for existing in entry["alt_edits"]:
             if existing[0] == edit_type and existing[1] == alt_edit:
                 existing[2] += reads
                 break
         else:
-            entry["alt_edits"].append([edit_type, alt_edit, reads])
-
-    # Keep longest ref_seq
-    if len(ref_seq_for_key) > len(entry["ref_seq"]):
-        entry["ref_seq"] = ref_seq_for_key
+            entry["alt_edits"].append([edit_type, alt_edit, reads, ref_seq_for_key])
 
 
 def build_alt_map(df_alleles, amplicon_positions):
@@ -151,9 +151,11 @@ def build_alt_map(df_alleles, amplicon_positions):
       - Emit entries:
           key: (chrom, left_index)
           value: {
-              "ref_seq": str,      # longest reference context seen at the key
-              "alt_edits": [ [edit_type, alt_edit, reads], ... ]
+              "alt_edits": [ [edit_type, alt_edit, reads, ref_seq], ... ]
           }
+
+    Each alt_edit stores its own ref_seq, enabling biallelic VCF output
+    where each edit is written as a separate VCF line with its own REF.
 
     Merge rules at a given key:
       - deletions: merge entries with the same deleted length (reads sum)
@@ -247,28 +249,29 @@ def _alt_seq_from_edit(ref_seq, edit_type, alt_edit):
     raise CRISPRessoShared.BadParameterException(f"Unknown edit type: {edit_type!r}")
 
 
-def _write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads):
-    """Takes one (chrom, pos) and returns the relevant VCF record line."""
+def _write_vcf_lines(chrom, pos, alt_edits, num_reads):
+    """Takes one (chrom, pos) and returns biallelic VCF record lines (one per unique REF/ALT pair).
+
+    Each alt_edit is [edit_type, payload, reads, ref_seq].
+    """
     if num_reads is None or num_reads <= 0:
         raise CRISPRessoShared.BadParameterException("Error counting total number of reads.")
 
-    alt_counts = defaultdict(int)
-    for edit_type, payload, reads in alt_edits:
+    # Group by (ref_seq, alt_seq) to aggregate reads for identical biallelic records
+    line_counts = defaultdict(int)
+    for edit_type, payload, reads, ref_seq in alt_edits:
         alt_seq = _alt_seq_from_edit(ref_seq, edit_type, payload)
-        alt_counts[alt_seq] += int(reads)
+        line_counts[(ref_seq, alt_seq)] += int(reads)
 
-    # Deterministic ordering: shortest first, then lexicographic
-    sorted_alt_seqs = sorted(alt_counts.keys(), key=lambda s: (len(s), s))
-
-    # Allele frequencies
+    # Deterministic ordering: shortest ALT first, then lexicographic ALT, then REF
     denom = float(num_reads)
-    afs = [f"{alt_counts[alt_seq] / denom:.3f}" for alt_seq in sorted_alt_seqs]
+    lines = []
+    for (ref_seq, alt_seq) in sorted(line_counts.keys(), key=lambda k: (len(k[1]), k[1], len(k[0]), k[0])):
+        af = f"{line_counts[(ref_seq, alt_seq)] / denom:.3f}"
+        record = f"{chrom}\t{pos}\t.\t{ref_seq}\t{alt_seq}\t.\tPASS\tAF={af}"
+        lines.append(record)
 
-    # Core VCF columns
-    info = f"AF={','.join(afs)}"
-    record = f"{chrom}\t{pos}\t.\t{ref_seq}\t{','.join(sorted_alt_seqs)}\t.\tPASS\t{info}"
-
-    return record
+    return lines
 
 
 def vcf_lines_from_alt_map(alt_map, num_reads, amplicon_lens, vcf_path):
@@ -293,10 +296,10 @@ def vcf_lines_from_alt_map(alt_map, num_reads, amplicon_lens, vcf_path):
         f.write(base + "\n")
         for (chrom, pos) in sorted(alt_map.keys(), key=_key_sort):
             entry = alt_map[(chrom, pos)]
-            ref_seq = entry["ref_seq"]
             alt_edits = entry["alt_edits"]
-            f.write(_write_vcf_line(chrom, pos, ref_seq, alt_edits, num_reads) + "\n")
-            counter += 1
+            for line in _write_vcf_lines(chrom, pos, alt_edits, num_reads):
+                f.write(line + "\n")
+                counter += 1
     return counter
 
 

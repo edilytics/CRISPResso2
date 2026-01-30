@@ -4546,7 +4546,6 @@ def main():
         if args.vcf_output:
             # TODO add this path to crispresso2_info
             vcf_path = os.path.join(OUTPUT_DIRECTORY, "CRISPResso_output.vcf")
-            breakpoint()
             vcf.write_vcf_file(
                 df_alleles,
                 ref_names,
