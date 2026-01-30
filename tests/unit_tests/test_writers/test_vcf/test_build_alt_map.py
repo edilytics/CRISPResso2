@@ -12,15 +12,6 @@ from CRISPResso2.writers import vcf
 REF_SEQ = "ATGCGTACGATCGTACGTAGCTAGCTAGCGTAGCTAGCTA"  # 40 bp
 REF_POSITIONS = list(range(len(REF_SEQ)))
 
-def _normalize_alt_map(alt_map):
-    """Sort alt_edits so ordering does not affect equality checks."""
-    norm = {}
-    for key, val in alt_map.items():
-        norm[key] = {
-            "alt_edits": sorted(val["alt_edits"], key=lambda t: (t[0], t[1])),
-        }
-    return norm
-
 
 def create_df_alleles(*refs_alns):
     payloads = []
@@ -51,7 +42,7 @@ def create_df_alleles(*refs_alns):
 
 
 # ----------------------------- alteration functions -----------------------------
-# These functions are used throughout the tests to alter the base REF_SEQ before calling build_alt_map.
+# These functions are used throughout the tests to alter the base REF_SEQ before calling build_edit_counts.
 
 def make_unmodified(reads=1, ref_name="Reference"):
     """Unmodified read identical to REF_SEQ."""
@@ -74,7 +65,7 @@ def make_del(start, end, reads=1, ref_name="Reference"):
 def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
     """
     Insertion of 'ins_seq' BETWEEN after_index and after_index+1 (0‑based).
-    For build_alt_map, insertion_coordinates use the right‑anchor ref index (after_index+1),
+    For build_edit_counts, insertion_coordinates use the right‑anchor ref index (after_index+1),
     and the aligned start is exactly after_index+1 when there are no prior edits in the row.
     """
     aligned_start = after_index + 1
@@ -83,7 +74,7 @@ def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
     return (updated_ref_seq, aligned, reads, ref_name)
 
 
-# ----------------------------- core mixed case (old test modernized) -----------------------------
+# ----------------------------- core mixed case -----------------------------
 
 @pytest.mark.parametrize(
     "rows, amplicon_positions, expected",
@@ -99,32 +90,19 @@ def make_ins(after_index, ins_seq, reads=1, ref_name="Reference"):
             ],
             {"Reference": (1, 1)},
             {
-            # Key is chrom, pos
-            # Value is dict with list of alt_edits (each alt_edit is [type, alt_edit, reads, ref_seq])
-                # substitution at 1 + 9 = 10
-                (1, 10): {
-                    "alt_edits": [["sub", "G", 1, "A"]],
-                },
-                # deletions at 19 (including the padding base, the deletion is at 20); each edit has its own ref_seq
-                (1, 19): {
-                    "alt_edits": [
-                        ["delete", REF_SEQ[19:20], 1, REF_SEQ[18:20]],  # 1‑bp del
-                        ["delete", REF_SEQ[19:29], 1, REF_SEQ[18:29]],  # 10‑bp del
-                    ],
-                },
-                # insertion after index 30 -> key (1, 32)
-                (1, 31): {
-                    "alt_edits": [["insert", "GG", 1, REF_SEQ[30]]],
-                },
+                (1, 10, REF_SEQ[9], "G"): 1,
+                (1, 19, REF_SEQ[18:20], REF_SEQ[18]): 1,       # 1‑bp del
+                (1, 19, REF_SEQ[18:29], REF_SEQ[18]): 1,       # 10‑bp del
+                (1, 31, REF_SEQ[30], REF_SEQ[30] + "GG"): 1,   # insertion
             },
         ),
     ],
     ids=["mixed_edits_happy_path"],
 )
-def test_build_alt_map_mixed(rows, amplicon_positions, expected):
+def test_build_edit_counts_mixed(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    alt_map = vcf.build_alt_map(df, amplicon_positions)
-    assert _normalize_alt_map(alt_map) == _normalize_alt_map(expected)
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    assert out == expected
 
 
 # ----------------------------- substitutions -----------------------------
@@ -136,27 +114,27 @@ def test_build_alt_map_mixed(rows, amplicon_positions, expected):
         (
             [make_sub(9, "G", reads=1)],
             {"Reference": (1, 1)},
-            {(1, 10): {"alt_edits": [["sub", "G", 1, "A"]]}},
+            {(1, 10, REF_SEQ[9], "G"): 1},
         ),
         # merge same SNP (reads sum)
         (
             [make_sub(9, "G", reads=2), make_sub(9, "G", reads=3)],
             {"Reference": (1, 1)},
-            {(1, 10): {"alt_edits": [["sub", "G", 5, "A"]]}},
+            {(1, 10, REF_SEQ[9], "G"): 5},
         ),
         # split different alt bases
         (
             [make_sub(9, "G", reads=1), make_sub(9, "T", reads=2)],
             {"Reference": (1, 1)},
-            {(1, 10): {"alt_edits": [["sub", "G", 1, "A"], ["sub", "T", 2, "A"]]}},
+            {(1, 10, REF_SEQ[9], "G"): 1, (1, 10, REF_SEQ[9], "T"): 2},
         ),
     ],
     ids=["sub_single", "sub_merge_same_base", "sub_split_diff_base"],
 )
-def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
+def test_build_edit_counts_substitutions(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = vcf.build_alt_map(df, amplicon_positions)
-    assert _normalize_alt_map(out) == _normalize_alt_map(expected)
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    assert out == expected
 
 
 # ----------------------------- deletions -----------------------------
@@ -168,52 +146,36 @@ def test_build_alt_map_substitutions(rows, amplicon_positions, expected):
         (
             [make_del(19, 20, reads=1)],
             {"Reference": (1, 1)},
-            {
-                (1, 19): {
-                    "alt_edits": [["delete", REF_SEQ[19:20], 1, REF_SEQ[18:20]]],
-                }
-            },
+            {(1, 19, REF_SEQ[18:20], REF_SEQ[18]): 1},
         ),
         # merge same‑length deletion at same key (reads sum)
         (
             [make_del(19, 20, reads=2), make_del(19, 20, reads=3)],
             {"Reference": (1, 1)},
-            {
-                (1, 19): {
-                    "alt_edits": [["delete", REF_SEQ[19:20], 5, REF_SEQ[18:20]]],
-                }
-            },
+            {(1, 19, REF_SEQ[18:20], REF_SEQ[18]): 5},
         ),
-        # two different lengths at same key -> two entries; each has its own ref_seq
+        # two different lengths at same position -> two entries
         (
             [make_del(19, 20, reads=1), make_del(19, 29, reads=1)],
             {"Reference": (1, 1)},
             {
-                (1, 19): {
-                    "alt_edits": [
-                        ["delete", REF_SEQ[19:20], 1, REF_SEQ[18:20]],
-                        ["delete", REF_SEQ[19:29], 1, REF_SEQ[18:29]],
-                    ],
-                }
+                (1, 19, REF_SEQ[18:20], REF_SEQ[18]): 1,
+                (1, 19, REF_SEQ[18:29], REF_SEQ[18]): 1,
             },
         ),
         # deletion at second element
         (
             [make_del(1, 2, reads=1)],
             {'Reference': (1, 1)},
-            {
-                (1, 1): {
-                    "alt_edits": [["delete", REF_SEQ[1:2], 1, REF_SEQ[0:2]]],
-                }
-            },
+            {(1, 1, REF_SEQ[0:2], REF_SEQ[0]): 1},
         ),
     ],
     ids=["del_single", "del_merge_same_len", "del_two_lengths_same_key", "del_second_element"],
 )
-def test_build_alt_map_deletions(rows, amplicon_positions, expected):
+def test_build_edit_counts_deletions(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = vcf.build_alt_map(df, amplicon_positions)
-    assert _normalize_alt_map(out) == _normalize_alt_map(expected)
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    assert out == expected
 
 
 @pytest.mark.parametrize(
@@ -222,187 +184,131 @@ def test_build_alt_map_deletions(rows, amplicon_positions, expected):
         (
             [make_del(39, 40, reads=1)],
             {'Reference': (1, 1)},
-            {
-                (1, 39):{
-                    'alt_edits': [['delete', REF_SEQ[39:49], 1, REF_SEQ[38:40]]],
-                }
-            },
+            {(1, 39, REF_SEQ[38:40], REF_SEQ[38]): 1},
         ),
         (
             [make_del(38, 40, reads=1)],
             {"Reference": (1, 1)},
-            {
-                (1, 38): {
-                    "alt_edits": [["delete", REF_SEQ[38:40], 1, REF_SEQ[37:40]]],
-                }
-            },
+            {(1, 38, REF_SEQ[37:40], REF_SEQ[37]): 1},
         ),
     ],
     ids=['last_element', 'second_to_last_element']
 )
-def test_build_alt_map_deletion_end_at_len_raises(rows, amplicon_positions, expected):
+def test_build_edit_counts_deletion_at_end(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = vcf.build_alt_map(df, amplicon_positions)
-    assert _normalize_alt_map(out) == _normalize_alt_map(expected)
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    assert out == expected
 
 
-def test_build_alt_map_deletion_start_at_zero_should_anchor_correctly():
-    """When a deletion occurs at the start of a sequence, then you record the base after the deletion.
+def test_build_edit_counts_deletion_start_at_zero_should_anchor_correctly():
+    """When a deletion occurs at the start of a sequence, REF includes the base after the deletion.
 
     Source: https://bioinformatics.stackexchange.com/questions/2476/how-to-represent-a-deletion-at-position-1-in-a-vcf-file
     """
     df = create_df_alleles(make_del(0, 3, reads=1))  # delete first 3 bases
     amplicon_positions = {"Reference": (1, 1)}
-    out = vcf.build_alt_map(df, amplicon_positions)
-    expected = {
-        (1, 1): {
-            "alt_edits": [["delete_start", REF_SEQ[0:3], 1, REF_SEQ[0:4]]],
-        }
-    }
-    assert _normalize_alt_map(out) == _normalize_alt_map(expected)
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    # REF = deleted + following_base, ALT = following_base
+    assert out == {(1, 1, REF_SEQ[0:4], REF_SEQ[3]): 1}
 
 
-def test_build_alt_map_deletion_start():
+def test_build_edit_counts_deletion_start():
     ref1 = 'GATTACA'
     aln1 = '-ATTACA'
 
+    df = create_df_alleles((ref1, aln1))
+    amplicon_positions = {"Reference": (1, 1)}
+    edit_counts = vcf.build_edit_counts(df, amplicon_positions)
+
+    assert edit_counts == {(1, 1, 'GA', 'A'): 1}
+
+
+def test_build_edit_counts_multi_deletion_start():
+    ref = 'AACCTTGG'
     df = create_df_alleles(
-        (ref1, aln1),
+        (ref, '-ACCTTGG'),
+        (ref, '--CCTTGG'),
+        (ref, '---CTTGG'),
+        (ref, '----TTGG'),
+        (ref, '-----TGG'),
+        (ref, '------GG'),
+        (ref, '-------G'),
     )
 
     amplicon_positions = {"Reference": (1, 1)}
-    alt_map = vcf.build_alt_map(df, amplicon_positions)
+    edit_counts = vcf.build_edit_counts(df, amplicon_positions)
 
-    assert alt_map[(1, 1)] == {
-        'alt_edits': [['delete_start', 'G', 1, 'GA']],
+    assert edit_counts == {
+        (1, 1, 'AA', 'A'): 1,
+        (1, 1, 'AAC', 'C'): 1,
+        (1, 1, 'AACC', 'C'): 1,
+        (1, 1, 'AACCT', 'T'): 1,
+        (1, 1, 'AACCTT', 'T'): 1,
+        (1, 1, 'AACCTTG', 'G'): 1,
+        (1, 1, 'AACCTTGG', 'G'): 1,
     }
 
-    vcf_lines = vcf._write_vcf_lines(1, 1, alt_map[(1, 1)]['alt_edits'], len(df))
-    assert len(vcf_lines) == 1
-    assert 'GA\tA' in vcf_lines[0]
+    # Validate VCF output: 7 biallelic lines
+    temp_vcf_path = 'multi_deletion_start.vcf'
+    num_vcf_rows = vcf.write_vcf_from_edits(edit_counts, len(df), {}, temp_vcf_path)
+    assert num_vcf_rows == 7
+
+    with open(temp_vcf_path) as fh:
+        vcf_contents = fh.read()
+    assert 'AA\tA' in vcf_contents
+    assert 'AAC\tC' in vcf_contents
+    assert 'AACC\tC' in vcf_contents
+    assert 'AACCT\tT' in vcf_contents
+    assert 'AACCTT\tT' in vcf_contents
+    assert 'AACCTTG\tG' in vcf_contents
+    assert 'AACCTTGG\tG' in vcf_contents
+
+    os.remove(temp_vcf_path)
 
 
-def test_build_alt_map_multi_deletion_start():
-    ref1 = 'AACCTTGG'
-    aln1 = '-ACCTTGG'
-
-    ref2 = 'AACCTTGG'
-    aln2 = '--CCTTGG'
-
-    ref3 = 'AACCTTGG'
-    aln3 = '---CTTGG'
-
-    ref4 = 'AACCTTGG'
-    aln4 = '----TTGG'
-
-    ref5 = 'AACCTTGG'
-    aln5 = '-----TGG'
-
-    ref6 = 'AACCTTGG'
-    aln6 = '------GG'
-
-    ref7 = 'AACCTTGG'
-    aln7 = '-------G'
-
+def test_build_edit_counts_multi_deletion_start_and_middle():
+    ref = 'AACCTTGG'
     df = create_df_alleles(
-        (ref1, aln1),
-        (ref2, aln2),
-        (ref3, aln3),
-        (ref4, aln4),
-        (ref5, aln5),
-        (ref6, aln6),
-        (ref7, aln7),
+        (ref, '-ACCTTGG'),
+        (ref, '--CCTTGG'),
+        (ref, 'A--CTTGG'),   # middle deletion (2 reads)
+        (ref, 'A--CTTGG'),
+        (ref, '----TTGG'),
+        (ref, '-----TGG'),
+        (ref, '------GG'),
+        (ref, '-------G'),   # (2 reads)
+        (ref, '-------G'),
     )
 
     amplicon_positions = {"Reference": (1, 1)}
-    alt_map = vcf.build_alt_map(df, amplicon_positions)
+    edit_counts = vcf.build_edit_counts(df, amplicon_positions)
 
-    assert alt_map[(1, 1)] == {
-        'alt_edits': [
-            ['delete_start', 'A', 1, 'AA'],
-            ['delete_start', 'AA', 1, 'AAC'],
-            ['delete_start', 'AAC', 1, 'AACC'],
-            ['delete_start', 'AACC', 1, 'AACCT'],
-            ['delete_start', 'AACCT', 1, 'AACCTT'],
-            ['delete_start', 'AACCTT', 1, 'AACCTTG'],
-            ['delete_start', 'AACCTTG', 1, 'AACCTTGG'],
-        ],
+    assert edit_counts == {
+        (1, 1, 'AA', 'A'): 1,          # del_start 1bp
+        (1, 1, 'AAC', 'C'): 1,         # del_start 2bp
+        (1, 1, 'AAC', 'A'): 2,         # middle del 'AC' (2 reads)
+        (1, 1, 'AACCT', 'T'): 1,       # del_start 4bp
+        (1, 1, 'AACCTT', 'T'): 1,      # del_start 5bp
+        (1, 1, 'AACCTTG', 'G'): 1,     # del_start 6bp
+        (1, 1, 'AACCTTGG', 'G'): 2,    # del_start 7bp (2 reads)
     }
 
-    vcf_lines = vcf._write_vcf_lines(1, 1, alt_map[(1, 1)]['alt_edits'], len(df))
-    # Biallelic: one line per deletion, each with its own REF
-    assert len(vcf_lines) == 7
-    # Check each line has the expected REF/ALT pair
-    all_lines = '\n'.join(vcf_lines)
-    assert 'AA\tA' in all_lines
-    assert 'AAC\tC' in all_lines
-    assert 'AACC\tC' in all_lines
-    assert 'AACCT\tT' in all_lines
-    assert 'AACCTT\tT' in all_lines
-    assert 'AACCTTG\tG' in all_lines
-    assert 'AACCTTGG\tG' in all_lines
+    # Validate VCF output
+    temp_vcf_path = 'multi_deletion_start_and_middle.vcf'
+    num_vcf_rows = vcf.write_vcf_from_edits(edit_counts, len(df), {}, temp_vcf_path)
+    assert num_vcf_rows == 7
 
+    with open(temp_vcf_path) as fh:
+        vcf_contents = fh.read()
+    assert 'AA\tA' in vcf_contents
+    assert 'AAC\tC' in vcf_contents
+    assert 'AAC\tA' in vcf_contents
+    assert 'AACCT\tT' in vcf_contents
+    assert 'AACCTT\tT' in vcf_contents
+    assert 'AACCTTG\tG' in vcf_contents
+    assert 'AACCTTGG\tG' in vcf_contents
 
-def test_build_alt_map_multi_deletion_start_and_middle():
-    ref1 = 'AACCTTGG'
-    aln1 = '-ACCTTGG'
-
-    ref2 = 'AACCTTGG'
-    aln2 = '--CCTTGG'
-
-    ref3 = 'AACCTTGG'
-    aln3 = 'A--CTTGG'
-
-    ref4 = 'AACCTTGG'
-    aln4 = '----TTGG'
-
-    ref5 = 'AACCTTGG'
-    aln5 = '-----TGG'
-
-    ref6 = 'AACCTTGG'
-    aln6 = '------GG'
-
-    ref7 = 'AACCTTGG'
-    aln7 = '-------G'
-
-    df = create_df_alleles(
-        (ref1, aln1),
-        (ref2, aln2),
-        (ref3, aln3),
-        (ref3, aln3),
-        (ref4, aln4),
-        (ref5, aln5),
-        (ref6, aln6),
-        (ref7, aln7),
-        (ref7, aln7),
-    )
-
-    amplicon_positions = {"Reference": (1, 1)}
-    alt_map = vcf.build_alt_map(df, amplicon_positions)
-
-    assert alt_map[(1, 1)] == {
-        'alt_edits': [
-            ['delete_start', 'A', 1, 'AA'],
-            ['delete_start', 'AA', 1, 'AAC'],
-            ['delete', 'AC', 2, 'AAC'],
-            ['delete_start', 'AACC', 1, 'AACCT'],
-            ['delete_start', 'AACCT', 1, 'AACCTT'],
-            ['delete_start', 'AACCTT', 1, 'AACCTTG'],
-            ['delete_start', 'AACCTTG', 2, 'AACCTTGG'],
-        ],
-    }
-
-    vcf_lines = vcf._write_vcf_lines(1, 1, alt_map[(1, 1)]['alt_edits'], len(df))
-    # Biallelic: one line per edit
-    assert len(vcf_lines) == 7
-    all_lines = '\n'.join(vcf_lines)
-    assert 'AA\tA' in all_lines       # delete_start 'A'
-    assert 'AAC\tC' in all_lines       # delete_start 'AA'
-    assert 'AAC\tA' in all_lines       # delete 'AC' (middle deletion)
-    assert 'AACCT\tT' in all_lines     # delete_start 'AACC'
-    assert 'AACCTT\tT' in all_lines    # delete_start 'AACCT'
-    assert 'AACCTTG\tG' in all_lines   # delete_start 'AACCTT'
-    assert 'AACCTTGG\tG' in all_lines  # delete_start 'AACCTTG'
+    os.remove(temp_vcf_path)
 
 
 # ----------------------------- insertions -----------------------------
@@ -410,41 +316,34 @@ def test_build_alt_map_multi_deletion_start_and_middle():
 @pytest.mark.parametrize(
     "rows, amplicon_positions, expected",
     [
-        # single insertion of "GG" after index 30 -> key (1, 32)
+        # single insertion of "GG" after index 30
         (
             [make_ins(30, "GG", reads=1)],
             {"Reference": (1, 1)},
-            {(1, 31): {"alt_edits": [["insert", "GG", 1, REF_SEQ[30]]]}},
+            {(1, 31, REF_SEQ[30], REF_SEQ[30] + "GG"): 1},
         ),
         # merge same inserted string and key (reads sum)
         (
             [make_ins(30, "GG", reads=2), make_ins(30, "GG", reads=3)],
             {"Reference": (1, 1)},
-            {(1, 31): {"alt_edits": [["insert", "GG", 5, REF_SEQ[30]]]}},
+            {(1, 31, REF_SEQ[30], REF_SEQ[30] + "GG"): 5},
         ),
         # split different inserted strings at same key
         (
             [make_ins(30, "GG", reads=1), make_ins(30, "T", reads=1)],
             {"Reference": (1, 1)},
-            {(1, 31): {"alt_edits": [["insert", "GG", 1, REF_SEQ[30]], ["insert", "T", 1, REF_SEQ[30]]]}},
+            {
+                (1, 31, REF_SEQ[30], REF_SEQ[30] + "GG"): 1,
+                (1, 31, REF_SEQ[30], REF_SEQ[30] + "T"): 1,
+            },
         ),
     ],
     ids=["ins_single", "ins_merge_same_seq", "ins_split_diff_seq"],
 )
-def test_build_alt_map_insertions(rows, amplicon_positions, expected):
+def test_build_edit_counts_insertions(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = vcf.build_alt_map(df, amplicon_positions)
-    assert _normalize_alt_map(out) == _normalize_alt_map(expected)
-
-
-def test_upsert_edit_del_and_ins():
-    alt_map = {
-        ('chrX', 10): {
-            'alt_edits': [['delete', 'T', 2, 'AT']]
-        },
-    }
-    vcf._upsert_edit(alt_map, ('chrX', 10), 'AT', 'insert', 'TT', 2)
-    assert alt_map[('chrX', 10)] == {'alt_edits': [['delete', 'T', 2, 'AT'], ['insert', 'TT', 2, 'AT']]}
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    assert out == expected
 
 
 # ----------------------------- multiple amplicons & coordinate offsets -----------------------------
@@ -457,19 +356,17 @@ def test_upsert_edit_del_and_ins():
              make_ins(0, "G", reads=2, ref_name="B")],
             {"A": (1, 1), "B": (2, 1000)},
             {
-                # SNP: chrom 1, pos = 1 + 2 = 3
-                (1, 3): {"alt_edits": [["sub", "T", 1, REF_SEQ[2]]]},
-                # insertion on chrom 2: left_index = 1000 + 0 = 1000
-                (2, 1000): {"alt_edits": [["insert", "G", 2, REF_SEQ[0]]]},
+                (1, 3, REF_SEQ[2], "T"): 1,
+                (2, 1000, REF_SEQ[0], REF_SEQ[0] + "G"): 2,
             },
         ),
     ],
     ids=["two_amplicons_offsets"],
 )
-def test_build_alt_map_multi_amplicon_and_offsets(rows, amplicon_positions, expected):
+def test_build_edit_counts_multi_amplicon_and_offsets(rows, amplicon_positions, expected):
     df = create_df_alleles(*rows)
-    out = vcf.build_alt_map(df, amplicon_positions)
-    assert _normalize_alt_map(out) == _normalize_alt_map(expected)
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    assert out == expected
 
 
 # ----------------------------- unmodified rows are skipped -----------------------------
@@ -482,44 +379,32 @@ def test_build_alt_map_multi_amplicon_and_offsets(rows, amplicon_positions, expe
     ],
     ids=["only_unmodified", "mixed_with_unmodified"],
 )
-def test_build_alt_map_skips_unmodified(rows, amplicon_positions, expected_size):
+def test_build_edit_counts_skips_unmodified(rows, amplicon_positions, expected_size):
     df = create_df_alleles(*rows)
-    out = vcf.build_alt_map(df, amplicon_positions)
+    out = vcf.build_edit_counts(df, amplicon_positions)
     assert len(out) == expected_size
 
-# ----------------------------- ensuring that insertions are keyed by right anchor -----------------------------
+# ----------------------------- fidelity test with real-like alignment data -----------------------------
 
-def test_build_alt_map_fidelity_like_real_row():
-    # Short 40bp reference used across tests
+def test_build_edit_counts_fidelity_like_real_row():
     ref_seq = "ATGCGTACGA---TCGTACGTAGCTAGCTAGCGTAGCTAGCTA"
     aln_seq = "ATGCGTACGAGGGTCGTACGTAGCTAGCTAGCGTAGCTAGCTA"
     num_reads = 7
     ins_right_anchor = 9
 
     df = create_df_alleles((ref_seq, aln_seq, num_reads))
-
-    # Amplicon starts at absolute position 500 on chromosome 1
     amplicon_positions = {"Reference": (1, 500)}
 
-    # Expected: key uses the right anchor; ref_seq is the anchor base; alt carries inserted string & reads
+    anchor = ref_seq[ins_right_anchor]
     expected = {
-        (1, 500 + ins_right_anchor): {
-            "alt_edits": [["insert", "GGG", num_reads, ref_seq[ins_right_anchor]]],
-        }
+        (1, 500 + ins_right_anchor, anchor, anchor + "GGG"): num_reads,
     }
 
-    out = vcf.build_alt_map(df, amplicon_positions)
-
-    def _normalize(m):
-        return {
-            k: {"alt_edits": sorted(v["alt_edits"], key=lambda t: (t[0], t[1]))}
-            for k, v in m.items()
-        }
-
-    assert _normalize(out) == _normalize(expected)
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    assert out == expected
 
 
-def test_aln_to_alt_map_ins_del_same_pos():
+def test_aln_to_edit_counts_ins_del_same_pos():
     ref1 = 'AATGCGTAC'
     aln1 = 'AA--CGTAC'
 
@@ -528,39 +413,41 @@ def test_aln_to_alt_map_ins_del_same_pos():
 
     df = create_df_alleles((ref1, aln1), (ref2, aln2))
     amplicon_positions = {"Reference": (1, 1)}
-    alt_map = vcf.build_alt_map(df, amplicon_positions)
+    edit_counts = vcf.build_edit_counts(df, amplicon_positions)
 
-    assert list(alt_map.keys()) == [(1, 2)]
-    assert alt_map[(1, 2)] == {'alt_edits': [['delete', 'TG', 1, 'ATG'], ['insert', 'TT', 1, 'A']]}
+    assert edit_counts == {
+        (1, 2, 'ATG', 'A'): 1,    # deletion of TG
+        (1, 2, 'A', 'ATT'): 1,    # insertion of TT
+    }
 
-    temp_vcf_path = 'aln_to_alt_map_ins_del_same_pos.vcf'
+    temp_vcf_path = 'aln_to_edit_counts_ins_del_same_pos.vcf'
     num_reads = 5
-    num_vcf_rows = vcf.vcf_lines_from_alt_map(alt_map, num_reads, {'Reference': 9}, temp_vcf_path)
-    # Biallelic: 2 lines (one for deletion, one for insertion)
+    num_vcf_rows = vcf.write_vcf_from_edits(edit_counts, num_reads, {'Reference': 9}, temp_vcf_path)
     assert num_vcf_rows == 2
 
     with open(temp_vcf_path) as fh:
         vcf_contents = fh.read()
-    assert 'ATG\tA' in vcf_contents      # deletion
-    assert 'A\tATT' in vcf_contents      # insertion
+    assert 'ATG\tA' in vcf_contents
+    assert 'A\tATT' in vcf_contents
 
     os.remove(temp_vcf_path)
 
 
-def test_aln_to_alt_map_ins_then_del():
+def test_aln_to_edit_counts_ins_then_del():
     ref1 = 'AATTT---GCGTAC'
     aln1 = 'AATTTCCCGCG---'
 
     df = create_df_alleles((ref1, aln1))
     amplicon_positions = {'Reference': (1, 1)}
-    alt_map = vcf.build_alt_map(df, amplicon_positions)
+    edit_counts = vcf.build_edit_counts(df, amplicon_positions)
 
-    assert list(alt_map.keys()) == [(1, 8), (1, 5)]
-    assert alt_map[(1, 5)] == {'alt_edits': [['insert', 'CCC', 1, 'T']]}
-    assert alt_map[(1, 8)] == {'alt_edits': [['delete', 'TAC', 1, 'GTAC']]}
+    assert edit_counts == {
+        (1, 5, 'T', 'TCCC'): 1,     # insertion of CCC
+        (1, 8, 'GTAC', 'G'): 1,     # deletion of TAC
+    }
 
 
-def test_aln_to_alt_map_to_vcf():
+def test_aln_to_edit_counts_to_vcf():
     ref1 = 'AATGCGTAC'
     aln1 = 'AATGCG-AC'
     #             ^ Interested in this deletion across each of these examples
@@ -590,33 +477,32 @@ def test_aln_to_alt_map_to_vcf():
     )
 
     amplicon_positions = {"Reference": (1, 1)}
-    alt_map = vcf.build_alt_map(df, amplicon_positions)
+    edit_counts = vcf.build_edit_counts(df, amplicon_positions)
 
     # deletion at position 7 (1-based) in each example above, should occur 5 times
-    assert alt_map[(1, 6)] == {'alt_edits': [['delete', 'T', 5, 'GT']]}
+    assert edit_counts[(1, 6, 'GT', 'G')] == 5
     # insertion of GG occurs 2 times in 2, 5 and deletion of T occurs 2 times in 3, 4
-    assert alt_map[(1, 2)] == {'alt_edits': [['insert', 'GG', 2, 'A'], ['delete', 'T', 2, 'AT']]}
+    assert edit_counts[(1, 2, 'A', 'AGG')] == 2
+    assert edit_counts[(1, 2, 'AT', 'A')] == 2
     # insertion of AA occurs 1 time in 4
-    assert alt_map[(1, 4)] == {'alt_edits': [['insert', 'AA', 1, 'G']]}
+    assert edit_counts[(1, 4, 'G', 'GAA')] == 1
     # substitution of A -> G occurs 1 time in 5
-    assert alt_map[(1, 8)] == {'alt_edits': [['sub', 'G', 1, 'A']]}
+    assert edit_counts[(1, 8, 'A', 'G')] == 1
     # substitution of C -> G occurs 1 time in 5
-    assert alt_map[(1, 9)] == {'alt_edits': [['sub', 'G', 1, 'C']]}
+    assert edit_counts[(1, 9, 'C', 'G')] == 1
     # deletion at position 1 (1-based) occurs 1 time in 6
-    assert alt_map[(1, 1)] == {'alt_edits': [['delete_start', 'AATGCGT', 1, 'AATGCGTA']]}
+    assert edit_counts[(1, 1, 'AATGCGTA', 'A')] == 1
 
-    temp_vcf_path = 'aln_to_alt_map_to_vcf.vcf'
+    temp_vcf_path = 'aln_to_edit_counts_to_vcf.vcf'
     num_reads = 5
-    num_vcf_rows = vcf.vcf_lines_from_alt_map(alt_map, num_reads, {'Reference': 9}, temp_vcf_path)
-    # Biallelic: each edit is its own line. Position (1,2) has 2 edits, rest have 1 each = 7 total
+    num_vcf_rows = vcf.write_vcf_from_edits(edit_counts, num_reads, {'Reference': 9}, temp_vcf_path)
+    # Biallelic: 7 records (position 2 has 2 records, rest have 1 each)
     assert num_vcf_rows == 7
 
     with open(temp_vcf_path, 'r') as fh:
         vcf_contents = fh.read()
 
-    # Biallelic: each edit on its own line with its own REF
     assert '\t'.join(('1', '6', '.', 'GT', 'G', '.', 'PASS', f'AF={5 / num_reads:.3f}')) in vcf_contents
-    # Position 2: deletion and insertion are separate lines
     assert '\t'.join(('1', '2', '.', 'AT', 'A', '.', 'PASS', f'AF={2 / num_reads:.3f}')) in vcf_contents
     assert '\t'.join(('1', '2', '.', 'A', 'AGG', '.', 'PASS', f'AF={2 / num_reads:.3f}')) in vcf_contents
     assert '\t'.join(('1', '4', '.', 'G', 'GAA', '.', 'PASS', f'AF={1 / num_reads:.3f}')) in vcf_contents

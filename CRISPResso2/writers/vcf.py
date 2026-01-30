@@ -1,53 +1,45 @@
 from collections import defaultdict
-from contextlib import nullcontext
 
 from CRISPResso2 import CRISPRessoShared
 
 
-def _ref_length_from_positions(ref_positions):
-    """Infer true reference length from the max non-negative position."""
-    nonneg = [p for p in ref_positions if p >= 0]
-    return (max(nonneg) + 1) if nonneg else 0
+def _edits_from_deletions(row, chrom, pos):
+    """Yield (chrom, vcf_pos, ref, alt, reads) for each deletion in the row.
 
-
-def _process_deletions(row, chrom, pos, alt_map):
+    VCF deletion representation:
+      - Start of sequence (pos 0):  REF = deleted + following_base, ALT = following_base
+      - Middle or end of sequence:  REF = anchor + deleted, ALT = anchor
+    """
     ref_positions = row["ref_positions"]
     ref_str = row["Reference_Sequence"]
     reads = row["#Reads"]
 
     for (start, end) in row["deletion_coordinates"]:
-        left_index = max(1, pos + start - 1)          # absolute 1-based coordinate
-        key = (chrom, left_index)
+        left_index = max(1, pos + start - 1)
         ref_start = ref_positions.index(start)
-        edit_type = "delete"
         try:
             ref_end = ref_positions.index(end)
-        except ValueError:  # deletion extends to the end of the sequence, and end is not in ref_positions
+        except ValueError:  # deletion extends to the end of the sequence
             ref_end = ref_positions.index(end - 1)
 
-        if start == 0:  # deletion at the start of a sequence
-            edit_type = "delete_start"
-            deleted_edit = ref_str[ref_start:ref_end]
-            ref_for_key = ref_str[ref_start:ref_end + 1]
-        elif ref_end == len(ref_str) - 1:  # deletion at the end of a sequence
-            deleted_edit = ref_str[ref_start:ref_end + 1]
-            ref_for_key = ref_str[ref_start - 1:ref_end + 1]
-        else:  # deletion in the middle of a sequence
-            deleted_edit = ref_str[ref_start:ref_end]
-            ref_for_key = ref_str[ref_start - 1:ref_end]
+        if start == 0:
+            ref_seq = ref_str[ref_start:ref_end + 1]
+            alt_seq = ref_seq[-1]
+        elif ref_end == len(ref_str) - 1:
+            ref_seq = ref_str[ref_start - 1:ref_end + 1]
+            alt_seq = ref_seq[0]
+        else:
+            ref_seq = ref_str[ref_start - 1:ref_end]
+            alt_seq = ref_seq[0]
 
-        _upsert_edit(
-            alt_map,
-            key,
-            ref_for_key,
-            edit_type=edit_type,
-            alt_edit=deleted_edit,
-            reads=reads,
-        )
+        yield (chrom, left_index, ref_seq, alt_seq, reads)
 
 
-def _process_insertions(row, chrom, pos, alt_map):
-    """Uses ref_positions and insertion_coordinates to find the correct original base."""
+def _edits_from_insertions(row, chrom, pos):
+    """Yield (chrom, vcf_pos, ref, alt, reads) for each insertion in the row.
+
+    VCF insertion: REF = anchor_base, ALT = anchor_base + inserted_bases
+    """
     ref_positions = row["ref_positions"]
     ref_str = row["Reference_Sequence"]
     aln_str = row["Aligned_Sequence"]
@@ -56,38 +48,30 @@ def _process_insertions(row, chrom, pos, alt_map):
     sizes = row.get("insertion_sizes", []) or []
     coords = row.get("insertion_coordinates", []) or []
 
-    # Infer true reference length in case insertion is at the end of reference
     ref_len = max(p for p in ref_positions if p >= 0) + 1
 
     for i, (right_anchor_ref_pos, aligned_start) in enumerate(coords):
         left_index = pos + right_anchor_ref_pos
-        key = (chrom, left_index)
 
-        # Use the matching size for this insertion
         size = sizes[i] if i < len(sizes) else 0
-        ins_edit = aln_str[aligned_start : aligned_start + size]
+        ins_bases = aln_str[aligned_start:aligned_start + size]
 
-        # The anchor base for ref_seq: normally at 'right_anchor_ref_pos';
-        # for inserts after the last base (right_anchor == ref_len), anchor to the last base.
+        # Anchor base: normally at right_anchor_ref_pos;
+        # for inserts after the last base, anchor to the last base.
         if right_anchor_ref_pos == ref_len and ref_len > 0:
             ref_char_idx = ref_positions.index(ref_len - 1)
         else:
             ref_char_idx = ref_positions.index(right_anchor_ref_pos)
 
-        ref_for_key = ref_str[ref_char_idx]  # single-base ref for insertions
-
-        _upsert_edit(
-            alt_map,
-            key,
-            ref_for_key,
-            edit_type="insert",
-            alt_edit=ins_edit,
-            reads=reads,
-        )
+        anchor = ref_str[ref_char_idx]
+        yield (chrom, left_index, anchor, anchor + ins_bases, reads)
 
 
-def _process_substitutions(row, chrom, pos, alt_map):
-    """Uses ref_positions and substitution_position to find the correct original base."""
+def _edits_from_substitutions(row, chrom, pos):
+    """Yield (chrom, vcf_pos, ref, alt, reads) for each substitution in the row.
+
+    VCF substitution: REF = original_base, ALT = alt_base
+    """
     ref_positions = row["ref_positions"]
     ref_str = row["Reference_Sequence"]
     aln_str = row["Aligned_Sequence"]
@@ -95,80 +79,30 @@ def _process_substitutions(row, chrom, pos, alt_map):
 
     for sub_ref_pos in row["substitution_positions"]:
         left_index = pos + sub_ref_pos
-        key = (chrom, left_index)
-
         char_idx = ref_positions.index(sub_ref_pos)
-        alt_base = aln_str[char_idx]
-        ref_base = ref_str[char_idx]
-
-        _upsert_edit(
-            alt_map,
-            key,
-            ref_base,
-            edit_type="sub",
-            alt_edit=alt_base,
-            reads=reads,
-        )
+        yield (chrom, left_index, ref_str[char_idx], aln_str[char_idx], reads)
 
 
-def _upsert_edit(alt_map, key, ref_seq_for_key, edit_type, alt_edit, reads):
-    """Helper function to upsert an edit into alt_map[key].
+def build_edit_counts(df_alleles, amplicon_positions):
+    """Build a dict mapping (chrom, pos, ref, alt) -> total_reads from allele data.
 
-    Each alt_edit entry stores its own ref_seq as a 4th element:
-        [edit_type, alt_edit, reads, ref_seq]
-    """
-    entry = alt_map.get(key)
-    if entry is None:
-        alt_map[key] = {"alt_edits": [[edit_type, alt_edit, reads, ref_seq_for_key]]}
-        return
+    Each entry represents one biallelic VCF record. Read counts are
+    summed for identical edits across alleles.
 
-    # Merge rule
-    if edit_type == "delete" or edit_type == 'delete_start':
-        target_len = len(alt_edit)
-        for existing in entry["alt_edits"]:
-            if existing[0] == edit_type and len(existing[1]) == target_len:
-                existing[2] += reads
-                break
-        else:
-            entry["alt_edits"].append([edit_type, alt_edit, reads, ref_seq_for_key])
-    else:
-        for existing in entry["alt_edits"]:
-            if existing[0] == edit_type and existing[1] == alt_edit:
-                existing[2] += reads
-                break
-        else:
-            entry["alt_edits"].append([edit_type, alt_edit, reads, ref_seq_for_key])
-
-
-def build_alt_map(df_alleles, amplicon_positions):
-    """
-    Build a nested alt_map keyed by (chrom, left_index).
-
-    For each allele row:
-      - Skip unmodified reads (no insertions, deletions, or substitutions).
-      - Use amplicon_positions[Reference_Name] -> (chrom, pos), where pos is 1-based
+    Parameters
+    ----------
+    df_alleles : pd.DataFrame
+        The alleles DataFrame from CRISPResso2 analysis.
+    amplicon_positions : dict
+        Maps reference name -> (chrom, pos) where pos is the 1-based
         absolute coordinate of reference index 0.
-      - Emit entries:
-          key: (chrom, left_index)
-          value: {
-              "alt_edits": [ [edit_type, alt_edit, reads, ref_seq], ... ]
-          }
 
-    Each alt_edit stores its own ref_seq, enabling biallelic VCF output
-    where each edit is written as a separate VCF line with its own REF.
-
-    Merge rules at a given key:
-      - deletions: merge entries with the same deleted length (reads sum)
-      - insertions: merge entries with the same inserted string
-      - substitutions: merge entries with the same alt base
-
-    Edge cases handled:
-      - deletion starting at ref index 0 -> no left flank in ref_seq
-      - deletion ending at len(ref) -> safe bound computation (no .index(end))
-      - multiple insertions per allele -> each uses its own insertion size
-      - substitution indexing via ref_positions (robust to hyphen padding)
+    Returns
+    -------
+    dict
+        Mapping of (chrom, pos, ref, alt) -> total read count.
     """
-    alt_map = {}
+    edit_counts = defaultdict(int)
 
     for _, row in df_alleles.iterrows():
         if (
@@ -181,130 +115,65 @@ def build_alt_map(df_alleles, amplicon_positions):
         ref_name = row["Reference_Name"]
         chrom, pos = amplicon_positions[ref_name]
 
-        # Process each edit class, make sure that you always process deletions first, as it will set the proper reference length
-        _process_deletions(row, chrom, pos, alt_map)
-        _process_insertions(row, chrom, pos, alt_map)
-        _process_substitutions(row, chrom, pos, alt_map)
+        for chrom_v, pos_v, ref, alt, reads in _edits_from_deletions(row, chrom, pos):
+            edit_counts[(chrom_v, pos_v, ref, alt)] += reads
+        for chrom_v, pos_v, ref, alt, reads in _edits_from_insertions(row, chrom, pos):
+            edit_counts[(chrom_v, pos_v, ref, alt)] += reads
+        for chrom_v, pos_v, ref, alt, reads in _edits_from_substitutions(row, chrom, pos):
+            edit_counts[(chrom_v, pos_v, ref, alt)] += reads
 
-    return alt_map
+    return dict(edit_counts)
 
 
-def _alt_seq_from_edit(ref_seq, edit_type, alt_edit):
-    """Build each edit's ALT string using this position's final ref_seq.
-
-    - Insertions: keep left anchor (ref_seq[0]), inject inserted bases, then append any trailing ref context.
-        (appending additional context will only occur if there's also a deletion at this position)
-    - Deletions: drop exactly len(alt_edit) bases immediately after the left anchor then append any remaining sequences in ref_seq.
-        (this will only occur if there's another deletion with a longer span).
-    - Substitutions: replace the left anchor base with the alt base, append trailing ref context.
+def write_vcf_from_edits(edit_counts, num_reads, amplicon_lens, vcf_path):
+    """Write biallelic VCF file from edit counts.
 
     Parameters
     ----------
-    ref_seq : str
-        The reference sequence for this key, always including the left anchor base.
-        The length of ref_seq is always 1 + the longest deleted span at this position.
-        If there are no deletions, ref_seq is a single base (the left anchor).
-    edit_type : str
-        The type of edit, one of "insert", "delete", "delete_start", or "sub".
-    alt_edit : str
-        The inserted bases (for "insert"), the deleted bases (for "delete" and "delete_start"),
-        or the alt base (for "sub").
-
+    edit_counts : dict
+        Mapping of (chrom, pos, ref, alt) -> read count.
+    num_reads : int
+        Total read count (denominator for allele frequencies).
+    amplicon_lens : dict
+        Maps amplicon/chrom name -> amplicon length (for contig headers).
+    vcf_path : str
+        Output file path.
 
     Returns
     -------
-    str
-        The final alt sequence for this edit.
-
-    """
-
-    alt_len = len(alt_edit)
-    ref_len = len(ref_seq)
-
-    if edit_type == "insert":
-        # ALT = left_anchor + inserted + trailing_ref
-        return ref_seq[0] + (alt_edit or "") + ref_seq[1:]
-
-    if edit_type == "delete":
-        if alt_len >= ref_len:
-            raise CRISPRessoShared.BadParameterException(
-                f"Deletion alt_edit ({alt_edit}) must be at least 1 base pair shorter than ref_seq: ({ref_seq})."
-            )
-        return ref_seq[0] + ref_seq[alt_len + 1:]
-
-    if edit_type == "delete_start":
-        if len(ref_seq) > 1:
-            return ref_seq[alt_len:]
-        elif len(ref_seq) == 0 or len(ref_seq) == 1:
-            raise CRISPRessoShared.BadParameterException(
-                f"The ref_seq for deletion at the start of a seq should always have at least 2 basepairs. {ref_seq}."
-            )
-
-    if edit_type == "sub":
-        if alt_len != 1:
-            raise CRISPRessoShared.BadParameterException("Substitution ALT must be a single base.")
-        # ALT = alt_base + trailing_ref
-        return alt_edit + ref_seq[1:]
-
-    raise CRISPRessoShared.BadParameterException(f"Unknown edit type: {edit_type!r}")
-
-
-def _write_vcf_lines(chrom, pos, alt_edits, num_reads):
-    """Takes one (chrom, pos) and returns biallelic VCF record lines (one per unique REF/ALT pair).
-
-    Each alt_edit is [edit_type, payload, reads, ref_seq].
+    int
+        Number of VCF data lines written (excluding header).
     """
     if num_reads is None or num_reads <= 0:
         raise CRISPRessoShared.BadParameterException("Error counting total number of reads.")
 
-    # Group by (ref_seq, alt_seq) to aggregate reads for identical biallelic records
-    line_counts = defaultdict(int)
-    for edit_type, payload, reads, ref_seq in alt_edits:
-        alt_seq = _alt_seq_from_edit(ref_seq, edit_type, payload)
-        line_counts[(ref_seq, alt_seq)] += int(reads)
-
-    # Deterministic ordering: shortest ALT first, then lexicographic ALT, then REF
-    denom = float(num_reads)
-    lines = []
-    for (ref_seq, alt_seq) in sorted(line_counts.keys(), key=lambda k: (len(k[1]), k[1], len(k[0]), k[0])):
-        af = f"{line_counts[(ref_seq, alt_seq)] / denom:.3f}"
-        record = f"{chrom}\t{pos}\t.\t{ref_seq}\t{alt_seq}\t.\tPASS\tAF={af}"
-        lines.append(record)
-
-    return lines
-
-
-def vcf_lines_from_alt_map(alt_map, num_reads, amplicon_lens, vcf_path):
-    """After being passed a single location, this generates the final alt_seqs and AFs, and returns the single VCF line."""
-
     def _key_sort(k):
-        chrom, pos = k
+        chrom, pos, ref, alt = k
         try:
-            c_key = (0, int(chrom))         # numeric chroms first (e.g., "1", 2)
+            c_key = (0, int(chrom))
         except (TypeError, ValueError):
-            c_key = (1, str(chrom))         # non‑numeric chroms next, lexicographic (e.g., "chr1", "chr10")
-        return (c_key, int(pos))
+            c_key = (1, str(chrom))
+        return (c_key, int(pos), len(alt), alt, len(ref), ref)
 
     counter = 0
+    denom = float(num_reads)
     with open(vcf_path, "w") as f:
         f.write('##fileformat=VCFv4.5\n')
         f.write('##source=CRISPResso2\n')
         f.write('##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n')
         for amplicon_name, amplicon_len in amplicon_lens.items():
             f.write(f'##contig=<ID={amplicon_name},length={amplicon_len}>\n')
-        base = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO"
-        f.write(base + "\n")
-        for (chrom, pos) in sorted(alt_map.keys(), key=_key_sort):
-            entry = alt_map[(chrom, pos)]
-            alt_edits = entry["alt_edits"]
-            for line in _write_vcf_lines(chrom, pos, alt_edits, num_reads):
-                f.write(line + "\n")
-                counter += 1
+        f.write("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
+        for key in sorted(edit_counts.keys(), key=_key_sort):
+            chrom, pos, ref, alt = key
+            af = f"{edit_counts[key] / denom:.3f}"
+            f.write(f"{chrom}\t{pos}\t.\t{ref}\t{alt}\t.\tPASS\tAF={af}\n")
+            counter += 1
     return counter
 
 
 def write_vcf_file(df_alleles, ref_names, ref_lens, args, vcf_path):
-    """Orchestrates: parse amplicon coordinates, build alt_map, make VCF, and write to file.
+    """Orchestrates: parse amplicon coordinates, build edits, and write VCF file.
 
     Parameters
     ----------
@@ -323,7 +192,7 @@ def write_vcf_file(df_alleles, ref_names, ref_lens, args, vcf_path):
     Returns
     -------
     int
-        Solely for testing; the number of lines written to the VCF file (including header).
+        Solely for testing; the number of VCF data lines written.
     """
     try:
         all_coords = args.amplicon_coordinates.strip().split(',')
@@ -345,10 +214,9 @@ def write_vcf_file(df_alleles, ref_names, ref_lens, args, vcf_path):
     for ref_name, (chrom, pos) in amplicon_positions.items():
         amplicon_lens[chrom] = ref_lens[ref_name]
 
-    # Denominator for AFs
     num_reads = df_alleles['#Reads'].sum()
 
-    alt_map = build_alt_map(df_alleles, amplicon_positions)
-    count = vcf_lines_from_alt_map(alt_map, num_reads, amplicon_lens, vcf_path)
+    edit_counts = build_edit_counts(df_alleles, amplicon_positions)
+    count = write_vcf_from_edits(edit_counts, num_reads, amplicon_lens, vcf_path)
 
     return count
