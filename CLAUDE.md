@@ -114,6 +114,12 @@ Required system tools (for pooled/WGS analysis):
 - `samtools` - BAM file processing
 - `fastp` - Quality filtering (optional)
 
+## Design Documents
+
+See `design_docs/` for detailed write-ups on specific subsystems and past debugging decisions:
+
+- **`LEFT_NORMALIZATION.md`** - VCF indel left-normalization in `writers/vcf.py`: why it's needed, how the fix works, key data structures
+
 ## Key Constraints
 
 - **Python 3 only**
