@@ -328,13 +328,15 @@ def test_build_edit_counts_multi_deletion_start_and_middle():
             {"Reference": (1, 1)},
             {(1, 31, REF_SEQ[30], REF_SEQ[30] + "GG"): 5},
         ),
-        # split different inserted strings at same key
+        # split different inserted strings at same anchor (before normalization)
+        # "GG" at anchor 30(T): ins[-1]='G' != 'T' -> stays at pos 31
+        # "T" at anchor 30(T): ins[-1]='T' == 'T' -> left-normalizes to anchor 29(G), pos 30
         (
             [make_ins(30, "GG", reads=1), make_ins(30, "T", reads=1)],
             {"Reference": (1, 1)},
             {
                 (1, 31, REF_SEQ[30], REF_SEQ[30] + "GG"): 1,
-                (1, 31, REF_SEQ[30], REF_SEQ[30] + "T"): 1,
+                (1, 30, REF_SEQ[29], REF_SEQ[29] + "T"): 1,
             },
         ),
     ],

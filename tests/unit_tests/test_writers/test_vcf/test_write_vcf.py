@@ -180,6 +180,182 @@ class TestLeftNormalizeDeletion:
         assert vcf._left_normalize_deletion(1, 3, rp, rs) == (1, 3)
 
 
+# ----------------------------- _left_normalize_insertion -----------------------------
+
+
+class TestLeftNormalizeInsertion:
+    """Direct tests for vcf._left_normalize_insertion."""
+
+    def test_no_shift_distinct_bases(self):
+        """ATGC: inserting 'A' at anchor pos 2 (G). Last ins base A != G -> no shift."""
+        rp, rs = _simple_ref("ATGC")
+        anchor, ins = vcf._left_normalize_insertion(2, "A", rp, rs)
+        assert anchor == 2
+        assert ins == "A"
+
+    def test_single_base_shift_homopolymer(self):
+        """ATCC: inserting 'C' at anchor pos 2 (C). Shifts left to pos 1 (T != C -> stop)."""
+        #        0123
+        # ref:   ATCC
+        # anchor=2(C), ins='C'. ins[-1]='C' == ref[2]='C' -> ins='C'+'', anchor=1
+        # anchor=1(T), ins='C'. ins[-1]='C' != ref[1]='T' -> stop
+        rp, rs = _simple_ref("ATCC")
+        anchor, ins = vcf._left_normalize_insertion(2, "C", rp, rs)
+        assert anchor == 1
+        assert ins == "C"
+
+    def test_homopolymer_shifts_to_zero(self):
+        """ACCCG: inserting 'C' at anchor pos 3. Shifts to anchor 0 (A != C -> stop)."""
+        #        01234
+        # ref:   ACCCG
+        rp, rs = _simple_ref("ACCCG")
+        anchor, ins = vcf._left_normalize_insertion(3, "C", rp, rs)
+        assert anchor == 0
+        assert ins == "C"
+
+    def test_already_at_position_zero(self):
+        """ACGT: inserting 'A' at anchor pos 0. Can't shift further."""
+        rp, rs = _simple_ref("ACGT")
+        anchor, ins = vcf._left_normalize_insertion(0, "A", rp, rs)
+        assert anchor == 0
+        assert ins == "A"
+
+    def test_multi_base_insertion_dinucleotide_repeat(self):
+        """ACACG: inserting 'AC' at anchor pos 3 (C). Shifts to anchor 0.
+
+        anchor=3(C), ins='AC'. ins[-1]='C' == ref[3]='C' -> ins='C'+'A'='CA', anchor=2
+        anchor=2(A), ins='CA'. ins[-1]='A' == ref[2]='A' -> ins='A'+'C'='AC', anchor=1
+        anchor=1(C), ins='AC'. ins[-1]='C' == ref[1]='C' -> ins='C'+'A'='CA', anchor=0
+        anchor=0, stop.
+        """
+        rp, rs = _simple_ref("ACACG")
+        anchor, ins = vcf._left_normalize_insertion(3, "AC", rp, rs)
+        assert anchor == 0
+        assert ins == "CA"
+
+    def test_no_shift_when_last_ins_base_differs(self):
+        """ACGT: inserting 'T' at anchor pos 2 (G). T != G -> no shift."""
+        rp, rs = _simple_ref("ACGT")
+        anchor, ins = vcf._left_normalize_insertion(2, "T", rp, rs)
+        assert anchor == 2
+        assert ins == "T"
+
+    def test_partial_shift_multi_base(self):
+        """TAAAC: inserting 'A' at anchor pos 3 (A). Shifts to anchor 1 (T blocks).
+
+        anchor=3(A), ins='A'. ins[-1]='A' == ref[3]='A' -> ins='A', anchor=2
+        anchor=2(A), ins='A'. ins[-1]='A' == ref[2]='A' -> ins='A', anchor=1
+        anchor=1(A), ins='A'. ins[-1]='A' == ref[1]='A' -> ins='A', anchor=0
+        anchor=0(T), ins='A'. ins[-1]='A' != ref[0]='T' -> stop.
+        """
+        rp, rs = _simple_ref("TAAAC")
+        anchor, ins = vcf._left_normalize_insertion(3, "A", rp, rs)
+        assert anchor == 0
+        assert ins == "A"
+
+    def test_trinucleotide_repeat(self):
+        """GATGATGATC: inserting 'GAT' at anchor pos 8 (T). Shifts to anchor 0.
+
+        anchor=8(T), ins='GAT'. ins[-1]='T' == ref[8]='T' -> ins='T'+'GA'='TGA', anchor=7
+        anchor=7(A), ins='TGA'. ins[-1]='A' == ref[7]='A' -> ins='A'+'TG'='ATG', anchor=6
+        anchor=6(G), ins='ATG'. ins[-1]='G' == ref[6]='G' -> ins='G'+'AT'='GAT', anchor=5
+        anchor=5(T), ins='GAT'. ins[-1]='T' == ref[5]='T' -> ins='T'+'GA'='TGA', anchor=4
+        anchor=4(A), ins='TGA'. ins[-1]='A' == ref[4]='A' -> ins='A'+'TG'='ATG', anchor=3
+        anchor=3(G), ins='ATG'. ins[-1]='G' == ref[3]='G' -> ins='G'+'AT'='GAT', anchor=2
+        anchor=2(T), ins='GAT'. ins[-1]='T' == ref[2]='T' -> ins='T'+'GA'='TGA', anchor=1
+        anchor=1(A), ins='TGA'. ins[-1]='A' == ref[1]='A' -> ins='A'+'TG'='ATG', anchor=0
+        anchor=0, stop.
+        """
+        rp, rs = _simple_ref("GATGATGATC")
+        anchor, ins = vcf._left_normalize_insertion(8, "GAT", rp, rs)
+        assert anchor == 0
+        assert ins == "ATG"
+
+
+# ----------------------------- _edits_from_insertions left-normalization ---------------------
+
+
+def _make_insertion_row(amplicon, anchor_ref_pos, ins_bases, reads=1):
+    """Build a minimal allele-row dict for an insertion-only read.
+
+    Constructs a synthetic aligned sequence with the insertion spliced in,
+    and computes ref_positions with -1 entries for inserted bases.
+    """
+    ref_positions = []
+    aligned_ref = []
+    aligned_read = []
+
+    for ref_pos in range(len(amplicon)):
+        ref_positions.append(ref_pos)
+        aligned_ref.append(amplicon[ref_pos])
+        aligned_read.append(amplicon[ref_pos])
+
+        if ref_pos == anchor_ref_pos:
+            aligned_start = len(aligned_read)
+            for base in ins_bases:
+                ref_positions.append(-1)
+                aligned_ref.append("-")
+                aligned_read.append(base)
+
+    return {
+        "ref_positions": ref_positions,
+        "Reference_Sequence": "".join(aligned_ref),
+        "Aligned_Sequence": "".join(aligned_read),
+        "#Reads": reads,
+        "n_deleted": 0,
+        "n_inserted": len(ins_bases),
+        "n_mutated": 0,
+        "deletion_coordinates": [],
+        "deletion_sizes": [],
+        "Reference_Name": "Reference",
+        "insertion_coordinates": [(anchor_ref_pos, aligned_start)],
+        "insertion_sizes": [len(ins_bases)],
+        "substitution_positions": [],
+    }
+
+
+def test_insertion_left_normalization_homopolymer():
+    """Inserting 'C' at anchor pos 3 in ACCCG should left-normalize to anchor pos 0.
+
+    VCF before normalization: POS=4, REF=C, ALT=CC
+    VCF after normalization:  POS=1, REF=A, ALT=AC
+    """
+    row = _make_insertion_row("ACCCG", 3, "C")
+    edits = list(vcf._edits_from_insertions(row, "chr1", 1))
+    assert len(edits) == 1
+    chrom, vcf_pos, ref, alt, reads = edits[0]
+    assert chrom == "chr1"
+    assert vcf_pos == 1, f"Expected left-normalized VCF pos 1, got {vcf_pos}"
+    assert ref == "A", f"Expected REF=A, got {ref}"
+    assert alt == "AC", f"Expected ALT=AC, got {alt}"
+
+
+def test_insertion_no_normalization_needed():
+    """Inserting 'T' at anchor pos 2 in ACGT: no shift (T != G)."""
+    row = _make_insertion_row("ACGT", 2, "T")
+    edits = list(vcf._edits_from_insertions(row, "chr1", 1))
+    assert len(edits) == 1
+    chrom, vcf_pos, ref, alt, reads = edits[0]
+    assert vcf_pos == 3
+    assert ref == "G"
+    assert alt == "GT"
+
+
+def test_insertion_left_normalization_dinucleotide():
+    """Inserting 'AC' at anchor pos 3 in ACACG should left-normalize to anchor pos 0.
+
+    VCF before: POS=4, REF=C, ALT=CAC
+    VCF after:  POS=1, REF=A, ALT=ACA
+    """
+    row = _make_insertion_row("ACACG", 3, "AC")
+    edits = list(vcf._edits_from_insertions(row, "chr1", 1))
+    assert len(edits) == 1
+    chrom, vcf_pos, ref, alt, reads = edits[0]
+    assert vcf_pos == 1, f"Expected left-normalized VCF pos 1, got {vcf_pos}"
+    assert ref == "A", f"Expected REF=A, got {ref}"
+    assert alt == "ACA", f"Expected ALT=ACA, got {alt}"
+
+
 # ----------------------------- _edits_from_deletions left-normalization ----------------------
 
 # The FANC amplicon used in integration tests

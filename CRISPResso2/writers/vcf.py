@@ -69,6 +69,41 @@ def _edits_from_deletions(row, chrom, pos):
         yield (chrom, left_index, ref_seq, alt_seq, reads)
 
 
+def _left_normalize_insertion(anchor_ref_pos, ins_bases, ref_positions, ref_str):
+    """Left-normalize an insertion so the VCF record is leftmost-aligned.
+
+    The aligner may right-shift insertions in repetitive regions. VCF spec
+    requires the leftmost representation. This rotates the inserted bases
+    and shifts the anchor position left while the last inserted base equals
+    the base at the current anchor position.
+
+    Parameters
+    ----------
+    anchor_ref_pos : int
+        0-based reference position of the anchor base (the base immediately
+        before the inserted sequence in VCF representation).
+    ins_bases : str
+        The inserted bases.
+    ref_positions : list of int
+        Mapping from alignment index to reference position.
+    ref_str : str
+        The aligned reference sequence.
+
+    Returns
+    -------
+    (int, str)
+        Left-normalized (anchor_ref_pos, ins_bases).
+    """
+    while anchor_ref_pos > 0:
+        anchor_idx = ref_positions.index(anchor_ref_pos)
+        if ins_bases[-1] == ref_str[anchor_idx]:
+            ins_bases = ref_str[anchor_idx] + ins_bases[:-1]
+            anchor_ref_pos -= 1
+        else:
+            break
+    return anchor_ref_pos, ins_bases
+
+
 def _edits_from_insertions(row, chrom, pos):
     """Yield (chrom, vcf_pos, ref, alt, reads) for each insertion in the row.
 
@@ -85,18 +120,21 @@ def _edits_from_insertions(row, chrom, pos):
     ref_len = max(p for p in ref_positions if p >= 0) + 1
 
     for i, (right_anchor_ref_pos, aligned_start) in enumerate(coords):
-        left_index = pos + right_anchor_ref_pos
-
         size = sizes[i] if i < len(sizes) else 0
         ins_bases = aln_str[aligned_start:aligned_start + size]
 
         # Anchor base: normally at right_anchor_ref_pos;
         # for inserts after the last base, anchor to the last base.
         if right_anchor_ref_pos == ref_len and ref_len > 0:
-            ref_char_idx = ref_positions.index(ref_len - 1)
+            anchor_ref_pos = ref_len - 1
         else:
-            ref_char_idx = ref_positions.index(right_anchor_ref_pos)
+            anchor_ref_pos = right_anchor_ref_pos
 
+        anchor_ref_pos, ins_bases = _left_normalize_insertion(
+            anchor_ref_pos, ins_bases, ref_positions, ref_str,
+        )
+        left_index = pos + anchor_ref_pos
+        ref_char_idx = ref_positions.index(anchor_ref_pos)
         anchor = ref_str[ref_char_idx]
         yield (chrom, left_index, anchor, anchor + ins_bases, reads)
 
