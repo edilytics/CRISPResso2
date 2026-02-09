@@ -10,6 +10,11 @@ import pytest
 ALN_MATRIX = CRISPResso2Align.read_matrix("./CRISPResso2/EDNAFULL")
 
 
+# =============================================================================
+# Tests for get_mismatches function
+# =============================================================================
+
+
 def test_get_mismatches():
     """Test get_mismatches function."""
     mismatch_cords = CRISPRessoShared.get_mismatches(
@@ -32,11 +37,21 @@ def test_get_mismatches():
     assert len(mismatch_cords) == expected_mismatch_count
 
 
+# =============================================================================
+# Tests for get_relative_coordinates function
+# =============================================================================
+
+
 def test_get_relative_coordinates():
     """Test get_relative_coordinates function."""
     s1inds_gap_left, s1inds_gap_right = CRISPRessoShared.get_relative_coordinates("ATCGT", "TTCGT")
     assert s1inds_gap_left == [0, 1, 2, 3, 4]
     assert s1inds_gap_right == [0, 1, 2, 3, 4]
+
+
+# =============================================================================
+# Tests for get_n_reads_fastq function
+# =============================================================================
 
 
 def test_get_n_reads_fastq():
@@ -163,6 +178,11 @@ def test_get_n_reads_fastq_empty_file():
     os.remove(f.name)
 
 
+# =============================================================================
+# Tests for get_relative_coordinates function - gap handling
+# =============================================================================
+
+
 def test_get_relative_coordinates_to_gap():
     """Test get_relative_coordinates with gap in to_sequence."""
     # unaligned sequences
@@ -218,6 +238,11 @@ def test_get_relative_coordinates_ind_and_dels():
     assert s1inds_gap_right == [0, 2, 3, 3, 3]
 
 
+# =============================================================================
+# Tests for get_quant_window_ranges_from_include_idxs function
+# =============================================================================
+
+
 def test_get_quant_window_ranges_from_include_idxs():
     """Test get_quant_window_ranges_from_include_idxs function."""
     include_idxs = [0, 1, 2, 10, 11, 12]
@@ -246,6 +271,11 @@ def test_get_quant_window_ranges_from_include_idxs_multiple_gaps():
     """Test get_quant_window_ranges_from_include_idxs with multiple gaps."""
     include_idxs = [50, 51, 52, 53, 55, 56, 57, 58, 60]
     assert CRISPRessoShared.get_quant_window_ranges_from_include_idxs(include_idxs) == [(50, 53), (55, 58), (60, 60)]
+
+
+# =============================================================================
+# Tests for get_silent_edits function
+# =============================================================================
 
 
 def test_get_silent_edits():
@@ -690,14 +720,13 @@ def test_clean_filename_slashes():
 def test_clean_filename_special_chars():
     """Test clean_filename removes special characters."""
     result = CRISPRessoShared.clean_filename("file<>name")
-    assert "<" not in result
-    assert ">" not in result
+    assert result == "file_name"
 
 
 def test_clean_filename_colons():
     """Test clean_filename handles colons."""
     result = CRISPRessoShared.clean_filename("file:name:test")
-    assert ":" not in result
+    assert result == "file_name_test"
 
 
 def test_clean_filename_already_clean():
@@ -730,23 +759,11 @@ def test_clean_filename_hyphens():
 # =============================================================================
 
 
-def test_get_crispresso_logo_returns_string():
-    """Test get_crispresso_logo returns a string."""
+def test_get_crispresso_logo():
+    """Test get_crispresso_logo returns the expected ASCII art."""
     logo = CRISPRessoShared.get_crispresso_logo()
-    assert isinstance(logo, str)
-
-
-def test_get_crispresso_logo_is_ascii_art():
-    """Test get_crispresso_logo returns ASCII art."""
-    logo = CRISPRessoShared.get_crispresso_logo()
-    # Logo contains ASCII art with backslashes
-    assert "\\" in logo or "/" in logo
-
-
-def test_get_crispresso_logo_non_empty():
-    """Test get_crispresso_logo returns non-empty string."""
-    logo = CRISPRessoShared.get_crispresso_logo()
-    assert len(logo) > 0
+    assert "C)|" in logo
+    assert "\\___/" in logo
 
 
 # =============================================================================
@@ -754,16 +771,10 @@ def test_get_crispresso_logo_non_empty():
 # =============================================================================
 
 
-def test_get_crispresso_footer_returns_string():
-    """Test get_crispresso_footer returns a string."""
+def test_get_crispresso_footer():
+    """Test get_crispresso_footer returns footer with expected ASCII art."""
     footer = CRISPRessoShared.get_crispresso_footer()
-    assert isinstance(footer, str)
-
-
-def test_get_crispresso_footer_non_empty():
-    """Test get_crispresso_footer returns non-empty string."""
-    footer = CRISPRessoShared.get_crispresso_footer()
-    assert len(footer) > 0
+    assert "\\___/" in footer
 
 
 # =============================================================================
@@ -771,23 +782,10 @@ def test_get_crispresso_footer_non_empty():
 # =============================================================================
 
 
-def test_get_crispresso_header_returns_string():
-    """Test get_crispresso_header returns a string."""
-    header = CRISPRessoShared.get_crispresso_header("Test Description", "Test Header")
-    assert isinstance(header, str)
-
-
-def test_get_crispresso_header_non_empty():
-    """Test get_crispresso_header is non-empty."""
-    header = CRISPRessoShared.get_crispresso_header("Description", "Header")
-    assert len(header) > 0
-
-
-def test_get_crispresso_header_contains_header_str():
-    """Test get_crispresso_header contains header string."""
-    header_str = "MyHeader"
-    header = CRISPRessoShared.get_crispresso_header("Desc", header_str)
-    assert header_str in header
+def test_get_crispresso_header():
+    """Test get_crispresso_header contains the provided header string."""
+    header = CRISPRessoShared.get_crispresso_header("Desc", "MyHeader")
+    assert "MyHeader" in header
 
 
 # =============================================================================
@@ -796,24 +794,23 @@ def test_get_crispresso_header_contains_header_str():
 
 
 def test_format_cl_text_basic():
-    """Test format_cl_text with basic text."""
+    """Test format_cl_text returns text unchanged when short."""
     result = CRISPRessoShared.format_cl_text("test text")
-    assert isinstance(result, str)
+    assert result == "test text"
 
 
 def test_format_cl_text_with_max_chars():
-    """Test format_cl_text respects max_chars parameter."""
+    """Test format_cl_text wraps long text with newlines."""
     long_text = "a" * 200
     result = CRISPRessoShared.format_cl_text(long_text, max_chars=50)
-    # Result should have newlines if text was wrapped
-    assert isinstance(result, str)
+    assert "\n" in result
 
 
 def test_format_cl_text_converts_spaces_to_tabs():
     """Test format_cl_text handles spaces to tab conversion."""
     text = "    indented"
     result = CRISPRessoShared.format_cl_text(text, spaces_to_tab=4)
-    assert isinstance(result, str)
+    assert result == "    indented"
 
 
 def test_format_cl_text_empty():
@@ -827,10 +824,10 @@ def test_format_cl_text_empty():
 # =============================================================================
 
 
-def test_is_C2Pro_installed_returns_bool():
-    """Test is_C2Pro_installed returns boolean."""
+def test_is_C2Pro_installed():
+    """Test is_C2Pro_installed returns False when C2Pro is not installed."""
     result = CRISPRessoShared.is_C2Pro_installed()
-    assert isinstance(result, bool)
+    assert result is False
 
 
 # =============================================================================
@@ -914,23 +911,10 @@ def test_check_output_folder_invalid_raises():
 # =============================================================================
 
 
-def test_read_version_returns_string():
-    """Test read_version returns a string."""
+def test_read_version():
+    """Test read_version returns a valid version string."""
     version = CRISPRessoShared.read_version()
-    assert isinstance(version, str)
-
-
-def test_read_version_non_empty():
-    """Test read_version returns non-empty string."""
-    version = CRISPRessoShared.read_version()
-    assert len(version) > 0
-
-
-def test_read_version_format():
-    """Test read_version returns version-like string."""
-    version = CRISPRessoShared.read_version()
-    # Version should contain at least one number
-    assert any(char.isdigit() for char in version)
+    assert version == "2.3.3"
 
 
 # =============================================================================
@@ -1001,7 +985,7 @@ def test_get_command_output_can_iterate():
     """Test get_command_output output can be iterated."""
     result = CRISPRessoShared.get_command_output("echo test")
     output = list(result)
-    assert isinstance(output, list)
+    assert output[0] == "test\n"
 
 
 # =============================================================================
@@ -1444,15 +1428,13 @@ def test_find_wrong_nt_numbers():
 def test_slugify_unicode():
     """Test slugify with unicode characters."""
     result = CRISPRessoShared.slugify("tëst_sàmple")
-    # Should normalize unicode
-    assert isinstance(result, str)
-    assert "_" in result or "test" in result.lower()
+    assert result == "test_sample"
 
 
 def test_clean_filename_pipe():
     """Test clean_filename handles pipe character."""
     result = CRISPRessoShared.clean_filename("file|name")
-    assert "|" not in result
+    assert result == "file_name"
 
 
 def test_unexplode_cigar_soft_clip():
@@ -1722,12 +1704,23 @@ def test_unexplode_cigar_alternating():
 def test_check_custom_config_none():
     """Test check_custom_config with None returns defaults."""
     result = CRISPRessoShared.check_custom_config(None)
-    assert isinstance(result, dict)
     assert "colors" in result
+    assert "guardrails" in result
 
 
-def test_check_custom_config_returns_colors():
-    """Test check_custom_config returns color configuration."""
+def test_check_custom_config_returns_default_colors():
+    """Test check_custom_config returns default color configuration."""
     result = CRISPRessoShared.check_custom_config(None)
-    colors = result.get("colors", {})
-    assert isinstance(colors, dict)
+    colors = result["colors"]
+    assert colors == {
+        "Substitution": "#0000FF",
+        "Insertion": "#008000",
+        "Deletion": "#FF0000",
+        "A": "#7FC97F",
+        "T": "#BEAED4",
+        "C": "#FDC086",
+        "G": "#FFFF99",
+        "N": "#C8C8C8",
+        "-": "#1E1E1E",
+        "amino_acid_scheme": "unique",
+    }

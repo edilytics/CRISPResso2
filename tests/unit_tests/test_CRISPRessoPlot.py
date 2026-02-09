@@ -169,9 +169,7 @@ def test_hex_to_rgb_gray():
 def test_amino_acids_to_numbers_basic():
     """Test amino_acids_to_numbers with basic sequence."""
     result = CRISPRessoPlot.amino_acids_to_numbers("MA")
-    assert len(result) == 2
-    assert isinstance(result[0], int)
-    assert isinstance(result[1], int)
+    assert result == [11, 1]
 
 
 def test_amino_acids_to_numbers_stop():
@@ -184,16 +182,14 @@ def test_amino_acids_to_numbers_stop():
 def test_amino_acids_to_numbers_gap():
     """Test amino_acids_to_numbers with gap."""
     result = CRISPRessoPlot.amino_acids_to_numbers("-")
-    assert len(result) == 1
+    assert result == [22]
 
 
 def test_amino_acids_to_numbers_all_standard():
     """Test amino_acids_to_numbers with all standard amino acids."""
     all_aa = "ACDEFGHIKLMNPQRSTVWY"
     result = CRISPRessoPlot.amino_acids_to_numbers(all_aa)
-    assert len(result) == 20
-    # All should be unique numbers
-    assert len(set(result)) == 20
+    assert result == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 
 
 def test_amino_acids_to_numbers_empty():
@@ -250,8 +246,10 @@ def test_get_amino_acid_colors_basic():
 
 def test_setMatplotlibDefaults_no_error():
     """Test that setMatplotlibDefaults runs without error."""
-    # Should not raise any exception
+    import matplotlib
     CRISPRessoPlot.setMatplotlibDefaults()
+    # Verify it actually changed matplotlib settings
+    assert matplotlib.rcParams['font.size'] != 0
 
 
 # =============================================================================
@@ -260,17 +258,9 @@ def test_setMatplotlibDefaults_no_error():
 
 
 def test_get_rows_for_sgRNA_annotation_empty():
-    """Test get_rows_for_sgRNA_annotation with no sgRNA intervals raises or returns empty."""
-    import numpy as np
-    sgRNA_intervals = []
-    amp_len = 100
-    # Function may raise ValueError on empty input or return empty array
-    try:
-        result = CRISPRessoPlot.get_rows_for_sgRNA_annotation(sgRNA_intervals, amp_len)
-        assert len(result) == 0
-    except ValueError:
-        # Empty intervals may cause max() to fail, which is acceptable behavior
-        pass
+    """Test get_rows_for_sgRNA_annotation raises ValueError with empty intervals."""
+    with pytest.raises(ValueError):
+        CRISPRessoPlot.get_rows_for_sgRNA_annotation([], 100)
 
 
 def test_get_rows_for_sgRNA_annotation_single():
@@ -379,93 +369,6 @@ def test_prep_alleles_table_with_insertions():
     assert len(insertion_dict[0]) > 0
 
 
-# =============================================================================
-# Tests for plot utility functions - smoke tests
-# =============================================================================
-
-
-def test_plot_nucleotide_quilt_creates_figure():
-    """Test plot_nucleotide_quilt creates a figure without error."""
-    import pandas as pd
-    import numpy as np
-    import tempfile
-    import os
-
-    # Create minimal nucleotide percentage dataframe
-    nuc_pct_df = pd.DataFrame({
-        'Batch': ['Sample1'] * 6,
-        'Nucleotide': ['A', 'T', 'C', 'G', 'N', '-'],
-        'pos1': [0.9, 0.05, 0.02, 0.02, 0.01, 0.0],
-        'pos2': [0.1, 0.8, 0.05, 0.04, 0.01, 0.0],
-        'pos3': [0.05, 0.05, 0.85, 0.04, 0.01, 0.0],
-        'pos4': [0.02, 0.02, 0.02, 0.93, 0.01, 0.0],
-    })
-
-    mod_pct_df = pd.DataFrame({
-        'Batch': ['Sample1'],
-        'Insertions_Left': [0.0],
-        'pos1': [0.0],
-        'pos2': [0.0],
-        'pos3': [0.0],
-        'pos4': [0.0],
-    })
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        fig_root = os.path.join(tmpdir, "test_quilt")
-        # This should not raise an error
-        try:
-            CRISPRessoPlot.plot_nucleotide_quilt(
-                nuc_pct_df,
-                mod_pct_df,
-                fig_filename_root=fig_root,
-                save_also_png=False
-            )
-            # Check that PDF was created
-            assert os.path.exists(fig_root + ".pdf")
-        except Exception as e:
-            # Some plots may require more data, that's ok for smoke test
-            pass
-
-
-def test_plot_indel_size_distribution_smoke():
-    """Smoke test for plot_indel_size_distribution."""
-    import tempfile
-    import os
-    import numpy as np
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        fig_root = os.path.join(tmpdir, "test_indel")
-        try:
-            CRISPRessoPlot.plot_indel_size_distribution(
-                count_indels_arr=np.array([100, 50, 20, 10, 5, 2]),
-                ref_name="TestRef",
-                fig_filename_root=fig_root,
-                save_also_png=False
-            )
-        except Exception:
-            # Function may have different signature, that's ok
-            pass
-
-
-def test_plot_read_barplot_smoke():
-    """Smoke test for plot_read_barplot."""
-    import tempfile
-    import os
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        fig_root = os.path.join(tmpdir, "test_barplot")
-        try:
-            CRISPRessoPlot.plot_read_barplot(
-                N_READS_INPUT=10000,
-                N_READS_AFTER_PREPROCESSING=9500,
-                N_TOTAL=9000,
-                n_this_category=8500,
-                category_name="Aligned",
-                fig_filename_root=fig_root,
-                save_also_png=False
-            )
-        except Exception:
-            pass
 
 
 # =============================================================================
@@ -692,55 +595,6 @@ def test_get_color_lookup_preserves_all_nucleotides():
         assert colors[nuc][3] == 0.5  # Alpha should be 0.5
 
 
-# =============================================================================
-# Tests for plot functions with minimal data - smoke tests
-# =============================================================================
-
-
-def test_plot_class_piechart_and_barplot_smoke():
-    """Smoke test for plot_class_piechart_and_barplot."""
-    import tempfile
-    import os
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        fig_root = os.path.join(tmpdir, "test_pie")
-        try:
-            CRISPRessoPlot.plot_class_piechart_and_barplot(
-                class_counts_order=["Modified", "Unmodified", "Ambiguous"],
-                class_counts={"Modified": 100, "Unmodified": 800, "Ambiguous": 100},
-                expected_hdr_class_name=None,
-                N_TOTAL=1000,
-                N_UNMODIFIED=800,
-                N_MODIFIED=100,
-                N_AMBIGUOUS=100,
-                fig_filename_root=fig_root,
-                save_also_png=False
-            )
-        except Exception:
-            # Function may need different parameters
-            pass
-
-
-def test_plot_conversion_map_smoke():
-    """Smoke test for plot_conversion_map."""
-    import tempfile
-    import os
-    import numpy as np
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        fig_root = os.path.join(tmpdir, "test_conversion")
-        # Create minimal conversion data
-        nuc_indices = {'A': 0, 'T': 1, 'C': 2, 'G': 3}
-
-        try:
-            CRISPRessoPlot.plot_conversion_map(
-                nuc_indices=nuc_indices,
-                conversion_matrix=np.zeros((4, 4)),
-                fig_filename_root=fig_root,
-                save_also_png=False
-            )
-        except Exception:
-            pass
 
 
 # =============================================================================
@@ -772,111 +626,10 @@ def test_get_amino_acid_color_dict_something_scheme():
     assert '*' in colors
 
 
-# =============================================================================
-# Tests for plot_frequency_deletions_insertions
-# =============================================================================
 
 
-def test_plot_frequency_deletions_insertions_smoke():
-    """Smoke test for plot_frequency_deletions_insertions."""
-    import tempfile
-    import os
-    import numpy as np
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        fig_root = os.path.join(tmpdir, "test_freq")
-
-        ref_data = {
-            'y_values_mut': [10, 5, 2, 1],
-            'x_bins_mut': [0, 1, 2, 3],
-            'y_values_ins': [5, 3, 1, 0],
-            'x_bins_ins': [0, 1, 2, 3],
-            'y_values_del': [8, 4, 2, 1],
-            'x_bins_del': [0, 1, 2, 3],
-        }
-
-        try:
-            CRISPRessoPlot.plot_frequency_deletions_insertions(
-                ref_data,
-                plot_path=fig_root,
-                counts_total=100,
-                xmax_ins=5,
-                xmax_del=5,
-                xmax_mut=5,
-                plot_titles={
-                    'ins': 'Insertions',
-                    'del': 'Deletions',
-                    'mut': 'Substitutions'
-                },
-                save_also_png=False
-            )
-            assert os.path.exists(fig_root + ".pdf")
-        except Exception as e:
-            # Some parameter issues are OK for smoke tests
-            pass
 
 
-# =============================================================================
-# Tests for plot_alleles_heatmap
-# =============================================================================
-
-
-def test_plot_alleles_heatmap_smoke():
-    """Smoke test for plot_alleles_heatmap."""
-    import tempfile
-    import os
-    import numpy as np
-    import pandas as pd
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        fig_root = os.path.join(tmpdir, "test_alleles")
-
-        # Create minimal data
-        reference_seq = "ATCG"
-        X = [[1, 2, 3, 4], [1, 2, 3, 4]]  # DNA to numbers
-        annot = [['A', 'T', 'C', 'G'], ['A', 'T', 'G', 'G']]  # Annotations
-        y_labels = ["50% (500)", "30% (300)"]
-
-        try:
-            CRISPRessoPlot.plot_alleles_heatmap(
-                reference_seq=reference_seq,
-                fig_filename_root=fig_root,
-                X=np.array(X),
-                annot=np.array(annot),
-                y_labels=y_labels,
-                insertion_dict={},
-                per_element_annot_kws=np.array([[{}]*4, [{}]*4]),
-                SAVE_ALSO_PNG=False,
-            )
-        except Exception:
-            pass
-
-
-# =============================================================================
-# Tests for plot_scaffold_indel_pie
-# =============================================================================
-
-
-def test_plot_scaffold_incorporated_pie_smoke():
-    """Smoke test for scaffold incorporated pie plot."""
-    import tempfile
-    import os
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        fig_root = os.path.join(tmpdir, "test_scaffold")
-
-        try:
-            CRISPRessoPlot.plot_scaffold_indel_pie(
-                insertion_count=100,
-                deletion_count=50,
-                mixed_count=20,
-                ref_name="Reference",
-                fig_filename_root=fig_root,
-                save_also_png=False
-            )
-        except (TypeError, AttributeError):
-            # Function may not exist or have different signature
-            pass
 
 
 # =============================================================================
@@ -926,45 +679,6 @@ def test_custom_heatmapper_with_mask():
     )
     # mask might be stored differently - just verify mapper was created
     assert mapper is not None
-
-
-# =============================================================================
-# Tests for plot_modification_frequency
-# =============================================================================
-
-
-def test_plot_modification_frequency_smoke():
-    """Smoke test for plot_modification_frequency type function."""
-    import tempfile
-    import os
-    import numpy as np
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        fig_root = os.path.join(tmpdir, "test_mod_freq")
-
-        try:
-            # The actual function name might differ
-            CRISPRessoPlot.plot_amplicon_modifications(
-                all_indelsub_count_vectors=np.zeros(100),
-                include_idxs_list=list(range(20, 80)),
-                cut_points=[50],
-                plot_cut_points=[True],
-                sgRNA_intervals=[(40, 60)],
-                n_total=1000,
-                n_this_category=800,
-                ref_name="Reference",
-                num_refs=1,
-                ref_len=100,
-                y_max=100,
-                plot_titles={
-                    'main': 'Modification frequency',
-                    'combined': 'All modifications'
-                },
-                plot_root=fig_root,
-                save_also_png=False
-            )
-        except Exception:
-            pass
 
 
 # =============================================================================
@@ -1063,3 +777,243 @@ def test_amino_acids_to_numbers_empty():
     """Test amino_acids_to_numbers with empty string."""
     result = CRISPRessoPlot.amino_acids_to_numbers("")
     assert result == []
+
+
+# =============================================================================
+# Tests for plot functions - file creation verification
+# =============================================================================
+
+
+def test_plot_nucleotide_quilt():
+    """Test plot_nucleotide_quilt creates a PDF with valid data."""
+    import pandas as pd
+    import numpy as np
+    import tempfile
+    import os
+
+    # Column names at positions 2+ are used as the reference sequence
+    nuc_pct_df = pd.DataFrame({
+        'Batch': ['Sample1'] * 6,
+        'Nucleotide': ['A', 'T', 'C', 'G', 'N', '-'],
+        'A': [0.9, 0.05, 0.02, 0.02, 0.01, 0.0],
+        'T': [0.1, 0.8, 0.05, 0.04, 0.01, 0.0],
+        'C': [0.05, 0.05, 0.85, 0.04, 0.01, 0.0],
+        'G': [0.02, 0.02, 0.02, 0.93, 0.01, 0.0],
+    })
+    mod_pct_df = pd.DataFrame({
+        'Batch': ['Sample1', 'Sample1'],
+        'Modification': ['Insertions_Left', 'Insertions'],
+        'A': [0.0, 0.0],
+        'T': [0.0, 0.0],
+        'C': [0.0, 0.0],
+        'G': [0.0, 0.0],
+    })
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fig_root = os.path.join(tmpdir, "test_quilt")
+        CRISPRessoPlot.plot_nucleotide_quilt(
+            nuc_pct_df,
+            mod_pct_df,
+            fig_filename_root=fig_root,
+            save_also_png=False,
+        )
+        assert os.path.exists(fig_root + ".pdf")
+
+
+def test_plot_indel_size_distribution():
+    """Test plot_indel_size_distribution creates a PDF with valid data."""
+    import numpy as np
+    import tempfile
+    import os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        plot_root = os.path.join(tmpdir, "test_indel")
+        CRISPRessoPlot.plot_indel_size_distribution(
+            hdensity=np.array([100, 50, 20, 10, 5]),
+            hlengths=np.array([-2, -1, 0, 1, 2]),
+            center_index=2,
+            n_this_category=185,
+            xmin=-3,
+            xmax=3,
+            title="Indel Size Distribution",
+            plot_root=plot_root,
+            save_also_png=False,
+        )
+        assert os.path.exists(plot_root + ".pdf")
+
+
+def test_plot_read_barplot():
+    """Test plot_read_barplot creates a PDF with valid data."""
+    import tempfile
+    import os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fig_root = os.path.join(tmpdir, "test_barplot")
+        CRISPRessoPlot.plot_read_barplot(
+            N_READS_INPUT=10000,
+            N_READS_AFTER_PREPROCESSING=9500,
+            N_TOTAL=9000,
+            fig_filename_root=fig_root,
+            save_png=False,
+        )
+        assert os.path.exists(fig_root + ".pdf")
+
+
+def test_plot_class_piechart_and_barplot():
+    """Test plot_class_piechart_and_barplot creates piechart and barplot PDFs."""
+    import tempfile
+    import os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        pie_root = os.path.join(tmpdir, "test_pie")
+        bar_root = os.path.join(tmpdir, "test_bar")
+        CRISPRessoPlot.plot_class_piechart_and_barplot(
+            class_counts_order=["Reference_MODIFIED", "Reference_UNMODIFIED"],
+            class_counts={
+                "Reference_MODIFIED": 200,
+                "Reference_UNMODIFIED": 800,
+            },
+            ref_names=["Reference"],
+            expected_hdr_amplicon_seq=None,
+            N_TOTAL=1000,
+            piechart_plot_root=pie_root,
+            barplot_plot_root=bar_root,
+            save_png=False,
+        )
+        assert os.path.exists(pie_root + ".pdf")
+        assert os.path.exists(bar_root + ".pdf")
+
+
+def test_plot_conversion_map():
+    """Test plot_conversion_map creates a PDF with valid data."""
+    import pandas as pd
+    import tempfile
+    import os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fig_root = os.path.join(tmpdir, "test_conversion")
+        nuc_pct_df = pd.DataFrame({
+            'Batch': ['Sample1'] * 4,
+            'Nucleotide': ['A', 'T', 'C', 'G'],
+            'A': [0.90, 0.05, 0.03, 0.02],
+            'C': [0.05, 0.05, 0.85, 0.05],
+            'G': [0.02, 0.05, 0.02, 0.91],
+        })
+        CRISPRessoPlot.plot_conversion_map(
+            nuc_pct_df=nuc_pct_df,
+            conversion_nuc_from='C',
+            conversion_nuc_to='A',
+            fig_filename_root=fig_root,
+            save_also_png=False,
+        )
+        assert os.path.exists(fig_root + ".pdf")
+
+
+def test_plot_conversion_map_nuc_not_found():
+    """Test plot_conversion_map returns early when from-nucleotide is not in the sequence."""
+    import pandas as pd
+
+    nuc_pct_df = pd.DataFrame({
+        'Batch': ['Sample1'] * 4,
+        'Nucleotide': ['A', 'T', 'C', 'G'],
+        'A': [0.90, 0.05, 0.03, 0.02],
+        'T': [0.05, 0.85, 0.05, 0.05],
+        'C': [0.03, 0.05, 0.90, 0.02],
+    })
+    result = CRISPRessoPlot.plot_conversion_map(
+        nuc_pct_df=nuc_pct_df,
+        conversion_nuc_from='G',
+        conversion_nuc_to='A',
+    )
+    assert result == ()
+
+
+def test_plot_frequency_deletions_insertions():
+    """Test plot_frequency_deletions_insertions creates a PDF with valid data."""
+    import numpy as np
+    import tempfile
+    import os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        plot_path = os.path.join(tmpdir, "test_freq")
+        ref = {
+            'y_values_mut': np.array([10, 5, 2]),
+            'x_bins_mut': np.array([0, 1, 2]),
+            'y_values_ins': np.array([5, 3, 1]),
+            'x_bins_ins': np.array([0, 1, 2]),
+            'y_values_del': np.array([8, 4, 2]),
+            'x_bins_del': np.array([0, 1, 2]),
+        }
+        CRISPRessoPlot.plot_frequency_deletions_insertions(
+            ref=ref,
+            counts_total=100,
+            plot_titles={
+                'ins': 'Insertions',
+                'del': 'Deletions',
+                'mut': 'Substitutions',
+            },
+            plot_path=plot_path,
+            xmax_del=5,
+            xmax_ins=5,
+            xmax_mut=5,
+            save_also_png=False,
+        )
+        assert os.path.exists(plot_path + ".pdf")
+
+
+def test_plot_alleles_heatmap():
+    """Test plot_alleles_heatmap creates a PDF with valid data."""
+    import numpy as np
+    import tempfile
+    import os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fig_root = os.path.join(tmpdir, "test_alleles")
+        X = np.array([[1, 2, 3, 4], [1, 2, 4, 4]])
+        annot = np.array([['A', 'T', 'C', 'G'], ['A', 'T', 'G', 'G']])
+        per_element_annot_kws = np.array(
+            [[{}, {}, {}, {}], [{}, {}, {'weight': 'bold'}, {}]],
+            dtype=object,
+        )
+        CRISPRessoPlot.plot_alleles_heatmap(
+            reference_seq="ATCG",
+            X=X,
+            annot=annot,
+            y_labels=["50.0% (500)", "30.0% (300)"],
+            insertion_dict={},
+            per_element_annot_kws=per_element_annot_kws,
+            fig_filename_root=fig_root,
+            SAVE_ALSO_PNG=False,
+            plot_cut_point=False,
+        )
+        assert os.path.exists(fig_root + ".pdf")
+
+
+def test_plot_amplicon_modifications():
+    """Test plot_amplicon_modifications creates a PDF with valid data."""
+    import numpy as np
+    import tempfile
+    import os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        plot_root = os.path.join(tmpdir, "test_amp_mod")
+        CRISPRessoPlot.plot_amplicon_modifications(
+            all_indelsub_count_vectors=np.zeros(20),
+            include_idxs_list=list(range(5, 15)),
+            cut_points=[10],
+            plot_cut_points=[True],
+            sgRNA_intervals=[(7, 13)],
+            n_total=1000,
+            n_this_category=800,
+            ref_name="Reference",
+            num_refs=1,
+            ref_len=20,
+            y_max=100,
+            plot_titles={
+                'main': 'Modification Frequency',
+                'combined': 'All modifications',
+            },
+            plot_root=plot_root,
+            save_also_png=False,
+        )
+        assert os.path.exists(plot_root + ".pdf")

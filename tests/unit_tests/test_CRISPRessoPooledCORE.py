@@ -39,19 +39,19 @@ def test_calculate_aligned_samtools_exclude_flags_comma():
 def test_calculate_aligned_samtools_exclude_flags_large():
     """Test with large flag value."""
     result = CRISPRessoPooledCORE.calculate_aligned_samtools_exclude_flags("4096")
-    assert result is not None
+    assert result == "0x1900"
 
 
 def test_calculate_aligned_samtools_exclude_flags_multiple_commas():
     """Test with multiple comma-separated values."""
     result = CRISPRessoPooledCORE.calculate_aligned_samtools_exclude_flags("0,4,8")
-    assert "," in result
+    assert result == "0,4,8,0x900"
 
 
 def test_calculate_aligned_samtools_exclude_flags_hex_lowercase():
     """Test with lowercase hex prefix."""
     result = CRISPRessoPooledCORE.calculate_aligned_samtools_exclude_flags("0x10")
-    assert result is not None
+    assert result == "0x910"
 
 
 def test_calculate_aligned_samtools_exclude_flags_1():
