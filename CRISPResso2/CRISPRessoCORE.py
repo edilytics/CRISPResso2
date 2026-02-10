@@ -2833,9 +2833,6 @@ def main():
             if args.amplicon_coordinates == "":
                 raise CRISPRessoShared.BadParameterException('Please provide the coordinates of the VCF file using the --amplicon_coordinates parameter.')
 
-
-
-
         #### ASSERT GUIDE(S)
         guides = []
         if args.guide_seq:
