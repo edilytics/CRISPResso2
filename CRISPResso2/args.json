@@ -898,7 +898,7 @@
         },
         "vcf_output": {
             "keys": ["--vcf_output"],
-            "help": "Generate a VCF file that contains the edits that occur within the quantification window(s). This parameter requires `--amplicon_coordinates` to be provided.",
+            "help": "Generate a VCF file that contains the edits that occur within the quantification window(s). This parameter requires `--amplicon_coordinates` to be provided. Note: this implicitly enables `--write_detailed_allele_table`.",
             "action": "store_true",
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
