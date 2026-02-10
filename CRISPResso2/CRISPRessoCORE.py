@@ -497,6 +497,159 @@ def get_pe_scaffold_search(prime_edited_ref_sequence, prime_editing_pegRNA_exten
     info('Searching for scaffold-templated reads with the sequence: \'' + str(scaffold_dna[0:len_scaffold_to_use]) +'\' starting at position '+ str(scaffold_start_loc) + ' in reads that align to the prime-edited sequence')
     return (scaffold_start_loc, scaffold_dna[0:len_scaffold_to_use])
 
+
+def get_prime_editing_guides(this_amp_seq, ref0_seq, prime_editing_edited_amp_seq, prime_editing_pegRNA_extension_seq, prime_editing_extension_seq_dna, prime_editing_pegRNA_spacer_seq, prime_editing_nicking_guide_seq,
+                             prime_editing_pegRNA_extension_quantification_window_size, nicking_qw_center, nicking_qw_size, aln_matrix, needleman_wunsch_gap_open, needleman_wunsch_gap_extend, prime_editing_gap_open, prime_editing_gap_extend):
+    """
+    gets prime editing guide sequences for this amplicon
+    this_amp_seq : sequence of this amplicon
+    ref0_seq : sequence of the 0th amplicon (the wildtype amplicon)
+    prime_editing_edited_amp_seq : sequence of the edited amplicon
+    prime_editing_extension_seq : the extension sequence on the RNA strand
+    prime_editing_extension_seq_dna : the extension sequence on the DNA strand (usually reverse complement of the RNA strand)
+    prime_editing_pegRNA_spacer_seq : the spacer sequence of the pegRNA
+    prime_editing_nicking_guide_seq : the spacer sequence of the nicking guide
+    prime_editing_pegRNA_extension_quantification_window_size : qw size for extension sequence (starts at end of extension sequence)
+    nicking_qw_center: for the nicking guides, what is the quantification center (usually int(args.quantification_window_center.split(",")[0]))
+    nicking_qw_size: for the nicking guides, what is the quantification size (usually int(args.quantification_window_size.split(",")[0]))
+    aln_matrix: matrix specifying alignment substitution scores in the NCBI format
+    needleman_wunsch_gap_open: alignment penalty assignment used to determine similarity of two sequences.
+    needleman_wunsch_gap_extend: alignment penalty assignment used to determine similarity of two sequences.
+    prime_editing_gap_open: alignment penalty assignment used to determine similarity of two pegRNA components. For prime editing the gap open is usually larger while the extension penalty is lower/zero to accomodate insertions of large sequences.
+    prime_editing_gap_extend: alignment penalty assignment used to determine similarity of two pegRNA components
+    """
+    pe_guides = []
+    pe_orig_guide_seqs = []
+    pe_guide_mismatches = []
+    pe_guide_names = []
+    pe_guide_qw_centers = []
+    pe_guide_qw_sizes = []
+    pe_guide_plot_cut_points = []
+
+    #editing extension aligns to the prime-edited sequence only
+    #if this is the prime edited sequence, add it directly
+    if this_amp_seq == prime_editing_edited_amp_seq:
+        best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, prime_editing_edited_amp_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+        pe_guides.append(best_aln_seq)
+        pe_orig_guide_seqs.append(prime_editing_pegRNA_extension_seq)
+        pe_guide_mismatches.append(best_aln_mismatches)
+        pe_guide_names.append('PE Extension')
+        pe_guide_qw_centers.append(0)
+        pe_guide_qw_sizes.append(prime_editing_pegRNA_extension_quantification_window_size)
+        pe_guide_plot_cut_points.append(False)
+    #otherwise, clone the coordinates from the prime_editing_edited_amp_seq
+    else:
+        best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, prime_editing_edited_amp_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+        match = re.search(best_aln_seq, prime_editing_edited_amp_seq)
+        pe_start_loc = match.start()
+        pe_end_loc = match.end()
+        coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=this_amp_seq, from_sequence=prime_editing_edited_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+        new_seq = this_amp_seq[coords_l[pe_start_loc]:coords_r[pe_end_loc]]
+        pe_guides.append(new_seq)
+        pe_orig_guide_seqs.append(prime_editing_pegRNA_extension_seq)
+        rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=prime_editing_edited_amp_seq, from_sequence=this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+
+        this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(this_amp_seq, prime_editing_edited_amp_seq, pe_start_loc, pe_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
+        this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
+        pe_guide_mismatches.append(this_mismatches)
+
+        pe_guide_names.append('PE Extension')
+        pe_guide_qw_centers.append(0)
+        pe_guide_qw_sizes.append(prime_editing_pegRNA_extension_quantification_window_size)
+        pe_guide_plot_cut_points.append(False)
+
+
+    #now handle the pegRNA spacer seq
+    if prime_editing_pegRNA_spacer_seq == "":
+        raise CRISPRessoShared.BadParameterException('The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) is required for prime editing analysis.')
+    pegRNA_spacer_seq = prime_editing_pegRNA_spacer_seq.upper().replace('U', 'T')
+    wrong_nt=CRISPRessoShared.find_wrong_nt(pegRNA_spacer_seq)
+    if wrong_nt:
+        raise CRISPRessoShared.NTException('The prime editing pegRNA spacer sgRNA sequence contains bad characters:%s'  % ' '.join(wrong_nt))
+    if pegRNA_spacer_seq not in ref0_seq and CRISPRessoShared.reverse_complement(pegRNA_spacer_seq) not in ref0_seq:
+        raise CRISPRessoShared.BadParameterException('The given prime editing pegRNA spacer is not found in the reference sequence')
+
+    #spacer is found in the first amplicon (unmodified ref), may be modified in the other amplicons
+    #if this is the first sequence, add it directly
+    if this_amp_seq == ref0_seq:
+        best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(pegRNA_spacer_seq, ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+        pe_guides.append(best_aln_seq)
+        pe_orig_guide_seqs.append(prime_editing_pegRNA_spacer_seq)
+        pe_guide_mismatches.append(best_aln_mismatches)
+        pe_guide_names.append('PE spacer sgRNA')
+        pe_guide_qw_centers.append(nicking_qw_center)
+        pe_guide_qw_sizes.append(nicking_qw_size)
+        pe_guide_plot_cut_points.append(True)
+    #otherwise, clone the coordinates from the ref0 amplicon
+    else:
+        best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(pegRNA_spacer_seq, ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+        match = re.search(best_aln_seq, ref0_seq)
+        r0_start_loc = match.start()
+        r0_end_loc = match.end()
+        coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=this_amp_seq, from_sequence=ref0_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+        new_seq = this_amp_seq[coords_l[r0_start_loc]:coords_r[r0_end_loc]]
+        pe_guides.append(new_seq)
+        pe_orig_guide_seqs.append(prime_editing_pegRNA_spacer_seq)
+        rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=ref0_seq, from_sequence=this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+        this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(this_amp_seq, ref0_seq, r0_start_loc, r0_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
+        this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
+        pe_guide_mismatches.append(this_mismatches)
+
+        pe_guide_names.append('PE spacer sgRNA')
+        nicking_center_ref0 = r0_end_loc + nicking_qw_center #if there are indels in this amplicon between the end of the guide and the nicking center, adjust the center
+        nicking_center_this_amp_seq = rev_coords_r[nicking_center_ref0] - coords_r[r0_end_loc]
+        pe_guide_qw_centers.append(nicking_center_this_amp_seq)
+        pe_guide_qw_sizes.append(nicking_qw_size)
+        pe_guide_plot_cut_points.append(True)
+
+    #nicking guide
+    if prime_editing_nicking_guide_seq:
+        nicking_guide_seq = prime_editing_nicking_guide_seq.upper().replace('U', 'T')
+        wrong_nt=CRISPRessoShared.find_wrong_nt(nicking_guide_seq)
+        if wrong_nt:
+            raise CRISPRessoShared.NTException('The prime editing nicking sgRNA sequence contains bad characters:%s'  % ' '.join(wrong_nt))
+
+        #nicking guide is found in the reverse_complement of the first amplicon, may be modified in the other amplicons
+        if this_amp_seq == ref0_seq:
+            rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
+            best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+            if nicking_guide_seq not in rc_ref0_seq:
+                warn('The given prime editing nicking guide is not found in the reference sequence. Using the best match: ' + str(best_aln_seq))
+            pe_guides.append(best_aln_seq)
+            pe_orig_guide_seqs.append(prime_editing_nicking_guide_seq)
+            pe_guide_mismatches.append(best_aln_mismatches)
+            pe_guide_names.append('PE nicking sgRNA')
+            pe_guide_qw_centers.append(nicking_qw_center)
+            pe_guide_qw_sizes.append(nicking_qw_size)
+            pe_guide_plot_cut_points.append(True)
+        #otherwise, clone the coordinates from the ref0 amplicon
+        else:
+            rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
+            rc_this_amp_seq = CRISPRessoShared.reverse_complement(this_amp_seq)
+            best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+            match = re.search(best_aln_seq, rc_ref0_seq)
+            r0_start_loc = match.start()
+            r0_end_loc = match.end()
+            coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=rc_this_amp_seq, from_sequence=rc_ref0_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+            new_seq = rc_this_amp_seq[coords_l[r0_start_loc]:coords_r[r0_end_loc]]
+            pe_guides.append(new_seq)
+            pe_orig_guide_seqs.append(prime_editing_nicking_guide_seq)
+            rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=rc_ref0_seq, from_sequence=rc_this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+            this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(rc_this_amp_seq, rc_ref0_seq, r0_start_loc, r0_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
+            this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
+
+            pe_guide_mismatches.append(this_mismatches)
+            pe_guide_names.append('PE nicking sgRNA')
+            nicking_center_ref0 = r0_end_loc + nicking_qw_center
+            nicking_center_this_amp_seq = rev_coords_r[nicking_center_ref0] - coords_r[r0_end_loc]
+            pe_guide_qw_centers.append(nicking_center_this_amp_seq)
+            pe_guide_qw_sizes.append(nicking_qw_size)
+            pe_guide_plot_cut_points.append(True)
+
+    return(pe_guides, pe_orig_guide_seqs, pe_guide_mismatches, pe_guide_names, pe_guide_qw_centers, pe_guide_qw_sizes, pe_guide_plot_cut_points)
+#end prime editing guide function
+
+
 def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info):
     """
     Gets the payload object for a read that hasn't been seen in the cache yet
@@ -2949,157 +3102,6 @@ def main():
         if len(amplicon_seq_set) != len(amplicon_seq_arr):
             raise CRISPRessoShared.BadParameterException('Provided amplicon sequences must be unique!')
 
-
-
-        def get_prime_editing_guides(this_amp_seq, this_amp_name, ref0_seq, prime_edited_seq, prime_editing_extension_seq_dna, prime_editing_pegRNA_extension_quantification_window_size,
-                                     nicking_qw_center, nicking_qw_size,aln_matrix,needleman_wunsch_gap_open,needleman_wunsch_gap_extend, prime_editing_gap_open, prime_editing_gap_extend):
-            """
-            gets prime editing guide sequences for this amplicon
-            this_amp_seq : sequence of this amplicon
-            this_amp_name : name of this amplicon
-            ref0_seq : sequence of the 0th amplicon (the wildtype amplicon)
-            prime_editing_edited_amp_seq : sequence of the edited amplicon
-            prime_editing_extension_seq_dna : the extension sequence on the DNA strand
-            prime_editing_pegRNA_extension_quantification_window_size : qw size for extension sequence (starts at end of extension sequence)
-            nicking_qw_center: for the nicking guides, what is the quantification center (usually int(args.quantification_window_center.split(",")[0]))
-            nicking_qw_size: for the nicking guides, what is the quantification size (usually int(args.quantification_window_size.split(",")[0]))
-            aln_matrix: matrix specifying alignment substitution scores in the NCBI format
-            needleman_wunsch_gap_open: alignment penalty assignment used to determine similarity of two sequences.
-            needleman_wunsch_gap_extend: alignment penalty assignment used to determine similarity of two sequences.
-            prime_editing_gap_open: alignment penalty assignment used to determine similarity of two pegRNA components. For prime editing the gap open is usually larger while the extension penalty is lower/zero to accomodate insertions of large sequences.
-            prime_editing_gap_extend: alignment penalty assignment used to determine similarity of two pegRNA components
-            """
-            pe_guides = []
-            pe_orig_guide_seqs = []
-            pe_guide_mismatches = []
-            pe_guide_names = []
-            pe_guide_qw_centers = []
-            pe_guide_qw_sizes = []
-            pe_guide_plot_cut_points = []
-
-            #editing extension aligns to the prime-edited sequence only
-            #if this is the prime edited sequence, add it directly
-            if this_amp_seq == prime_editing_edited_amp_seq:
-                best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, prime_editing_edited_amp_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                pe_guides.append(best_aln_seq)
-                pe_orig_guide_seqs.append(args.prime_editing_pegRNA_extension_seq)
-                pe_guide_mismatches.append(best_aln_mismatches)
-                pe_guide_names.append('PE Extension')
-                pe_guide_qw_centers.append(0)
-                pe_guide_qw_sizes.append(prime_editing_pegRNA_extension_quantification_window_size)
-                pe_guide_plot_cut_points.append(False)
-            #otherwise, clone the coordinates from the prime_editing_edited_amp_seq
-            else:
-                best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, prime_editing_edited_amp_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                match = re.search(best_aln_seq, prime_editing_edited_amp_seq)
-                pe_start_loc = match.start()
-                pe_end_loc = match.end()
-                coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=this_amp_seq, from_sequence=prime_editing_edited_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                new_seq = this_amp_seq[coords_l[pe_start_loc]:coords_r[pe_end_loc]]
-                pe_guides.append(new_seq)
-                pe_orig_guide_seqs.append(args.prime_editing_pegRNA_extension_seq)
-                rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=prime_editing_edited_amp_seq, from_sequence=this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-
-                this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(this_amp_seq, prime_editing_edited_amp_seq, pe_start_loc, pe_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
-                this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
-                pe_guide_mismatches.append(this_mismatches)
-
-                pe_guide_names.append('PE Extension')
-                pe_guide_qw_centers.append(0)
-                pe_guide_qw_sizes.append(prime_editing_pegRNA_extension_quantification_window_size)
-                pe_guide_plot_cut_points.append(False)
-
-
-            #now handle the pegRNA spacer seq
-            if args.prime_editing_pegRNA_spacer_seq == "":
-                raise CRISPRessoShared.BadParameterException('The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) is required for prime editing analysis.')
-            pegRNA_spacer_seq = args.prime_editing_pegRNA_spacer_seq.upper().replace('U', 'T')
-            wrong_nt=CRISPRessoShared.find_wrong_nt(pegRNA_spacer_seq)
-            if wrong_nt:
-                raise CRISPRessoShared.NTException('The prime editing pegRNA spacer sgRNA sequence contains bad characters:%s'  % ' '.join(wrong_nt))
-            if pegRNA_spacer_seq not in amplicon_seq_arr[0] and CRISPRessoShared.reverse_complement(pegRNA_spacer_seq) not in amplicon_seq_arr[0]:
-                raise CRISPRessoShared.BadParameterException('The given prime editing pegRNA spacer is not found in the reference sequence')
-
-            #spacer is found in the first amplicon (unmodified ref), may be modified in the other amplicons
-            #if this is the first sequence, add it directly
-            if this_amp_seq == ref0_seq:
-                best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(pegRNA_spacer_seq, ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                pe_guides.append(best_aln_seq)
-                pe_orig_guide_seqs.append(args.prime_editing_pegRNA_spacer_seq)
-                pe_guide_mismatches.append(best_aln_mismatches)
-                pe_guide_names.append('PE spacer sgRNA')
-                pe_guide_qw_centers.append(nicking_qw_center)
-                pe_guide_qw_sizes.append(nicking_qw_size)
-                pe_guide_plot_cut_points.append(True)
-            #otherwise, clone the coordinates from the ref0 amplicon
-            else:
-                best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(pegRNA_spacer_seq, ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                match = re.search(best_aln_seq, ref0_seq)
-                r0_start_loc = match.start()
-                r0_end_loc = match.end()
-                coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=this_amp_seq, from_sequence=ref0_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                new_seq = this_amp_seq[coords_l[r0_start_loc]:coords_r[r0_end_loc]]
-                pe_guides.append(new_seq)
-                pe_orig_guide_seqs.append(args.prime_editing_pegRNA_spacer_seq)
-                rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=ref0_seq, from_sequence=this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(this_amp_seq, ref0_seq, r0_start_loc, r0_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
-                this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
-                pe_guide_mismatches.append(this_mismatches)
-
-                pe_guide_names.append('PE spacer sgRNA')
-                nicking_center_ref0 = r0_end_loc + nicking_qw_center #if there are indels in this amplicon between the end of the guide and the nicking center, adjust the center
-                nicking_center_this_amp_seq = rev_coords_r[nicking_center_ref0] - coords_r[r0_end_loc]
-                pe_guide_qw_centers.append(nicking_center_this_amp_seq)
-                pe_guide_qw_sizes.append(nicking_qw_size)
-                pe_guide_plot_cut_points.append(True)
-
-            #nicking guide
-            if args.prime_editing_nicking_guide_seq:
-                nicking_guide_seq = args.prime_editing_nicking_guide_seq.upper().replace('U', 'T')
-                wrong_nt=CRISPRessoShared.find_wrong_nt(nicking_guide_seq)
-                if wrong_nt:
-                    raise CRISPRessoShared.NTException('The prime editing nicking sgRNA sequence contains bad characters:%s'  % ' '.join(wrong_nt))
-
-                #nicking guide is found in the reverse_complement of the first amplicon, may be modified in the other amplicons
-                if this_amp_seq == ref0_seq:
-                    rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
-                    best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                    if nicking_guide_seq not in rc_ref0_seq:
-                        warn('The given prime editing nicking guide is not found in the reference sequence. Using the best match: ' + str(best_aln_seq))
-                    pe_guides.append(best_aln_seq)
-                    pe_orig_guide_seqs.append(args.prime_editing_nicking_guide_seq)
-                    pe_guide_mismatches.append(best_aln_mismatches)
-                    pe_guide_names.append('PE nicking sgRNA')
-                    pe_guide_qw_centers.append(nicking_qw_center)
-                    pe_guide_qw_sizes.append(nicking_qw_size)
-                    pe_guide_plot_cut_points.append(True)
-                #otherwise, clone the coordinates from the ref0 amplicon
-                else:
-                    rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
-                    rc_this_amp_seq = CRISPRessoShared.reverse_complement(this_amp_seq)
-                    best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                    match = re.search(best_aln_seq, rc_ref0_seq)
-                    r0_start_loc = match.start()
-                    r0_end_loc = match.end()
-                    coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=rc_this_amp_seq, from_sequence=rc_ref0_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                    new_seq = rc_this_amp_seq[coords_l[r0_start_loc]:coords_r[r0_end_loc]]
-                    pe_guides.append(new_seq)
-                    pe_orig_guide_seqs.append(args.prime_editing_nicking_guide_seq)
-                    rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=rc_ref0_seq, from_sequence=rc_this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                    this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(rc_this_amp_seq, rc_ref0_seq, r0_start_loc, r0_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
-                    this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
-
-                    pe_guide_mismatches.append(this_mismatches)
-                    pe_guide_names.append('PE nicking sgRNA')
-                    nicking_center_ref0 = r0_end_loc + nicking_qw_center
-                    nicking_center_this_amp_seq = rev_coords_r[nicking_center_ref0] - coords_r[r0_end_loc]
-                    pe_guide_qw_centers.append(nicking_center_this_amp_seq)
-                    pe_guide_qw_sizes.append(nicking_qw_size)
-                    pe_guide_plot_cut_points.append(True)
-
-            return(pe_guides, pe_orig_guide_seqs, pe_guide_mismatches, pe_guide_names, pe_guide_qw_centers, pe_guide_qw_sizes, pe_guide_plot_cut_points)
-        #end prime editing guide function
-
         #now that we're done with adding possible guides and amplicons, go through each amplicon and compute quantification windows
         info('Computing quantification windows', {'percent_complete': 2})
 
@@ -3183,8 +3185,9 @@ def main():
             if args.prime_editing_pegRNA_extension_seq:
                 nicking_qw_center = int(args.quantification_window_center.split(",")[0])
                 nicking_qw_size = int(args.quantification_window_size.split(",")[0])
-                pe_guides, pe_orig_guide_seqs, pe_guide_mismatches, pe_guide_names, pe_guide_qw_centers, pe_guide_qw_sizes, pe_guide_plot_cut_points = get_prime_editing_guides(this_seq, this_name, amplicon_seq_arr[0],
-                        prime_editing_edited_amp_seq, prime_editing_extension_seq_dna, args.prime_editing_pegRNA_extension_quantification_window_size, nicking_qw_center, nicking_qw_size, aln_matrix,
+                pe_guides, pe_orig_guide_seqs, pe_guide_mismatches, pe_guide_names, pe_guide_qw_centers, pe_guide_qw_sizes, pe_guide_plot_cut_points = get_prime_editing_guides(this_seq, amplicon_seq_arr[0],
+                        prime_editing_edited_amp_seq, args.prime_editing_pegRNA_extension_seq, prime_editing_extension_seq_dna, args.prime_editing_pegRNA_spacer_seq, args.prime_editing_nicking_guide_seq,
+                        args.prime_editing_pegRNA_extension_quantification_window_size, nicking_qw_center, nicking_qw_size, aln_matrix,
                         args.needleman_wunsch_gap_open, args.needleman_wunsch_gap_extend, args.prime_editing_gap_open_penalty, args.prime_editing_gap_extend_penalty)
                 this_guides.extend(pe_guides)
                 this_orig_guide_seqs.extend(pe_orig_guide_seqs)
@@ -3657,13 +3660,13 @@ def main():
                     else:
                         args.fastp_options_string = ' --detect_adapter_for_pe'
 
-                fastp_cmd = '{command} -i {r1} -I {r2} --merge --merged_out {out_merged} --unpaired1 {unpaired1} --unpaired2 {unpaired2} --overlap_len_require {min_overlap} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
+                fastp_cmd = '{command} -i {r1} -I {r2} --merge --merged_out {out_merged} --out1 {unmerged1} --out2 {unmerged2} --overlap_len_require {min_overlap} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
                     command=args.fastp_command,
                     r1=args.fastq_r1,
                     r2=args.fastq_r2,
                     out_merged=processed_output_filename,
-                    unpaired1=not_combined_1_filename,
-                    unpaired2=not_combined_2_filename,
+                    unmerged1=not_combined_1_filename,
+                    unmerged2=not_combined_2_filename,
                     min_overlap=args.min_paired_end_reads_overlap,
                     num_threads=n_processes,
                     json_report=_jp('fastp_report.json'),
@@ -3698,7 +3701,7 @@ def main():
                     if merge_status:
                         raise CRISPRessoShared.FastpException('Force-merging read pairs failed to run, please check the log file.')
                     else:
-                        info(f'Forced {num_reads_force_merged} read paisr together.')
+                        info(f'Forced {num_reads_force_merged} read pairs together.')
                     processed_output_filename = new_output_filename
 
                     files_to_remove += [new_merged_filename]
@@ -3715,12 +3718,12 @@ def main():
                     else:
                         args.fastp_options_string = ' --detect_adapter_for_pe'
 
-                fastp_cmd = '{command} -i {r1} -I {r2} --out1 {unpaired1} --out2 {unpaired2} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
+                fastp_cmd = '{command} -i {r1} -I {r2} --out1 {unmerged1} --out2 {unmerged2} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
                     command=args.fastp_command,
                     r1=args.fastq_r1,
                     r2=args.fastq_r2,
-                    unpaired1=not_combined_1_filename,
-                    unpaired2=not_combined_2_filename,
+                    unmerged1=not_combined_1_filename,
+                    unmerged2=not_combined_2_filename,
                     min_overlap=args.min_paired_end_reads_overlap,
                     num_threads=n_processes,
                     json_report=_jp('fastp_report.json'),
@@ -5016,7 +5019,7 @@ def main():
             #only show reference name in filenames if more than one reference
             ref_plot_name = refs[ref_name]['ref_plot_name']
 
-            info('Begin processing plots for amplicon {0}'.format(ref_name), {'percent_complete': ref_percent_complete_start + (ref_percent_complete_step * ref_index)})
+            info('Processing plots for amplicon {0}...'.format(ref_name), {'percent_complete': ref_percent_complete_start + (ref_percent_complete_step * ref_index)})
 
             if n_this_category < 1:
                 continue
