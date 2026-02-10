@@ -904,7 +904,7 @@
         },
         "amplicon_coordinates": {
             "keys": ["--amplicon_coordinates"],
-            "help": "Comma separated chromosome name and positions of the leftmost base of the amplicon sequence(s) in the reference genome. This is used to generate the VCF file. Ex: 'chr19:14039,chr18:430', where chr19 will be in the CHROM VCF column and 14039 is the position of the leftmost base pair of the amplicon. When multiple coordinates are provided, the order corresponds to the order of the amplicons.",
+            "help": "Comma separated chromosome name and positions of the leftmost base of the amplicon sequence(s) in the reference genome. This is used to generate the VCF file. Ex: 'chr19:14039,chr18:430', where chr19 will be in the CHROM VCF column and 14039 is the position of the leftmost basepair of the first amplicon and chr18 will be in the CHROM VCF column and 430 is the position of the leftmost basepair of the second amplicon. When multiple coordinates are provided, the order corresponds to the order of the amplicons.",
             "type": "str",
             "default": "",
             "tools": ["Core", "Batch", "Pooled", "WGS"]
