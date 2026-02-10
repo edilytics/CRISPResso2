@@ -52,7 +52,10 @@ def _edits_from_deletions(row, chrom, pos):
 
     for (start, end) in row["deletion_coordinates"]:
         start, end = _left_normalize_deletion(start, end, ref_positions, ref_str)
-        left_index = max(1, pos + start - 1)
+        if start == 0:
+            left_index = pos
+        else:
+            left_index = pos + start - 1
         ref_start = ref_positions.index(start)
         try:
             ref_end = ref_positions.index(end)

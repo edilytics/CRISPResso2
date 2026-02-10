@@ -433,3 +433,19 @@ def test_deletion_no_normalization_needed():
     assert vcf_pos == 90
     assert ref == "AG"
     assert alt == "A"
+
+
+def test_deletion_at_start_with_pos_offset():
+    """Deletion at start of amplicon with pos=100 should give VCF POS=100, not 99.
+
+    Amplicon: GATTACA, delete first base G -> REF=GA, ALT=A.
+    With pos=100, VCF POS should be 100 (position of the first deleted base).
+    """
+    row = _make_deletion_row("GATTACA", 0, 1)
+    edits = list(vcf._edits_from_deletions(row, "chr1", 100))
+    assert len(edits) == 1
+    chrom, vcf_pos, ref, alt, reads = edits[0]
+    assert chrom == "chr1"
+    assert vcf_pos == 100, f"Expected VCF pos 100, got {vcf_pos}"
+    assert ref == "GA", f"Expected REF=GA, got {ref}"
+    assert alt == "A", f"Expected ALT=A, got {alt}"

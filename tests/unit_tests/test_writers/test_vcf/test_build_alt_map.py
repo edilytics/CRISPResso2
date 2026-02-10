@@ -212,6 +212,26 @@ def test_build_edit_counts_deletion_start_at_zero_should_anchor_correctly():
     assert out == {(1, 1, REF_SEQ[0:4], REF_SEQ[3]): 1}
 
 
+def test_build_edit_counts_deletion_start_at_zero_pos_offset_single_base():
+    """Single-base deletion at start=0 with pos=100 should give VCF POS=100, not 99."""
+    ref = 'GATTACA'
+    aln = '-ATTACA'
+    df = create_df_alleles((ref, aln))
+    amplicon_positions = {"Reference": ("chr1", 100)}
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    # REF = deleted + following_base, ALT = following_base
+    assert out == {("chr1", 100, "GA", "A"): 1}
+
+
+def test_build_edit_counts_deletion_start_at_zero_pos_offset_multi_base():
+    """Multi-base deletion at start=0 with pos=100 should give VCF POS=100, not 99."""
+    df = create_df_alleles(make_del(0, 3, reads=1))  # delete first 3 bases
+    amplicon_positions = {"Reference": ("chr1", 100)}
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    # REF = deleted + following_base, ALT = following_base
+    assert out == {("chr1", 100, REF_SEQ[0:4], REF_SEQ[3]): 1}
+
+
 def test_build_edit_counts_deletion_start():
     ref1 = 'GATTACA'
     aln1 = '-ATTACA'
