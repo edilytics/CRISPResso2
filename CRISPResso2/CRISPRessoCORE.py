@@ -25,8 +25,6 @@ from concurrent.futures import ProcessPoolExecutor, wait
 from datetime import datetime
 from functools import partial
 from multiprocessing import Process
-from contextlib import nullcontext
-
 from CRISPResso2 import CRISPRessoCOREResources, CRISPRessoShared
 from CRISPResso2.writers import vcf
 from CRISPResso2.CRISPRessoCOREResources import ResultsSlotsDict
