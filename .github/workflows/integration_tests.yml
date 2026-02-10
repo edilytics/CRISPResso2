@@ -45,6 +45,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Compute Conda Cache Key
+        id: conda-cache-key
+        run: echo "key=conda-${{ runner.os }}--${{ runner.arch }}--0-${{ hashFiles('.github/envs/test_env.yml') }}" >> $GITHUB_OUTPUT
+
       - name: Setup Conda Env
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -56,12 +60,9 @@ jobs:
       - name: Restore Conda Env Cache
         id: cache-env
         uses: actions/cache/restore@v4
-        env:
-          # Increase this number to reset the cache if envs/test_env.yml hasn't changed
-          CACHE_NUMBER: 0
         with:
           path: /usr/share/miniconda/envs/test_env
-          key: conda-${{ runner.os }}--${{ runner.arch }}--${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
+          key: ${{ steps.conda-cache-key.outputs.key }}
 
       - name: Update Conda Env
         run: |
@@ -107,8 +108,6 @@ jobs:
       - name: Save Conda Env Cache
         uses: actions/cache/save@v4
         if: always() && steps.cache-env.outputs.cache-hit != 'true'
-        env:
-          CACHE_NUMBER: 0
         with:
           path: /usr/share/miniconda/envs/test_env
-          key: conda-${{ runner.os }}--${{ runner.arch }}--${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
+          key: ${{ steps.conda-cache-key.outputs.key }}
