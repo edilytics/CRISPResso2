@@ -1,6 +1,9 @@
+import logging
 from collections import defaultdict
 
 from CRISPResso2 import CRISPRessoShared
+
+logger = logging.getLogger(__name__)
 
 
 def _left_normalize_deletion(start, end, ref_positions, ref_str):
@@ -284,7 +287,16 @@ def write_vcf_file(df_alleles, ref_names, ref_lens, args, vcf_path):
 
     amplicon_lens = {}
     for ref_name, (chrom, pos) in amplicon_positions.items():
-        amplicon_lens[chrom] = ref_lens[ref_name]
+        amp_len = ref_lens[ref_name]
+        if chrom in amplicon_lens:
+            logger.warning(
+                "Multiple amplicons map to chromosome '%s'. "
+                "Using the max amplicon length (%d vs %d) for the VCF contig header.",
+                chrom, amplicon_lens[chrom], amp_len,
+            )
+            amplicon_lens[chrom] = max(amplicon_lens[chrom], amp_len)
+        else:
+            amplicon_lens[chrom] = amp_len
 
     num_reads = df_alleles['#Reads'].sum()
 
