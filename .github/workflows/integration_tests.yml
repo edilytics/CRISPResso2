@@ -134,6 +134,11 @@ jobs:
         run: |
           make pooled-paired-sim test print
 
+      - name: Run Pooled Prime Editing
+        if: success() || failure()
+        run: |
+          make pooled-prime-editing test print
+
       - name: Run WGS
         if: success() || failure()
         run: |
@@ -163,3 +168,13 @@ jobs:
         if: success() || failure()
         run: |
           make asym-both test print
+
+      - name: Run VCF Basic
+        if: success() || failure()
+        run: |
+          make vcf-basic test print
+
+      - name: Run VCF Prime Edit Basic
+        if: success() || failure()
+        run: |
+          make vcf-prime-edit-basic test print
