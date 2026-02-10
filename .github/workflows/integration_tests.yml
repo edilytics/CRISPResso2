@@ -53,20 +53,15 @@ jobs:
           auto-activate-base: false
           use-mamba: true
 
-      - name: Get Date
-        id: get-date
-        run: echo "today=$(/bin/date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
-        shell: bash
-
-      - name: Cache Conda Env
+      - name: Restore Conda Env Cache
         id: cache-env
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v4
         env:
           # Increase this number to reset the cache if envs/test_env.yml hasn't changed
           CACHE_NUMBER: 0
         with:
           path: /usr/share/miniconda/envs/test_env
-          key: conda-${{ runner.os }}--${{ runner.arch }}--${{ steps.get-date.outputs.today }}-${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
+          key: conda-${{ runner.os }}--${{ runner.arch }}--${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
 
       - name: Update Conda Env
         run: |
@@ -100,3 +95,12 @@ jobs:
             echo "::endgroup::"
           done
           exit $failed
+
+      - name: Save Conda Env Cache
+        uses: actions/cache/save@v4
+        if: always() && steps.cache-env.outputs.cache-hit != 'true'
+        env:
+          CACHE_NUMBER: 0
+        with:
+          path: /usr/share/miniconda/envs/test_env
+          key: conda-${{ runner.os }}--${{ runner.arch }}--${{ env.CACHE_NUMBER }}-${{ hashFiles('.github/envs/test_env.yml') }}
