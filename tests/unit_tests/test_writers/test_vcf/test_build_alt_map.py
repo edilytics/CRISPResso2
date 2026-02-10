@@ -368,6 +368,25 @@ def test_build_edit_counts_insertions(rows, amplicon_positions, expected):
     assert out == expected
 
 
+def test_build_edit_counts_two_insertions_same_read():
+    """Two insertions in the same read should both extract the correct bases.
+
+    Amplicon: ATGCATGC (8bp)
+    Read has CC inserted after pos 1, and GG inserted after pos 3.
+    Aligned ref: AT--GC--ATGC
+    Aligned read: ATCCGCGGATGC
+    """
+    ref = 'AT--GC--ATGC'
+    aln = 'ATCCGCGGATGC'
+    df = create_df_alleles((ref, aln, 1))
+    amplicon_positions = {"Reference": ("chr1", 1)}
+    out = vcf.build_edit_counts(df, amplicon_positions)
+    assert out == {
+        ("chr1", 2, "T", "TCC"): 1,   # insertion of CC, anchor at ref pos 1 (T)
+        ("chr1", 4, "C", "CGG"): 1,   # insertion of GG, anchor at ref pos 3 (C)
+    }
+
+
 # ----------------------------- multiple amplicons & coordinate offsets -----------------------------
 @pytest.mark.parametrize(
     "rows, amplicon_positions, expected",

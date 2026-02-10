@@ -125,16 +125,22 @@ def _edits_from_insertions(row, chrom, pos):
 
     ref_len = max(p for p in ref_positions if p >= 0) + 1
 
-    for i, (right_anchor_ref_pos, aligned_start) in enumerate(coords):
+    for i, (left_anchor_ref_pos, right_anchor_ref_pos) in enumerate(coords):
         size = sizes[i] if i < len(sizes) else 0
-        ins_bases = aln_str[aligned_start:aligned_start + size]
+        # The right anchor's alignment index marks the end of the inserted
+        # bases.  Extract the `size` characters immediately before it.
+        right_anchor_idx = ref_positions.index(right_anchor_ref_pos)
+        ins_bases = aln_str[right_anchor_idx - size:right_anchor_idx]
 
-        # Anchor base: normally at right_anchor_ref_pos;
-        # for inserts after the last base, anchor to the last base.
-        if right_anchor_ref_pos == ref_len and ref_len > 0:
+        # Anchor base: normally at left_anchor_ref_pos (the base before
+        # the insertion in VCF representation).
+        # Defensive: if left_anchor_ref_pos somehow equals ref_len, fall
+        # back to the last base.  Currently unreachable because
+        # find_indels_substitutions does not record trailing insertions.
+        if left_anchor_ref_pos == ref_len and ref_len > 0:
             anchor_ref_pos = ref_len - 1
         else:
-            anchor_ref_pos = right_anchor_ref_pos
+            anchor_ref_pos = left_anchor_ref_pos
 
         anchor_ref_pos, ins_bases = _left_normalize_insertion(
             anchor_ref_pos, ins_bases, ref_positions, ref_str,

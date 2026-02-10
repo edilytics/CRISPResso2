@@ -356,6 +356,88 @@ def test_insertion_left_normalization_dinucleotide():
     assert alt == "ACA", f"Expected ALT=ACA, got {alt}"
 
 
+# ----------------------------- _edits_from_insertions multi-insertion --------------------------
+
+
+def _make_two_insertion_row(amplicon, after1, ins1, after2, ins2, reads=1):
+    """Build a minimal allele-row dict for a read with two insertions.
+
+    Insertions are placed after 0-based ref positions after1 and after2.
+    after1 must be < after2.
+    """
+    ref_positions = []
+    aligned_ref = []
+    aligned_read = []
+    insertion_coordinates = []
+    insertion_sizes = []
+
+    for ref_pos in range(len(amplicon)):
+        ref_positions.append(ref_pos)
+        aligned_ref.append(amplicon[ref_pos])
+        aligned_read.append(amplicon[ref_pos])
+
+        if ref_pos == after1:
+            for base in ins1:
+                ref_positions.append(-1)
+                aligned_ref.append("-")
+                aligned_read.append(base)
+
+        if ref_pos == after2:
+            for base in ins2:
+                ref_positions.append(-1)
+                aligned_ref.append("-")
+                aligned_read.append(base)
+
+    # Derive insertion_coordinates using find_indels_substitutions
+    from CRISPResso2.CRISPRessoCOREResources import find_indels_substitutions
+    r = find_indels_substitutions(
+        "".join(aligned_read), "".join(aligned_ref),
+        list(range(len(aligned_ref))),
+    )
+
+    return {
+        "ref_positions": ref_positions,
+        "Reference_Sequence": "".join(aligned_ref),
+        "Aligned_Sequence": "".join(aligned_read),
+        "#Reads": reads,
+        "n_deleted": 0,
+        "n_inserted": len(ins1) + len(ins2),
+        "n_mutated": 0,
+        "deletion_coordinates": [],
+        "deletion_sizes": [],
+        "Reference_Name": "Reference",
+        "insertion_coordinates": r.insertion_coordinates,
+        "insertion_sizes": r.insertion_sizes,
+        "substitution_positions": [],
+    }
+
+
+def test_two_insertions_same_read():
+    """Two insertions in one read should both extract the correct bases.
+
+    Amplicon: ATGCATGC
+    Insert CC after pos 1, GG after pos 3.
+    Aligned ref:  AT--GC--ATGC
+    Aligned read: ATCCGCGGATGC
+
+    First insertion (CC): anchor=T(pos1), VCF POS=2, REF=T, ALT=TCC
+    Second insertion (GG): anchor=C(pos3), VCF POS=4, REF=C, ALT=CGG
+    """
+    row = _make_two_insertion_row("ATGCATGC", 1, "CC", 3, "GG")
+    edits = list(vcf._edits_from_insertions(row, "chr1", 1))
+    assert len(edits) == 2
+
+    chrom1, pos1, ref1, alt1, reads1 = edits[0]
+    assert pos1 == 2, f"Expected VCF pos 2, got {pos1}"
+    assert ref1 == "T", f"Expected REF=T, got {ref1}"
+    assert alt1 == "TCC", f"Expected ALT=TCC, got {alt1}"
+
+    chrom2, pos2, ref2, alt2, reads2 = edits[1]
+    assert pos2 == 4, f"Expected VCF pos 4, got {pos2}"
+    assert ref2 == "C", f"Expected REF=C (anchor at ref pos 3), got {ref2}"
+    assert alt2 == "CGG", f"Expected ALT=CGG, got {alt2}"
+
+
 # ----------------------------- _edits_from_deletions left-normalization ----------------------
 
 # The FANC amplicon used in integration tests

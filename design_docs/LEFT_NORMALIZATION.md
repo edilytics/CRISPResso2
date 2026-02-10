@@ -72,9 +72,13 @@ making them correct even when the alignment contains other indels.
 
 - **`deletion_coordinates`**: List of `(start, end)` tuples, 0-based half-open
   `[start, end)`. Produced by `CRISPRessoCOREResources.find_indels_substitutions`.
-- **`insertion_coordinates`**: List of `(anchor_ref_pos, aligned_start)` tuples.
-  `anchor_ref_pos` is the 0-based reference position of the base before the
-  insertion; `aligned_start` is the alignment index where inserted bases begin.
+- **`insertion_coordinates`**: List of `(left_anchor_ref_pos, right_anchor_ref_pos)`
+  tuples. Both are 0-based reference positions produced by
+  `CRISPRessoCOREResources.find_indels_substitutions`. `left_anchor_ref_pos` is
+  the base before the insertion; `right_anchor_ref_pos` is the base after.
+  To find the inserted bases in the aligned sequence, convert
+  `right_anchor_ref_pos` to an alignment index via `ref_positions.index()` and
+  take the `size` characters immediately before it.
 - **`ref_positions`**: List mapping each alignment column index to its reference
   position (or -1 for inserted bases).
 
