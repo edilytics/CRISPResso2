@@ -1425,10 +1425,19 @@ def test_find_wrong_nt_numbers():
     assert set(result) == {"1", "2", "3"}
 
 
-def test_slugify_unicode():
-    """Test slugify with unicode characters."""
-    result = CRISPRessoShared.slugify("tëst_sàmple")
-    assert result == "test_sample"
+def test_slugify_unicode_decomposable():
+    """Test slugify decomposes accented characters to their base letter via NFKD normalization."""
+    # NFKD decomposes ë -> e + combining diaeresis, then ascii encode drops the combining char
+    assert CRISPRessoShared.slugify("café") == "cafe"
+    assert CRISPRessoShared.slugify("naïve") == "naive"
+    assert CRISPRessoShared.slugify("résumé") == "resume"
+
+
+def test_slugify_unicode_non_decomposable():
+    """Test slugify drops non-decomposable unicode characters (CJK, emoji)."""
+    # CJK and emoji have no ASCII decomposition, so they are dropped entirely
+    assert CRISPRessoShared.slugify("test_日本語") == "test_"
+    assert CRISPRessoShared.slugify("emoji_😀") == "emoji_"
 
 
 def test_clean_filename_pipe():

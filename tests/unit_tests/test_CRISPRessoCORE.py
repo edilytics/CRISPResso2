@@ -1072,53 +1072,51 @@ def test_get_bp_subs_insertions():
 def test_get_bp_substitutions_no_changes():
     """Test get_bp_substitutions with no substitutions."""
     ref_seq = 'ATCG'
-    ref_changes_dict = {0: 'A', 1: 'T', 2: 'C', 3: 'G'}
+    ref_changes_dict = CRISPRessoCORE.get_refpos_values('ATCG', 'ATCG')
     ref_positions = [0, 1, 2, 3]
 
     result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
 
-    assert len(result) == 0
+    assert result == []
 
 
 def test_get_bp_substitutions_single_sub():
-    """Test get_bp_substitutions with single substitution."""
+    """Test get_bp_substitutions with single A->G substitution at position 0."""
     ref_seq = 'ATCG'
-    ref_changes_dict = {0: 'G', 1: 'T', 2: 'C', 3: 'G'}  # A->G at position 0
+    ref_changes_dict = CRISPRessoCORE.get_refpos_values('ATCG', 'GTCG')
     ref_positions = [0, 1, 2, 3]
 
     result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
 
-    assert len(result) == 1
-    assert result[0] == (0, 'A', 'G')
+    assert result == [(0, 'A', 'G')]
 
 
 def test_get_bp_substitutions_multiple_subs():
     """Test get_bp_substitutions with multiple substitutions."""
     ref_seq = 'ATCG'
-    ref_changes_dict = {0: 'G', 1: 'A', 2: 'C', 3: 'T'}  # Multiple changes
+    ref_changes_dict = CRISPRessoCORE.get_refpos_values('ATCG', 'GACT')
     ref_positions = [0, 1, 2, 3]
 
     result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
 
-    assert len(result) == 3  # A->G, T->A, G->T
+    assert result == [(0, 'A', 'G'), (1, 'T', 'A'), (3, 'G', 'T')]
 
 
 def test_get_bp_substitutions_partial_positions():
-    """Test get_bp_substitutions with partial positions included."""
+    """Test get_bp_substitutions only checks specified positions."""
     ref_seq = 'ATCG'
-    ref_changes_dict = {0: 'G', 1: 'T', 2: 'C', 3: 'A'}
+    ref_changes_dict = CRISPRessoCORE.get_refpos_values('ATCG', 'GTCA')
     ref_positions = [0, 3]  # Only check positions 0 and 3
 
     result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
 
-    # Should only find changes at positions 0 and 3
-    assert len(result) == 2
+    assert result == [(0, 'A', 'G'), (3, 'G', 'A')]
 
 
 def test_get_bp_substitutions_all_match():
-    """Test get_bp_substitutions with all matching positions."""
+    """Test get_bp_substitutions with identical read and reference."""
     ref_seq = 'ATCG'
-    ref_changes_dict = {0: 'A', 1: 'T', 2: 'C', 3: 'G'}
+    ref_changes_dict = CRISPRessoCORE.get_refpos_values('ATCG', 'ATCG')
     ref_positions = [0, 1, 2, 3]
 
     result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
@@ -1127,14 +1125,14 @@ def test_get_bp_substitutions_all_match():
 
 
 def test_get_bp_substitutions_all_different():
-    """Test get_bp_substitutions with all different positions."""
+    """Test get_bp_substitutions with all positions substituted."""
     ref_seq = 'ATCG'
-    ref_changes_dict = {0: 'T', 1: 'A', 2: 'G', 3: 'C'}  # All swapped
+    ref_changes_dict = CRISPRessoCORE.get_refpos_values('ATCG', 'TAGC')
     ref_positions = [0, 1, 2, 3]
 
     result = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions)
 
-    assert len(result) == 4
+    assert result == [(0, 'A', 'T'), (1, 'T', 'A'), (2, 'C', 'G'), (3, 'G', 'C')]
 
 
 def test_get_bp_substitutions_with_insertion():
@@ -1426,10 +1424,17 @@ def test_normalize_name_r1_r2_suffix():
     assert result == "sample_L001_R1_001_sample_L001_R2_001"
 
 
-def test_normalize_name_unicode():
-    """Test normalize_name handles unicode in name."""
+def test_normalize_name_unicode_decomposable():
+    """Test normalize_name decomposes accented characters to base letters."""
+    # ë -> e, ä -> a via NFKD normalization in slugify
     result = CRISPRessoCORE.normalize_name("tëst_sämple", None, None, None)
     assert result == "test_sample"
+
+
+def test_normalize_name_unicode_non_decomposable():
+    """Test normalize_name drops non-decomposable unicode characters."""
+    result = CRISPRessoCORE.normalize_name("sample_日本語", None, None, None)
+    assert result == "sample_"
 
 
 # =============================================================================
