@@ -125,7 +125,6 @@ def run_crispresso_cmds(crispresso_cmds, n_processes="1", descriptor = 'region',
         pool.terminate()
         logger.warn('Caught SIGINT. Program Terminated')
         raise Exception('CRISPResso2 Terminated')
-        exit (0)
     except Exception as e:
         print('CRISPResso2 failed')
         raise e
@@ -175,7 +174,6 @@ def run_pandas_apply_parallel(input_df, input_function_chunk, n_processes=1):
         pool.terminate()
         logging.warn('Caught SIGINT. Program Terminated')
         raise Exception('CRISPResso2 Terminated')
-        exit (0)
     except Exception as e:
         print('CRISPResso2 failed')
         raise e
@@ -206,7 +204,6 @@ def run_function_on_array_chunk_parallel(input_array, input_function, n_processe
         pool.terminate()
         logging.warn('Caught SIGINT. Program Terminated')
         raise Exception('CRISPResso2 Terminated')
-        exit (0)
     except Exception as e:
         print('CRISPResso2 failed')
         raise e
@@ -242,7 +239,6 @@ def run_parallel_commands(commands_arr,n_processes=1,descriptor='CRISPResso2',co
         pool.terminate()
         logging.warn('Caught SIGINT. Program Terminated')
         raise Exception('CRISPResso2 Terminated')
-        exit (0)
     except Exception as e:
         print('CRISPResso2 failed')
         raise e
