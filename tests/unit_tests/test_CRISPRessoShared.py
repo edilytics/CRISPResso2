@@ -914,7 +914,7 @@ def test_check_output_folder_invalid_raises():
 def test_read_version():
     """Test read_version returns a valid version string."""
     version = CRISPRessoShared.read_version()
-    assert version == "2.3.3"
+    assert version == "2.3.4"
 
 
 # =============================================================================
