@@ -1685,10 +1685,10 @@ def test_find_wrong_nt_mixed():
 
 def test_cigar_unexplode_pattern():
     """Test CIGAR_UNEXPLODE_PATTERN regex exists."""
-    assert hasattr(CRISPRessoShared, 'CIGAR_UNEXPLODE_PATTERN')
+    assert hasattr(CRISPRessoShared, 'cigarUnexplodePattern')
     # Test it can match CIGAR operations
     import re
-    result = CRISPRessoShared.CIGAR_UNEXPLODE_PATTERN.findall("MMMIID")
+    result = CRISPRessoShared.cigarUnexplodePattern.findall("MMMIID")
     assert len(result) > 0
 
 

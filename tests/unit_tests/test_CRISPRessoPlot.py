@@ -642,7 +642,7 @@ def test_custom_heatmapper_init():
     import numpy as np
 
     data = np.array([[1, 2], [3, 4]])
-    mapper = CRISPRessoPlot.CustomHeatMapper(
+    mapper = CRISPRessoPlot.Custom_HeatMapper(
         data, vmin=0, vmax=10, cmap=None, center=None, robust=False,
         annot=None, fmt=".2g", annot_kws=None, per_element_annot_kws=None,
         cbar=True, cbar_kws=None, xticklabels=True, yticklabels=True, mask=None
@@ -657,7 +657,7 @@ def test_custom_heatmapper_with_annotation():
     data = np.array([[1, 2], [3, 4]])
     annot = np.array([['A', 'B'], ['C', 'D']])
 
-    mapper = CRISPRessoPlot.CustomHeatMapper(
+    mapper = CRISPRessoPlot.Custom_HeatMapper(
         data, vmin=0, vmax=10, cmap=None, center=None, robust=False,
         annot=annot, fmt='s', annot_kws={'size': 10}, per_element_annot_kws=None,
         cbar=True, cbar_kws=None, xticklabels=True, yticklabels=True, mask=None
@@ -672,7 +672,7 @@ def test_custom_heatmapper_with_mask():
     data = np.array([[1, 2], [3, 4]])
     mask = np.array([[False, True], [True, False]])
 
-    mapper = CRISPRessoPlot.CustomHeatMapper(
+    mapper = CRISPRessoPlot.Custom_HeatMapper(
         data, vmin=0, vmax=10, cmap=None, center=None, robust=False,
         annot=None, fmt=".2g", annot_kws=None, per_element_annot_kws=None,
         cbar=True, cbar_kws=None, xticklabels=True, yticklabels=True, mask=mask
