@@ -6,7 +6,7 @@ Take care when committing into these files as not to mix unrelated git histories
 
 ## How do I work with this repo?
 
-Step 1 only needs to be done once per cloned repo, the other steps will need to be dne more frequently.
+Step 1 only needs to be done once per cloned repo, the other steps will need to be done more frequently.
 
 1. Add the remote to this repo to the "parent" repo (i.e. `CRISPResso2` or `C2Web`). **You should only have to do this once.**
 
@@ -86,10 +86,16 @@ Also, note that the default commit message may have a summary of all commits, pl
 
 1. In the parent repo, switch to (or create) the branch on `CRISPRessoReports` that will have the changes you push.
 
-If you are creating a new branch based off of `CRISPRessoReports` master, run this:
+If you are creating a new branch based off of `CRISPRessoReports` master, run this to switch to the reports master branch:
 
 ``` shell
-git checkout -b <feature-branch>-reports reports/master
+git checkout reports/master
+```
+
+Then, run to actually create (and switch to) the branch that you will be working with:
+
+``` shell
+git checkout -b <feature-branch>-reports
 ```
 
 Or if you would like to push to an existing branch on `CRISPRessoReports`, run this:
@@ -105,6 +111,18 @@ git merge --squash -Xsubtree="CRISPResso2/CRISPRessoReports" --no-commit --allow
 ```
 
 *Note:* `<feature-branch>` is the branch of the parent repo that contains the changes inside the `CRISPRessoReports` sub-directory.
+
+3. Push to `CRISPRessoReports`.
+
+``` shell
+git push
+```
+
+4. Switch back to your branch on `CRISPResso` or `C2Web`.
+
+``` shell
+git checkout <feature-branch>
+```
 
 ### I am working on a feature that requires changing `CRISPRessoReports`, what do I do?
 

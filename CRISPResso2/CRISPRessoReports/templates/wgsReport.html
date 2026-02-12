@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 {% block head %}
-<script src="https://cdn.plot.ly/plotly-2.11.1.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-3.3.0.min.js" charset="utf-8"></script>
 <style>
 .nav-tabs.amp-header {
   border-bottom:none !important;
@@ -45,7 +45,6 @@
 {% endblock %}
 
 {% block content %}
-
 <div class="row">
 <div class="col-sm-1"></div>
 <div class="col-sm-10">
@@ -55,13 +54,13 @@
 
             <div class="card text-center mb-2">
                 <div class="card-header">
-                    <h5>{{report_name}}</h5>
+                    <h5 id="{{report_name}}">{{report_name}}</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
                         {% for region_name in run_names %}
-                      <a href="{{sub_html_files[region_name]}}" class="list-group-item list-group-item-action" id="{{region_name}}">{{region_name}}</a>
-                      {% endfor %}
+                        <a href="{{sub_html_files[region_name]}}" class="list-group-item list-group-item-action" id="{{region_name}}">{{region_name}}</a>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
@@ -82,10 +81,6 @@
           {% endif %}
 
           {{render_partial('shared/partials/report_footer_buttons.html', report_zip_filename=report_zip_filename, report_path=report_path)}}
-    {# data bit for web version: #}
-    {#
-        			  <p class="m-0"><small>Data: <a href="{{report_data['crispresso_data_path']}}{{data_path}}">{{data_label}}</a> <a href="{{report_data['crispresso_data_path']}}{{data_path}}" title="{{data_label}}" download> <span class="fas fa-download" data-toggle='tooltip' title='Download {{data_label}}'><span></a></small></p>
-    #}
 	</div> {# jumbotron_content #} <!-- end jumbotron_content -->
 </div> {# jumbrotron #} <!-- end jumbotron -->
 

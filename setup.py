@@ -33,8 +33,8 @@ import re
 
 def main():
     version = re.search(
-        r'^__version__\s*=\s*"(.*)"',
-        open('CRISPResso2/CRISPRessoShared.py').read(),
+        r'^version\s*=\s*"(.*)"',
+        open('pyproject.toml').read(),
         re.M
     ).group(1)
 
@@ -89,10 +89,9 @@ def main():
               'matplotlib',  # '>=1.3.1,<=2.2.3',
               'seaborn', # '>0.7.1,<0.10',
               'jinja2',
-              'jinja_partials',
               'scipy',
               'numpy',
-              'plotly',
+              'upsetplot',
               ],
           cmdclass = command_classes,
           ext_modules = ext_modules
