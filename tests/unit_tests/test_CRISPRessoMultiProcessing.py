@@ -1,7 +1,6 @@
 """Tests for CRISPRessoMultiProcessing module."""
 
 import os
-import sys
 
 import pandas as pd
 import pytest
@@ -9,25 +8,39 @@ import pytest
 from CRISPResso2 import CRISPRessoMultiProcessing
 
 
+# Module-level helper functions for multi-process tests.
+# multiprocessing.Pool requires picklable (i.e. top-level) functions.
+def _mp_square_all(arr):
+    return [x ** 2 for x in arr]
+
+
+def _mp_uppercase_all(arr):
+    return [s.upper() for s in arr]
+
+
+def _mp_identity(arr):
+    return list(arr)
+
+
+def _mp_double_column(df_chunk):
+    df_chunk = df_chunk.copy()
+    df_chunk["doubled"] = df_chunk["value"] * 2
+    return df_chunk
+
+
+def _mp_add_column(df_chunk):
+    df_chunk = df_chunk.copy()
+    df_chunk["new_col"] = "added"
+    return df_chunk
+
+
 # =============================================================================
 # Tests for get_max_processes
 # =============================================================================
 
 
-def test_get_max_processes_returns_positive():
-    """Test that get_max_processes returns a positive integer."""
-    max_procs = CRISPRessoMultiProcessing.get_max_processes()
-    assert max_procs >= 1
-
-
-def test_get_max_processes_returns_int():
-    """Test that get_max_processes returns an integer."""
-    max_procs = CRISPRessoMultiProcessing.get_max_processes()
-    assert isinstance(max_procs, int)
-
-
-def test_get_max_processes_matches_cpu_count():
-    """Test that get_max_processes matches os.cpu_count."""
+def test_get_max_processes():
+    """Test that get_max_processes returns os.cpu_count()."""
     max_procs = CRISPRessoMultiProcessing.get_max_processes()
     assert max_procs == os.cpu_count()
 
@@ -38,285 +51,12 @@ def test_get_max_processes_matches_cpu_count():
 
 
 def test_wrapper_returns_index_and_result():
-    """Test that wrapper returns tuple of (index, result)."""
+    """Test that wrapper returns tuple of (index, func(arg))."""
     def add_one(x):
         return x + 1
 
     result = CRISPRessoMultiProcessing.wrapper(add_one, (0, 5))
     assert result == (0, 6)
-
-
-def test_wrapper_preserves_index():
-    """Test that wrapper preserves the index in the result."""
-    def identity(x):
-        return x
-
-    result = CRISPRessoMultiProcessing.wrapper(identity, (42, "test"))
-    assert result[0] == 42
-    assert result[1] == "test"
-
-
-def test_wrapper_with_different_indices():
-    """Test wrapper with various indices."""
-    def double(x):
-        return x * 2
-
-    for i in [0, 1, 10, 100]:
-        result = CRISPRessoMultiProcessing.wrapper(double, (i, 5))
-        assert result[0] == i
-        assert result[1] == 10
-
-
-# =============================================================================
-# Tests for run_subprocess
-# =============================================================================
-
-
-def test_run_subprocess_echo():
-    """Test run_subprocess with simple echo command."""
-    result = CRISPRessoMultiProcessing.run_subprocess("echo hello")
-    assert result == 0
-
-
-def test_run_subprocess_true():
-    """Test run_subprocess with true command (always succeeds)."""
-    result = CRISPRessoMultiProcessing.run_subprocess("true")
-    assert result == 0
-
-
-def test_run_subprocess_false():
-    """Test run_subprocess with false command (always fails)."""
-    result = CRISPRessoMultiProcessing.run_subprocess("false")
-    assert result != 0
-
-
-def test_run_subprocess_invalid_command():
-    """Test run_subprocess with invalid command returns non-zero."""
-    result = CRISPRessoMultiProcessing.run_subprocess(
-        "nonexistent_command_xyz_12345 2>/dev/null"
-    )
-    assert result != 0
-
-
-def test_run_subprocess_exit_code():
-    """Test run_subprocess captures specific exit codes."""
-    # sh -c 'exit 5' will return exit code 5
-    result = CRISPRessoMultiProcessing.run_subprocess("sh -c 'exit 5'")
-    assert result == 5
-
-
-# =============================================================================
-# Tests for run_function_on_array_chunk_parallel
-# =============================================================================
-
-
-def test_run_function_on_array_chunk_parallel_single_process():
-    """Test parallel function execution with single process."""
-    def square_all(arr):
-        return [x ** 2 for x in arr]
-
-    input_array = [1, 2, 3, 4, 5]
-    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
-        input_array, square_all, n_processes=1
-    )
-    assert result == [1, 4, 9, 16, 25]
-
-
-def test_run_function_on_array_chunk_parallel_empty_array():
-    """Test parallel function with empty array."""
-    def identity(arr):
-        return arr
-
-    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
-        [], identity, n_processes=1
-    )
-    assert result == []
-
-
-def test_run_function_on_array_chunk_parallel_preserves_order_single():
-    """Test that single process preserves order."""
-    def add_index(arr):
-        return [f"item_{x}" for x in arr]
-
-    input_array = list(range(10))
-    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
-        input_array, add_index, n_processes=1
-    )
-    expected = [f"item_{i}" for i in range(10)]
-    assert result == expected
-
-
-def test_run_function_on_array_chunk_parallel_large_array():
-    """Test parallel function with larger array."""
-    def double_all(arr):
-        return [x * 2 for x in arr]
-
-    input_array = list(range(100))
-    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
-        input_array, double_all, n_processes=1
-    )
-    expected = [x * 2 for x in range(100)]
-    assert result == expected
-
-
-def test_run_function_on_array_chunk_parallel_with_strings():
-    """Test parallel function with string data."""
-    def uppercase_all(arr):
-        return [s.upper() for s in arr]
-
-    input_array = ["hello", "world", "test"]
-    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
-        input_array, uppercase_all, n_processes=1
-    )
-    assert result == ["HELLO", "WORLD", "TEST"]
-
-
-# =============================================================================
-# Tests for run_pandas_apply_parallel
-# =============================================================================
-
-
-def test_run_pandas_apply_parallel_single_process():
-    """Test pandas parallel apply with single process."""
-    def double_column(df_chunk):
-        df_chunk["doubled"] = df_chunk["value"] * 2
-        return df_chunk
-
-    df = pd.DataFrame({"value": [1, 2, 3, 4, 5]})
-    result = CRISPRessoMultiProcessing.run_pandas_apply_parallel(
-        df, double_column, n_processes=1
-    )
-
-    assert "doubled" in result.columns
-    assert list(result["doubled"]) == [2, 4, 6, 8, 10]
-
-
-def test_run_pandas_apply_parallel_preserves_columns():
-    """Test that parallel apply preserves existing columns."""
-    def add_column(df_chunk):
-        df_chunk["new_col"] = "added"
-        return df_chunk
-
-    df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
-    result = CRISPRessoMultiProcessing.run_pandas_apply_parallel(
-        df, add_column, n_processes=1
-    )
-
-    assert "a" in result.columns
-    assert "b" in result.columns
-    assert "new_col" in result.columns
-
-
-def test_run_pandas_apply_parallel_two_rows():
-    """Test parallel apply with two-row dataframe."""
-    def identity(df_chunk):
-        return df_chunk
-
-    df = pd.DataFrame({"a": [1, 2]})
-    result = CRISPRessoMultiProcessing.run_pandas_apply_parallel(
-        df, identity, n_processes=1
-    )
-
-    assert len(result) == 2
-
-
-def test_run_pandas_apply_parallel_single_row():
-    """Test parallel apply with single row dataframe."""
-    def add_computed(df_chunk):
-        df_chunk["computed"] = df_chunk["x"] + df_chunk["y"]
-        return df_chunk
-
-    df = pd.DataFrame({"x": [5], "y": [3]})
-    result = CRISPRessoMultiProcessing.run_pandas_apply_parallel(
-        df, add_computed, n_processes=1
-    )
-
-    assert len(result) == 1
-    assert result["computed"].iloc[0] == 8
-
-
-def test_run_pandas_apply_parallel_transform_values():
-    """Test parallel apply transforming values."""
-    def square_values(df_chunk):
-        df_chunk["squared"] = df_chunk["num"] ** 2
-        return df_chunk
-
-    df = pd.DataFrame({"num": [1, 2, 3, 4, 5]})
-    result = CRISPRessoMultiProcessing.run_pandas_apply_parallel(
-        df, square_values, n_processes=1
-    )
-
-    expected = [1, 4, 9, 16, 25]
-    assert list(result["squared"]) == expected
-
-
-# =============================================================================
-# Tests for run_parallel_commands
-# =============================================================================
-
-
-def test_run_parallel_commands_single_process_success():
-    """Test parallel commands with single process and successful commands."""
-    commands = ["true", "true", "true"]
-    # Should not raise
-    CRISPRessoMultiProcessing.run_parallel_commands(
-        commands, n_processes=1, descriptor="test"
-    )
-
-
-def test_run_parallel_commands_single_process_failure():
-    """Test parallel commands with single process and failing command."""
-    commands = ["true", "false", "true"]
-    with pytest.raises(Exception, match="was failed"):
-        CRISPRessoMultiProcessing.run_parallel_commands(
-            commands, n_processes=1, descriptor="test"
-        )
-
-
-def test_run_parallel_commands_continue_on_fail():
-    """Test parallel commands continues on failure when flag is set."""
-    commands = ["true", "false", "true"]
-    # Should not raise
-    CRISPRessoMultiProcessing.run_parallel_commands(
-        commands, n_processes=1, descriptor="test", continue_on_fail=True
-    )
-
-
-def test_run_parallel_commands_empty_list():
-    """Test parallel commands with empty list."""
-    commands = []
-    # Should not raise and return immediately
-    CRISPRessoMultiProcessing.run_parallel_commands(
-        commands, n_processes=1, descriptor="test"
-    )
-
-
-def test_run_parallel_commands_single_command():
-    """Test parallel commands with single command."""
-    commands = ["echo hello"]
-    CRISPRessoMultiProcessing.run_parallel_commands(
-        commands, n_processes=1, descriptor="test"
-    )
-
-
-# =============================================================================
-# Tests for run_crispresso_cmds with empty input
-# =============================================================================
-
-
-def test_run_crispresso_cmds_empty_list():
-    """Test run_crispresso_cmds with empty list returns immediately."""
-    # Should return without doing anything
-    CRISPRessoMultiProcessing.run_crispresso_cmds(
-        crispresso_cmds=[],
-        n_processes="1",
-        descriptor="test",
-    )
-
-
-# =============================================================================
-# Edge case tests
-# =============================================================================
 
 
 def test_wrapper_with_none_result():
@@ -334,8 +74,54 @@ def test_wrapper_with_complex_return():
         return {"input": x, "processed": True}
 
     result = CRISPRessoMultiProcessing.wrapper(return_dict, (5, "data"))
-    assert result[0] == 5
-    assert result[1] == {"input": "data", "processed": True}
+    assert result == (5, {"input": "data", "processed": True})
+
+
+# =============================================================================
+# Tests for run_subprocess
+# =============================================================================
+
+
+def test_run_subprocess_success():
+    """Test run_subprocess with successful command returns 0."""
+    assert CRISPRessoMultiProcessing.run_subprocess("true") == 0
+
+
+def test_run_subprocess_failure():
+    """Test run_subprocess with failing command returns non-zero."""
+    assert CRISPRessoMultiProcessing.run_subprocess("false") != 0
+
+
+def test_run_subprocess_exit_code():
+    """Test run_subprocess captures specific exit codes."""
+    assert CRISPRessoMultiProcessing.run_subprocess("sh -c 'exit 5'") == 5
+
+
+# =============================================================================
+# Tests for run_function_on_array_chunk_parallel — single process
+# =============================================================================
+
+
+def test_run_function_on_array_chunk_parallel_single_process():
+    """Test single-process path calls function directly on full array."""
+    def square_all(arr):
+        return [x ** 2 for x in arr]
+
+    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
+        [1, 2, 3, 4, 5], square_all, n_processes=1
+    )
+    assert result == [1, 4, 9, 16, 25]
+
+
+def test_run_function_on_array_chunk_parallel_empty_array():
+    """Test single-process path with empty array."""
+    def identity(arr):
+        return arr
+
+    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
+        [], identity, n_processes=1
+    )
+    assert result == []
 
 
 def test_run_function_on_array_chunk_parallel_exception_handling():
@@ -347,3 +133,267 @@ def test_run_function_on_array_chunk_parallel_exception_handling():
         CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
             [1, 2, 3], raise_error, n_processes=1
         )
+
+
+# =============================================================================
+# Tests for run_function_on_array_chunk_parallel — multi process
+# =============================================================================
+
+
+def test_run_function_on_array_chunk_parallel_multi_process():
+    """Test multi-process path splits array into chunks and flattens results.
+
+    Uses 25 elements with n_processes=2 so chunk size is max(10, 12)=12,
+    producing 2 real chunks that exercise pool.map_async and result flattening.
+    """
+    input_array = list(range(25))
+    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
+        input_array, _mp_square_all, n_processes=2
+    )
+    assert result == [x ** 2 for x in range(25)]
+
+
+def test_run_function_on_array_chunk_parallel_multi_process_strings():
+    """Test multi-process path with string data (pickling of non-numeric types).
+
+    Uses 20 elements so chunk size max(10, 10)=10 produces 2 chunks.
+    """
+    input_array = [f"word_{i}" for i in range(20)]
+    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
+        input_array, _mp_uppercase_all, n_processes=2
+    )
+    assert result == [f"WORD_{i}" for i in range(20)]
+
+
+def test_run_function_on_array_chunk_parallel_multi_process_empty():
+    """Test multi-process path with empty array doesn't error."""
+    result = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
+        [], _mp_identity, n_processes=2
+    )
+    assert result == []
+
+
+# =============================================================================
+# Tests for run_pandas_apply_parallel — single process
+# =============================================================================
+
+
+def test_run_pandas_apply_parallel_single_process():
+    """Test single-process path calls function directly on full dataframe."""
+    def double_column(df_chunk):
+        df_chunk["doubled"] = df_chunk["value"] * 2
+        return df_chunk
+
+    df = pd.DataFrame({"value": [1, 2, 3, 4, 5]})
+    result = CRISPRessoMultiProcessing.run_pandas_apply_parallel(
+        df, double_column, n_processes=1
+    )
+
+    assert len(result) == 5
+    assert "doubled" in result.columns
+    assert list(result["doubled"]) == [2, 4, 6, 8, 10]
+
+
+def test_run_pandas_apply_parallel_single_row():
+    """Test single-process path with single-row dataframe (edge case)."""
+    def add_computed(df_chunk):
+        df_chunk["computed"] = df_chunk["x"] + df_chunk["y"]
+        return df_chunk
+
+    df = pd.DataFrame({"x": [5], "y": [3]})
+    result = CRISPRessoMultiProcessing.run_pandas_apply_parallel(
+        df, add_computed, n_processes=1
+    )
+
+    assert len(result) == 1
+    assert result["computed"].iloc[0] == 8
+
+
+# =============================================================================
+# Tests for run_pandas_apply_parallel — multi process
+# =============================================================================
+
+
+def test_run_pandas_apply_parallel_multi_process():
+    """Test multi-process path preserves per-row data integrity.
+
+    The implementation shuffles rows before splitting across workers, then
+    concatenates results. This verifies every row's relationship survives.
+    """
+    df = pd.DataFrame({"value": list(range(10))})
+    result = CRISPRessoMultiProcessing.run_pandas_apply_parallel(
+        df, _mp_double_column, n_processes=2
+    )
+
+    assert len(result) == 10
+    assert "doubled" in result.columns
+    assert (result["doubled"] == result["value"] * 2).all()
+
+
+def test_run_pandas_apply_parallel_multi_process_preserves_columns():
+    """Test multi-process path preserves existing columns and adds new ones."""
+    df = pd.DataFrame({"a": list(range(6)), "b": list(range(6, 12))})
+    result = CRISPRessoMultiProcessing.run_pandas_apply_parallel(
+        df, _mp_add_column, n_processes=2
+    )
+
+    assert len(result) == 6
+    assert (result["new_col"] == "added").all()
+    # Original values survived shuffle+split+reassembly
+    assert sorted(result["a"]) == list(range(6))
+    assert sorted(result["b"]) == list(range(6, 12))
+
+
+# =============================================================================
+# Tests for run_parallel_commands — single process
+# =============================================================================
+
+
+def test_run_parallel_commands_single_process_success():
+    """Test single-process path runs all commands successfully."""
+    CRISPRessoMultiProcessing.run_parallel_commands(
+        ["true", "true", "true"], n_processes=1, descriptor="test"
+    )
+
+
+def test_run_parallel_commands_single_process_failure():
+    """Test single-process path raises on command failure."""
+    with pytest.raises(Exception, match="was failed"):
+        CRISPRessoMultiProcessing.run_parallel_commands(
+            ["true", "false", "true"], n_processes=1, descriptor="test"
+        )
+
+
+def test_run_parallel_commands_single_process_continue_on_fail():
+    """Test single-process path continues past failures when flag is set."""
+    CRISPRessoMultiProcessing.run_parallel_commands(
+        ["true", "false", "true"],
+        n_processes=1,
+        descriptor="test",
+        continue_on_fail=True,
+    )
+
+
+def test_run_parallel_commands_single_process_empty_list():
+    """Test single-process path with empty command list."""
+    CRISPRessoMultiProcessing.run_parallel_commands(
+        [], n_processes=1, descriptor="test"
+    )
+
+
+# =============================================================================
+# Tests for run_parallel_commands — multi process
+# =============================================================================
+
+
+def test_run_parallel_commands_multi_process_success():
+    """Test multi-process path runs all commands successfully."""
+    CRISPRessoMultiProcessing.run_parallel_commands(
+        ["true", "true", "true", "true"], n_processes=2, descriptor="test"
+    )
+
+
+def test_run_parallel_commands_multi_process_failure():
+    """Test multi-process path raises on command failure."""
+    with pytest.raises(Exception, match="failed"):
+        CRISPRessoMultiProcessing.run_parallel_commands(
+            ["true", "false", "true", "true"], n_processes=2, descriptor="test"
+        )
+
+
+def test_run_parallel_commands_multi_process_continue_on_fail():
+    """Test multi-process path continues past failures when flag is set."""
+    CRISPRessoMultiProcessing.run_parallel_commands(
+        ["true", "false", "true", "true"],
+        n_processes=2,
+        descriptor="test",
+        continue_on_fail=True,
+    )
+
+
+def test_run_parallel_commands_multi_process_empty_list():
+    """Test multi-process path with empty command list creates pool but succeeds."""
+    CRISPRessoMultiProcessing.run_parallel_commands(
+        [], n_processes=2, descriptor="test"
+    )
+
+
+# =============================================================================
+# Tests for run_crispresso_cmds
+# =============================================================================
+
+
+def test_run_crispresso_cmds_empty_list():
+    """Test run_crispresso_cmds with empty list returns immediately."""
+    CRISPRessoMultiProcessing.run_crispresso_cmds(
+        crispresso_cmds=[],
+        n_processes="1",
+        descriptor="test",
+    )
+
+
+def test_run_crispresso_cmds_single_process_success():
+    """Test run_crispresso_cmds single-process path."""
+    CRISPRessoMultiProcessing.run_crispresso_cmds(
+        crispresso_cmds=["true", "true"],
+        n_processes="1",
+        descriptor="test",
+    )
+
+
+def test_run_crispresso_cmds_single_process_failure():
+    """Test run_crispresso_cmds single-process path raises on failure."""
+    with pytest.raises(Exception, match="failed"):
+        CRISPRessoMultiProcessing.run_crispresso_cmds(
+            crispresso_cmds=["true", "false", "true"],
+            n_processes="1",
+            descriptor="test",
+        )
+
+
+def test_run_crispresso_cmds_single_process_continue_on_fail():
+    """Test run_crispresso_cmds single-process path continues past failures."""
+    CRISPRessoMultiProcessing.run_crispresso_cmds(
+        crispresso_cmds=["true", "false", "true"],
+        n_processes="1",
+        descriptor="test",
+        continue_on_fail=True,
+    )
+
+
+def test_run_crispresso_cmds_multi_process_success():
+    """Test run_crispresso_cmds multi-process path (imap_unordered)."""
+    CRISPRessoMultiProcessing.run_crispresso_cmds(
+        crispresso_cmds=["true", "true", "true"],
+        n_processes="2",
+        descriptor="test",
+    )
+
+
+def test_run_crispresso_cmds_multi_process_failure():
+    """Test run_crispresso_cmds multi-process path raises on failure."""
+    with pytest.raises(Exception, match="failed"):
+        CRISPRessoMultiProcessing.run_crispresso_cmds(
+            crispresso_cmds=["true", "false", "true"],
+            n_processes="2",
+            descriptor="test",
+        )
+
+
+def test_run_crispresso_cmds_multi_process_continue_on_fail():
+    """Test run_crispresso_cmds multi-process path continues past failures."""
+    CRISPRessoMultiProcessing.run_crispresso_cmds(
+        crispresso_cmds=["true", "false", "true"],
+        n_processes="2",
+        descriptor="test",
+        continue_on_fail=True,
+    )
+
+
+def test_run_crispresso_cmds_max_processes():
+    """Test run_crispresso_cmds with n_processes='max' branch."""
+    CRISPRessoMultiProcessing.run_crispresso_cmds(
+        crispresso_cmds=["true"],
+        n_processes="max",
+        descriptor="test",
+    )
