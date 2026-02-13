@@ -25,11 +25,10 @@ from concurrent.futures import ProcessPoolExecutor, wait
 from datetime import datetime
 from functools import partial
 from multiprocessing import Process
-
-from CRISPResso2 import CRISPRessoCOREResources
+from CRISPResso2 import CRISPRessoCOREResources, CRISPRessoShared
+from CRISPResso2.writers import vcf
 from CRISPResso2.CRISPRessoCOREResources import ResultsSlotsDict
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
-from CRISPResso2 import CRISPRessoShared
 
 if CRISPRessoShared.is_C2Pro_installed():
     from CRISPRessoPro import __version__ as CRISPRessoProVersion
@@ -37,8 +36,7 @@ if CRISPRessoShared.is_C2Pro_installed():
 else:
     C2PRO_INSTALLED = False
 
-from CRISPResso2 import CRISPResso2Align
-from CRISPResso2 import CRISPRessoMultiProcessing
+from CRISPResso2 import CRISPResso2Align, CRISPRessoMultiProcessing
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -136,8 +134,6 @@ def get_n_reads_bam(bam_filename,bam_chr_loc=""):
     except ValueError:
         raise CRISPRessoShared.InstallationException('Error when running the command:' + cmd + '\nCheck that samtools is installed correctly.')
     return retval
-
-
 pd=check_library('pandas')
 np=check_library('numpy')
 
@@ -499,6 +495,159 @@ def get_pe_scaffold_search(prime_edited_ref_sequence, prime_editing_pegRNA_exten
     info('Searching for scaffold-templated reads with the sequence: \'' + str(scaffold_dna[0:len_scaffold_to_use]) +'\' starting at position '+ str(scaffold_start_loc) + ' in reads that align to the prime-edited sequence')
     return (scaffold_start_loc, scaffold_dna[0:len_scaffold_to_use])
 
+
+def get_prime_editing_guides(this_amp_seq, ref0_seq, prime_editing_edited_amp_seq, prime_editing_pegRNA_extension_seq, prime_editing_extension_seq_dna, prime_editing_pegRNA_spacer_seq, prime_editing_nicking_guide_seq,
+                             prime_editing_pegRNA_extension_quantification_window_size, nicking_qw_center, nicking_qw_size, aln_matrix, needleman_wunsch_gap_open, needleman_wunsch_gap_extend, prime_editing_gap_open, prime_editing_gap_extend):
+    """
+    gets prime editing guide sequences for this amplicon
+    this_amp_seq : sequence of this amplicon
+    ref0_seq : sequence of the 0th amplicon (the wildtype amplicon)
+    prime_editing_edited_amp_seq : sequence of the edited amplicon
+    prime_editing_extension_seq : the extension sequence on the RNA strand
+    prime_editing_extension_seq_dna : the extension sequence on the DNA strand (usually reverse complement of the RNA strand)
+    prime_editing_pegRNA_spacer_seq : the spacer sequence of the pegRNA
+    prime_editing_nicking_guide_seq : the spacer sequence of the nicking guide
+    prime_editing_pegRNA_extension_quantification_window_size : qw size for extension sequence (starts at end of extension sequence)
+    nicking_qw_center: for the nicking guides, what is the quantification center (usually int(args.quantification_window_center.split(",")[0]))
+    nicking_qw_size: for the nicking guides, what is the quantification size (usually int(args.quantification_window_size.split(",")[0]))
+    aln_matrix: matrix specifying alignment substitution scores in the NCBI format
+    needleman_wunsch_gap_open: alignment penalty assignment used to determine similarity of two sequences.
+    needleman_wunsch_gap_extend: alignment penalty assignment used to determine similarity of two sequences.
+    prime_editing_gap_open: alignment penalty assignment used to determine similarity of two pegRNA components. For prime editing the gap open is usually larger while the extension penalty is lower/zero to accomodate insertions of large sequences.
+    prime_editing_gap_extend: alignment penalty assignment used to determine similarity of two pegRNA components
+    """
+    pe_guides = []
+    pe_orig_guide_seqs = []
+    pe_guide_mismatches = []
+    pe_guide_names = []
+    pe_guide_qw_centers = []
+    pe_guide_qw_sizes = []
+    pe_guide_plot_cut_points = []
+
+    #editing extension aligns to the prime-edited sequence only
+    #if this is the prime edited sequence, add it directly
+    if this_amp_seq == prime_editing_edited_amp_seq:
+        best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, prime_editing_edited_amp_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+        pe_guides.append(best_aln_seq)
+        pe_orig_guide_seqs.append(prime_editing_pegRNA_extension_seq)
+        pe_guide_mismatches.append(best_aln_mismatches)
+        pe_guide_names.append('PE Extension')
+        pe_guide_qw_centers.append(0)
+        pe_guide_qw_sizes.append(prime_editing_pegRNA_extension_quantification_window_size)
+        pe_guide_plot_cut_points.append(False)
+    #otherwise, clone the coordinates from the prime_editing_edited_amp_seq
+    else:
+        best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, prime_editing_edited_amp_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+        match = re.search(best_aln_seq, prime_editing_edited_amp_seq)
+        pe_start_loc = match.start()
+        pe_end_loc = match.end()
+        coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=this_amp_seq, from_sequence=prime_editing_edited_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+        new_seq = this_amp_seq[coords_l[pe_start_loc]:coords_r[pe_end_loc]]
+        pe_guides.append(new_seq)
+        pe_orig_guide_seqs.append(prime_editing_pegRNA_extension_seq)
+        rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=prime_editing_edited_amp_seq, from_sequence=this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+
+        this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(this_amp_seq, prime_editing_edited_amp_seq, pe_start_loc, pe_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
+        this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
+        pe_guide_mismatches.append(this_mismatches)
+
+        pe_guide_names.append('PE Extension')
+        pe_guide_qw_centers.append(0)
+        pe_guide_qw_sizes.append(prime_editing_pegRNA_extension_quantification_window_size)
+        pe_guide_plot_cut_points.append(False)
+
+
+    #now handle the pegRNA spacer seq
+    if prime_editing_pegRNA_spacer_seq == "":
+        raise CRISPRessoShared.BadParameterException('The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) is required for prime editing analysis.')
+    pegRNA_spacer_seq = prime_editing_pegRNA_spacer_seq.upper().replace('U', 'T')
+    wrong_nt=CRISPRessoShared.find_wrong_nt(pegRNA_spacer_seq)
+    if wrong_nt:
+        raise CRISPRessoShared.NTException('The prime editing pegRNA spacer sgRNA sequence contains bad characters:%s'  % ' '.join(wrong_nt))
+    if pegRNA_spacer_seq not in ref0_seq and CRISPRessoShared.reverse_complement(pegRNA_spacer_seq) not in ref0_seq:
+        raise CRISPRessoShared.BadParameterException('The given prime editing pegRNA spacer is not found in the reference sequence')
+
+    #spacer is found in the first amplicon (unmodified ref), may be modified in the other amplicons
+    #if this is the first sequence, add it directly
+    if this_amp_seq == ref0_seq:
+        best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(pegRNA_spacer_seq, ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+        pe_guides.append(best_aln_seq)
+        pe_orig_guide_seqs.append(prime_editing_pegRNA_spacer_seq)
+        pe_guide_mismatches.append(best_aln_mismatches)
+        pe_guide_names.append('PE spacer sgRNA')
+        pe_guide_qw_centers.append(nicking_qw_center)
+        pe_guide_qw_sizes.append(nicking_qw_size)
+        pe_guide_plot_cut_points.append(True)
+    #otherwise, clone the coordinates from the ref0 amplicon
+    else:
+        best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(pegRNA_spacer_seq, ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+        match = re.search(best_aln_seq, ref0_seq)
+        r0_start_loc = match.start()
+        r0_end_loc = match.end()
+        coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=this_amp_seq, from_sequence=ref0_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+        new_seq = this_amp_seq[coords_l[r0_start_loc]:coords_r[r0_end_loc]]
+        pe_guides.append(new_seq)
+        pe_orig_guide_seqs.append(prime_editing_pegRNA_spacer_seq)
+        rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=ref0_seq, from_sequence=this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+        this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(this_amp_seq, ref0_seq, r0_start_loc, r0_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
+        this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
+        pe_guide_mismatches.append(this_mismatches)
+
+        pe_guide_names.append('PE spacer sgRNA')
+        nicking_center_ref0 = r0_end_loc + nicking_qw_center #if there are indels in this amplicon between the end of the guide and the nicking center, adjust the center
+        nicking_center_this_amp_seq = rev_coords_r[nicking_center_ref0] - coords_r[r0_end_loc]
+        pe_guide_qw_centers.append(nicking_center_this_amp_seq)
+        pe_guide_qw_sizes.append(nicking_qw_size)
+        pe_guide_plot_cut_points.append(True)
+
+    #nicking guide
+    if prime_editing_nicking_guide_seq:
+        nicking_guide_seq = prime_editing_nicking_guide_seq.upper().replace('U', 'T')
+        wrong_nt=CRISPRessoShared.find_wrong_nt(nicking_guide_seq)
+        if wrong_nt:
+            raise CRISPRessoShared.NTException('The prime editing nicking sgRNA sequence contains bad characters:%s'  % ' '.join(wrong_nt))
+
+        #nicking guide is found in the reverse_complement of the first amplicon, may be modified in the other amplicons
+        if this_amp_seq == ref0_seq:
+            rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
+            best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+            if nicking_guide_seq not in rc_ref0_seq:
+                warn('The given prime editing nicking guide is not found in the reference sequence. Using the best match: ' + str(best_aln_seq))
+            pe_guides.append(best_aln_seq)
+            pe_orig_guide_seqs.append(prime_editing_nicking_guide_seq)
+            pe_guide_mismatches.append(best_aln_mismatches)
+            pe_guide_names.append('PE nicking sgRNA')
+            pe_guide_qw_centers.append(nicking_qw_center)
+            pe_guide_qw_sizes.append(nicking_qw_size)
+            pe_guide_plot_cut_points.append(True)
+        #otherwise, clone the coordinates from the ref0 amplicon
+        else:
+            rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
+            rc_this_amp_seq = CRISPRessoShared.reverse_complement(this_amp_seq)
+            best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
+            match = re.search(best_aln_seq, rc_ref0_seq)
+            r0_start_loc = match.start()
+            r0_end_loc = match.end()
+            coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=rc_this_amp_seq, from_sequence=rc_ref0_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+            new_seq = rc_this_amp_seq[coords_l[r0_start_loc]:coords_r[r0_end_loc]]
+            pe_guides.append(new_seq)
+            pe_orig_guide_seqs.append(prime_editing_nicking_guide_seq)
+            rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=rc_ref0_seq, from_sequence=rc_this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
+            this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(rc_this_amp_seq, rc_ref0_seq, r0_start_loc, r0_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
+            this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
+
+            pe_guide_mismatches.append(this_mismatches)
+            pe_guide_names.append('PE nicking sgRNA')
+            nicking_center_ref0 = r0_end_loc + nicking_qw_center
+            nicking_center_this_amp_seq = rev_coords_r[nicking_center_ref0] - coords_r[r0_end_loc]
+            pe_guide_qw_centers.append(nicking_center_this_amp_seq)
+            pe_guide_qw_sizes.append(nicking_qw_size)
+            pe_guide_plot_cut_points.append(True)
+
+    return(pe_guides, pe_orig_guide_seqs, pe_guide_mismatches, pe_guide_names, pe_guide_qw_centers, pe_guide_qw_sizes, pe_guide_plot_cut_points)
+#end prime editing guide function
+
+
 def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaffold_dna_info):
     """
     Gets the payload object for a read that hasn't been seen in the cache yet
@@ -518,6 +667,8 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
     """
     aln_scores = []
     best_match_score = -1
+    best_unfiltered_score = -1
+    best_unfiltered_name = None
     best_match_s1s = []
     best_match_s2s = []
     best_match_names = []
@@ -560,8 +711,12 @@ def get_new_variant_object(args, fastq_seq, refs, ref_names, aln_matrix, pe_scaf
                 aln_strand = '-'
 
 #                print "for " + ref_name + " got fws1: " + str(fws1) + " and fws2: " + str(fws2) + " score: " +str(fwscore)
-        aln_scores.append(score)
         ref_aln_details.append((ref_name, s1, s2, score))
+        if score > best_unfiltered_score:
+            best_unfiltered_score = score
+            best_unfiltered_name = ref_name
+        aln_scores.append(score)
+
 
         #reads are matched to the reference to which they best align. The 'min_aln_score' is calculated using only the changes in 'include_idxs'
         if score > best_match_score and score > refs[ref_name]['min_aln_score']:
@@ -873,6 +1028,8 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
 
     aln_scores = []
     best_match_score = -1
+    best_unfiltered_score = -1
+    best_unfiltered_name = None
     best_match_s1s = []
     best_match_s2s = []
     best_match_names = []
@@ -919,9 +1076,14 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
                 s2 = rvs2
                 score = rvscore
 
+            if score > best_unfiltered_score:
+                best_unfiltered_score = score
+                best_unfiltered_name = ref_name
+
 #                print "for " + ref_name + " got fws1: " + str(fws1) + " and fws2: " + str(fws2) + " score: " +str(fwscore)
         aln_scores.append(score)
         ref_aln_details.append((ref_name, s1, s2, score, qual))
+
         #reads are matched to the reference to which they best align. The 'min_aln_score' is calculated using only the changes in 'include_idxs'
         if score > best_match_score and score > refs[ref_name]['min_aln_score']:
             best_match_score = score
@@ -1071,7 +1233,6 @@ def variant_file_generator_process(seq_list, get_new_variant_object, args, refs,
 
     """
     variant_file_path = os.path.join(variants_dir, f"variants_{process_id}.tsv")
-
     variant_lines = ""
     with open(variant_file_path, 'w') as file:
         file.truncate() # Ensures tsv file is empty before writing to it
@@ -1124,7 +1285,6 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
     N_MODS_OUTSIDE_WINDOW = 0 # number of modifications found outside the quantification window
     N_READS_IRREGULAR_ENDS = 0 # number of reads with modifications at the 0 or -1 position
     READ_LENGTH = 0
-    unaligned_reads = []
 
     aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
     CRISPRessoShared.check_file(aln_matrix_loc)
@@ -1262,8 +1422,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
                                 if variant['best_match_score'] <= 0:
                                     N_COMPUTED_NOTALN += 1
                                     N_CACHED_NOTALN += (variant_count - 1)
-                                    # remove the unaligned reads from the cache
-                                    unaligned_reads.append(seq)
+                                    not_aln[seq] = variant
                                 elif variant['best_match_score'] > 0:
                                     variantCache[seq] = variant
                                     N_COMPUTED_ALN += 1
@@ -1288,7 +1447,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         else:
             raise CRISPRessoShared.OutputFolderIncompleteException(f"Could not find output folder, try deleting output folder and rerunning CRISPResso")
 
-        for seq in unaligned_reads:
+        for seq in not_aln:
             del variantCache[seq]
 
         for key in list(variantCache.keys()):
@@ -1581,12 +1740,12 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
         "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
         "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
         "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
-        "READ_LENGTH": READ_LENGTH
+        "READ_LENGTH": READ_LENGTH,
         }
-    return(aln_stats)
+    return aln_stats, not_aln
 
 
-def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory, fastq_write_out=False):
+def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_remove, output_directory):
     """process_fastq processes each of the reads contained in a fastq file, given a cache of pre-computed variants
     Parameters
     ----------
@@ -1668,8 +1827,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
     if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
         pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
-    if fastq_write_out:
-        not_aligned_variants = {}
+
+    not_aligned_variants = {}
 
 
 
@@ -1781,8 +1940,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                                 if variant['best_match_score'] <= 0:
                                     N_COMPUTED_NOTALN += 1
                                     N_CACHED_NOTALN += (variant_count - 1)
-                                    if fastq_write_out:
-                                        not_aligned_variants[seq] = variant
+                                    not_aligned_variants[seq] = variant
                                     # remove the unaligned reads from the cache
                                     unaligned_reads.append(seq)
                                 elif variant['best_match_score'] > 0:
@@ -1820,8 +1978,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
                 N_COMPUTED_NOTALN += 1
                 N_CACHED_NOTALN += (variant_count - 1)
                 unaligned_reads.append(fastq_seq)
-                if fastq_write_out:
-                    not_aligned_variants[fastq_seq] = variant
+                not_aligned_variants[fastq_seq] = variant
             elif variant['best_match_score'] > 0:
                 variantCache[fastq_seq] = variant
                 N_COMPUTED_ALN += 1
@@ -1853,12 +2010,9 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
             "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
             "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
             "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
-            "READ_LENGTH": READ_LENGTH
+            "READ_LENGTH": READ_LENGTH,
             }
-    if fastq_write_out:
-        return(aln_stats, not_aligned_variants)
-    else:
-        return(aln_stats)
+    return aln_stats, not_aligned_variants
 
 
 def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, refs, args, files_to_remove, output_directory):
@@ -1993,7 +2147,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                                     crispresso_sam_optional_fields = "c2:Z:ALN=NA" +\
                                             " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                                             " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
-                                    not_aln[seq] = crispresso_sam_optional_fields
+                                    not_aln[seq] = new_variant
+                                    not_aln[seq]['crispresso_sam_optional_fields'] = crispresso_sam_optional_fields
                                 else:
                                     class_names = []
                                     ins_inds = []
@@ -2061,7 +2216,8 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
                             " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                             " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
                     sam_line_els.append(crispresso_sam_optional_fields)
-                    not_aln[fastq_seq] = crispresso_sam_optional_fields
+                    not_aln[fastq_seq] = new_variant
+                    not_aln[fastq_seq]['crispresso_sam_optional_fields'] = crispresso_sam_optional_fields
                 else:
                     N_COMPUTED_ALN+=1
                     N_CACHED_ALN += (variant_count - 1)
@@ -2120,12 +2276,11 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             sam_line_els = sam_line.rstrip().split("\t")
             fastq_seq = sam_line_els[9]
             if fastq_seq in not_aln:
-                sam_line_els.append(not_aln[fastq_seq]) #Crispresso2 alignment: NA
+                sam_line_els.append(not_aln[fastq_seq]['crispresso_sam_optional_fields']) #Crispresso2 alignment: NA
                 sam_out.write("\t".join(sam_line_els)+"\n")
             elif fastq_seq in variantCache:
                 sam_line_els.append(variantCache[fastq_seq]['crispresso2_annotation'])
                 sam_out.write("\t".join(sam_line_els)+"\n")
-
     for fastq_seq in not_aln.keys():
         del variantCache[fastq_seq]
     info("Finished reads; N_TOT_READS: %d N_COMPUTED_ALN: %d N_CACHED_ALN: %d N_COMPUTED_NOTALN: %d N_CACHED_NOTALN: %d"%(N_TOT_READS, N_COMPUTED_ALN, N_CACHED_ALN, N_COMPUTED_NOTALN, N_CACHED_NOTALN))
@@ -2139,14 +2294,14 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
             "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
             "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
             "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
-            "READ_LENGTH": READ_LENGTH
+            "READ_LENGTH": READ_LENGTH,
             }
-    return(aln_stats)
+    return aln_stats, not_aln
 
 
 def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, refs, args, files_to_remove, output_directory):
 
-    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
+    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory)
     info("Reads processed, now annotating fastq_output file: %s"%(fastq_output))
 
     if fastq_input.endswith('.gz'):
@@ -2210,7 +2365,7 @@ def process_fastq_write_out(fastq_input, fastq_output, variantCache, ref_names, 
             fastq_id = fastq_input_handle.readline()
 
 
-    return aln_stats
+    return aln_stats, not_aln
 
 def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, variantCache, ref_names, refs, args, files_to_remove, output_directory):
     """
@@ -2235,7 +2390,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         files_to_remove: list of files to remove
         output_directory: directory to write output tsv files to
     """
-    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory, True)
+    aln_stats, not_aln = process_fastq(fastq_input, variantCache, ref_names, refs, args, files_to_remove, output_directory)
     info("Reads processed, now annotating fastq_output file: %s"%(bam_output))
 
 
@@ -2281,9 +2436,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
                         " ALN_SCORES=" + ('&'.join([str(x) for x in new_variant['aln_scores']])) +\
                         " ALN_DETAILS=" + ('&'.join([','.join([str(y) for y in x]) for x in new_variant['ref_aln_details']]))
                 new_sam_entry.append(crispresso_sam_optional_fields)
-                not_aln[fastq_seq] = new_sam_entry
                 sam_out_handle.write("\t".join(new_sam_entry)+"\n")  # write cached alignment with modified read id and qual
-                continue
 
             if fastq_seq in variantCache:
                 new_variant = variantCache[fastq_seq]
@@ -2379,7 +2532,7 @@ def process_single_fastq_write_bam_out(fastq_input, bam_output, bam_header, vari
         os.remove(sam_out)
 
     info("Finished writing out to bam file: %s"%(bam_output))
-    return(aln_stats)
+    return aln_stats, not_aln
 
 
 def normalize_name(name, fastq_r1, fastq_r2, bam_input):
@@ -2437,6 +2590,39 @@ def to_numeric_ignore_columns(df, ignore_columns):
         if col not in ignore_columns:
             df[col] = df[col].apply(pd.to_numeric, errors='raise')
     return df
+
+
+def get_scores_and_counts(variant_dict):
+    homology_scores = []
+    counts = []
+    alleles_homology_scores_and_counts = []
+    for seq, variant in variant_dict.items():
+        if len(variant) > 1:
+            homology_scores.append(max(variant['aln_scores']))
+            counts.append(variant['count'])
+            alleles_homology_scores_and_counts.append({
+                'sequence': seq,
+                'homology_score': max(variant['aln_scores']),
+                'count': variant['count']
+            })
+    return homology_scores, counts, alleles_homology_scores_and_counts
+
+
+def get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename):
+    """Get and save the unfiltered homology scores for all alleles"""
+
+    aln_homology_scores, aln_counts, aln_alleles_homology_scores_and_counts = get_scores_and_counts(variantCache)
+    not_aln_homology_scores, not_aln_counts, not_aln_alleles_homology_scores_and_counts = get_scores_and_counts(not_aln_variant_objects)
+
+    alleles_homology_scores_and_counts = aln_alleles_homology_scores_and_counts + not_aln_alleles_homology_scores_and_counts
+    homology_scores = aln_homology_scores + not_aln_homology_scores
+    counts = aln_counts + not_aln_counts
+
+    alleles_homology_scores_and_counts.sort(key=lambda x: (x['homology_score'], x['sequence']), reverse=True)
+
+    df = pd.DataFrame(alleles_homology_scores_and_counts)
+    df.to_csv(alleles_homology_scores_filename, sep='\t', header=True, index=None)
+    return homology_scores, counts
 
 
 def main():
@@ -2643,6 +2829,9 @@ def main():
             crispresso2_info['bam_output'] = bam_output
             info('Writing bam output file: ' + bam_output)
 
+        if args.vcf_output:
+            if args.amplicon_coordinates == "":
+                raise CRISPRessoShared.BadParameterException('Please provide the coordinates of the VCF file using the --amplicon_coordinates parameter.')
 
         #### ASSERT GUIDE(S)
         guides = []
@@ -2908,157 +3097,6 @@ def main():
         if len(amplicon_seq_set) != len(amplicon_seq_arr):
             raise CRISPRessoShared.BadParameterException('Provided amplicon sequences must be unique!')
 
-
-
-        def get_prime_editing_guides(this_amp_seq, this_amp_name, ref0_seq, prime_edited_seq, prime_editing_extension_seq_dna, prime_editing_pegRNA_extension_quantification_window_size,
-                                     nicking_qw_center, nicking_qw_size,aln_matrix,needleman_wunsch_gap_open,needleman_wunsch_gap_extend, prime_editing_gap_open, prime_editing_gap_extend):
-            """
-            gets prime editing guide sequences for this amplicon
-            this_amp_seq : sequence of this amplicon
-            this_amp_name : name of this amplicon
-            ref0_seq : sequence of the 0th amplicon (the wildtype amplicon)
-            prime_editing_edited_amp_seq : sequence of the edited amplicon
-            prime_editing_extension_seq_dna : the extension sequence on the DNA strand
-            prime_editing_pegRNA_extension_quantification_window_size : qw size for extension sequence (starts at end of extension sequence)
-            nicking_qw_center: for the nicking guides, what is the quantification center (usually int(args.quantification_window_center.split(",")[0]))
-            nicking_qw_size: for the nicking guides, what is the quantification size (usually int(args.quantification_window_size.split(",")[0]))
-            aln_matrix: matrix specifying alignment substitution scores in the NCBI format
-            needleman_wunsch_gap_open: alignment penalty assignment used to determine similarity of two sequences.
-            needleman_wunsch_gap_extend: alignment penalty assignment used to determine similarity of two sequences.
-            prime_editing_gap_open: alignment penalty assignment used to determine similarity of two pegRNA components. For prime editing the gap open is usually larger while the extension penalty is lower/zero to accomodate insertions of large sequences.
-            prime_editing_gap_extend: alignment penalty assignment used to determine similarity of two pegRNA components
-            """
-            pe_guides = []
-            pe_orig_guide_seqs = []
-            pe_guide_mismatches = []
-            pe_guide_names = []
-            pe_guide_qw_centers = []
-            pe_guide_qw_sizes = []
-            pe_guide_plot_cut_points = []
-
-            #editing extension aligns to the prime-edited sequence only
-            #if this is the prime edited sequence, add it directly
-            if this_amp_seq == prime_editing_edited_amp_seq:
-                best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, prime_editing_edited_amp_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                pe_guides.append(best_aln_seq)
-                pe_orig_guide_seqs.append(args.prime_editing_pegRNA_extension_seq)
-                pe_guide_mismatches.append(best_aln_mismatches)
-                pe_guide_names.append('PE Extension')
-                pe_guide_qw_centers.append(0)
-                pe_guide_qw_sizes.append(prime_editing_pegRNA_extension_quantification_window_size)
-                pe_guide_plot_cut_points.append(False)
-            #otherwise, clone the coordinates from the prime_editing_edited_amp_seq
-            else:
-                best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(prime_editing_extension_seq_dna, prime_editing_edited_amp_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                match = re.search(best_aln_seq, prime_editing_edited_amp_seq)
-                pe_start_loc = match.start()
-                pe_end_loc = match.end()
-                coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=this_amp_seq, from_sequence=prime_editing_edited_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                new_seq = this_amp_seq[coords_l[pe_start_loc]:coords_r[pe_end_loc]]
-                pe_guides.append(new_seq)
-                pe_orig_guide_seqs.append(args.prime_editing_pegRNA_extension_seq)
-                rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=prime_editing_edited_amp_seq, from_sequence=this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-
-                this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(this_amp_seq, prime_editing_edited_amp_seq, pe_start_loc, pe_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
-                this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
-                pe_guide_mismatches.append(this_mismatches)
-
-                pe_guide_names.append('PE Extension')
-                pe_guide_qw_centers.append(0)
-                pe_guide_qw_sizes.append(prime_editing_pegRNA_extension_quantification_window_size)
-                pe_guide_plot_cut_points.append(False)
-
-
-            #now handle the pegRNA spacer seq
-            if args.prime_editing_pegRNA_spacer_seq == "":
-                raise CRISPRessoShared.BadParameterException('The prime editing pegRNA spacer sequence (--prime_editing_pegRNA_spacer_seq) is required for prime editing analysis.')
-            pegRNA_spacer_seq = args.prime_editing_pegRNA_spacer_seq.upper().replace('U', 'T')
-            wrong_nt=CRISPRessoShared.find_wrong_nt(pegRNA_spacer_seq)
-            if wrong_nt:
-                raise CRISPRessoShared.NTException('The prime editing pegRNA spacer sgRNA sequence contains bad characters:%s'  % ' '.join(wrong_nt))
-            if pegRNA_spacer_seq not in amplicon_seq_arr[0] and CRISPRessoShared.reverse_complement(pegRNA_spacer_seq) not in amplicon_seq_arr[0]:
-                raise CRISPRessoShared.BadParameterException('The given prime editing pegRNA spacer is not found in the reference sequence')
-
-            #spacer is found in the first amplicon (unmodified ref), may be modified in the other amplicons
-            #if this is the first sequence, add it directly
-            if this_amp_seq == ref0_seq:
-                best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(pegRNA_spacer_seq, ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                pe_guides.append(best_aln_seq)
-                pe_orig_guide_seqs.append(args.prime_editing_pegRNA_spacer_seq)
-                pe_guide_mismatches.append(best_aln_mismatches)
-                pe_guide_names.append('PE spacer sgRNA')
-                pe_guide_qw_centers.append(nicking_qw_center)
-                pe_guide_qw_sizes.append(nicking_qw_size)
-                pe_guide_plot_cut_points.append(True)
-            #otherwise, clone the coordinates from the ref0 amplicon
-            else:
-                best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(pegRNA_spacer_seq, ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                match = re.search(best_aln_seq, ref0_seq)
-                r0_start_loc = match.start()
-                r0_end_loc = match.end()
-                coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=this_amp_seq, from_sequence=ref0_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                new_seq = this_amp_seq[coords_l[r0_start_loc]:coords_r[r0_end_loc]]
-                pe_guides.append(new_seq)
-                pe_orig_guide_seqs.append(args.prime_editing_pegRNA_spacer_seq)
-                rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=ref0_seq, from_sequence=this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(this_amp_seq, ref0_seq, r0_start_loc, r0_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
-                this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
-                pe_guide_mismatches.append(this_mismatches)
-
-                pe_guide_names.append('PE spacer sgRNA')
-                nicking_center_ref0 = r0_end_loc + nicking_qw_center #if there are indels in this amplicon between the end of the guide and the nicking center, adjust the center
-                nicking_center_this_amp_seq = rev_coords_r[nicking_center_ref0] - coords_r[r0_end_loc]
-                pe_guide_qw_centers.append(nicking_center_this_amp_seq)
-                pe_guide_qw_sizes.append(nicking_qw_size)
-                pe_guide_plot_cut_points.append(True)
-
-            #nicking guide
-            if args.prime_editing_nicking_guide_seq:
-                nicking_guide_seq = args.prime_editing_nicking_guide_seq.upper().replace('U', 'T')
-                wrong_nt=CRISPRessoShared.find_wrong_nt(nicking_guide_seq)
-                if wrong_nt:
-                    raise CRISPRessoShared.NTException('The prime editing nicking sgRNA sequence contains bad characters:%s'  % ' '.join(wrong_nt))
-
-                #nicking guide is found in the reverse_complement of the first amplicon, may be modified in the other amplicons
-                if this_amp_seq == ref0_seq:
-                    rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
-                    best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                    if nicking_guide_seq not in rc_ref0_seq:
-                        warn('The given prime editing nicking guide is not found in the reference sequence. Using the best match: ' + str(best_aln_seq))
-                    pe_guides.append(best_aln_seq)
-                    pe_orig_guide_seqs.append(args.prime_editing_nicking_guide_seq)
-                    pe_guide_mismatches.append(best_aln_mismatches)
-                    pe_guide_names.append('PE nicking sgRNA')
-                    pe_guide_qw_centers.append(nicking_qw_center)
-                    pe_guide_qw_sizes.append(nicking_qw_size)
-                    pe_guide_plot_cut_points.append(True)
-                #otherwise, clone the coordinates from the ref0 amplicon
-                else:
-                    rc_ref0_seq = CRISPRessoShared.reverse_complement(ref0_seq)
-                    rc_this_amp_seq = CRISPRessoShared.reverse_complement(this_amp_seq)
-                    best_aln_seq, best_aln_score, best_aln_mismatches, best_aln_start, best_aln_end, s1, s2 = CRISPRessoShared.get_best_aln_pos_and_mismatches(nicking_guide_seq, rc_ref0_seq,aln_matrix,prime_editing_gap_open,prime_editing_gap_extend)
-                    match = re.search(best_aln_seq, rc_ref0_seq)
-                    r0_start_loc = match.start()
-                    r0_end_loc = match.end()
-                    coords_l, coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=rc_this_amp_seq, from_sequence=rc_ref0_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                    new_seq = rc_this_amp_seq[coords_l[r0_start_loc]:coords_r[r0_end_loc]]
-                    pe_guides.append(new_seq)
-                    pe_orig_guide_seqs.append(args.prime_editing_nicking_guide_seq)
-                    rev_coords_l, rev_coords_r = CRISPRessoShared.get_alignment_coordinates(to_sequence=rc_ref0_seq, from_sequence=rc_this_amp_seq,aln_matrix=aln_matrix,needleman_wunsch_gap_open=needleman_wunsch_gap_open,needleman_wunsch_gap_extend=needleman_wunsch_gap_extend)
-                    this_mismatches = CRISPRessoShared.get_sgRNA_mismatch_vals(rc_this_amp_seq, rc_ref0_seq, r0_start_loc, r0_end_loc, coords_l, coords_r, rev_coords_l, rev_coords_r)
-                    this_mismatches += [coords_l[i] for i in best_aln_mismatches] #add mismatches to original sequence
-
-                    pe_guide_mismatches.append(this_mismatches)
-                    pe_guide_names.append('PE nicking sgRNA')
-                    nicking_center_ref0 = r0_end_loc + nicking_qw_center
-                    nicking_center_this_amp_seq = rev_coords_r[nicking_center_ref0] - coords_r[r0_end_loc]
-                    pe_guide_qw_centers.append(nicking_center_this_amp_seq)
-                    pe_guide_qw_sizes.append(nicking_qw_size)
-                    pe_guide_plot_cut_points.append(True)
-
-            return(pe_guides, pe_orig_guide_seqs, pe_guide_mismatches, pe_guide_names, pe_guide_qw_centers, pe_guide_qw_sizes, pe_guide_plot_cut_points)
-        #end prime editing guide function
-
         #now that we're done with adding possible guides and amplicons, go through each amplicon and compute quantification windows
         info('Computing quantification windows', {'percent_complete': 2})
 
@@ -3142,8 +3180,9 @@ def main():
             if args.prime_editing_pegRNA_extension_seq:
                 nicking_qw_center = int(args.quantification_window_center.split(",")[0])
                 nicking_qw_size = int(args.quantification_window_size.split(",")[0])
-                pe_guides, pe_orig_guide_seqs, pe_guide_mismatches, pe_guide_names, pe_guide_qw_centers, pe_guide_qw_sizes, pe_guide_plot_cut_points = get_prime_editing_guides(this_seq, this_name, amplicon_seq_arr[0],
-                        prime_editing_edited_amp_seq, prime_editing_extension_seq_dna, args.prime_editing_pegRNA_extension_quantification_window_size, nicking_qw_center, nicking_qw_size, aln_matrix,
+                pe_guides, pe_orig_guide_seqs, pe_guide_mismatches, pe_guide_names, pe_guide_qw_centers, pe_guide_qw_sizes, pe_guide_plot_cut_points = get_prime_editing_guides(this_seq, amplicon_seq_arr[0],
+                        prime_editing_edited_amp_seq, args.prime_editing_pegRNA_extension_seq, prime_editing_extension_seq_dna, args.prime_editing_pegRNA_spacer_seq, args.prime_editing_nicking_guide_seq,
+                        args.prime_editing_pegRNA_extension_quantification_window_size, nicking_qw_center, nicking_qw_size, aln_matrix,
                         args.needleman_wunsch_gap_open, args.needleman_wunsch_gap_extend, args.prime_editing_gap_open_penalty, args.prime_editing_gap_extend_penalty)
                 this_guides.extend(pe_guides)
                 this_orig_guide_seqs.extend(pe_orig_guide_seqs)
@@ -3610,18 +3649,19 @@ def main():
             if not args.crispresso_merge:
                 processed_output_filename = _jp('out.extendedFrags.fastq.gz')
                 info('Processing sequences with fastp...')
-                if not args.trim_sequences:
-                    args.fastp_options_string += ' --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering'
-                else:
-                    args.fastp_options_string += ' --detect_adapter_for_pe'
+                if not args.fastp_options_string:  # if fastp_options_string has NOT been set by user, set default options
+                    if not args.trim_sequences:
+                        args.fastp_options_string = ' --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering'
+                    else:
+                        args.fastp_options_string = ' --detect_adapter_for_pe'
 
-                fastp_cmd = '{command} -i {r1} -I {r2} --merge --merged_out {out_merged} --unpaired1 {unpaired1} --unpaired2 {unpaired2} --overlap_len_require {min_overlap} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
+                fastp_cmd = '{command} -i {r1} -I {r2} --merge --merged_out {out_merged} --out1 {unmerged1} --out2 {unmerged2} --overlap_len_require {min_overlap} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
                     command=args.fastp_command,
                     r1=args.fastq_r1,
                     r2=args.fastq_r2,
                     out_merged=processed_output_filename,
-                    unpaired1=not_combined_1_filename,
-                    unpaired2=not_combined_2_filename,
+                    unmerged1=not_combined_1_filename,
+                    unmerged2=not_combined_2_filename,
                     min_overlap=args.min_paired_end_reads_overlap,
                     num_threads=n_processes,
                     json_report=_jp('fastp_report.json'),
@@ -3656,7 +3696,7 @@ def main():
                     if merge_status:
                         raise CRISPRessoShared.FastpException('Force-merging read pairs failed to run, please check the log file.')
                     else:
-                        info(f'Forced {num_reads_force_merged} read paisr together.')
+                        info(f'Forced {num_reads_force_merged} read pairs together.')
                     processed_output_filename = new_output_filename
 
                     files_to_remove += [new_merged_filename]
@@ -3667,17 +3707,18 @@ def main():
                 info('Done!', {'percent_complete': 7})
             else:
                 info('Processing sequences with fastp...')
-                if not args.trim_sequences:
-                    args.fastp_options_string += ' --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering'
-                else:
-                    args.fastp_options_string += ' --detect_adapter_for_pe'
+                if not args.fastp_options_string:  # if fastp_options_string has NOT been set by user, set default options
+                    if not args.trim_sequences:
+                        args.fastp_options_string = ' --disable_adapter_trimming --disable_trim_poly_g --disable_quality_filtering --disable_length_filtering'
+                    else:
+                        args.fastp_options_string = ' --detect_adapter_for_pe'
 
-                fastp_cmd = '{command} -i {r1} -I {r2} --out1 {unpaired1} --out2 {unpaired2} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
+                fastp_cmd = '{command} -i {r1} -I {r2} --out1 {unmerged1} --out2 {unmerged2} --thread {num_threads} --json {json_report} --html {html_report} {options} >> {log} 2>&1'.format(
                     command=args.fastp_command,
                     r1=args.fastq_r1,
                     r2=args.fastq_r2,
-                    unpaired1=not_combined_1_filename,
-                    unpaired2=not_combined_2_filename,
+                    unmerged1=not_combined_1_filename,
+                    unmerged2=not_combined_2_filename,
                     min_overlap=args.min_paired_end_reads_overlap,
                     num_threads=n_processes,
                     json_report=_jp('fastp_report.json'),
@@ -3733,19 +3774,19 @@ def main():
 
         #operates on variantCache
         if args.bam_input:
-            aln_stats = process_bam(args.bam_input, args.bam_chr_loc, crispresso2_info['bam_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+            aln_stats, not_aln_variant_objects = process_bam(args.bam_input, args.bam_chr_loc, crispresso2_info['bam_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.fastq_output and not args.crispresso_merge:
-            aln_stats = process_fastq_write_out(processed_output_filename, crispresso2_info['fastq_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+            aln_stats, not_aln_variant_objects = process_fastq_write_out(processed_output_filename, crispresso2_info['fastq_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.bam_output:
             bam_header += '@PG\tID:crispresso2\tPN:crispresso2\tVN:'+CRISPRessoShared.__version__+'\tCL:"'+crispresso_cmd_to_write+'"\n'
-            aln_stats = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+            aln_stats, not_aln_variant_objects = process_single_fastq_write_bam_out(processed_output_filename, crispresso2_info['bam_output'], bam_header, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.crispresso_merge:
             if args.fastq_output:
-                aln_stats = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY, crispresso2_info['fastq_output'])
+                aln_stats, not_aln_variant_objects = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY, crispresso2_info['fastq_output'])
             else:
-                aln_stats = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+                aln_stats, not_aln_variant_objects = process_paired_fastq(not_combined_1_filename, not_combined_2_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         else:
-            aln_stats = process_fastq(processed_output_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
+            aln_stats, not_aln_variant_objects = process_fastq(processed_output_filename, variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
 
         #put empty sequence into cache
         cache_fastq_seq = ''
@@ -3907,7 +3948,7 @@ def main():
             hists_frameshift                    [ref_name] = Counter()
             hists_frameshift                    [ref_name][0] = 0
         #end initialize data structures for each ref
-        def get_allele_row(reference_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, write_detailed_allele_table):
+        def get_allele_row(reference_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload):
             """
             gets a row for storing allele information in the allele table
             parameters:
@@ -3920,7 +3961,7 @@ def main():
             returns:
                 row to put into allele table
             """
-            if args.write_detailed_allele_table:
+            if args.write_detailed_allele_table or args.vcf_output:
                 allele_row = {'#Reads':variant_count,
                     'Aligned_Sequence': variant_payload['aln_seq'],
                     'Reference_Sequence':variant_payload['aln_ref'],
@@ -3990,7 +4031,7 @@ def main():
             #if class is AMBIGUOUS (set above if the args.expand_ambiguous_alignments param is false) don't add the modifications in this allele to the allele summaries
             if class_name == "AMBIGUOUS":
                 variant_payload = variantCache[variant]["variant_"+aln_ref_names[0]]
-                allele_row = get_allele_row('AMBIGUOUS_'+aln_ref_names[0], variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, args.write_detailed_allele_table)
+                allele_row = get_allele_row('AMBIGUOUS_'+aln_ref_names[0], variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload)
                 alleles_list.append(allele_row)
                 continue #for ambiguous reads, don't add indels to reference totals
 
@@ -3999,7 +4040,7 @@ def main():
                 variant_payload = variantCache[variant]["variant_"+ref_name]
                 if args.discard_indel_reads and (variant_payload['deletion_n'] > 0 or variant_payload['insertion_n'] > 0):
                     counts_discarded[ref_name] += variant_count
-                    allele_row = get_allele_row('DISCARDED_'+aln_ref_names[0],variant_count,aln_ref_names_str,aln_ref_scores_str,variant_payload,args.write_detailed_allele_table)
+                    allele_row = get_allele_row('DISCARDED_'+aln_ref_names[0],variant_count,aln_ref_names_str,aln_ref_scores_str,variant_payload)
                     alleles_list.append(allele_row)
                     continue
 
@@ -4009,7 +4050,7 @@ def main():
                 else:
                     counts_unmodified[ref_name] += variant_count
 
-                allele_row = get_allele_row(ref_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload, args.write_detailed_allele_table)
+                allele_row = get_allele_row(ref_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload)
                 alleles_list.append(allele_row)
 
                 this_effective_len= refs[ref_name]['sequence_length'] #how long is this alignment (insertions increase length, deletions decrease length)
@@ -4500,12 +4541,17 @@ def main():
 
         info('Saving processed data...')
 
-        #write alleles table
-        #crispresso1Cols = ["Aligned_Sequence","Reference_Sequence","NHEJ","UNMODIFIED","HDR","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
-        #df_alleles.loc[:,crispresso1Cols].to_csv(_jp('Alleles_frequency_table.txt'),sep='\t',header=True,index=None)
-        #crispresso2Cols = ["Aligned_Sequence","Reference_Sequence","Reference_Name","Read_Status","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
-#        crispresso2Cols = ["Aligned_Sequence","Reference_Sequence","Reference_Name","Read_Status","n_deleted","n_inserted","n_mutated","#Reads","%Reads","Aligned_Reference_Names","Aligned_Reference_Scores"]
-#        crispresso2Cols = ["Read_Sequence","Amplicon_Sequence","Amplicon_Name","Read_Status","n_deleted","n_inserted","n_mutated","#Reads","%Reads"]
+        if args.vcf_output:
+            vcf_path = _jp('CRISPResso_output.vcf')
+            vcf.write_vcf_file(
+                df_alleles,
+                ref_names,
+                {ref_name: len(refs[ref_name]['sequence']) for ref_name in ref_names},
+                args,
+                vcf_path,
+            )
+            crispresso2_info['vcf_output'] = vcf_path
+
         crispresso2Cols = ["Aligned_Sequence", "Reference_Sequence", "Reference_Name", "Read_Status", "n_deleted", "n_inserted", "n_mutated", "#Reads", "%Reads"]
 
         allele_frequency_table_filename = 'Alleles_frequency_table.txt'
@@ -4925,6 +4971,22 @@ def main():
                 crispresso2_info['results']['general_plots']['plot_1d_root'] = os.path.basename(plot_root)
                 crispresso2_info['results']['general_plots']['plot_1d_caption'] = "Figure 1d: Frequency of detection of dsODN " + args.dsODN
                 crispresso2_info['results']['general_plots']['plot_1d_data'] = [('Allele table', os.path.basename(allele_frequency_table_filename))]
+
+            alleles_homology_scores_filename = _jp('Alleles_homology_scores.txt')
+            homology_scores, counts = get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename)
+            plot_1e_root = _jp('1e.Allele_homology_histogram')
+            plot_1e_input = {
+                'fig_root': plot_1e_root,
+                'homology_scores': homology_scores,
+                'counts': counts,
+                'min_homology': args.default_min_aln_score,
+                'save_also_png': save_png,
+            }
+            debug('Plotting alleles homology histogram', {'percent_complete': 47})
+            plot(CRISPRessoPlot.plot_alleles_homology_histogram, plot_1e_input)
+            crispresso2_info['results']['general_plots']['plot_1e_root'] = os.path.basename(plot_1e_root)
+            crispresso2_info['results']['general_plots']['plot_1e_caption'] = "Figure 1e: Distribution of read alignment homology scores, showing the best-scoring alignment of each sequencing read to the provided amplicons. The dashed line indicates the minimum alignment score threshold used to discard low-quality alignments."
+            crispresso2_info['results']['general_plots']['plot_1e_data'] = [('Alleles Homology Scores', os.path.basename(alleles_homology_scores_filename))]
         ###############################################################################################################################################
 
         ref_percent_complete_start, ref_percent_complete_end = 48, 88
@@ -4952,7 +5014,7 @@ def main():
             #only show reference name in filenames if more than one reference
             ref_plot_name = refs[ref_name]['ref_plot_name']
 
-            info('Begin processing plots for amplicon {0}'.format(ref_name), {'percent_complete': ref_percent_complete_start + (ref_percent_complete_step * ref_index)})
+            info('Processing plots for amplicon {0}...'.format(ref_name), {'percent_complete': ref_percent_complete_start + (ref_percent_complete_step * ref_index)})
 
             if n_this_category < 1:
                 continue
