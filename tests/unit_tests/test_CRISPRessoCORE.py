@@ -1252,8 +1252,8 @@ def test_get_refpos_values_insertion_at_start():
 
     result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
 
-    # First ref position should have all leading insertions
-    assert "GG" == result[0]
+    # First ref position should have leading insertions + aligned base
+    assert "GGA" == result[0]
 
 
 def test_get_refpos_values_insertion_at_end():
@@ -1263,8 +1263,8 @@ def test_get_refpos_values_insertion_at_end():
 
     result = CRISPRessoCORE.get_refpos_values(ref_seq, read_seq)
 
-    # Last position should have trailing insertions
-    assert "G" == result[3]
+    # Last position should have aligned base + trailing insertions
+    assert "GGG" == result[3]
 
 
 def test_get_refpos_values_deletions():

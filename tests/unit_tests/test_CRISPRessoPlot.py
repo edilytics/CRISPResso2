@@ -13,59 +13,49 @@ from CRISPResso2 import CRISPRessoPlot
 def test_get_nuc_color_A():
     """Test get_nuc_color returns correct color for A."""
     color = CRISPRessoPlot.get_nuc_color("A", 1.0)
-    assert len(color) == 4  # RGBA
-    assert color[3] == 1.0  # Alpha
-    # Check it's greenish
-    assert color[0] < color[1]  # Green > Red
+    assert color == pytest.approx((127 / 255.0, 201 / 255.0, 127 / 255.0, 1.0))
 
 
 def test_get_nuc_color_T():
     """Test get_nuc_color returns correct color for T."""
     color = CRISPRessoPlot.get_nuc_color("T", 1.0)
-    assert len(color) == 4
-    assert color[3] == 1.0
+    assert color == pytest.approx((190 / 255.0, 174 / 255.0, 212 / 255.0, 1.0))
 
 
 def test_get_nuc_color_C():
     """Test get_nuc_color returns correct color for C."""
     color = CRISPRessoPlot.get_nuc_color("C", 1.0)
-    assert len(color) == 4
-    assert color[3] == 1.0
+    assert color == pytest.approx((253 / 255.0, 192 / 255.0, 134 / 255.0, 1.0))
 
 
 def test_get_nuc_color_G():
     """Test get_nuc_color returns correct color for G."""
     color = CRISPRessoPlot.get_nuc_color("G", 1.0)
-    assert len(color) == 4
-    assert color[3] == 1.0
+    assert color == pytest.approx((255 / 255.0, 255 / 255.0, 153 / 255.0, 1.0))
 
 
 def test_get_nuc_color_N():
     """Test get_nuc_color returns correct color for N (ambiguous)."""
     color = CRISPRessoPlot.get_nuc_color("N", 1.0)
-    assert len(color) == 4
-    assert color[3] == 1.0
+    assert color == pytest.approx((200 / 255.0, 200 / 255.0, 200 / 255.0, 1.0))
 
 
 def test_get_nuc_color_INS():
     """Test get_nuc_color returns correct color for INS (insertion)."""
     color = CRISPRessoPlot.get_nuc_color("INS", 1.0)
-    assert len(color) == 4
-    assert color[3] == 1.0
+    assert color == pytest.approx((193 / 255.0, 129 / 255.0, 114 / 255.0, 1.0))
 
 
 def test_get_nuc_color_DEL():
     """Test get_nuc_color returns correct color for DEL (deletion)."""
     color = CRISPRessoPlot.get_nuc_color("DEL", 1.0)
-    assert len(color) == 4
-    assert color[3] == 1.0
+    assert color == pytest.approx((193 / 255.0, 129 / 255.0, 114 / 255.0, 1.0))
 
 
 def test_get_nuc_color_gap():
     """Test get_nuc_color returns correct color for - (gap)."""
     color = CRISPRessoPlot.get_nuc_color("-", 1.0)
-    assert len(color) == 4
-    assert color[3] == 1.0
+    assert color == pytest.approx((30 / 255.0, 30 / 255.0, 30 / 255.0, 1.0))
 
 
 def test_get_nuc_color_alpha():
@@ -79,10 +69,11 @@ def test_get_nuc_color_alpha():
 
 
 def test_get_nuc_color_unknown():
-    """Test get_nuc_color handles unknown nucleotides."""
+    """Test get_nuc_color handles unknown nucleotides with computed color."""
     color = CRISPRessoPlot.get_nuc_color("X", 1.0)
-    assert len(color) == 4
-    assert color[3] == 1.0  # Alpha
+    char_sum = (ord('X') - 65) / 90.0
+    expected = (char_sum, 1 - char_sum, 2 * char_sum * (1 - char_sum), 1.0)
+    assert color == pytest.approx(expected)
 
 
 # =============================================================================
@@ -110,7 +101,7 @@ def test_get_color_lookup_single():
     """Test get_color_lookup with single nucleotide."""
     colors = CRISPRessoPlot.get_color_lookup(["A"], 1.0)
     assert len(colors) == 1
-    assert "A" in colors
+    assert colors["A"] == pytest.approx((127 / 255.0, 201 / 255.0, 127 / 255.0, 1.0))
 
 
 def test_get_color_lookup_all_nucs():
@@ -118,9 +109,10 @@ def test_get_color_lookup_all_nucs():
     nucs = ["A", "T", "C", "G", "N", "-", "INS", "DEL"]
     colors = CRISPRessoPlot.get_color_lookup(nucs, 0.8)
     assert len(colors) == 8
-    for nuc in nucs:
-        assert nuc in colors
-        assert colors[nuc][3] == 0.8  # Check alpha
+    assert colors["A"] == pytest.approx((127 / 255.0, 201 / 255.0, 127 / 255.0, 0.8))
+    assert colors["T"] == pytest.approx((190 / 255.0, 174 / 255.0, 212 / 255.0, 0.8))
+    assert colors["G"] == pytest.approx((255 / 255.0, 255 / 255.0, 153 / 255.0, 0.8))
+    assert colors["INS"] == pytest.approx(colors["DEL"])  # Same color
 
 
 # =============================================================================
@@ -206,17 +198,21 @@ def test_amino_acids_to_numbers_empty():
 def test_get_amino_acid_color_dict_clustal():
     """Test get_amino_acid_color_dict with clustal scheme."""
     colors = CRISPRessoPlot.get_amino_acid_color_dict('clustal')
-    # Check that standard amino acids are present
-    assert 'A' in colors
-    assert 'G' in colors
-    assert '*' in colors  # Stop codon
+    assert colors['*'] == '#FF0000'
+    assert colors['A'] == '#000000'
+    assert colors['G'] == '#FFA500'
+    assert colors['F'] == '#0000FF'
+    assert colors['I'] == '#008000'
+    assert colors['-'] == '#FFFFFF'
 
 
 def test_get_amino_acid_color_dict_default():
-    """Test get_amino_acid_color_dict with default scheme."""
+    """Test get_amino_acid_color_dict with default scheme (clustal)."""
     colors = CRISPRessoPlot.get_amino_acid_color_dict()
-    assert isinstance(colors, dict)
-    assert len(colors) > 0
+    assert len(colors) == 23
+    assert colors['*'] == '#FF0000'
+    assert colors['A'] == '#000000'
+    assert colors['G'] == '#FFA500'
 
 
 def test_get_amino_acid_color_dict_returns_hex():
@@ -234,9 +230,11 @@ def test_get_amino_acid_color_dict_returns_hex():
 
 
 def test_get_amino_acid_colors_basic():
-    """Test get_amino_acid_colors with basic sequence."""
+    """Test get_amino_acid_colors returns hex+alpha list for clustal."""
     colors = CRISPRessoPlot.get_amino_acid_colors("clustal")
-    assert isinstance(colors, list)
+    assert len(colors) == 23
+    assert colors[0] == '#FF000066'   # * (stop codon)
+    assert colors[1] == '#00000066'   # A
 
 
 # =============================================================================
@@ -278,6 +276,8 @@ def test_get_rows_for_sgRNA_annotation_multiple_non_overlapping():
     amp_len = 100
     result = CRISPRessoPlot.get_rows_for_sgRNA_annotation(sgRNA_intervals, amp_len)
     assert len(result) == 2
+    # Non-overlapping sgRNAs should be on the same row
+    assert result[0] == result[1] == 0
 
 
 def test_get_rows_for_sgRNA_annotation_overlapping():
@@ -311,10 +311,10 @@ def test_prep_alleles_table_basic():
     X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = \
         CRISPRessoPlot.prep_alleles_table(df, 'ATCG', MAX_N_ROWS=10, MIN_FREQUENCY=0)
 
-    assert len(X) == 3
-    assert len(annot) == 3
-    assert len(y_labels) == 3
-    assert is_reference[0] is True  # First row matches reference
+    assert X == [[1, 2, 3, 4], [1, 2, 4, 4], [1, 0, 3, 4]]
+    assert annot == [['A', 'T', 'C', 'G'], ['A', 'T', 'G', 'G'], ['A', '-', 'C', 'G']]
+    assert y_labels == ['50.00% (500 reads)', '30.00% (300 reads)', '20.00% (200 reads)']
+    assert is_reference == [True, False, False]
 
 
 def test_prep_alleles_table_empty():
@@ -347,7 +347,9 @@ def test_prep_alleles_table_max_rows():
     X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = \
         CRISPRessoPlot.prep_alleles_table(df, 'ATCG', MAX_N_ROWS=3, MIN_FREQUENCY=0)
 
-    assert len(X) == 3
+    assert X == [[1, 2, 3, 4], [1, 2, 4, 4], [2, 2, 3, 4]]
+    assert annot == [['A', 'T', 'C', 'G'], ['A', 'T', 'G', 'G'], ['T', 'T', 'C', 'G']]
+    assert y_labels == ['30.00% (300 reads)', '25.00% (250 reads)', '20.00% (200 reads)']
 
 
 def test_prep_alleles_table_with_insertions():
@@ -369,8 +371,6 @@ def test_prep_alleles_table_with_insertions():
     assert len(insertion_dict[0]) > 0
 
 
-
-
 # =============================================================================
 # Tests for color functions - additional cases
 # =============================================================================
@@ -389,16 +389,21 @@ def test_get_color_lookup_with_custom_colors():
     nucs = ['A', 'T', 'C', 'G', 'N', '-']
     colors = CRISPRessoPlot.get_color_lookup(nucs, 0.8, custom_colors=custom_colors)
 
-    assert 'A' in colors
-    assert len(colors['A']) == 4  # RGBA
+    assert colors['A'] == pytest.approx((1.0, 0.0, 0.0, 0.8))
+    assert colors['T'] == pytest.approx((0.0, 1.0, 0.0, 0.8))
+    assert colors['C'] == pytest.approx((0.0, 0.0, 1.0, 0.8))
+    assert colors['G'] == pytest.approx((1.0, 1.0, 0.0, 0.8))
+    assert colors['N'] == pytest.approx((204 / 255.0, 204 / 255.0, 204 / 255.0, 0.8))
+    assert colors['-'] == pytest.approx((0.0, 0.0, 0.0, 0.8))
 
 
 def test_get_amino_acid_color_dict_unique_scheme():
     """Test get_amino_acid_color_dict with unique scheme."""
     colors = CRISPRessoPlot.get_amino_acid_color_dict('unique')
-    assert isinstance(colors, dict)
-    assert '*' in colors
-    assert 'A' in colors
+    assert colors['*'] == '#FF0000'
+    assert colors['A'] == '#000000'
+    assert colors['C'] == '#1E90FF'
+    assert colors['-'] == '#B0B0B0'
 
 
 def test_get_amino_acid_colors_with_dict():
@@ -412,8 +417,10 @@ def test_get_amino_acid_colors_with_dict():
         'Y': '#9ACD32', '': '#FFFFFF', '-': '#B0B0B0'
     }
     colors = CRISPRessoPlot.get_amino_acid_colors(custom_scheme)
-    assert isinstance(colors, list)
-    assert len(colors) == 23  # Number of amino acids including special chars
+    assert len(colors) == 23
+    assert colors[0] == '#FF000066'   # * with hex alpha
+    assert colors[1] == '#00000066'   # A with hex alpha
+    assert colors[-1] == '#B0B0B066'  # - with hex alpha
 
 
 def test_amino_acids_to_numbers_with_special():
@@ -469,9 +476,12 @@ def test_prep_alleles_table_compare_basic():
             df, 'sample1', 'sample2', MAX_N_ROWS=10, MIN_FREQUENCY=0
         )
 
-    assert len(X) == 2
-    assert len(annot) == 2
-    assert len(y_labels) == 2
+    assert X == [[1, 2, 3, 4], [1, 2, 4, 4]]
+    assert annot == [['A', 'T', 'C', 'G'], ['A', 'T', 'G', 'G']]
+    assert y_labels == [
+        '50.00% (500 reads) 40.00% (400 reads) ',
+        '30.00% (300 reads) 35.00% (350 reads) ',
+    ]
 
 
 def test_prep_alleles_table_compare_with_insertion():
@@ -579,10 +589,19 @@ def test_custom_heatmap_with_annotation():
 
 
 def test_get_nuc_color_all_special():
-    """Test get_nuc_color with all special characters."""
-    for nuc in ['A', 'T', 'C', 'G', 'N', 'INS', 'DEL', '-']:
-        color = CRISPRessoPlot.get_nuc_color(nuc, 1.0)
-        assert len(color) == 4  # All should return RGBA
+    """Test get_nuc_color returns distinct colors for each nucleotide type."""
+    expected = {
+        'A':   (127 / 255.0, 201 / 255.0, 127 / 255.0, 1.0),
+        'T':   (190 / 255.0, 174 / 255.0, 212 / 255.0, 1.0),
+        'C':   (253 / 255.0, 192 / 255.0, 134 / 255.0, 1.0),
+        'G':   (255 / 255.0, 255 / 255.0, 153 / 255.0, 1.0),
+        'N':   (200 / 255.0, 200 / 255.0, 200 / 255.0, 1.0),
+        'INS': (193 / 255.0, 129 / 255.0, 114 / 255.0, 1.0),
+        'DEL': (193 / 255.0, 129 / 255.0, 114 / 255.0, 1.0),
+        '-':   (30 / 255.0, 30 / 255.0, 30 / 255.0, 1.0),
+    }
+    for nuc, exp in expected.items():
+        assert CRISPRessoPlot.get_nuc_color(nuc, 1.0) == pytest.approx(exp)
 
 
 def test_get_color_lookup_preserves_all_nucleotides():
@@ -593,8 +612,6 @@ def test_get_color_lookup_preserves_all_nucleotides():
     for nuc in nucs:
         assert nuc in colors
         assert colors[nuc][3] == 0.5  # Alpha should be 0.5
-
-
 
 
 # =============================================================================
@@ -613,23 +630,21 @@ def test_amino_acids_to_numbers_all_standard():
 
 
 def test_get_amino_acid_colors_none_scheme():
-    """Test get_amino_acid_colors with None scheme uses default."""
+    """Test get_amino_acid_colors with None scheme uses default (clustal)."""
     colors = CRISPRessoPlot.get_amino_acid_colors(None)
-    assert isinstance(colors, list)
     assert len(colors) == 23
+    assert colors[0] == '#FF000066'   # * (stop codon)
+    assert colors[1] == '#00000066'   # A
 
 
 def test_get_amino_acid_color_dict_something_scheme():
     """Test get_amino_acid_color_dict with 'something' scheme."""
     colors = CRISPRessoPlot.get_amino_acid_color_dict('something')
-    assert isinstance(colors, dict)
-    assert '*' in colors
-
-
-
-
-
-
+    assert colors['*'] == '#000000'
+    assert colors['A'] == '#90EE90'
+    assert colors['G'] == '#90EE90'
+    assert colors['I'] == '#0000FF'
+    assert colors['-'] == '#FFFFFF'
 
 
 # =============================================================================
@@ -729,11 +744,10 @@ def test_prep_alleles_table_all_reference():
 
 
 def test_get_nuc_color_lowercase():
-    """Test get_nuc_color handles lowercase (it converts internally)."""
-    # The function typically expects uppercase, but some inputs may be lowercase
+    """Test get_nuc_color falls through to computed color for lowercase."""
     color = CRISPRessoPlot.get_nuc_color("a", 1.0)
-    # Should return some color (may be default/random for unknown)
-    assert len(color) >= 3
+    # Lowercase 'a' doesn't match any case; computed via ord('A')-65 = 0
+    assert color == pytest.approx((0.0, 1.0, 0.0, 1.0))
 
 
 def test_get_color_lookup_alpha_zero():
