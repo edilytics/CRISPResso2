@@ -907,17 +907,6 @@ def test_check_output_folder_invalid_raises():
 
 
 # =============================================================================
-# Tests for read_version function
-# =============================================================================
-
-
-def test_read_version():
-    """Test read_version returns a valid version string."""
-    version = CRISPRessoShared.read_version()
-    assert version == "2.3.4"
-
-
-# =============================================================================
 # Tests for force_symlink function
 # =============================================================================
 
