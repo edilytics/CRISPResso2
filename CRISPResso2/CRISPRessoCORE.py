@@ -6117,7 +6117,26 @@ def main():
                 for i, coding_seq in enumerate(coding_seqs):
                     fig_filename_root = _jp('9a.'+ref_plot_name+'amino_acid_table_around_'+coding_seq)
                     coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
-                    amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1)// 3
+
+                    # Find the sgRNA with cut_point closest to this coding sequence's exon interval
+                    exon_start, exon_end = refs[ref_name]['exon_intervals'][i]
+                    best_cut_point = (exon_start + exon_end) // 2  # default to exon midpoint if no guides
+                    best_plot_cut_point = False
+                    if len(sgRNA_cut_points) > 0:
+                        best_sgRNA_idx = 0
+                        best_distance = float('inf')
+                        for sgRNA_idx, cp in enumerate(sgRNA_cut_points):
+                            if exon_start <= cp <= exon_end:
+                                distance = 0
+                            else:
+                                distance = min(abs(cp - exon_start), abs(cp - exon_end))
+                            if distance < best_distance:
+                                best_distance = distance
+                                best_sgRNA_idx = sgRNA_idx
+                        best_cut_point = sgRNA_cut_points[best_sgRNA_idx]
+                        best_plot_cut_point = sgRNA_plot_cut_points[best_sgRNA_idx]
+
+                    amino_acid_cut_point = (best_cut_point - exon_start + 1) // 3
                     amino_acid_cut_point = max(0, min(amino_acid_cut_point, len(coding_seq_amino_acids) - 1))
                     df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
                         df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
@@ -6134,10 +6153,7 @@ def main():
                         'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
                         'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
                         'SAVE_ALSO_PNG': save_png,
-                        'plot_cut_point': plot_cut_point,
-                        'sgRNA_intervals': new_sgRNA_intervals,
-                        'sgRNA_names': sgRNA_names,
-                        'sgRNA_mismatches': sgRNA_mismatches,
+                        'plot_cut_point': best_plot_cut_point,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
                         'cut_point': amino_acid_cut_point,
                     }
