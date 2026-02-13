@@ -6118,6 +6118,7 @@ def main():
                     fig_filename_root = _jp('9a.'+ref_plot_name+'amino_acid_table_around_'+coding_seq)
                     coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
                     amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1)// 3
+                    amino_acid_cut_point = max(0, min(amino_acid_cut_point, len(coding_seq_amino_acids) - 1))
                     df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
                         df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
                         refs[ref_name]['exon_intervals'][i][0],
