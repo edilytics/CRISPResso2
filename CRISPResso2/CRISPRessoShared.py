@@ -1121,7 +1121,7 @@ def check_if_failed_run(folder_name, info):
         with open(status_info) as fh:
             try:
                 status_dict = json.load(fh)
-                if status_dict['percent_complete'] != 100.0:
+                if status_dict['percent_complete'] < 100:
                     info("Skipping folder '%s'. Run is not complete (%s)." % (folder_name, status_dict['status']))
                     return True, str(status_dict['message'])
                 else:
