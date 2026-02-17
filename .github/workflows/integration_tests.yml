@@ -68,6 +68,8 @@ jobs:
 
       - name: Run Tests
         run: |
+          # Disable set -e that setup-miniconda injects via ~/.profile,
+          # since we handle errors explicitly with || failed=1
           set +e
           failed=0
           for target in ${{ matrix.targets }}; do
