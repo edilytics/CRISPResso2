@@ -47,6 +47,7 @@ CRISPRessoAggregate = "CRISPResso2.CRISPRessoAggregateCORE:main"
 Homepage = "https://github.com/pinellolab/CRISPResso2"
 
 [tool.setuptools]
-packages = ["CRISPResso2", "CRISPResso2.CRISPRessoReports"]
 include-package-data = true
 
+[tool.setuptools.packages.find]
+include = ["CRISPResso2*"]
