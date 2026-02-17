@@ -3103,9 +3103,6 @@ def plot_amino_acid_heatmap(
         custom_colors,
         SAVE_ALSO_PNG=False,
         plot_cut_point=True,
-        sgRNA_intervals=None,
-        sgRNA_names=None,
-        sgRNA_mismatches=None,
         amino_acid_cut_point=None,
         **kwargs):
     """
@@ -3155,9 +3152,6 @@ def plot_amino_acid_heatmap(
             fig.savefig(fig_filename_root+'.png', bbox_inches='tight')
         plt.close(fig)
         return
-
-    sgRNA_rows = []
-    num_sgRNA_rows = 0
 
     fig=plt.figure(figsize=(plot_aa_len*0.3, (N_ROWS+1)*0.6))
     gs1 = gridspec.GridSpec(N_ROWS+1, N_COLUMNS)
