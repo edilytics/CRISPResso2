@@ -24,6 +24,7 @@ from functools import partial
 from multiprocessing import Process
 from CRISPResso2 import CRISPRessoCOREResources, CRISPRessoShared
 from CRISPResso2.writers import vcf
+from CRISPResso2.CRISPRessoCOREResources import ResultsSlotsDict
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
 if CRISPRessoShared.is_C2Pro_installed():
@@ -136,10 +137,8 @@ def get_n_reads_bam(bam_filename, bam_chr_loc=""):
     except ValueError:
         raise CRISPRessoShared.InstallationException('Error when running the command:' + cmd + '\nCheck that samtools is installed correctly.')
     return retval
-
-
-pd = check_library('pandas')
-np = check_library('numpy')
+pd=check_library('pandas')
+np=check_library('numpy')
 
 # start = time.time()
 sns = check_library('seaborn')
@@ -3941,8 +3940,19 @@ def main():
             hists_frameshift[ref_name][0] = 0
         # end initialize data structures for each ref
 
+            inserted_n_dicts                    [ref_name] = Counter()
+            deleted_n_dicts                     [ref_name] = Counter()
+            substituted_n_dicts                 [ref_name] = Counter()
+            effective_len_dicts                 [ref_name] = Counter()
+
+            hists_inframe                       [ref_name] = Counter()
+            hists_inframe                       [ref_name][0] = 0
+            hists_frameshift                    [ref_name] = Counter()
+            hists_frameshift                    [ref_name][0] = 0
+        #end initialize data structures for each ref
         def get_allele_row(reference_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload):
-            """Gets a row for storing allele information in the allele table
+            """
+            gets a row for storing allele information in the allele table
             parameters:
                 reference_name: string Reference name to write
                 variant_count: number of times this allele appears
@@ -3954,7 +3964,7 @@ def main():
                 row to put into allele table
             """
             if args.write_detailed_allele_table or args.vcf_output:
-                allele_row = {'#Reads': variant_count,
+                allele_row = {'#Reads':variant_count,
                     'Aligned_Sequence': variant_payload['aln_seq'],
                     'Reference_Sequence': variant_payload['aln_ref'],
                     'n_inserted': variant_payload['insertion_n'],
@@ -4022,8 +4032,8 @@ def main():
 
             # if class is AMBIGUOUS (set above if the args.expand_ambiguous_alignments param is false) don't add the modifications in this allele to the allele summaries
             if class_name == "AMBIGUOUS":
-                variant_payload = variantCache[variant]["variant_" + aln_ref_names[0]]
-                allele_row = get_allele_row('AMBIGUOUS_' + aln_ref_names[0], variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload)
+                variant_payload = variantCache[variant]["variant_"+aln_ref_names[0]]
+                allele_row = get_allele_row('AMBIGUOUS_'+aln_ref_names[0], variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload)
                 alleles_list.append(allele_row)
                 continue  # for ambiguous reads, don't add indels to reference totals
 
@@ -4032,7 +4042,7 @@ def main():
                 variant_payload = variantCache[variant]["variant_" + ref_name]
                 if args.discard_indel_reads and (variant_payload['deletion_n'] > 0 or variant_payload['insertion_n'] > 0):
                     counts_discarded[ref_name] += variant_count
-                    allele_row = get_allele_row('DISCARDED_' + aln_ref_names[0], variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload)
+                    allele_row = get_allele_row('DISCARDED_'+aln_ref_names[0],variant_count,aln_ref_names_str,aln_ref_scores_str,variant_payload)
                     alleles_list.append(allele_row)
                     continue
 
