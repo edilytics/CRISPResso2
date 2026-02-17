@@ -84,7 +84,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: edilytics/CRISPResso2_tests
-          ref: 'mckay/coding_seq_file_name_too_long' # update to specific branch
+          ref: 'mckay/coding_seq_file_name_too_long' #update to specific branch
 
       - name: Run Tests
         run: |
