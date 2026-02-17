@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install gcc g++ bowtie2 samtools libsys-hostname-l
   && rm -rf /usr/share/zoneinfo
 
 
-RUN micromamba install -c conda-forge -c bioconda -y -n base --debug fastp numpy cython jinja2 tbb=2020.2 pyparsing=2.3.1 setuptools scipy matplotlib-base seaborn pandas plotly upsetplot\
+RUN micromamba install -c conda-forge -c bioconda -y -n base --debug fastp numpy cython jinja2 tbb=2020.2 pyparsing=2.3.1 setuptools scipy matplotlib-base seaborn pandas plotly\
   && micromamba clean --all --yes
 
 # install crispresso

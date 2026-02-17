@@ -91,7 +91,6 @@ def main():
               'jinja2',
               'scipy',
               'numpy',
-              'upsetplot',
               ],
           cmdclass = command_classes,
           ext_modules = ext_modules
