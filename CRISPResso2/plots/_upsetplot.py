@@ -683,8 +683,8 @@ class UpSet:
             for rect in rects:
                 width = rect.get_width() + rect.get_x()
                 ax.text(
-                    width + margin,
-                    rect.get_y() + rect.get_height() * 0.5,
+                    float(np.ravel(width + margin)[0]),
+                    float(np.ravel(rect.get_y() + rect.get_height() * 0.5)[0]),
                     fmt.format(*make_args(width)),
                     ha="left",
                     va="center",
@@ -694,8 +694,8 @@ class UpSet:
             for rect in rects:
                 width = rect.get_width() + rect.get_x()
                 ax.text(
-                    width + margin,
-                    rect.get_y() + rect.get_height() * 0.5,
+                    float(np.ravel(width + margin)[0]),
+                    float(np.ravel(rect.get_y() + rect.get_height() * 0.5)[0]),
                     fmt.format(*make_args(width)),
                     ha="right",
                     va="center",
@@ -705,8 +705,8 @@ class UpSet:
             for rect in rects:
                 height = rect.get_height() + rect.get_y()
                 ax.text(
-                    rect.get_x() + rect.get_width() * 0.5,
-                    height + margin,
+                    float(np.ravel(rect.get_x() + rect.get_width() * 0.5)[0]),
+                    float(np.ravel(height + margin)[0]),
                     fmt.format(*make_args(height)),
                     ha="center",
                     va="bottom",
