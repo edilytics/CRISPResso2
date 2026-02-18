@@ -103,6 +103,7 @@ ignore = [
     "PLW1509",  # subprocess-popen-preexec-fn - intentional for signal handling
     "RUF059",  # unused-unpacked-variable - tuple unpacking pattern is consistent across the codebase
     "B905",  # zip-without-explicit-strict - strict parameter requires Python 3.10+
+    "PLR1730", # Replace if block to assign lower value to variable with min() function call
     # These should be fixed but will require a larger refactor
     "PLR0912",  # too-many-branches
     "PLR0913",  # too-many-arguments

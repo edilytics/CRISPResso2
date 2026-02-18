@@ -27,7 +27,9 @@ def main():
     args = parser.parse_args()
 
     if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
-        pass
+        from CRISPResso2 import CRISPRessoPlot
+    else:
+        from CRISPRessoPro import plot as CRISPRessoPlot  # noqa: F401
 
     plot_ambiguous_alleles_tables_from_folder(args.CRISPResso2_folder, args.output_root, MIN_FREQUENCY=args.min_freq, MAX_N_ROWS=args.max_rows, SAVE_ALSO_PNG=args.save_png, plot_cut_point=args.plot_cut_point)
 

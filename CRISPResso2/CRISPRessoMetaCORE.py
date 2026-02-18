@@ -94,9 +94,6 @@ def main():
 
         args = parser.parse_args()
 
-        if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
-            pass
-
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
         debug_flag = args.debug

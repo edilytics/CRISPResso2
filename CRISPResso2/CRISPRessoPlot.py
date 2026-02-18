@@ -2268,7 +2268,9 @@ def add_sgRNA_to_ax(ax, sgRNA_intervals, sgRNA_y_start, sgRNA_y_height, amp_len,
         # set left-most sgrna start
         if not min_sgRNA_x:
             min_sgRNA_x = this_sgRNA_start
-        min_sgRNA_x = min(min_sgRNA_x, this_sgRNA_start)
+        if this_sgRNA_start < min_sgRNA_x:
+            min_sgRNA_x = this_sgRNA_start
+
         if sgRNA_names is not None and idx < len(sgRNA_names) and sgRNA_names[idx] != "":
             if (label_at_zero and x_offset + this_sgRNA_start < len(sgRNA_names[idx]) * 0.66):
                 ax.text(0, this_sgRNA_y_start + this_sgRNA_y_height / 2, sgRNA_names[idx] + " ", horizontalalignment='left', verticalalignment='center', fontsize=font_size)

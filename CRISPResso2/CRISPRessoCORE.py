@@ -3941,17 +3941,6 @@ def main():
             hists_frameshift[ref_name][0] = 0
         # end initialize data structures for each ref
 
-            inserted_n_dicts[ref_name] = Counter()
-            deleted_n_dicts[ref_name] = Counter()
-            substituted_n_dicts[ref_name] = Counter()
-            effective_len_dicts[ref_name] = Counter()
-
-            hists_inframe[ref_name] = Counter()
-            hists_inframe[ref_name][0] = 0
-            hists_frameshift[ref_name] = Counter()
-            hists_frameshift[ref_name][0] = 0
-        # end initialize data structures for each ref
-
         def get_allele_row(reference_name, variant_count, aln_ref_names_str, aln_ref_scores_str, variant_payload):
             """Gets a row for storing allele information in the allele table
             parameters:
