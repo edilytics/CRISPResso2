@@ -19,7 +19,7 @@ from copy import deepcopy
 import re
 from matplotlib import colors as colors_mpl
 import seaborn as sns
-from CRISPResso2 import _upsetplot
+from CRISPResso2.plots import _upsetplot
 
 from CRISPResso2 import CRISPRessoShared
 
@@ -3874,7 +3874,7 @@ def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root=
     sgRNA_names: array (for each sgRNA_interval) of names of sgRNAs (otherwise empty) (if set overrides settings used in crispresso folder)
 
     example:
-    from CRISPResso2 import CRISPRessoPlot
+    from CRISPResso2.plots import CRISPRessoPlot
     CRISPRessoPlot.plot_alleles_tables_from_folder('CRISPResso_on_allele_specific','test_plots')
     custom_colors = {'A':(1,0,0,0.8), 'T':(0,1,0,0.8), 'C':(0,0,1,0.8), 'G':(1,1,0,0.8), 'N':(0,1,1,0.8)}
     CRISPRessoPlot.plot_alleles_tables_from_folder('CRISPResso_on_allele_specific','test_plots_colors',custom_colors=custom_colors)
@@ -3992,7 +3992,7 @@ def plot_nucleotide_quilt_from_folder(crispresso_output_folder, fig_filename_roo
     shade_unchanged: if true, unchanged/reference nucleotides will be shaded (only changes with regard to reference will be dark)
 
     example:
-    from CRISPResso2 import CRISPRessoPlot
+    from CRISPResso2.plots import CRISPRessoPlot
     CRISPRessoPlot.plot_nucleotide_quilt_from_folder('CRISPResso_on_allele_specific','test_plots')
     """
     crispresso2_info = CRISPRessoShared.load_crispresso_info(crispresso_output_folder)

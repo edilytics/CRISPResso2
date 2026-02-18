@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from CRISPResso2 import _upsetplot
+from CRISPResso2.plots import _upsetplot
 
 
 def _make_sample_data():
