@@ -2741,7 +2741,7 @@ def main():
 
 
         if args.use_matplotlib or not C2PRO_INSTALLED:
-            from CRISPResso2 import CRISPRessoPlot
+            from CRISPResso2.plots import CRISPRessoPlot
         else:
             from CRISPRessoPro import plot as CRISPRessoPlot
         CRISPRessoPlot.setMatplotlibDefaults()
