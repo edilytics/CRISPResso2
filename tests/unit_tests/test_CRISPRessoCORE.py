@@ -905,6 +905,93 @@ def test_write_base_edit_counts():
             assert False
 
 
+def test_find_closest_sgRNA_cut_point_no_guides():
+    """No sgRNA cut points: should return exon midpoint and False."""
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(100, 200, [], [])
+    assert cut == 150
+    assert plot_cut is False
+
+
+def test_find_closest_sgRNA_cut_point_single_guide_inside_exon():
+    """Single guide inside the exon interval."""
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(100, 200, [150], [15])
+    assert cut == 150
+    assert plot_cut == 15
+
+
+def test_find_closest_sgRNA_cut_point_single_guide_outside_exon():
+    """Single guide outside the exon: still returned since it's the only one."""
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(100, 200, [50], [5])
+    assert cut == 50
+    assert plot_cut == 5
+
+
+def test_find_closest_sgRNA_cut_point_multiple_guides_one_inside():
+    """Multiple guides, one inside the exon: the inside one should win."""
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(
+        100, 200, [50, 150, 300], [5, 15, 30],
+    )
+    assert cut == 150
+    assert plot_cut == 15
+
+
+def test_find_closest_sgRNA_cut_point_multiple_guides_all_outside():
+    """Multiple guides all outside: the closest one should be selected."""
+    # 50 is 50 away from exon_start=100, 250 is 50 away from exon_end=200, 400 is 200 away
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(
+        100, 200, [50, 250, 400], [5, 25, 40],
+    )
+    # 50 -> distance min(|50-100|, |50-200|) = 50
+    # 250 -> distance min(|250-100|, |250-200|) = 50
+    # 400 -> distance min(|400-100|, |400-200|) = 200
+    # 50 and 250 are equidistant; first one (index 0) wins due to strict '<'
+    assert cut == 50
+    assert plot_cut == 5
+
+
+def test_find_closest_sgRNA_cut_point_multiple_guides_inside():
+    """Multiple guides inside the exon: first one wins (all have distance 0)."""
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(
+        100, 200, [120, 150, 180], [12, 15, 18],
+    )
+    assert cut == 120
+    assert plot_cut == 12
+
+
+def test_find_closest_sgRNA_cut_point_guide_at_exon_boundary():
+    """Guide exactly at exon_start or exon_end: treated as inside (distance 0)."""
+    # Guide at exon_start
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(100, 200, [100], [10])
+    assert cut == 100
+    assert plot_cut == 10
+
+    # Guide at exon_end
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(100, 200, [200], [20])
+    assert cut == 200
+    assert plot_cut == 20
+
+
+def test_find_closest_sgRNA_cut_point_equidistant_guides():
+    """Two guides equidistant from exon: first one wins due to strict '<'."""
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(
+        100, 200, [80, 220], [8, 22],
+    )
+    # 80 -> distance min(|80-100|, |80-200|) = 20
+    # 220 -> distance min(|220-100|, |220-200|) = 20
+    assert cut == 80
+    assert plot_cut == 8
+
+
+def test_find_closest_sgRNA_cut_point_plot_cut_points_returned():
+    """Verify the correct corresponding plot_cut_point is returned."""
+    cut, plot_cut = CRISPRessoCORE.find_closest_sgRNA_cut_point(
+        100, 200, [50, 160, 300], ["plotA", "plotB", "plotC"],
+    )
+    # 160 is inside the exon, so it wins
+    assert cut == 160
+    assert plot_cut == "plotB"
+
+
 if __name__ == "__main__":
 # execute only if run as a script
     test_get_consensus_alignment_from_pairs()
