@@ -1,4 +1,4 @@
-"""Tests for the internal _upsetplot module ported from upsetplot v0.9.0."""
+"""Tests for the internal upsetplot module ported from upsetplot v0.9.0."""
 import os
 import tempfile
 
@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from CRISPResso2.plots import _upsetplot
+from CRISPResso2.plots import upsetplot
 
 
 def _make_sample_data():
@@ -35,7 +35,7 @@ def _make_sample_data():
 def test_plot_returns_axes_dict():
     data = _make_sample_data()
     fig = plt.figure(figsize=(10, 6))
-    result = _upsetplot.plot(
+    result = upsetplot.plot(
         data,
         fig=fig,
         element_size=None,
@@ -54,7 +54,7 @@ def test_plot_returns_axes_dict():
 def test_plot_saves_to_pdf():
     data = _make_sample_data()
     fig = plt.figure(figsize=(15, 10))
-    _upsetplot.plot(
+    upsetplot.plot(
         data,
         fig=fig,
         element_size=None,
@@ -73,7 +73,7 @@ def test_plot_saves_to_pdf():
 def test_plot_saves_to_png():
     data = _make_sample_data()
     fig = plt.figure(figsize=(15, 10))
-    _upsetplot.plot(
+    upsetplot.plot(
         data,
         fig=fig,
         element_size=None,
@@ -97,7 +97,7 @@ def test_plot_two_categories():
     )
     data = pd.Series([30, 50, 20], index=index, name="counts")
     fig = plt.figure(figsize=(10, 6))
-    result = _upsetplot.plot(data, fig=fig, element_size=None)
+    result = upsetplot.plot(data, fig=fig, element_size=None)
     assert "matrix" in result
     plt.close(fig)
 
@@ -115,7 +115,7 @@ def test_plot_all_false_row():
     )
     data = pd.Series([10, 20, 15, 55], index=index, name="counts")
     fig = plt.figure(figsize=(10, 6))
-    result = _upsetplot.plot(data, fig=fig, element_size=None)
+    result = upsetplot.plot(data, fig=fig, element_size=None)
     assert "matrix" in result
     plt.close(fig)
 
@@ -123,7 +123,7 @@ def test_plot_all_false_row():
 def test_sort_categories_by_input():
     """sort_categories_by='-input' preserves reverse input order."""
     data = _make_sample_data()
-    upset = _upsetplot.UpSet(data, sort_categories_by="-input")
+    upset = upsetplot.UpSet(data, sort_categories_by="-input")
     assert list(upset.totals.index) == ["has_indel", "5:A->G", "3:C->T"]
 
 
@@ -131,7 +131,7 @@ def test_show_counts_and_percentages():
     """Counts and percentages should not raise errors."""
     data = _make_sample_data()
     fig = plt.figure(figsize=(10, 6))
-    _upsetplot.plot(
+    upsetplot.plot(
         data,
         fig=fig,
         element_size=None,
@@ -147,7 +147,7 @@ def test_show_counts_and_percentages():
 
 def test_query_basic():
     data = _make_sample_data()
-    result = _upsetplot.query(data)
+    result = upsetplot.query(data)
     assert result.total == 100
     assert len(result.subset_sizes) == 6
     assert isinstance(result.category_totals, pd.Series)
@@ -155,14 +155,14 @@ def test_query_basic():
 
 def test_query_sort_by_cardinality():
     data = _make_sample_data()
-    result = _upsetplot.query(data, sort_by="cardinality")
+    result = upsetplot.query(data, sort_by="cardinality")
     sizes = result.subset_sizes.values
     assert all(sizes[i] >= sizes[i + 1] for i in range(len(sizes) - 1))
 
 
 def test_query_min_subset_size():
     data = _make_sample_data()
-    result = _upsetplot.query(data, min_subset_size=10)
+    result = upsetplot.query(data, min_subset_size=10)
     assert all(result.subset_sizes >= 10)
 
 
@@ -173,7 +173,7 @@ def test_query_non_boolean_index_raises():
     )
     data = pd.Series([10, 20], index=index)
     with pytest.raises(ValueError, match="not boolean"):
-        _upsetplot.query(data)
+        upsetplot.query(data)
 
 
 # ---------------------------------------------------------------------------
@@ -181,13 +181,13 @@ def test_query_non_boolean_index_raises():
 # ---------------------------------------------------------------------------
 
 def test_format_conversion_simple_int():
-    assert _upsetplot._to_new_pos_format("%d") == "{:d}"
+    assert upsetplot._to_new_pos_format("%d") == "{:d}"
 
 
 def test_format_conversion_float():
-    assert _upsetplot._to_new_pos_format("%.2f") == "{:.2f}"
+    assert upsetplot._to_new_pos_format("%.2f") == "{:.2f}"
 
 
 def test_format_conversion_passthrough_new_style():
-    result = _upsetplot._to_new_pos_format("{:.2f}")
+    result = upsetplot._to_new_pos_format("{:.2f}")
     assert ":.2f" in result
