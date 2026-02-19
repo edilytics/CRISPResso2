@@ -38,6 +38,8 @@
 
 - Fix a bug during `--bam_output` when there is an unaligned read, the remainder of the reads will not be output by [@Colelyman](https://github.com/Colelyman) in [#602](https://github.com/pinellolab/CRISPResso2/pull/602)
 
+- Fix a bug when an sgRNA aligns before the start of an exon by [@mbowcut2](https://github.com/mbowcut2) in [#](https://github.com/pinellolab/CRISPResso2/pull)
+
 ### CHANGED
 
 - Update the base Docker image to `mambaorg/micromamba:2.3.3` and remove dependency on Anaconda `defaults` channel by [@Colelyman](https://github.com/Colelyman) in [#575](https://github.com/pinellolab/CRISPResso2/pull/575)
