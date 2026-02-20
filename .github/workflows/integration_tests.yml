@@ -71,6 +71,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: edilytics/CRISPRessoPro
+          token: ${{ secrets.CRISPRESSOPRO_PAT }}
           path: CRISPRessoPro
           ref: sam/add_plot
 
