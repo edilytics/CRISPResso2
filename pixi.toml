@@ -18,7 +18,7 @@ fastp = "*"
 bowtie2 = "*"
 samtools = "*"
 upsetplot = "*"
-plotly = "*"
+plotly = "5.18.0"
 setuptools = "*"
 pip = "*"
 
