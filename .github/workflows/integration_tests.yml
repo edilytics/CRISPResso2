@@ -64,7 +64,6 @@ jobs:
         with:
           repository: edilytics/CRISPResso2_tests
           path: CRISPResso2_tests
-          ref: sam/pro-tests
 
       - name: Checkout CRISPRessoPro
         if: matrix.pro
