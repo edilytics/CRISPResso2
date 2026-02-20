@@ -54,3 +54,4 @@ cwd = "../CRISPResso2_tests"
 
 [feature.lint.tasks]
 lint = { cmd = "ruff check . --statistics" }
+fix = { cmd = "ruff check . --fix" }

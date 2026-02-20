@@ -2388,10 +2388,11 @@ class GuardrailMessageHandler:
     def report_pass(self, message):
         """Create and store a passed guardrail html message for the report
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         message : string
             Related guardrail pass message
+
         """
         html_pass = '<div class="alert alert-success"><strong>Guardrail Passed:</strong> {0}</div>'.format(message)
         self.passed_html_messages.append(html_pass)
