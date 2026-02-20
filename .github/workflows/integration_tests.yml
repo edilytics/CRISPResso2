@@ -77,7 +77,7 @@ jobs:
 
       - name: Install CRISPRessoPro
         if: matrix.pro
-        run: pixi run -e test -- pip install -e CRISPRessoPro
+        run: pixi run -e test -- pip install -e CRISPRessoPro && pixi run -e test -- pip install kaleido
 
       - name: Run Tests
         run: |
