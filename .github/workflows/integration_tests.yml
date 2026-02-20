@@ -64,6 +64,7 @@ jobs:
         with:
           repository: edilytics/CRISPResso2_tests
           path: CRISPResso2_tests
+          ref: sam/pro-tests
 
       - name: Checkout CRISPRessoPro
         if: matrix.pro
@@ -71,6 +72,7 @@ jobs:
         with:
           repository: edilytics/CRISPRessoPro
           path: CRISPRessoPro
+          ref: sam/add_plot
 
       - name: Install CRISPRessoPro
         if: matrix.pro
