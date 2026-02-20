@@ -6461,7 +6461,6 @@ def main():
             crispresso2_info['results']['guardrails_failed_htmls'] = guardrail_results['failed']
             crispresso2_info['results']['guardrails_passed_htmls'] = guardrail_results['passed']
 
-
         if not args.suppress_report:
             if (args.place_report_in_output_folder):
                 report_name = _jp("CRISPResso2_report.html")
