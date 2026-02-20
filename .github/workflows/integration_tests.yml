@@ -81,4 +81,4 @@ jobs:
       - name: Run Tests
         run: |
           pixi run -e test -- pytest CRISPResso2_tests/test_cli.py \
-            -k "${{ matrix.group.filter }}" -v ${{ matrix.pro && '--pro' || '' }}
+            -k "${{ matrix.group.filter }}" -v ${{ matrix.pro && '--pro' || '' }} --test --print
