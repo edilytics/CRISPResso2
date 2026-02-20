@@ -37,13 +37,9 @@ ydiff = "*"
 [feature.lint.dependencies]
 pylint = "*"
 
-[feature.pro.pypi-dependencies]
-CRISPRessoPro = { path = "../CRISPRessoPro", editable = true }
-
 [environments]
 default = { features = [], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
-test-pro = { features = ["test", "pro"], solve-group = "default" }
 lint = { features = ["lint"], solve-group = "default" }
 
 [tasks]
