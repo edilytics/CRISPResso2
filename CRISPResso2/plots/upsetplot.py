@@ -1,5 +1,4 @@
-"""
-Minimal UpSet plot implementation for CRISPResso2.
+"""Minimal UpSet plot implementation for CRISPResso2.
 
 Ported from UpSetPlot v0.9.0 (https://github.com/jnothman/UpSetPlot)
 by Joel Nothman and contributors.
@@ -54,7 +53,7 @@ import matplotlib
 import matplotlib.gridspec
 import numpy as np
 import pandas as pd
-from matplotlib import colors, patches
+from matplotlib import colors
 from matplotlib import pyplot as plt
 
 # matplotlib.tight_layout.get_renderer was removed in matplotlib >=3.6.
@@ -112,7 +111,7 @@ def _aggregate_data(df, subset_size, sum_over):
     if subset_size not in _SUBSET_SIZE_VALUES:
         raise ValueError(
             f"subset_size should be one of {_SUBSET_SIZE_VALUES}. "
-            f"Got {repr(subset_size)}"
+            f"Got {subset_size!r}"
         )
     if df.ndim == 1:
         input_name = df.name
@@ -127,22 +126,21 @@ def _aggregate_data(df, subset_size, sum_over):
                 "sum_over is not applicable when the input is a Series"
             )
         sum_over = False if subset_size == "count" else "_value"
-    else:
-        if sum_over is False:
-            raise ValueError("Unsupported value for sum_over: False")
-        elif subset_size == "auto" and sum_over is None:
-            sum_over = False
-        elif subset_size == "count":
-            if sum_over is not None:
-                raise ValueError(
-                    "sum_over cannot be set if subset_size=%r" % subset_size
-                )
-            sum_over = False
-        elif subset_size == "sum" and sum_over is None:
+    elif sum_over is False:
+        raise ValueError("Unsupported value for sum_over: False")
+    elif subset_size == "auto" and sum_over is None:
+        sum_over = False
+    elif subset_size == "count":
+        if sum_over is not None:
             raise ValueError(
-                "sum_over should be a field name if "
-                'subset_size="sum" and a DataFrame is provided.'
+                "sum_over cannot be set if subset_size=%r" % subset_size
             )
+        sum_over = False
+    elif subset_size == "sum" and sum_over is None:
+        raise ValueError(
+            "sum_over should be a field name if "
+            'subset_size="sum" and a DataFrame is provided.'
+        )
 
     gb = df.groupby(level=list(range(df.index.nlevels)), sort=False)
     if sum_over is False:
@@ -520,6 +518,7 @@ class UpSet:
     show_counts : bool or str
     show_percentages : bool or str
     include_empty_subsets : bool
+
     """
 
     _default_figsize = (10, 6)
@@ -1031,6 +1030,7 @@ class UpSet:
         -------
         subplots : dict of matplotlib.axes.Axes
             Keys are 'matrix', 'intersections', 'totals', 'shading'.
+
         """
         if fig is None:
             fig = plt.figure(figsize=self._default_figsize)
@@ -1092,5 +1092,6 @@ def plot(data, fig=None, **kwargs):
     Returns
     -------
     subplots : dict of matplotlib.axes.Axes
+
     """
     return UpSet(data, **kwargs).plot(fig)
