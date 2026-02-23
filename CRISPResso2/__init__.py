@@ -3,8 +3,8 @@
 # We can remove this once we update CRISPRessoPro's importing
 import sys
 
-from CRISPResso2.plots import CRISPRessoPlot  # noqa: F401
-from CRISPResso2.plots import upsetplot  # noqa: F401
+from CRISPResso2.plots import CRISPRessoPlot
+from CRISPResso2.plots import upsetplot
 
 # Register under old module paths so that `from CRISPResso2.CRISPRessoPlot import X`
 # and `from CRISPResso2.upsetplot import X` still work for downstream consumers
