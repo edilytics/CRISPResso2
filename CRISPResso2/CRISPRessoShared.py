@@ -593,6 +593,7 @@ def clean_filename(filename):
     cleanedFilename = unicodedata.normalize('NFKD', filename)
     return (''.join(c for c in cleanedFilename if c in validFilenameChars))
 
+
 def _get_short_seq_id(seq, max_len=20):
     """Return a short identifier for a nucleotide sequence suitable for use in filenames.
 
@@ -608,6 +609,7 @@ def _get_short_seq_id(seq, max_len=20):
     'ATCG'
     >>> _get_short_seq_id('A' * 200)  # doctest: +ELLIPSIS
     'AAAAAAAA_...'
+
     """
     if len(seq) <= max_len:
         return seq
