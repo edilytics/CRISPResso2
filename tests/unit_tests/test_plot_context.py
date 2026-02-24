@@ -14,7 +14,7 @@ class TestPlotContextConstruction:
 
     def test_minimal_construction(self):
         """PlotContext can be constructed with required fields."""
-        from CRISPResso2.plotting.plot_context import PlotContext
+        from CRISPResso2.plots.plot_context import PlotContext
 
         args = SimpleNamespace(name='test')
         ctx = PlotContext(
@@ -59,7 +59,7 @@ class TestPlotContextConstruction:
 
     def test_defaults(self):
         """Optional fields have correct defaults."""
-        from CRISPResso2.plotting.plot_context import PlotContext
+        from CRISPResso2.plots.plot_context import PlotContext
 
         ctx = PlotContext(
             args=SimpleNamespace(),
@@ -115,7 +115,7 @@ class TestPlotContextConstruction:
 
     def test_scope_fields_mutable(self):
         """ref_name and sgRNA_ind can be set after construction."""
-        from CRISPResso2.plotting.plot_context import PlotContext
+        from CRISPResso2.plots.plot_context import PlotContext
 
         ctx = PlotContext(
             args=SimpleNamespace(),
@@ -165,7 +165,7 @@ class TestPlotContextConstruction:
 
     def test_references_not_copied(self):
         """PlotContext holds references, not copies, of data structures."""
-        from CRISPResso2.plotting.plot_context import PlotContext
+        from CRISPResso2.plots.plot_context import PlotContext
 
         counts = {'ref1': 100}
         ctx = PlotContext(
@@ -213,9 +213,9 @@ class TestPlotContextImport:
     """Test that PlotContext is importable from the plotting package."""
 
     def test_import_from_package(self):
-        from CRISPResso2.plotting import PlotContext
+        from CRISPResso2.plots import PlotContext
         assert PlotContext is not None
 
     def test_import_from_module(self):
-        from CRISPResso2.plotting.plot_context import PlotContext
+        from CRISPResso2.plots.plot_context import PlotContext
         assert PlotContext is not None

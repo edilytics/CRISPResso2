@@ -5,6 +5,6 @@ CRISPRessoPro and plugins use to access analysis results for
 generating custom plots.
 """
 
-from CRISPResso2.plotting.plot_context import PlotContext
+from CRISPResso2.plots.plot_context import PlotContext
 
 __all__ = ['PlotContext']

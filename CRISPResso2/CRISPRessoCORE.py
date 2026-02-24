@@ -6412,7 +6412,7 @@ def main():
         # --- CRISPRessoPro plot hook ---
         if C2PRO_INSTALLED:
             try:
-                from CRISPResso2.plotting.plot_context import PlotContext
+                from CRISPResso2.plots.plot_context import PlotContext
                 from CRISPRessoPro import hooks as pro_hooks
 
                 plot_context = PlotContext(
