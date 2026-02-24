@@ -416,3 +416,50 @@ def prep_global_modifications_reference(
         'plot_title': plot_title,
         'plot_root': plot_root,
     }
+
+
+def prep_log_nuc_freqs(
+    df_nuc_freq,
+    tot_aln_reads,
+    include_idxs_list,
+    plot_idxs,
+    ref_len,
+    sgRNA_legend,
+    ref_name,
+    ref_names,
+    fig_filename_root,
+    save_also_png,
+):
+    """Prepare kwargs for plot_log_nuc_freqs (plot_10d).
+
+    Computes ``plot_quant_window_idxs`` — the indices in the plotting window
+    that overlap with the quantification window.
+
+    Parameters
+    ----------
+    plot_idxs : list of int
+        Indices into the full-amplicon sequence selected for the plot window.
+    """
+    is_window = np.zeros(ref_len)
+    for include_idx in include_idxs_list:
+        is_window[include_idx] = 1
+
+    plot_quant_window_idxs = []
+    for plot_ind, loc in enumerate(plot_idxs):
+        if is_window[loc]:
+            plot_quant_window_idxs.append(plot_ind - 2)
+
+    num_refs = len(ref_names)
+
+    return {
+        'df_nuc_freq': df_nuc_freq,
+        'tot_aln_reads': tot_aln_reads,
+        'plot_title': _plot_title_with_ref_name(
+            'Log2 Nucleotide Frequencies Around the ' + sgRNA_legend,
+            ref_name,
+            num_refs,
+        ),
+        'fig_filename_root': fig_filename_root,
+        'save_also_png': save_also_png,
+        'quantification_window_idxs': plot_quant_window_idxs,
+    }

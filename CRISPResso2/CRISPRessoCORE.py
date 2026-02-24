@@ -5800,16 +5800,8 @@ def main():
                     plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
                     plot_nuc_freqs = df_nuc_freq_all.iloc[:, plot_idxs]
 
-                    # get computation window in plotted region
-                    is_window = np.zeros(ref_len)
-                    for include_idx in include_idxs_list:
-                        is_window[include_idx] = 1
-                    plot_is_window = np.zeros(len(plot_idxs))  # binary array whether base should be plotted
-                    plot_quant_window_idxs = []
-                    for plot_ind, loc in enumerate(plot_idxs):
-                        plot_is_window[plot_ind] = is_window[loc]
-                        if is_window[loc]:
-                            plot_quant_window_idxs.append(plot_ind - 2)
+                    # get computation window in plotted region (plot_quant_window_idxs
+                    # is read back below for plot_10d; remaining computation in prep_log_nuc_freqs)
 
                     from_nuc_indices = [pos for pos, char in enumerate(list(plot_nuc_pcts.columns.values)) if char == args.conversion_nuc_from]
                     just_sel_nuc_pcts = plot_nuc_pcts.iloc[:, from_nuc_indices].copy()  # only nucleotides targeted by base editing
@@ -5842,17 +5834,18 @@ def main():
                         fig_filename_root = _jp(
                             '10d.' + ref_plot_name + 'Log2_nucleotide_frequency_around_' + sgRNA_label,
                         )
-                        plot_10d_input = {
-                            'df_nuc_freq': plot_nuc_freqs,
-                            'tot_aln_reads': tot_aln_reads,
-                            'plot_title': get_plot_title_with_ref_name(
-                                'Log2 Nucleotide Frequencies Around the ' + sgRNA_legend,
-                                ref_name,
-                            ),
-                            'fig_filename_root': fig_filename_root,
-                            'save_also_png': save_png,
-                            'quantification_window_idxs': plot_quant_window_idxs,
-                        }
+                        plot_10d_input = CRISPRessoPlotData.prep_log_nuc_freqs(
+                            df_nuc_freq=plot_nuc_freqs,
+                            tot_aln_reads=tot_aln_reads,
+                            include_idxs_list=include_idxs_list,
+                            plot_idxs=plot_idxs,
+                            ref_len=ref_len,
+                            sgRNA_legend=sgRNA_legend,
+                            ref_name=ref_name,
+                            ref_names=ref_names,
+                            fig_filename_root=fig_filename_root,
+                            save_also_png=save_png,
+                        )
                         debug('Plotting log2 nucleotide frequency for {0}'.format(ref_name))
                         plot(CRISPRessoPlot.plot_log_nuc_freqs, plot_10d_input)
                         crispresso2_info['results']['refs'][ref_name]['plot_10d_roots'].append(os.path.basename(fig_filename_root))

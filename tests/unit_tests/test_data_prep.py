@@ -449,3 +449,51 @@ class TestPrepGlobalModificationsReference:
             **self._inputs(ref_name='HDR', ref_names=['FANC', 'HDR'])
         ))
         assert result == snapshot({'custom_colors': {}, 'include_idxs_list': [0, 1, 2], 'n_total': 100, 'plot_root': '/out/4f.FANC.Global_mutations_in_HDR_reads_with_reference_to_FANC', 'plot_title': 'Mutation position distribution in HDR reads with reference to FANC', 'ref1': {'include_idxs': [0, 1, 2], 'sequence': 'ACG'}, 'ref1_all_deletion_count_vectors': [0, 1, 0], 'ref1_all_insertion_count_vectors': [1, 2, 3], 'ref1_all_substitution_count_vectors': [0, 0, 1], 'ref_len': 3, 'ref_name': 'FANC', 'save_also_png': False})
+
+
+class TestPrepLogNucFreqs:
+    """prep_log_nuc_freqs (plot_10d) — computes plot_quant_window_idxs."""
+
+    def _make_df(self, n_cols=10):
+        import pandas as pd
+        return pd.DataFrame(
+            np.zeros((6, n_cols)),
+            index=['A', 'C', 'G', 'T', 'N', '-'],
+        )
+
+    def test_basic_window_computation(self):
+        from CRISPResso2.plots.data_prep import prep_log_nuc_freqs
+        df = self._make_df(10)
+        result = prep_log_nuc_freqs(
+            df_nuc_freq=df,
+            tot_aln_reads=100,
+            include_idxs_list=[3, 4, 5],
+            plot_idxs=[2, 3, 4, 5, 6, 7, 8],  # window: positions 2-8
+            ref_len=10,
+            sgRNA_legend='sgRNA ATCG',
+            ref_name='FANC',
+            ref_names=['FANC'],
+            fig_filename_root='/tmp/10d',
+            save_also_png=False,
+        )
+        # Only positions 3,4,5 are in quant window; their local indices
+        # in plot_idxs are 1,2,3 → after -2 offset: -1,0,1
+        assert result['quantification_window_idxs'] == snapshot([-1, 0, 1])
+        assert result['plot_title'] == snapshot('Log2 Nucleotide Frequencies Around the sgRNA ATCG')
+
+    def test_multi_ref_title(self):
+        from CRISPResso2.plots.data_prep import prep_log_nuc_freqs
+        df = self._make_df(5)
+        result = prep_log_nuc_freqs(
+            df_nuc_freq=df,
+            tot_aln_reads=50,
+            include_idxs_list=[0, 1],
+            plot_idxs=[0, 1, 2],
+            ref_len=5,
+            sgRNA_legend='myGuide',
+            ref_name='REF1',
+            ref_names=['REF1', 'REF2'],
+            fig_filename_root='/tmp/10d',
+            save_also_png=True,
+        )
+        assert result['plot_title'] == snapshot('Log2 Nucleotide Frequencies Around the myGuide: REF1')
