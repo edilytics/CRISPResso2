@@ -463,3 +463,36 @@ def prep_log_nuc_freqs(
         'save_also_png': save_also_png,
         'quantification_window_idxs': plot_quant_window_idxs,
     }
+
+
+def prep_conversion_at_sel_nucs(plot_nuc_pcts, plot_nuc_freqs, conversion_nuc_from):
+    """Compute from_nuc_indices and selected-nucleotide DataFrames for plots 10e/10f/10g.
+
+    Finds the column positions matching ``conversion_nuc_from`` and returns
+    sliced, re-labeled DataFrames used for both CSV writes and plot inputs.
+
+    Returns a dict with:
+    - ``from_nuc_indices``: list of int column positions matching the conversion nucleotide
+    - ``just_sel_nuc_pcts``: DataFrame sliced to those columns, columns renamed
+    - ``just_sel_nuc_freqs``: same slicing applied to frequency DataFrame
+    """
+    from_nuc_indices = [
+        pos for pos, char in enumerate(list(plot_nuc_pcts.columns.values))
+        if char == conversion_nuc_from
+    ]
+
+    just_sel_nuc_pcts = plot_nuc_pcts.iloc[:, from_nuc_indices].copy()
+    just_sel_nuc_pcts.columns = [
+        conversion_nuc_from + str(pos + 1) for pos in from_nuc_indices
+    ]
+
+    just_sel_nuc_freqs = plot_nuc_freqs.iloc[:, from_nuc_indices].copy()
+    just_sel_nuc_freqs.columns = [
+        conversion_nuc_from + str(pos + 1) for pos in from_nuc_indices
+    ]
+
+    return {
+        'from_nuc_indices': from_nuc_indices,
+        'just_sel_nuc_pcts': just_sel_nuc_pcts,
+        'just_sel_nuc_freqs': just_sel_nuc_freqs,
+    }

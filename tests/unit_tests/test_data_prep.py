@@ -497,3 +497,40 @@ class TestPrepLogNucFreqs:
             save_also_png=True,
         )
         assert result['plot_title'] == snapshot('Log2 Nucleotide Frequencies Around the myGuide: REF1')
+
+
+class TestPrepConversionAtSelNucs:
+    """prep_conversion_at_sel_nucs (plot_10e/10f/10g) — from_nuc_indices + sliced dfs."""
+
+    def _make_pct_df(self, seq):
+        """Build a minimal nuc percentage DataFrame with column names = seq chars."""
+        import pandas as pd
+        n = len(seq)
+        data = np.zeros((6, n))
+        df = pd.DataFrame(data, index=['A', 'C', 'G', 'T', 'N', '-'], columns=list(seq))
+        return df
+
+    def test_finds_correct_indices(self):
+        from CRISPResso2.plots.data_prep import prep_conversion_at_sel_nucs
+        pcts = self._make_pct_df('ACGCTA')
+        freqs = self._make_pct_df('ACGCTA')
+        result = prep_conversion_at_sel_nucs(
+            plot_nuc_pcts=pcts,
+            plot_nuc_freqs=freqs,
+            conversion_nuc_from='C',
+        )
+        assert result['from_nuc_indices'] == snapshot([1, 3])
+        assert list(result['just_sel_nuc_pcts'].columns) == snapshot(['C2', 'C4'])
+        assert list(result['just_sel_nuc_freqs'].columns) == snapshot(['C2', 'C4'])
+
+    def test_no_matching_nucs(self):
+        from CRISPResso2.plots.data_prep import prep_conversion_at_sel_nucs
+        pcts = self._make_pct_df('AAAA')
+        freqs = self._make_pct_df('AAAA')
+        result = prep_conversion_at_sel_nucs(
+            plot_nuc_pcts=pcts,
+            plot_nuc_freqs=freqs,
+            conversion_nuc_from='C',
+        )
+        assert result['from_nuc_indices'] == snapshot([])
+        assert result['just_sel_nuc_pcts'].shape == snapshot((6, 0))

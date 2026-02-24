@@ -5803,12 +5803,14 @@ def main():
                     # get computation window in plotted region (plot_quant_window_idxs
                     # is read back below for plot_10d; remaining computation in prep_log_nuc_freqs)
 
-                    from_nuc_indices = [pos for pos, char in enumerate(list(plot_nuc_pcts.columns.values)) if char == args.conversion_nuc_from]
-                    just_sel_nuc_pcts = plot_nuc_pcts.iloc[:, from_nuc_indices].copy()  # only nucleotides targeted by base editing
-                    # just_sel_nuc_pcts.columns = [char + str(pos+1) for pos,char in enumerate(list(just_sel_nuc_pcts.columns.values))]
-                    just_sel_nuc_pcts.columns = [args.conversion_nuc_from + str(pos + 1) for pos in from_nuc_indices]
-                    just_sel_nuc_freqs = plot_nuc_freqs.iloc[:, from_nuc_indices].copy()
-                    just_sel_nuc_freqs.columns = [args.conversion_nuc_from + str(pos + 1) for pos in from_nuc_indices]
+                    _sel_nuc_data = CRISPRessoPlotData.prep_conversion_at_sel_nucs(
+                        plot_nuc_pcts=plot_nuc_pcts,
+                        plot_nuc_freqs=plot_nuc_freqs,
+                        conversion_nuc_from=args.conversion_nuc_from,
+                    )
+                    from_nuc_indices = _sel_nuc_data['from_nuc_indices']
+                    just_sel_nuc_pcts = _sel_nuc_data['just_sel_nuc_pcts']
+                    just_sel_nuc_freqs = _sel_nuc_data['just_sel_nuc_freqs']
 
                     quant_window_sel_nuc_pct_filename = _jp(ref_plot_name + 'Selected_nucleotide_percentage_table_around_' + sgRNA_label + '.txt')
                     just_sel_nuc_pcts.to_csv(quant_window_sel_nuc_pct_filename, sep='\t', header=True, index=True)
