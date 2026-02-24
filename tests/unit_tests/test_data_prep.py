@@ -7,14 +7,18 @@ with non-trivial computation are extracted and tested here.
 
 import numpy as np
 import pytest
+from inline_snapshot import snapshot
+
+from CRISPResso2.plots.data_prep import (
+    prep_amplicon_modifications,
+    prep_modification_frequency,
+)
 
 
 class TestPrepAmpliconModifications:
     """prep_amplicon_modifications (plot_4a) — packages vectors + metadata."""
 
-    def test_returns_correct_keys(self):
-        from CRISPResso2.plots.data_prep import prep_amplicon_modifications
-
+    def test_output_shape(self):
         indelsub = np.array([0, 1, 2, 3, 4])
         result = prep_amplicon_modifications(
             all_indelsub_count_vector=indelsub,
@@ -31,19 +35,32 @@ class TestPrepAmpliconModifications:
             custom_colors={},
             save_also_png=True,
         )
+        # Vector is passed through by reference
         assert result['all_indelsub_count_vectors'] is indelsub
-        assert result['n_total'] == 100
-        assert result['n_this_category'] == 80
-        assert result['ref_name'] == 'ref1'
-        assert result['num_refs'] == 1
-        assert result['ref_len'] == 5
-        # y_max should be max(indelsub) * 1.1
-        assert result['y_max'] == pytest.approx(4 * 1.1)
-        assert result['plot_root'] == '/tmp/4a.Combined'
+        # Computed values
+        assert result['y_max'] == snapshot(4.4)
+        assert result['num_refs'] == snapshot(1)
+        assert sorted(result.keys()) == snapshot(
+            [
+                "all_indelsub_count_vectors",
+                "custom_colors",
+                "cut_points",
+                "include_idxs_list",
+                "n_this_category",
+                "n_total",
+                "num_refs",
+                "plot_cut_points",
+                "plot_root",
+                "plot_titles",
+                "ref_len",
+                "ref_name",
+                "save_also_png",
+                "sgRNA_intervals",
+                "y_max",
+            ]
+        )
 
     def test_y_max_computed_from_vector(self):
-        from CRISPResso2.plots.data_prep import prep_amplicon_modifications
-
         indelsub = np.array([10, 0, 5])
         result = prep_amplicon_modifications(
             all_indelsub_count_vector=indelsub,
@@ -60,11 +77,9 @@ class TestPrepAmpliconModifications:
             custom_colors={},
             save_also_png=False,
         )
-        assert result['y_max'] == pytest.approx(10 * 1.1)
+        assert result['y_max'] == snapshot(11.0)
 
-    def test_plot_titles_present(self):
-        from CRISPResso2.plots.data_prep import prep_amplicon_modifications
-
+    def test_plot_titles_single_ref(self):
         result = prep_amplicon_modifications(
             all_indelsub_count_vector=np.array([1]),
             include_idxs_list=[0],
@@ -80,17 +95,41 @@ class TestPrepAmpliconModifications:
             custom_colors={},
             save_also_png=False,
         )
-        assert 'plot_titles' in result
-        assert 'combined' in result['plot_titles']
-        assert 'main' in result['plot_titles']
+        assert result['plot_titles'] == snapshot(
+            {
+                "combined": "Combined Insertions/Deletions/Substitutions",
+                "main": "Mutation position distribution",
+            }
+        )
+
+    def test_plot_titles_multi_ref(self):
+        result = prep_amplicon_modifications(
+            all_indelsub_count_vector=np.array([1]),
+            include_idxs_list=[0],
+            cut_points=[],
+            plot_cut_points=[],
+            sgRNA_intervals=[],
+            N_TOTAL=10,
+            n_this_category=10,
+            ref_name='myref',
+            ref_names=['myref', 'other'],
+            ref_len=1,
+            plot_root='/tmp/test',
+            custom_colors={},
+            save_also_png=False,
+        )
+        assert result['plot_titles'] == snapshot(
+            {
+                "combined": "Combined Insertions/Deletions/Substitutions: myref",
+                "main": "Mutation position distribution: myref",
+            }
+        )
 
 
 class TestPrepModificationFrequency:
     """prep_modification_frequency (plot_4b) — packages per-type vectors."""
 
-    def test_returns_correct_keys(self):
-        from CRISPResso2.plots.data_prep import prep_modification_frequency
-
+    def test_output_shape(self):
         ins = np.array([0, 1, 0])
         dels = np.array([1, 0, 0])
         subs = np.array([0, 0, 1])
@@ -112,17 +151,36 @@ class TestPrepModificationFrequency:
             custom_colors={},
             save_also_png=True,
         )
+        # Vectors passed through by reference
         assert result['all_insertion_count_vectors'] is ins
         assert result['all_deletion_count_vectors'] is dels
         assert result['all_substitution_count_vectors'] is subs
-        assert result['n_total'] == 50
-        assert result['num_refs'] == 1
-        assert result['y_max'] == 5.5
-        assert result['plot_root'] == '/tmp/4b.Modification'
+        # Computed values
+        assert result['num_refs'] == snapshot(1)
+        assert result['plot_title'] == snapshot("Mutation position distribution")
+        assert sorted(result.keys()) == snapshot(
+            [
+                "all_deletion_count_vectors",
+                "all_insertion_count_vectors",
+                "all_substitution_count_vectors",
+                "custom_colors",
+                "cut_points",
+                "include_idxs_list",
+                "n_this_category",
+                "n_total",
+                "num_refs",
+                "plot_cut_points",
+                "plot_root",
+                "plot_title",
+                "ref_len",
+                "ref_name",
+                "save_also_png",
+                "sgRNA_intervals",
+                "y_max",
+            ]
+        )
 
-    def test_all_expected_keys(self):
-        from CRISPResso2.plots.data_prep import prep_modification_frequency
-
+    def test_plot_title_multi_ref(self):
         result = prep_modification_frequency(
             include_idxs_list=[],
             all_insertion_count_vector=np.array([]),
@@ -130,8 +188,8 @@ class TestPrepModificationFrequency:
             all_substitution_count_vector=np.array([]),
             sgRNA_intervals=[],
             ref_len=0,
-            ref_name='r',
-            ref_names=['r'],
+            ref_name='FANC',
+            ref_names=['FANC', 'HDR'],
             N_TOTAL=0,
             n_this_category=0,
             cut_points=[],
@@ -141,11 +199,6 @@ class TestPrepModificationFrequency:
             custom_colors={},
             save_also_png=False,
         )
-        expected_keys = {
-            'include_idxs_list', 'all_insertion_count_vectors',
-            'all_deletion_count_vectors', 'all_substitution_count_vectors',
-            'sgRNA_intervals', 'ref_len', 'ref_name', 'num_refs',
-            'n_total', 'n_this_category', 'cut_points', 'plot_cut_points',
-            'y_max', 'plot_title', 'plot_root', 'custom_colors', 'save_also_png',
-        }
-        assert set(result.keys()) == expected_keys
+        assert result['plot_title'] == snapshot(
+            "Mutation position distribution: FANC"
+        )
