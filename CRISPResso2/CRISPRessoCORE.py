@@ -33,6 +33,7 @@ else:
     C2PRO_INSTALLED = False
 
 from CRISPResso2 import CRISPResso2Align, CRISPRessoMultiProcessing
+from CRISPResso2.plots import data_prep as CRISPRessoPlotData
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -4889,13 +4890,13 @@ def main():
         # FIGURE 1: Alignment
         if not args.suppress_plots:
             plot_1a_root = _jp("1a.Read_barplot")
-            plot_1a_input = {
-                'N_READS_INPUT': N_READS_INPUT,
-                'N_READS_AFTER_PREPROCESSING': N_READS_AFTER_PREPROCESSING,
-                'N_TOTAL': N_TOTAL,
-                'fig_filename_root': plot_1a_root,
-                'save_png': save_png
-            }
+            plot_1a_input = CRISPRessoPlotData.prep_read_barplot(
+                N_READS_INPUT=N_READS_INPUT,
+                N_READS_AFTER_PREPROCESSING=N_READS_AFTER_PREPROCESSING,
+                N_TOTAL=N_TOTAL,
+                fig_filename_root=plot_1a_root,
+                save_png=save_png,
+            )
             debug('Plotting read bar plot', {'percent_complete': 42})
             plot(CRISPRessoPlot.plot_read_barplot, plot_1a_input)
             crispresso2_info['results']['general_plots']['plot_1a_root'] = os.path.basename(plot_1a_root)
@@ -4904,17 +4905,17 @@ def main():
 
             plot_1b_root = _jp("1b.Alignment_pie_chart")
             plot_1c_root = _jp('1c.Alignment_barplot')
-            plot_1bc_input = {
-                'class_counts_order': class_counts_order,
-                'class_counts': class_counts,
-                'ref_names': ref_names,
-                'expected_hdr_amplicon_seq': args.expected_hdr_amplicon_seq,
-                'N_TOTAL': N_TOTAL,
-                'piechart_plot_root': plot_1b_root,
-                'barplot_plot_root': plot_1c_root,
-                'custom_colors': custom_config['colors'],
-                'save_png': save_png
-            }
+            plot_1bc_input = CRISPRessoPlotData.prep_class_piechart_barplot(
+                class_counts_order=class_counts_order,
+                class_counts=class_counts,
+                ref_names=ref_names,
+                expected_hdr_amplicon_seq=args.expected_hdr_amplicon_seq,
+                N_TOTAL=N_TOTAL,
+                piechart_plot_root=plot_1b_root,
+                barplot_plot_root=plot_1c_root,
+                custom_colors=custom_config['colors'],
+                save_png=save_png,
+            )
             crispresso2_info['results']['general_plots']['plot_1b_root'] = os.path.basename(plot_1b_root)
             crispresso2_info['results']['general_plots']['plot_1b_caption'] = "Figure 1b: Alignment and editing frequency of reads as determined by the percentage and number of sequence reads showing unmodified and modified alleles."
             if args.expected_hdr_amplicon_seq != "":
@@ -4954,13 +4955,13 @@ def main():
             alleles_homology_scores_filename = _jp('Alleles_homology_scores.txt')
             homology_scores, counts = get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename)
             plot_1e_root = _jp('1e.Allele_homology_histogram')
-            plot_1e_input = {
-                'fig_root': plot_1e_root,
-                'homology_scores': homology_scores,
-                'counts': counts,
-                'min_homology': args.default_min_aln_score,
-                'save_also_png': save_png,
-            }
+            plot_1e_input = CRISPRessoPlotData.prep_allele_homology(
+                fig_root=plot_1e_root,
+                homology_scores=homology_scores,
+                counts=counts,
+                min_homology=args.default_min_aln_score,
+                save_also_png=save_png,
+            )
             debug('Plotting alleles homology histogram', {'percent_complete': 47})
             plot(CRISPRessoPlot.plot_alleles_homology_histogram, plot_1e_input)
             crispresso2_info['results']['general_plots']['plot_1e_root'] = os.path.basename(plot_1e_root)
@@ -5288,34 +5289,25 @@ def main():
                 if modifiedName in class_counts:
                     n_this_category_modified = class_counts[modifiedName]
 
-                y_max = max(all_indelsub_count_vectors[ref_name]) * 1.1
                 plot_root = _jp(
                     '4a.' + ref_plot_name + 'Combined_insertion_deletion_substitution_locations',
                 )
-                plot_4a_input = {
-                    'all_indelsub_count_vectors': all_indelsub_count_vectors[ref_name],
-                    'include_idxs_list': include_idxs_list,
-                    'cut_points': cut_points,
-                    'plot_cut_points': plot_cut_points,
-                    'sgRNA_intervals': sgRNA_intervals,
-                    'n_total': N_TOTAL,
-                    'n_this_category': n_this_category,
-                    'ref_name': ref_name,
-                    'num_refs': len(ref_names),
-                    'ref_len': ref_len,
-                    'y_max': y_max,
-                    'plot_titles': {
-                        'combined': get_plot_title_with_ref_name(
-                            'Combined Insertions/Deletions/Substitutions', ref_name,
-                        ),
-                        'main': get_plot_title_with_ref_name(
-                            'Mutation position distribution', ref_name,
-                        ),
-                    },
-                    'plot_root': plot_root,
-                    'custom_colors': custom_config["colors"],
-                    'save_also_png': save_png,
-                }
+                plot_4a_input = CRISPRessoPlotData.prep_amplicon_modifications(
+                    all_indelsub_count_vector=all_indelsub_count_vectors[ref_name],
+                    include_idxs_list=include_idxs_list,
+                    cut_points=cut_points,
+                    plot_cut_points=plot_cut_points,
+                    sgRNA_intervals=sgRNA_intervals,
+                    N_TOTAL=N_TOTAL,
+                    n_this_category=n_this_category,
+                    ref_name=ref_name,
+                    ref_names=ref_names,
+                    ref_len=ref_len,
+                    plot_root=plot_root,
+                    custom_colors=custom_config["colors"],
+                    save_also_png=save_png,
+                )
+                y_max = plot_4a_input['y_max']
                 debug('Plotting amplication modifications for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_amplicon_modifications, plot_4a_input)
                 crispresso2_info['results']['refs'][ref_name]['plot_4a_root'] = os.path.basename(plot_root)
@@ -5325,27 +5317,24 @@ def main():
                 plot_root = _jp(
                     '4b.' + ref_plot_name + 'Insertion_deletion_substitution_locations',
                 )
-                plot_4b_input = {
-                    'include_idxs_list': include_idxs_list,
-                    'all_insertion_count_vectors': all_insertion_count_vectors[ref_name],
-                    'all_deletion_count_vectors': all_deletion_count_vectors[ref_name],
-                    'all_substitution_count_vectors': all_substitution_count_vectors[ref_name],
-                    'sgRNA_intervals': sgRNA_intervals,
-                    'ref_len': ref_len,
-                    'ref_name': ref_name,
-                    'num_refs': len(ref_names),
-                    'n_total': N_TOTAL,
-                    'n_this_category': n_this_category,
-                    'cut_points': cut_points,
-                    'plot_cut_points': plot_cut_points,
-                    'y_max': y_max,
-                    'plot_title': get_plot_title_with_ref_name(
-                        'Mutation position distribution', ref_name,
-                    ),
-                    'plot_root': plot_root,
-                    'custom_colors': custom_config["colors"],
-                    'save_also_png': save_png,
-                }
+                plot_4b_input = CRISPRessoPlotData.prep_modification_frequency(
+                    include_idxs_list=include_idxs_list,
+                    all_insertion_count_vector=all_insertion_count_vectors[ref_name],
+                    all_deletion_count_vector=all_deletion_count_vectors[ref_name],
+                    all_substitution_count_vector=all_substitution_count_vectors[ref_name],
+                    sgRNA_intervals=sgRNA_intervals,
+                    ref_len=ref_len,
+                    ref_name=ref_name,
+                    ref_names=ref_names,
+                    N_TOTAL=N_TOTAL,
+                    n_this_category=n_this_category,
+                    cut_points=cut_points,
+                    plot_cut_points=plot_cut_points,
+                    y_max=y_max,
+                    plot_root=plot_root,
+                    custom_colors=custom_config["colors"],
+                    save_also_png=save_png,
+                )
                 debug('Plotting modification frequency for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_modification_frequency, plot_4b_input)
                 crispresso2_info['results']['refs'][ref_name]['plot_4b_root'] = os.path.basename(plot_root)
