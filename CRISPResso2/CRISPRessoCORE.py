@@ -4885,6 +4885,78 @@ def main():
             process_futures=process_futures,
             halt_on_plot_fail=args.halt_on_plot_fail,
         )
+
+        # --- CRISPRessoPro plot gating ---
+        # When Pro is installed, build the registry and wrap plot() so that
+        # disabled plots are skipped entirely (no rendering, no PNG on disk).
+        _pro_registry = None
+        if C2PRO_INSTALLED:
+            try:
+                from CRISPRessoPro.plots.builtin_plots import register_builtin_plots
+                from CRISPRessoPro.plots.registry import PlotRegistry
+                import json as _json
+
+                _pro_registry = PlotRegistry()
+                register_builtin_plots(_pro_registry, CRISPRessoPlot)
+                _pro_registry.discover_plugins()
+
+                # Apply config file
+                if getattr(args, 'report_config', None):
+                    with open(args.report_config, 'r') as _f:
+                        _pro_registry.apply_config(_json.load(_f))
+
+                # Apply CLI overrides
+                _excl = getattr(args, 'exclude_plots', None)
+                _incl = getattr(args, 'include_plots', None)
+                if _excl:
+                    _pro_registry.apply_cli_overrides(
+                        exclude_plots=[s.strip() for s in _excl.split(',')],
+                    )
+                if _incl:
+                    _pro_registry.apply_cli_overrides(
+                        include_plots=[s.strip() for s in _incl.split(',')],
+                    )
+
+                # Build set of enabled filename prefixes from registry.
+                # legacy_id "plot_1a" -> prefix "1a.", "plot_10h" -> "10h."
+                _enabled_prefixes = set()
+                for _pd in _pro_registry._plots.values():
+                    if _pd.enabled and _pd.legacy_id:
+                        _enabled_prefixes.add(_pd.legacy_id.replace('plot_', '') + '.')
+
+                # Wrap plot() to skip disabled plots based on filename prefix
+                _original_plot = plot
+
+                # Keys that hold filename roots in plot args dicts
+                _ROOT_KEYS = {'fig_filename_root', 'fig_root', 'plot_root',
+                              'plot_path', 'piechart_plot_root', 'barplot_plot_root'}
+
+                def plot(plot_func, plot_args, _orig=_original_plot, _pfxs=_enabled_prefixes):
+                    # Extract all filename roots from the args dict
+                    roots = []
+                    for k, v in plot_args.items():
+                        if k in _ROOT_KEYS and isinstance(v, str):
+                            roots.append(os.path.basename(v))
+
+                    if not roots:
+                        # No filename root found — run unconditionally
+                        return _orig(plot_func, plot_args)
+
+                    # Check if ANY root matches an enabled prefix
+                    for root in roots:
+                        for pfx in _pfxs:
+                            if root.startswith(pfx):
+                                return _orig(plot_func, plot_args)
+
+                    # All roots are for disabled plots — skip
+                    return
+
+            except Exception as e:
+                logger.warning(f"Failed to build Pro plot registry for gating: {e}")
+                logger.debug(traceback.format_exc())
+                _pro_registry = None
+        # --- END CRISPRessoPro plot gating ---
+
         ###############################################################################################################################################
         # FIGURE 1: Alignment
         if not args.suppress_plots:
