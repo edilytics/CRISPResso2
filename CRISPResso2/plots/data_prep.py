@@ -20,14 +20,22 @@ def _plot_title_with_ref_name(title, ref_name, num_refs):
     return title
 
 
-def _clip_to_percentile(values, counts, percentile=0.99):
+def _clip_to_percentile(values, counts, percentile=0.99, total=None):
     """Find the value at which cumulative counts reach the given percentile.
 
     Scans ``values`` and ``counts`` in order, returning the value where
     the running sum of counts first exceeds ``percentile * total``.
     If the cutoff is never reached, returns the last value.
+
+    Parameters
+    ----------
+    total : float, optional
+        Override the total used for cutoff calculation. If None, uses
+        ``counts.sum()``.
+
     """
-    total = counts.sum()
+    if total is None:
+        total = counts.sum()
     if total == 0:
         return values[-1] if len(values) > 0 else 0
     cutoff = percentile * total
@@ -73,6 +81,52 @@ def prep_indel_size_distribution(hdensity, hlengths, center_index,
         ),
         'plot_root': plot_root,
         'save_also_png': save_also_png,
+        'ref_name': ref_name,
+    }
+
+
+def prep_frequency_deletions_insertions(x_bins_ins, y_values_ins,
+                                        x_bins_del, y_values_del,
+                                        x_bins_mut, y_values_mut,
+                                        hdensity, ref, counts_total,
+                                        ref_name, ref_names, plot_root,
+                                        save_also_png, custom_colors,
+                                        plot_histogram_outliers):
+    """Prepare kwargs for plot_frequency_deletions_insertions (plot_3b).
+
+    Clips each histogram's xmax to the 99th percentile of the overall
+    density (unless ``plot_histogram_outliers`` is True), clamped to 15.
+    """
+    xmax_ins = max(x_bins_ins)
+    xmax_del = max(x_bins_del)
+    xmax_mut = max(x_bins_mut)
+
+    if not plot_histogram_outliers:
+        density_total = hdensity.sum()
+        xmax_ins = _clip_to_percentile(x_bins_ins, y_values_ins, 0.99, total=density_total)
+        xmax_del = _clip_to_percentile(x_bins_del, y_values_del, 0.99, total=density_total)
+        xmax_mut = _clip_to_percentile(x_bins_mut, y_values_mut, 0.99, total=density_total)
+
+    xmax_ins = max(15, xmax_ins)
+    xmax_del = max(15, xmax_del)
+    xmax_mut = max(15, xmax_mut)
+
+    num_refs = len(ref_names)
+
+    return {
+        'ref': ref,
+        'counts_total': counts_total,
+        'plot_path': plot_root,
+        'plot_titles': {
+            'ins': _plot_title_with_ref_name('Insertions', ref_name, num_refs),
+            'del': _plot_title_with_ref_name('Deletions', ref_name, num_refs),
+            'mut': _plot_title_with_ref_name('Substitutions', ref_name, num_refs),
+        },
+        'xmax_ins': xmax_ins,
+        'xmax_del': xmax_del,
+        'xmax_mut': xmax_mut,
+        'save_also_png': save_also_png,
+        'custom_colors': custom_colors,
         'ref_name': ref_name,
     }
 

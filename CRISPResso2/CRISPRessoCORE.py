@@ -5182,74 +5182,37 @@ def main():
                 # (3b) Modification plots with one plot each for insertion lengths, deletion lengths, and number of substitutions
                 # Note that the previous plot (3a) shows the effective lengths of reads, which could include multiple insertions or deletions. This plot separates these by insertion and deletion.
 
-                xmax_ins = max(x_bins_ins)
-                if not args.plot_histogram_outliers:
-                    sum_cutoff = 0.99 * hdensity.sum()
-                    sum_so_far = 0
-                    for indel_len, indel_count in zip(x_bins_ins, y_values_ins):
-                        sum_so_far += indel_count
-                        if sum_so_far > sum_cutoff:
-                            xmax_ins = indel_len
-                            break
-                xmax_ins = max(15, xmax_ins)
+                plot_root = _jp(
+                    '3b.' + ref_plot_name + 'Insertion_deletion_substitutions_size_hist',
+                )
+                plot_3b_input = CRISPRessoPlotData.prep_frequency_deletions_insertions(
+                    x_bins_ins=x_bins_ins,
+                    y_values_ins=y_values_ins,
+                    x_bins_del=x_bins_del,
+                    y_values_del=y_values_del,
+                    x_bins_mut=x_bins_mut,
+                    y_values_mut=y_values_mut,
+                    hdensity=hdensity,
+                    ref=refs[ref_name],
+                    counts_total=counts_total[ref_name],
+                    ref_name=ref_name,
+                    ref_names=ref_names,
+                    plot_root=plot_root,
+                    save_also_png=save_png,
+                    custom_colors=custom_config["colors"],
+                    plot_histogram_outliers=args.plot_histogram_outliers,
+                )
+                xmax_ins = plot_3b_input['xmax_ins']
+                xmax_del = plot_3b_input['xmax_del']
+                xmax_mut = plot_3b_input['xmax_mut']
 
                 clipped_string = ""
                 if xmax_ins < max(x_bins_ins):
                     clipped_string += " (Insertion maximum " + str(int(max(x_bins_ins))) + " not shown)"
-
-                xmax_del = max(x_bins_del)
-                if not args.plot_histogram_outliers:
-                    sum_cutoff = .99 * hdensity.sum()
-                    sum_so_far = 0
-                    for indel_len, indel_count in zip(x_bins_del, y_values_del):
-                        sum_so_far += indel_count
-                        if sum_so_far > sum_cutoff:
-                            xmax_del = indel_len
-                            break
-                xmax_del = max(15, xmax_del)
-
                 if xmax_del < max(x_bins_del):
                     clipped_string += " (Deletion minimum -" + str(int(max(x_bins_del))) + " not shown)"
-
-                xmax_mut = max(x_bins_mut)
-                if not args.plot_histogram_outliers:
-                    sum_cutoff = .99 * hdensity.sum()
-                    sum_so_far = 0
-                    for mut_num, mut_count in zip(x_bins_mut, y_values_mut):
-                        sum_so_far += mut_count
-                        if sum_so_far > sum_cutoff:
-                            xmax_mut = mut_num
-                            break
-                xmax_mut = max(15, xmax_mut)
-
                 if xmax_mut < max(x_bins_mut):
                     clipped_string += " (Mutation maximum " + str(int(max(x_bins_mut))) + " not shown)"
-
-                plot_root = _jp(
-                    '3b.' + ref_plot_name + 'Insertion_deletion_substitutions_size_hist',
-                )
-                plot_3b_input = {
-                    'ref': refs[ref_name],
-                    'counts_total': counts_total[ref_name],
-                    'plot_path': plot_root,
-                    'plot_titles': {
-                        'ins': get_plot_title_with_ref_name(
-                            'Insertions', ref_name,
-                        ),
-                        'del': get_plot_title_with_ref_name(
-                            'Deletions', ref_name,
-                        ),
-                        'mut': get_plot_title_with_ref_name(
-                            'Substitutions', ref_name,
-                        ),
-                    },
-                    'xmax_del': xmax_del,
-                    'xmax_ins': xmax_ins,
-                    'xmax_mut': xmax_mut,
-                    'save_also_png': save_png,
-                    'custom_colors': custom_config["colors"],
-                    'ref_name': ref_name,
-                }
                 debug('Plotting frequency deletions/insertions for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_frequency_deletions_insertions, plot_3b_input)
 

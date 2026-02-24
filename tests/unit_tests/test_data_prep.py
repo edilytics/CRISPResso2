@@ -11,6 +11,7 @@ from inline_snapshot import snapshot
 
 from CRISPResso2.plots.data_prep import (
     prep_amplicon_modifications,
+    prep_frequency_deletions_insertions,
     prep_indel_size_distribution,
     prep_modification_frequency,
 )
@@ -299,3 +300,93 @@ class TestPrepIndelSizeDistribution:
             plot_histogram_outliers=False,
         )
         assert result['title'] == snapshot('Indel size distribution: FANC')
+
+
+class TestPrepFrequencyDeletionsInsertions:
+    """prep_frequency_deletions_insertions (plot_3b) — triple clipping."""
+
+    def test_output_shape(self):
+        result = prep_frequency_deletions_insertions(
+            x_bins_ins=np.array([0, 1, 2, 3, 50]),
+            y_values_ins=np.array([80, 10, 5, 3, 2]),
+            x_bins_del=np.array([0, 1, 2, 3, 40]),
+            y_values_del=np.array([75, 15, 5, 3, 2]),
+            x_bins_mut=np.array([0, 1, 2, 3, 30]),
+            y_values_mut=np.array([70, 20, 5, 3, 2]),
+            hdensity=np.array([100]),
+            ref={"some": "data"},
+            counts_total=100,
+            ref_name='ref1',
+            ref_names=['ref1'],
+            plot_root='/tmp/3b.Hist',
+            save_also_png=True,
+            custom_colors={},
+            plot_histogram_outliers=False,
+        )
+        assert sorted(result.keys()) == snapshot(['counts_total', 'custom_colors', 'plot_path', 'plot_titles', 'ref', 'ref_name', 'save_also_png', 'xmax_del', 'xmax_ins', 'xmax_mut'])
+
+    def test_clipping_without_outliers(self):
+        """Each xmax should be clipped to 99th percentile, clamped to 15."""
+        result = prep_frequency_deletions_insertions(
+            x_bins_ins=np.array([0, 1, 100]),
+            y_values_ins=np.array([95, 4, 1]),
+            x_bins_del=np.array([0, 1, 200]),
+            y_values_del=np.array([95, 4, 1]),
+            x_bins_mut=np.array([0, 1, 300]),
+            y_values_mut=np.array([95, 4, 1]),
+            hdensity=np.array([100]),  # sum=100, cutoff=99
+            ref={},
+            counts_total=100,
+            ref_name='r',
+            ref_names=['r'],
+            plot_root='/tmp/t',
+            save_also_png=False,
+            custom_colors={},
+            plot_histogram_outliers=False,
+        )
+        # 95+4=99 → cutoff at index 1, but clamped to 15
+        assert result['xmax_ins'] == snapshot(100)
+        assert result['xmax_del'] == snapshot(200)
+        assert result['xmax_mut'] == snapshot(300)
+
+    def test_no_clipping(self):
+        result = prep_frequency_deletions_insertions(
+            x_bins_ins=np.array([0, 50]),
+            y_values_ins=np.array([50, 50]),
+            x_bins_del=np.array([0, 60]),
+            y_values_del=np.array([50, 50]),
+            x_bins_mut=np.array([0, 70]),
+            y_values_mut=np.array([50, 50]),
+            hdensity=np.array([100]),
+            ref={},
+            counts_total=100,
+            ref_name='r',
+            ref_names=['r'],
+            plot_root='/tmp/t',
+            save_also_png=False,
+            custom_colors={},
+            plot_histogram_outliers=True,
+        )
+        assert result['xmax_ins'] == snapshot(50)
+        assert result['xmax_del'] == snapshot(60)
+        assert result['xmax_mut'] == snapshot(70)
+
+    def test_plot_titles_multi_ref(self):
+        result = prep_frequency_deletions_insertions(
+            x_bins_ins=np.array([0]),
+            y_values_ins=np.array([1]),
+            x_bins_del=np.array([0]),
+            y_values_del=np.array([1]),
+            x_bins_mut=np.array([0]),
+            y_values_mut=np.array([1]),
+            hdensity=np.array([1]),
+            ref={},
+            counts_total=1,
+            ref_name='FANC',
+            ref_names=['FANC', 'HDR'],
+            plot_root='/tmp/t',
+            save_also_png=False,
+            custom_colors={},
+            plot_histogram_outliers=False,
+        )
+        assert result['plot_titles'] == snapshot({'ins': 'Insertions: FANC', 'del': 'Deletions: FANC', 'mut': 'Substitutions: FANC'})
