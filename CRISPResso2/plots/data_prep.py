@@ -237,3 +237,124 @@ def prep_dsODN_piechart(df_alleles, N_TOTAL, plot_root, save_also_png):
         'plot_root': plot_root,
         'save_also_png': save_also_png,
     }
+
+
+def prep_nucleotide_quilt(
+    all_base_count_vectors,
+    all_insertion_count_vectors,
+    all_insertion_left_count_vectors,
+    all_deletion_count_vectors,
+    all_substitution_count_vectors,
+    all_indelsub_count_vectors,
+    counts_total,
+    ref_name,
+    ref_seq,
+    include_idxs_list,
+    sgRNA_intervals,
+    sgRNA_names,
+    sgRNA_mismatches,
+    sgRNA_sequences,
+    plot_root,
+    save_also_png,
+    custom_colors,
+):
+    """Prepare kwargs for plot_nucleotide_quilt (plot_2a).
+
+    Builds ``nuc_pct_df`` and ``mod_pct_df`` from per-position count vectors.
+
+    The returned dict is passed directly to ``plot_nucleotide_quilt``.
+    CORE should also read ``nuc_pct_df`` and ``mod_pct_df`` back from the
+    returned dict to pass as inputs to ``prep_nucleotide_quilt_around_sgRNA``.
+    """
+    tot = float(counts_total)
+
+    df_nuc_freq_all = pd.DataFrame([
+        all_base_count_vectors[ref_name + '_A'],
+        all_base_count_vectors[ref_name + '_C'],
+        all_base_count_vectors[ref_name + '_G'],
+        all_base_count_vectors[ref_name + '_T'],
+        all_base_count_vectors[ref_name + '_N'],
+        all_base_count_vectors[ref_name + '_-'],
+    ])
+    df_nuc_freq_all.index = ['A', 'C', 'G', 'T', 'N', '-']
+    df_nuc_freq_all.columns = list(ref_seq)
+    df_nuc_pct_all = df_nuc_freq_all.divide(tot)
+
+    mod_pcts = []
+    mod_pcts.append(np.concatenate((['Insertions'], np.array(all_insertion_count_vectors).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['Insertions_Left'], np.array(all_insertion_left_count_vectors).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['Deletions'], np.array(all_deletion_count_vectors).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['Substitutions'], np.array(all_substitution_count_vectors).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['All_modifications'], np.array(all_indelsub_count_vectors).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['Total'], [counts_total] * len(ref_seq))))
+    colnames = ['Modification'] + list(ref_seq)
+    modification_percentage_summary_df = _to_numeric_ignore_columns(
+        pd.DataFrame(mod_pcts, columns=colnames), {'Modification'},
+    )
+
+    nuc_df_for_plot = df_nuc_pct_all.reset_index().rename(columns={'index': 'Nucleotide'})
+    nuc_df_for_plot.insert(0, 'Batch', ref_name)
+    mod_df_for_plot = modification_percentage_summary_df.copy()
+    mod_df_for_plot.insert(0, 'Batch', ref_name)
+
+    return {
+        'nuc_pct_df': nuc_df_for_plot,
+        'mod_pct_df': mod_df_for_plot,
+        'fig_filename_root': plot_root,
+        'save_also_png': save_also_png,
+        'sgRNA_intervals': sgRNA_intervals,
+        'sgRNA_names': sgRNA_names,
+        'sgRNA_mismatches': sgRNA_mismatches,
+        'sgRNA_sequences': sgRNA_sequences,
+        'quantification_window_idxs': include_idxs_list,
+        'custom_colors': custom_colors,
+    }
+
+
+def prep_nucleotide_quilt_around_sgRNA(
+    nuc_df_for_plot,
+    mod_df_for_plot,
+    cut_point,
+    plot_half_window,
+    ref_len,
+    sgRNA_intervals,
+    include_idxs_list,
+    sgRNA_names,
+    sgRNA_mismatches,
+    sgRNA_sequences,
+    plot_root,
+    save_also_png,
+    custom_colors,
+):
+    """Prepare kwargs for plot_nucleotide_quilt around one sgRNA (plot_2b).
+
+    Slices ``nuc_df_for_plot`` and ``mod_df_for_plot`` to the window around
+    ``cut_point`` and adjusts sgRNA interval coordinates to the local frame.
+
+    ``nuc_df_for_plot`` and ``mod_df_for_plot`` come from the ``nuc_pct_df``
+    and ``mod_pct_df`` keys of ``prep_nucleotide_quilt``'s return value.
+    """
+    # Columns 0 and 1 are 'Batch' and 'Nucleotide'/'Modification' labels;
+    # sequence position p maps to column index p + 2.
+    new_sel_cols_start = max(2, cut_point - plot_half_window + 1)
+    new_sel_cols_end = min(ref_len, cut_point + plot_half_window + 1)
+    sel_cols = [0, 1] + list(range(new_sel_cols_start + 2, new_sel_cols_end + 2))
+
+    new_sgRNA_intervals = [
+        (int_start - new_sel_cols_start, int_end - new_sel_cols_start)
+        for (int_start, int_end) in sgRNA_intervals
+    ]
+    new_include_idx = [x - new_sel_cols_start for x in include_idxs_list]
+
+    return {
+        'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
+        'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
+        'fig_filename_root': plot_root,
+        'save_also_png': save_also_png,
+        'sgRNA_intervals': new_sgRNA_intervals,
+        'sgRNA_names': sgRNA_names,
+        'sgRNA_mismatches': sgRNA_mismatches,
+        'sgRNA_sequences': sgRNA_sequences,
+        'quantification_window_idxs': new_include_idx,
+        'custom_colors': custom_colors,
+    }

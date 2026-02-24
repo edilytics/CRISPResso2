@@ -5048,36 +5048,29 @@ def main():
                     crispresso2_info['results']['refs'][ref_name]['sub_freq_table_filename'] = os.path.basename(sub_freq_table_filename)
 
                 if not args.suppress_plots:
-                    mod_pcts = []
-                    tot = float(counts_total[ref_name])
-                    mod_pcts.append(np.concatenate((['Insertions'], np.array(all_insertion_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate((['Insertions_Left'], np.array(all_insertion_left_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate((['Deletions'], np.array(all_deletion_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate((['Substitutions'], np.array(all_substitution_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate((['All_modifications'], np.array(all_indelsub_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate((['Total'], [counts_total[ref_name]] * refs[ref_name]['sequence_length'])))
-                    colnames = ['Modification'] + list(ref_seq)
-                    modification_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(mod_pcts, columns=colnames), {'Modification'})
-
-                    nuc_df_for_plot = df_nuc_pct_all.reset_index().rename(columns={'index': 'Nucleotide'})
-                    nuc_df_for_plot.insert(0, 'Batch', ref_name)  # this function was designed for plottin batch... so just add a column in there to make it happy
-                    mod_df_for_plot = modification_percentage_summary_df.copy()
-                    mod_df_for_plot.insert(0, 'Batch', ref_name)
-
                     plot_root = _jp('2a.' + ref_plot_name + 'Nucleotide_percentage_quilt')
                     pro_output_name = os.path.join(OUTPUT_DIRECTORY, f'plot_{os.path.basename(plot_root)}.json')
-                    plot_2a_input = {
-                        'nuc_pct_df': nuc_df_for_plot,
-                        'mod_pct_df': mod_df_for_plot,
-                        'fig_filename_root': pro_output_name if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
-                        'save_also_png': save_png,
-                        'sgRNA_intervals': sgRNA_intervals,
-                        'sgRNA_names': sgRNA_names,
-                        'sgRNA_mismatches': sgRNA_mismatches,
-                        'sgRNA_sequences': sgRNA_sequences,
-                        'quantification_window_idxs': include_idxs_list,
-                        'custom_colors': custom_config["colors"],
-                    }
+                    plot_2a_input = CRISPRessoPlotData.prep_nucleotide_quilt(
+                        all_base_count_vectors=all_base_count_vectors,
+                        all_insertion_count_vectors=all_insertion_count_vectors[ref_name],
+                        all_insertion_left_count_vectors=all_insertion_left_count_vectors[ref_name],
+                        all_deletion_count_vectors=all_deletion_count_vectors[ref_name],
+                        all_substitution_count_vectors=all_substitution_count_vectors[ref_name],
+                        all_indelsub_count_vectors=all_indelsub_count_vectors[ref_name],
+                        counts_total=counts_total[ref_name],
+                        ref_name=ref_name,
+                        ref_seq=ref_seq,
+                        include_idxs_list=include_idxs_list,
+                        sgRNA_intervals=sgRNA_intervals,
+                        sgRNA_names=sgRNA_names,
+                        sgRNA_mismatches=sgRNA_mismatches,
+                        sgRNA_sequences=sgRNA_sequences,
+                        plot_root=pro_output_name if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
+                        save_also_png=save_png,
+                        custom_colors=custom_config["colors"],
+                    )
+                    nuc_df_for_plot = plot_2a_input['nuc_pct_df']
+                    mod_df_for_plot = plot_2a_input['mod_pct_df']
                     debug('Plotting nucleotide quilt across amplicon')
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2a_input)
                     crispresso2_info['results']['refs'][ref_name]['plot_2a_root'] = os.path.basename(plot_root)
@@ -5099,34 +5092,23 @@ def main():
                             sgRNA_legend = sgRNA_name + " (" + sgRNA + ")"
                         sgRNA_label = CRISPRessoShared.slugify(sgRNA_label)
 
-                        # get nucleotide columns to print for this sgRNA
-                        sel_cols = [0, 1]
-                        plot_half_window = max(1, args.plot_window_size)
-                        new_sel_cols_start = max(2, cut_point - plot_half_window + 1)
-                        new_sel_cols_end = min(ref_len, cut_point + plot_half_window + 1)
-                        sel_cols.extend(list(range(new_sel_cols_start + 2, new_sel_cols_end + 2)))
-                        # get new intervals
-                        new_sgRNA_intervals = []
-                        # add annotations for each sgRNA (to be plotted on this sgRNA's plot)
-                        for (int_start, int_end) in refs[ref_name]['sgRNA_intervals']:
-                            new_sgRNA_intervals += [(int_start - new_sel_cols_start, int_end - new_sel_cols_start)]
-                        new_include_idx = []
-                        for x in include_idxs_list:
-                            new_include_idx += [x - new_sel_cols_start]
                         plot_root = _jp('2b.' + ref_plot_name + 'Nucleotide_percentage_quilt_around_' + sgRNA_label)
                         pro_output_name = os.path.join(OUTPUT_DIRECTORY, f'plot_{os.path.basename(plot_root)}.json')
-                        plot_2b_input = {
-                            'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
-                            'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
-                            'fig_filename_root': pro_output_name if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
-                            'save_also_png': save_png,
-                            'sgRNA_intervals': new_sgRNA_intervals,
-                            'sgRNA_names': sgRNA_names,
-                            'sgRNA_mismatches': sgRNA_mismatches,
-                            'sgRNA_sequences': sgRNA_sequences,
-                            'quantification_window_idxs': new_include_idx,
-                            'custom_colors': custom_config["colors"],
-                        }
+                        plot_2b_input = CRISPRessoPlotData.prep_nucleotide_quilt_around_sgRNA(
+                            nuc_df_for_plot=nuc_df_for_plot,
+                            mod_df_for_plot=mod_df_for_plot,
+                            cut_point=cut_point,
+                            plot_half_window=max(1, args.plot_window_size),
+                            ref_len=ref_len,
+                            sgRNA_intervals=refs[ref_name]['sgRNA_intervals'],
+                            include_idxs_list=include_idxs_list,
+                            sgRNA_names=sgRNA_names,
+                            sgRNA_mismatches=sgRNA_mismatches,
+                            sgRNA_sequences=sgRNA_sequences,
+                            plot_root=pro_output_name if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
+                            save_also_png=save_png,
+                            custom_colors=custom_config["colors"],
+                        )
                         debug('Plotting nucleotide distribuition around {0} for {1}'.format(sgRNA_legend, ref_name))
                         plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2b_input)
                         crispresso2_info['results']['refs'][ref_name]['plot_2b_roots'].append(os.path.basename(plot_root))

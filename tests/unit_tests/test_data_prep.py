@@ -286,3 +286,129 @@ Contains dsODN
 No dsODN
 (50 reads)\
 """], 'plot_root': '/tmp/1d', 'save_also_png': False})
+
+
+class TestPrepNucleotideQuilt:
+    """prep_nucleotide_quilt (plot_2a) — builds nuc/mod DataFrames."""
+
+    def _make_inputs(self, ref_name='R', ref_seq='ACGT', counts_total=100):
+        n = len(ref_seq)
+        all_base = {
+            ref_name + '_A': np.array([counts_total, 0, 0, 0][:n]),
+            ref_name + '_C': np.array([0, counts_total, 0, 0][:n]),
+            ref_name + '_G': np.array([0, 0, counts_total, 0][:n]),
+            ref_name + '_T': np.array([0, 0, 0, counts_total][:n]),
+            ref_name + '_N': np.zeros(n, dtype=int),
+            ref_name + '_-': np.zeros(n, dtype=int),
+        }
+        return dict(
+            all_base_count_vectors=all_base,
+            all_insertion_count_vectors=np.zeros(n, dtype=int),
+            all_insertion_left_count_vectors=np.zeros(n, dtype=int),
+            all_deletion_count_vectors=np.zeros(n, dtype=int),
+            all_substitution_count_vectors=np.zeros(n, dtype=int),
+            all_indelsub_count_vectors=np.zeros(n, dtype=int),
+            counts_total=counts_total,
+            ref_name=ref_name,
+            ref_seq=ref_seq,
+            include_idxs_list=[1, 2],
+            sgRNA_intervals=[(1, 2)],
+            sgRNA_names=['sg1'],
+            sgRNA_mismatches=[0],
+            sgRNA_sequences=['ACGT'],
+            plot_root='/tmp/2a',
+            save_also_png=False,
+            custom_colors={},
+        )
+
+    def test_basic_structure(self):
+        from CRISPResso2.plots.data_prep import prep_nucleotide_quilt
+        result = prep_nucleotide_quilt(**self._make_inputs())
+        # Verify the DataFrame shapes — don't snapshot the full DataFrames
+        assert list(result.keys()) == snapshot(['nuc_pct_df', 'mod_pct_df', 'fig_filename_root', 'save_also_png', 'sgRNA_intervals', 'sgRNA_names', 'sgRNA_mismatches', 'sgRNA_sequences', 'quantification_window_idxs', 'custom_colors'])
+        assert result['nuc_pct_df'].shape == snapshot((6, 6))
+        assert result['mod_pct_df'].shape == snapshot((6, 6))
+        assert result['fig_filename_root'] == '/tmp/2a'
+        assert result['quantification_window_idxs'] == [1, 2]
+
+    def test_nuc_percentages_sum_to_one(self):
+        from CRISPResso2.plots.data_prep import prep_nucleotide_quilt
+        result = prep_nucleotide_quilt(**self._make_inputs())
+        # Each column (position) of nuc_pct_df (excluding Batch/Nucleotide columns)
+        # should sum to 1.0 (all reads assigned to one nucleotide in this fixture)
+        nuc_df = result['nuc_pct_df']
+        seq_cols = nuc_df.columns[2:]  # skip Batch and Nucleotide
+        col_sums = nuc_df[seq_cols].sum(axis=0)
+        np.testing.assert_allclose(col_sums.values, 1.0)
+
+
+class TestPrepNucleotideQuiltAroundSgRNA:
+    """prep_nucleotide_quilt_around_sgRNA (plot_2b) — window slicing."""
+
+    def _make_dfs(self, ref_name='R', ref_seq='ACGTACGTACGT'):
+        """Build minimal nuc/mod DataFrames matching the 2a output shape."""
+        import pandas as pd
+        n = len(ref_seq)
+        # nuc_df: shape (6 nucs × (n+2 cols: Batch + Nucleotide + n positions))
+        nuc_rows = []
+        for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
+            row = [ref_name, nuc] + [0.0] * n
+            nuc_rows.append(row)
+        nuc_cols = ['Batch', 'Nucleotide'] + list(ref_seq)
+        nuc_df = pd.DataFrame(nuc_rows, columns=nuc_cols)
+
+        # mod_df: shape (6 mods × (n+2 cols))
+        mod_rows = []
+        for mod in ['Insertions', 'Insertions_Left', 'Deletions', 'Substitutions', 'All_modifications', 'Total']:
+            row = [ref_name, mod] + [0.0] * n
+            mod_rows.append(row)
+        mod_cols = ['Batch', 'Modification'] + list(ref_seq)
+        mod_df = pd.DataFrame(mod_rows, columns=mod_cols)
+        return nuc_df, mod_df
+
+    def test_window_slicing(self):
+        from CRISPResso2.plots.data_prep import prep_nucleotide_quilt_around_sgRNA
+        nuc_df, mod_df = self._make_dfs()
+        result = prep_nucleotide_quilt_around_sgRNA(
+            nuc_df_for_plot=nuc_df,
+            mod_df_for_plot=mod_df,
+            cut_point=6,
+            plot_half_window=3,
+            ref_len=12,
+            sgRNA_intervals=[(4, 8)],
+            include_idxs_list=[5, 6, 7],
+            sgRNA_names=['sg1'],
+            sgRNA_mismatches=[0],
+            sgRNA_sequences=['ACGT'],
+            plot_root='/tmp/2b',
+            save_also_png=False,
+            custom_colors={},
+        )
+        assert list(result.keys()) == snapshot(['nuc_pct_df', 'mod_pct_df', 'fig_filename_root', 'save_also_png', 'sgRNA_intervals', 'sgRNA_names', 'sgRNA_mismatches', 'sgRNA_sequences', 'quantification_window_idxs', 'custom_colors'])
+        # Window around cut_point=6, half=3 → cols 4..9, sel_cols=[0,1,6,7,8,9,10,11]
+        assert result['nuc_pct_df'].shape == snapshot((6, 8))
+        assert result['sgRNA_intervals'] == snapshot([(0, 4)])
+        assert result['quantification_window_idxs'] == snapshot([1, 2, 3])
+
+    def test_clamped_near_start(self):
+        """When cut is near the start, new_sel_cols_start clamps to 2."""
+        from CRISPResso2.plots.data_prep import prep_nucleotide_quilt_around_sgRNA
+        nuc_df, mod_df = self._make_dfs()
+        result = prep_nucleotide_quilt_around_sgRNA(
+            nuc_df_for_plot=nuc_df,
+            mod_df_for_plot=mod_df,
+            cut_point=1,
+            plot_half_window=5,
+            ref_len=12,
+            sgRNA_intervals=[(0, 2)],
+            include_idxs_list=[1],
+            sgRNA_names=['sg1'],
+            sgRNA_mismatches=[0],
+            sgRNA_sequences=['ACGT'],
+            plot_root='/tmp/2b',
+            save_also_png=False,
+            custom_colors={},
+        )
+        # new_sel_cols_start = max(2, 1-5+1) = 2
+        assert result['sgRNA_intervals'] == snapshot([(-2, 0)])
+        assert result['quantification_window_idxs'] == snapshot([-1])
