@@ -6409,6 +6409,59 @@ def main():
 
         info('Done!')
 
+        # --- CRISPRessoPro plot hook ---
+        if C2PRO_INSTALLED:
+            try:
+                from CRISPResso2.plotting.plot_context import PlotContext
+                from CRISPRessoPro import hooks as pro_hooks
+
+                plot_context = PlotContext(
+                    args=args,
+                    run_data=crispresso2_info,
+                    refs=crispresso2_info['results']['refs'],
+                    ref_names=ref_names,
+                    counts_total=counts_total,
+                    counts_modified=counts_modified,
+                    counts_unmodified=counts_unmodified,
+                    counts_discarded=counts_discarded,
+                    counts_insertion=counts_insertion,
+                    counts_deletion=counts_deletion,
+                    counts_substitution=counts_substitution,
+                    class_counts=class_counts,
+                    N_TOTAL=N_TOTAL,
+                    df_alleles=df_alleles,
+                    all_insertion_count_vectors=all_insertion_count_vectors,
+                    all_insertion_left_count_vectors=all_insertion_left_count_vectors,
+                    all_deletion_count_vectors=all_deletion_count_vectors,
+                    all_substitution_count_vectors=all_substitution_count_vectors,
+                    all_indelsub_count_vectors=all_indelsub_count_vectors,
+                    all_substitution_base_vectors=all_substitution_base_vectors,
+                    all_base_count_vectors=all_base_count_vectors,
+                    insertion_count_vectors=insertion_count_vectors,
+                    deletion_count_vectors=deletion_count_vectors,
+                    substitution_count_vectors=substitution_count_vectors,
+                    insertion_length_vectors=insertion_length_vectors,
+                    deletion_length_vectors=deletion_length_vectors,
+                    nucleotide_frequency_summary={},
+                    nucleotide_percentage_summary={},
+                    hists_frameshift=hists_frameshift,
+                    hists_inframe=hists_inframe,
+                    counts_modified_frameshift=counts_modified_frameshift,
+                    counts_modified_non_frameshift=counts_modified_non_frameshift,
+                    counts_non_modified_non_frameshift=counts_non_modified_non_frameshift,
+                    counts_splicing_sites_modified=counts_splicing_sites_modified,
+                    _jp=_jp,
+                    save_png=save_png,
+                    output_directory=OUTPUT_DIRECTORY,
+                )
+
+                pro_hooks.on_plots_complete(plot_context, logger)
+            except Exception as e:
+                if args.halt_on_plot_fail:
+                    raise
+                logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
+        # --- END CRISPRessoPro plot hook ---
+
         if not args.keep_intermediate:
             info('Removing Intermediate files...')
 
@@ -6466,7 +6519,13 @@ def main():
                 report_name = _jp("CRISPResso2_report.html")
             else:
                 report_name = OUTPUT_DIRECTORY + '.html'
-            CRISPRessoReport.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
+
+            if C2PRO_INSTALLED:
+                from CRISPRessoPro import hooks as pro_hooks
+                pro_hooks.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
+            else:
+                CRISPRessoReport.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
+
             crispresso2_info['running_info']['report_location'] = report_name
             crispresso2_info['running_info']['report_filename'] = os.path.basename(report_name)
 
