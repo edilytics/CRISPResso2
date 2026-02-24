@@ -6439,6 +6439,7 @@ def main():
                     counts_modified_non_frameshift=counts_modified_non_frameshift,
                     counts_non_modified_non_frameshift=counts_non_modified_non_frameshift,
                     counts_splicing_sites_modified=counts_splicing_sites_modified,
+                    custom_config=custom_config,
                     _jp=_jp,
                     save_png=save_png,
                     output_directory=OUTPUT_DIRECTORY,
