@@ -1,115 +1,12 @@
 """Tests for CRISPResso2.plots.data_prep — extracted data preparation functions.
 
 Each prep function takes raw analysis data and returns the kwargs dict
-that the corresponding CRISPRessoPlot function expects.
+that the corresponding CRISPRessoPlot function expects. Only functions
+with non-trivial computation are extracted and tested here.
 """
 
 import numpy as np
 import pytest
-
-
-class TestPrepReadBarplot:
-    """prep_read_barplot (plot_1a) — trivial packaging."""
-
-    def test_returns_correct_keys(self):
-        from CRISPResso2.plots.data_prep import prep_read_barplot
-
-        result = prep_read_barplot(
-            N_READS_INPUT=1000,
-            N_READS_AFTER_PREPROCESSING=900,
-            N_TOTAL=800,
-            fig_filename_root='/tmp/1a.Read_barplot',
-            save_png=True,
-        )
-        assert result == {
-            'N_READS_INPUT': 1000,
-            'N_READS_AFTER_PREPROCESSING': 900,
-            'N_TOTAL': 800,
-            'fig_filename_root': '/tmp/1a.Read_barplot',
-            'save_png': True,
-        }
-
-    def test_zero_reads(self):
-        from CRISPResso2.plots.data_prep import prep_read_barplot
-
-        result = prep_read_barplot(
-            N_READS_INPUT=0,
-            N_READS_AFTER_PREPROCESSING=0,
-            N_TOTAL=0,
-            fig_filename_root='/tmp/test',
-            save_png=False,
-        )
-        assert result['N_READS_INPUT'] == 0
-        assert result['N_TOTAL'] == 0
-
-
-class TestPrepClassPiechartBarplot:
-    """prep_class_piechart_barplot (plot_1b/1c) — trivial packaging."""
-
-    def test_returns_correct_keys(self):
-        from CRISPResso2.plots.data_prep import prep_class_piechart_barplot
-
-        class_counts = {'Reference': 100, 'NHEJ': 50}
-        result = prep_class_piechart_barplot(
-            class_counts_order=['Reference', 'NHEJ'],
-            class_counts=class_counts,
-            ref_names=['ref1'],
-            expected_hdr_amplicon_seq='',
-            N_TOTAL=150,
-            piechart_plot_root='/tmp/1b.pie',
-            barplot_plot_root='/tmp/1c.bar',
-            custom_colors={'ref1': '#ff0000'},
-            save_png=True,
-        )
-        assert result['class_counts'] is class_counts
-        assert result['N_TOTAL'] == 150
-        assert result['piechart_plot_root'] == '/tmp/1b.pie'
-        assert result['barplot_plot_root'] == '/tmp/1c.bar'
-        assert result['save_png'] is True
-
-    def test_all_keys_present(self):
-        from CRISPResso2.plots.data_prep import prep_class_piechart_barplot
-
-        result = prep_class_piechart_barplot(
-            class_counts_order=[],
-            class_counts={},
-            ref_names=[],
-            expected_hdr_amplicon_seq='ACGT',
-            N_TOTAL=0,
-            piechart_plot_root='/tmp/pie',
-            barplot_plot_root='/tmp/bar',
-            custom_colors={},
-            save_png=False,
-        )
-        expected_keys = {
-            'class_counts_order', 'class_counts', 'ref_names',
-            'expected_hdr_amplicon_seq', 'N_TOTAL',
-            'piechart_plot_root', 'barplot_plot_root',
-            'custom_colors', 'save_png',
-        }
-        assert set(result.keys()) == expected_keys
-
-
-class TestPrepAlleleHomology:
-    """prep_allele_homology (plot_1e) — trivial packaging."""
-
-    def test_returns_correct_keys(self):
-        from CRISPResso2.plots.data_prep import prep_allele_homology
-
-        scores = [85, 90, 95]
-        counts = [10, 20, 30]
-        result = prep_allele_homology(
-            fig_root='/tmp/1e.Allele_homology',
-            homology_scores=scores,
-            counts=counts,
-            min_homology=60,
-            save_also_png=True,
-        )
-        assert result['fig_root'] == '/tmp/1e.Allele_homology'
-        assert result['homology_scores'] is scores
-        assert result['counts'] is counts
-        assert result['min_homology'] == 60
-        assert result['save_also_png'] is True
 
 
 class TestPrepAmpliconModifications:

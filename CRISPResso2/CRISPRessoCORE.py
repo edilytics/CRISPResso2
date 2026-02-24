@@ -4890,13 +4890,13 @@ def main():
         # FIGURE 1: Alignment
         if not args.suppress_plots:
             plot_1a_root = _jp("1a.Read_barplot")
-            plot_1a_input = CRISPRessoPlotData.prep_read_barplot(
-                N_READS_INPUT=N_READS_INPUT,
-                N_READS_AFTER_PREPROCESSING=N_READS_AFTER_PREPROCESSING,
-                N_TOTAL=N_TOTAL,
-                fig_filename_root=plot_1a_root,
-                save_png=save_png,
-            )
+            plot_1a_input = {
+                'N_READS_INPUT': N_READS_INPUT,
+                'N_READS_AFTER_PREPROCESSING': N_READS_AFTER_PREPROCESSING,
+                'N_TOTAL': N_TOTAL,
+                'fig_filename_root': plot_1a_root,
+                'save_png': save_png,
+            }
             debug('Plotting read bar plot', {'percent_complete': 42})
             plot(CRISPRessoPlot.plot_read_barplot, plot_1a_input)
             crispresso2_info['results']['general_plots']['plot_1a_root'] = os.path.basename(plot_1a_root)
@@ -4905,17 +4905,17 @@ def main():
 
             plot_1b_root = _jp("1b.Alignment_pie_chart")
             plot_1c_root = _jp('1c.Alignment_barplot')
-            plot_1bc_input = CRISPRessoPlotData.prep_class_piechart_barplot(
-                class_counts_order=class_counts_order,
-                class_counts=class_counts,
-                ref_names=ref_names,
-                expected_hdr_amplicon_seq=args.expected_hdr_amplicon_seq,
-                N_TOTAL=N_TOTAL,
-                piechart_plot_root=plot_1b_root,
-                barplot_plot_root=plot_1c_root,
-                custom_colors=custom_config['colors'],
-                save_png=save_png,
-            )
+            plot_1bc_input = {
+                'class_counts_order': class_counts_order,
+                'class_counts': class_counts,
+                'ref_names': ref_names,
+                'expected_hdr_amplicon_seq': args.expected_hdr_amplicon_seq,
+                'N_TOTAL': N_TOTAL,
+                'piechart_plot_root': plot_1b_root,
+                'barplot_plot_root': plot_1c_root,
+                'custom_colors': custom_config['colors'],
+                'save_png': save_png,
+            }
             crispresso2_info['results']['general_plots']['plot_1b_root'] = os.path.basename(plot_1b_root)
             crispresso2_info['results']['general_plots']['plot_1b_caption'] = "Figure 1b: Alignment and editing frequency of reads as determined by the percentage and number of sequence reads showing unmodified and modified alleles."
             if args.expected_hdr_amplicon_seq != "":
@@ -4955,13 +4955,13 @@ def main():
             alleles_homology_scores_filename = _jp('Alleles_homology_scores.txt')
             homology_scores, counts = get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_homology_scores_filename)
             plot_1e_root = _jp('1e.Allele_homology_histogram')
-            plot_1e_input = CRISPRessoPlotData.prep_allele_homology(
-                fig_root=plot_1e_root,
-                homology_scores=homology_scores,
-                counts=counts,
-                min_homology=args.default_min_aln_score,
-                save_also_png=save_png,
-            )
+            plot_1e_input = {
+                'fig_root': plot_1e_root,
+                'homology_scores': homology_scores,
+                'counts': counts,
+                'min_homology': args.default_min_aln_score,
+                'save_also_png': save_png,
+            }
             debug('Plotting alleles homology histogram', {'percent_complete': 47})
             plot(CRISPRessoPlot.plot_alleles_homology_histogram, plot_1e_input)
             crispresso2_info['results']['general_plots']['plot_1e_root'] = os.path.basename(plot_1e_root)

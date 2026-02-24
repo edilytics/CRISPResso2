@@ -4,6 +4,10 @@ Each function takes raw analysis data and returns the kwargs dict
 that the corresponding CRISPRessoPlot function expects. These are
 pure functions — no file I/O, no side effects.
 
+Only functions with non-trivial computation are extracted here.
+Trivial pass-through plots (where the dict is just packaging existing
+variables) stay inline in CORE — there's nothing to reuse.
+
 CORE calls these to build plot inputs. CRISPRessoPro can call them
 from PlotContext to generate plots independently.
 """
@@ -14,57 +18,6 @@ def _plot_title_with_ref_name(title, ref_name, num_refs):
     if num_refs > 1:
         return title + ": " + ref_name
     return title
-
-
-def prep_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
-                      fig_filename_root, save_png):
-    """Prepare kwargs for plot_read_barplot (plot_1a).
-
-    Pattern A — trivial packaging.
-    """
-    return {
-        'N_READS_INPUT': N_READS_INPUT,
-        'N_READS_AFTER_PREPROCESSING': N_READS_AFTER_PREPROCESSING,
-        'N_TOTAL': N_TOTAL,
-        'fig_filename_root': fig_filename_root,
-        'save_png': save_png,
-    }
-
-
-def prep_class_piechart_barplot(class_counts_order, class_counts, ref_names,
-                                expected_hdr_amplicon_seq, N_TOTAL,
-                                piechart_plot_root, barplot_plot_root,
-                                custom_colors, save_png):
-    """Prepare kwargs for plot_class_piechart_and_barplot (plot_1b/1c).
-
-    Pattern A — trivial packaging.
-    """
-    return {
-        'class_counts_order': class_counts_order,
-        'class_counts': class_counts,
-        'ref_names': ref_names,
-        'expected_hdr_amplicon_seq': expected_hdr_amplicon_seq,
-        'N_TOTAL': N_TOTAL,
-        'piechart_plot_root': piechart_plot_root,
-        'barplot_plot_root': barplot_plot_root,
-        'custom_colors': custom_colors,
-        'save_png': save_png,
-    }
-
-
-def prep_allele_homology(fig_root, homology_scores, counts, min_homology,
-                         save_also_png):
-    """Prepare kwargs for plot_alleles_homology_histogram (plot_1e).
-
-    Pattern A — trivial packaging.
-    """
-    return {
-        'fig_root': fig_root,
-        'homology_scores': homology_scores,
-        'counts': counts,
-        'min_homology': min_homology,
-        'save_also_png': save_also_png,
-    }
 
 
 def prep_amplicon_modifications(all_indelsub_count_vector, include_idxs_list,
