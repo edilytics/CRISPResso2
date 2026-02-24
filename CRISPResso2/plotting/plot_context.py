@@ -1,4 +1,4 @@
-"""PlotContext: read-only view into CRISPRessoCORE's computed data.
+"""PlotContext: view into CRISPRessoCORE's computed data for plugins.
 
 This is the ONLY part of the plugin architecture that lives in CRISPResso2.
 CRISPRessoPro and plugins consume this to generate custom plots.
@@ -10,14 +10,18 @@ from typing import Callable, Optional
 
 @dataclass
 class PlotContext:
-    """Read-only view into CORE's computed data, passed to CRISPRessoPro.
+    """View into CORE's computed data, passed to CRISPRessoPro and plugins.
 
     Constructed once per run by CORE after the analysis and built-in plot
     phases complete. Wraps references to CORE's local variables -- no data
     is copied.
 
-    Plugin data_funcs should treat all fields as read-only. Modifying the
-    underlying data structures will corrupt the analysis results.
+    .. warning::
+
+        All fields except ``ref_name`` and ``sgRNA_ind`` should be treated
+        as read-only. Mutating the underlying dicts, arrays, or DataFrames
+        will corrupt the analysis results and the output report. Python
+        cannot enforce this at runtime -- it is a contract.
     """
 
     # === Run-level data (always available) ===
