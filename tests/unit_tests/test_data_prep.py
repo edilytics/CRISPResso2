@@ -412,3 +412,40 @@ class TestPrepNucleotideQuiltAroundSgRNA:
         # new_sel_cols_start = max(2, 1-5+1) = 2
         assert result['sgRNA_intervals'] == snapshot([(-2, 0)])
         assert result['quantification_window_idxs'] == snapshot([-1])
+
+
+class TestPrepGlobalModificationsReference:
+    """prep_global_modifications_reference (plot_4e/4f) — conditional title/root."""
+
+    def _jp(self, suffix):
+        return '/out/' + suffix
+
+    def _inputs(self, ref_name, ref_names):
+        return dict(
+            ref_name=ref_name,
+            ref_names=ref_names,
+            ref1_all_insertion_count_vectors=np.array([1, 2, 3]),
+            ref1_all_deletion_count_vectors=np.array([0, 1, 0]),
+            ref1_all_substitution_count_vectors=np.array([0, 0, 1]),
+            ref1={'sequence': 'ACG', 'include_idxs': [0, 1, 2]},
+            include_idxs_list=[0, 1, 2],
+            N_TOTAL=100,
+            ref_len=3,
+            custom_colors={},
+            save_also_png=False,
+            _jp=self._jp,
+        )
+
+    def test_primary_ref_uses_4e(self):
+        from CRISPResso2.plots.data_prep import prep_global_modifications_reference
+        result = _to_serializable(prep_global_modifications_reference(
+            **self._inputs(ref_name='FANC', ref_names=['FANC', 'HDR'])
+        ))
+        assert result == snapshot({'custom_colors': {}, 'include_idxs_list': [0, 1, 2], 'n_total': 100, 'plot_root': '/out/4e.FANC.Global_mutations_in_all_reads', 'plot_title': 'Mutation position distribution in all reads with reference to FANC', 'ref1': {'include_idxs': [0, 1, 2], 'sequence': 'ACG'}, 'ref1_all_deletion_count_vectors': [0, 1, 0], 'ref1_all_insertion_count_vectors': [1, 2, 3], 'ref1_all_substitution_count_vectors': [0, 0, 1], 'ref_len': 3, 'ref_name': 'FANC', 'save_also_png': False})
+
+    def test_hdr_ref_uses_4f(self):
+        from CRISPResso2.plots.data_prep import prep_global_modifications_reference
+        result = _to_serializable(prep_global_modifications_reference(
+            **self._inputs(ref_name='HDR', ref_names=['FANC', 'HDR'])
+        ))
+        assert result == snapshot({'custom_colors': {}, 'include_idxs_list': [0, 1, 2], 'n_total': 100, 'plot_root': '/out/4f.FANC.Global_mutations_in_HDR_reads_with_reference_to_FANC', 'plot_title': 'Mutation position distribution in HDR reads with reference to FANC', 'ref1': {'include_idxs': [0, 1, 2], 'sequence': 'ACG'}, 'ref1_all_deletion_count_vectors': [0, 1, 0], 'ref1_all_insertion_count_vectors': [1, 2, 3], 'ref1_all_substitution_count_vectors': [0, 0, 1], 'ref_len': 3, 'ref_name': 'FANC', 'save_also_png': False})

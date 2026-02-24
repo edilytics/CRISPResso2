@@ -5327,29 +5327,26 @@ def main():
                 ###############################################################################################################################################
 
                 if args.expected_hdr_amplicon_seq != "" and (ref_name == ref_names[0] or ref_name == "HDR"):
-                    plot_4e_input = {
-                        'ref1_all_insertion_count_vectors': ref1_all_insertion_count_vectors[ref_name],
-                        'ref1_all_deletion_count_vectors': ref1_all_deletion_count_vectors[ref_name],
-                        'ref1_all_substitution_count_vectors': ref1_all_substitution_count_vectors[ref_name],
-                        'ref1': refs[ref_names[0]],
-                        'include_idxs_list': include_idxs_list,
-                        'n_total': N_TOTAL,
-                        'ref_len': ref_len,
-                        'ref_name': ref_names[0],
-                        'custom_colors': custom_config["colors"],
-                        'save_also_png': save_png,
-                    }
+                    plot_4e_input = CRISPRessoPlotData.prep_global_modifications_reference(
+                        ref_name=ref_name,
+                        ref_names=ref_names,
+                        ref1_all_insertion_count_vectors=ref1_all_insertion_count_vectors[ref_name],
+                        ref1_all_deletion_count_vectors=ref1_all_deletion_count_vectors[ref_name],
+                        ref1_all_substitution_count_vectors=ref1_all_substitution_count_vectors[ref_name],
+                        ref1=refs[ref_names[0]],
+                        include_idxs_list=include_idxs_list,
+                        N_TOTAL=N_TOTAL,
+                        ref_len=ref_len,
+                        custom_colors=custom_config["colors"],
+                        save_also_png=save_png,
+                        _jp=_jp,
+                    )
+                    plot_root = plot_4e_input['plot_root']
                     if ref_name == ref_names[0]:
-                        plot_root = _jp('4e.' + ref_names[0] + '.Global_mutations_in_all_reads')
-                        plot_4e_input['plot_title'] = 'Mutation position distribution in all reads with reference to %s' % (ref_names[0])
-                        plot_4e_input['plot_root'] = plot_root
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4e_root'] = os.path.basename(plot_root)
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4e_caption'] = "Figure 4e: Positions of modifications in all reads when aligned to the reference sequence (" + ref_names[0] + "). Insertions: red, deletions: purple, substitutions: green. All modifications (including those outside the quantification window) are shown."
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4e_data'] = []
                     elif ref_name == "HDR":
-                        plot_root = _jp('4f.' + ref_names[0] + '.Global_mutations_in_HDR_reads_with_reference_to_' + ref_names[0])
-                        plot_4e_input['plot_title'] = 'Mutation position distribution in %s reads with reference to %s' % (ref_name, ref_names[0])
-                        plot_4e_input['plot_root'] = plot_root
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_root'] = os.path.basename(plot_root)
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_caption'] = f"Figure 4f: Positions of modifications in HDR reads with respect to the reference sequence ({ref_names[0]}). All modifications (including those outside the quantification window) are shown."
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_4f_data'] = []

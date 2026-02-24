@@ -358,3 +358,61 @@ def prep_nucleotide_quilt_around_sgRNA(
         'quantification_window_idxs': new_include_idx,
         'custom_colors': custom_colors,
     }
+
+
+def prep_global_modifications_reference(
+    ref_name,
+    ref_names,
+    ref1_all_insertion_count_vectors,
+    ref1_all_deletion_count_vectors,
+    ref1_all_substitution_count_vectors,
+    ref1,
+    include_idxs_list,
+    N_TOTAL,
+    ref_len,
+    custom_colors,
+    save_also_png,
+    _jp,
+):
+    """Prepare kwargs for plot_global_modifications_reference (plot_4e/4f).
+
+    Selects plot_title and plot_root based on whether ref_name is the
+    primary reference (4e) or the HDR reference (4f).
+
+    Parameters
+    ----------
+    _jp : callable
+        Path-joining function that prepends the output directory.
+    """
+    ref0 = ref_names[0]
+
+    if ref_name == ref0:
+        plot_root = _jp('4e.' + ref0 + '.Global_mutations_in_all_reads')
+        plot_title = (
+            'Mutation position distribution in all reads with reference to %s'
+            % ref0
+        )
+    else:  # ref_name == "HDR"
+        plot_root = _jp(
+            '4f.' + ref0
+            + '.Global_mutations_in_HDR_reads_with_reference_to_' + ref0
+        )
+        plot_title = (
+            'Mutation position distribution in %s reads with reference to %s'
+            % (ref_name, ref0)
+        )
+
+    return {
+        'ref1_all_insertion_count_vectors': ref1_all_insertion_count_vectors,
+        'ref1_all_deletion_count_vectors': ref1_all_deletion_count_vectors,
+        'ref1_all_substitution_count_vectors': ref1_all_substitution_count_vectors,
+        'ref1': ref1,
+        'include_idxs_list': include_idxs_list,
+        'n_total': N_TOTAL,
+        'ref_len': ref_len,
+        'ref_name': ref0,
+        'custom_colors': custom_colors,
+        'save_also_png': save_also_png,
+        'plot_title': plot_title,
+        'plot_root': plot_root,
+    }
