@@ -10,6 +10,7 @@ from inline_snapshot import snapshot
 
 from CRISPResso2.plots.data_prep import (
     prep_amplicon_modifications,
+    prep_dsODN_piechart,
     prep_frequency_deletions_insertions,
     prep_indel_size_distribution,
     prep_modification_frequency,
@@ -242,3 +243,46 @@ class TestPrepFrequencyDeletionsInsertions:
             plot_histogram_outliers=False,
         )
         assert _to_serializable(result) == snapshot({'counts_total': 1, 'custom_colors': {}, 'plot_path': '/tmp/t', 'plot_titles': {'ins': 'Insertions: FANC', 'del': 'Deletions: FANC', 'mut': 'Substitutions: FANC'}, 'ref': {}, 'ref_name': 'FANC', 'save_also_png': False, 'xmax_del': 15, 'xmax_ins': 15, 'xmax_mut': 15})
+
+
+class TestPrepDsODNPiechart:
+    """prep_dsODN_piechart (plot_1d) — labels/sizes from df_alleles."""
+
+    def _make_df(self, n_contain, n_not_contain):
+        import pandas as pd
+        return pd.DataFrame({
+            'contains dsODN': [True] * n_contain + [False] * n_not_contain,
+            '#Reads': [1] * (n_contain + n_not_contain),
+        })
+
+    def test_basic(self):
+        df = self._make_df(n_contain=30, n_not_contain=70)
+        result = prep_dsODN_piechart(
+            df_alleles=df,
+            N_TOTAL=100,
+            plot_root='/tmp/1d',
+            save_also_png=True,
+        )
+        assert result == snapshot({'sizes': [np.float64(30.0), np.float64(70.0)], 'labels': ["""\
+Contains dsODN
+(30 reads)\
+""", """\
+No dsODN
+(70 reads)\
+"""], 'plot_root': '/tmp/1d', 'save_also_png': True})
+
+    def test_none_contain(self):
+        df = self._make_df(n_contain=0, n_not_contain=50)
+        result = prep_dsODN_piechart(
+            df_alleles=df,
+            N_TOTAL=50,
+            plot_root='/tmp/1d',
+            save_also_png=False,
+        )
+        assert result == snapshot({'sizes': [np.float64(0.0), np.float64(100.0)], 'labels': ["""\
+Contains dsODN
+(0 reads)\
+""", """\
+No dsODN
+(50 reads)\
+"""], 'plot_root': '/tmp/1d', 'save_also_png': False})

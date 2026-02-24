@@ -4932,19 +4932,13 @@ def main():
             # 1d for dsODN
             if args.dsODN != "":
                 # (1b) a piechart of classes
-                n_contain_dsODN = df_alleles[df_alleles['contains dsODN'] == True]['#Reads'].sum()
-                n_not_contain_dsODN = df_alleles[df_alleles['contains dsODN'] == False]['#Reads'].sum()
-                labels = ['Contains dsODN\n(' + str(n_contain_dsODN) + " reads)",
-                    'No dsODN\n(' + str(n_not_contain_dsODN) + ' reads)']
-                sizes = [100 * n_contain_dsODN / float(N_TOTAL),
-                    100 * n_not_contain_dsODN / float(N_TOTAL)]
                 plot_root = _jp("1d.Detection_of_dsODN")
-                plot_1d_input = {
-                    'sizes': sizes,
-                    'labels': labels,
-                    'plot_root': plot_root,
-                    'save_also_png': save_png,
-                }
+                plot_1d_input = CRISPRessoPlotData.prep_dsODN_piechart(
+                    df_alleles=df_alleles,
+                    N_TOTAL=N_TOTAL,
+                    plot_root=plot_root,
+                    save_also_png=save_png,
+                )
                 debug('Plotting dsODN pie chart', {'percent_complete': 46})
                 plot(CRISPRessoPlot.plot_class_dsODN_piechart, plot_1d_input)
 

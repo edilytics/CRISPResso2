@@ -12,6 +12,17 @@ CORE calls these to build plot inputs. CRISPRessoPro can call them
 from PlotContext to generate plots independently.
 """
 
+import numpy as np
+import pandas as pd
+
+
+def _to_numeric_ignore_columns(df, ignore_columns):
+    """Convert DataFrame columns to numeric, ignoring specified columns."""
+    for col in df.columns:
+        if col not in ignore_columns:
+            df[col] = df[col].apply(pd.to_numeric, errors='raise')
+    return df
+
 
 def _plot_title_with_ref_name(title, ref_name, num_refs):
     """Add ref_name suffix to plot title when there are multiple references."""
@@ -201,5 +212,28 @@ def prep_modification_frequency(include_idxs_list, all_insertion_count_vector,
         ),
         'plot_root': plot_root,
         'custom_colors': custom_colors,
+        'save_also_png': save_also_png,
+    }
+
+
+def prep_dsODN_piechart(df_alleles, N_TOTAL, plot_root, save_also_png):
+    """Prepare kwargs for plot_class_dsODN_piechart (plot_1d).
+
+    Computes labels and sizes from df_alleles 'contains dsODN' column.
+    """
+    n_contain = df_alleles[df_alleles['contains dsODN'] == True]['#Reads'].sum()
+    n_not_contain = df_alleles[df_alleles['contains dsODN'] == False]['#Reads'].sum()
+    labels = [
+        'Contains dsODN\n(' + str(n_contain) + ' reads)',
+        'No dsODN\n(' + str(n_not_contain) + ' reads)',
+    ]
+    sizes = [
+        100 * n_contain / float(N_TOTAL),
+        100 * n_not_contain / float(N_TOTAL),
+    ]
+    return {
+        'sizes': sizes,
+        'labels': labels,
+        'plot_root': plot_root,
         'save_also_png': save_also_png,
     }
