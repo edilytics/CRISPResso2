@@ -5147,43 +5147,22 @@ def main():
                 if counts_total[ref_name] < 1:
                     continue
 
-                xmin = min(hlengths)
-                xmax = max(hlengths)
-                # get 99% cutoff
-                if not args.plot_histogram_outliers:
-                    sum_cutoff = .99 * hdensity.sum()
-                    sum_so_far = 0
-                    for indel_len, indel_count in zip(hlengths, hdensity):
-                        sum_so_far += indel_count
-                        if sum_so_far > sum_cutoff:
-                            xmax = indel_len
-                            break
-                    sum_so_far = 0
-                    for indel_len, indel_count in zip(hlengths[::-1], hdensity[::-1]):
-                        sum_so_far += indel_count
-                        if sum_so_far > sum_cutoff:
-                            xmin = indel_len
-                            break
-                xmin = min(xmin, -15)
-                xmax = max(xmax, 15)
-
                 plot_root = _jp(
                     '3a.' + ref_plot_name + 'Indel_size_distribution',
                 )
-                plot_3a_input = {
-                    'hdensity': hdensity,
-                    'hlengths': hlengths,
-                    'center_index': center_index,
-                    'n_this_category': counts_total[ref_name],
-                    'xmin': xmin,
-                    'xmax': xmax,
-                    'title': get_plot_title_with_ref_name(
-                        'Indel size distribution', ref_name,
-                    ),
-                    'plot_root': plot_root,
-                    'save_also_png': save_png,
-                    'ref_name': ref_name,
-                }
+                plot_3a_input = CRISPRessoPlotData.prep_indel_size_distribution(
+                    hdensity=hdensity,
+                    hlengths=hlengths,
+                    center_index=center_index,
+                    n_this_category=counts_total[ref_name],
+                    ref_name=ref_name,
+                    ref_names=ref_names,
+                    plot_root=plot_root,
+                    save_also_png=save_png,
+                    plot_histogram_outliers=args.plot_histogram_outliers,
+                )
+                xmin = plot_3a_input['xmin']
+                xmax = plot_3a_input['xmax']
                 debug('Plotting indel size distribution for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_indel_size_distribution, plot_3a_input)
                 clipped_string = ""

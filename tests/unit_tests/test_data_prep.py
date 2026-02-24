@@ -11,6 +11,7 @@ from inline_snapshot import snapshot
 
 from CRISPResso2.plots.data_prep import (
     prep_amplicon_modifications,
+    prep_indel_size_distribution,
     prep_modification_frequency,
 )
 
@@ -202,3 +203,99 @@ class TestPrepModificationFrequency:
         assert result['plot_title'] == snapshot(
             "Mutation position distribution: FANC"
         )
+
+
+class TestPrepIndelSizeDistribution:
+    """prep_indel_size_distribution (plot_3a) — 99th percentile clipping."""
+
+    def test_output_shape(self):
+        hdensity = np.array([5, 10, 80, 3, 2])
+        hlengths = np.array([-20, -5, 0, 5, 50])
+        result = prep_indel_size_distribution(
+            hdensity=hdensity,
+            hlengths=hlengths,
+            center_index=2,
+            n_this_category=100,
+            ref_name='ref1',
+            ref_names=['ref1'],
+            plot_root='/tmp/3a.Indel',
+            save_also_png=True,
+            plot_histogram_outliers=False,
+        )
+        assert result['hdensity'] is hdensity
+        assert result['hlengths'] is hlengths
+        assert sorted(result.keys()) == snapshot(['center_index', 'hdensity', 'hlengths', 'n_this_category', 'plot_root', 'ref_name', 'save_also_png', 'title', 'xmax', 'xmin'])
+
+    def test_clipping_without_outliers(self):
+        """99th percentile should clip xmax and xmin."""
+        # 100 counts: 98 at 0, 1 at -30, 1 at +30
+        # 99% cutoff = 99. Scanning from left: at 0 we hit 99 (5+94), so xmax=0
+        # But clamped to at least 15
+        hdensity = np.array([1, 5, 94, 1])
+        hlengths = np.array([-30, -5, 0, 30])
+        result = prep_indel_size_distribution(
+            hdensity=hdensity,
+            hlengths=hlengths,
+            center_index=2,
+            n_this_category=101,
+            ref_name='r',
+            ref_names=['r'],
+            plot_root='/tmp/t',
+            save_also_png=False,
+            plot_histogram_outliers=False,
+        )
+        # xmax clipped from 30 to something <= 15 (clamped), xmin similarly
+        assert result['xmin'] == snapshot(-15)
+        assert result['xmax'] == snapshot(15)
+
+    def test_no_clipping_with_outliers(self):
+        """When plot_histogram_outliers=True, use raw min/max."""
+        hdensity = np.array([1, 5, 90, 3, 1])
+        hlengths = np.array([-50, -10, 0, 10, 50])
+        result = prep_indel_size_distribution(
+            hdensity=hdensity,
+            hlengths=hlengths,
+            center_index=2,
+            n_this_category=100,
+            ref_name='r',
+            ref_names=['r'],
+            plot_root='/tmp/t',
+            save_also_png=False,
+            plot_histogram_outliers=True,
+        )
+        assert result['xmin'] == snapshot(-50)
+        assert result['xmax'] == snapshot(50)
+
+    def test_xmin_xmax_clamped_to_15(self):
+        """Even with narrow data, xmin/xmax should be at least ±15."""
+        hdensity = np.array([50, 50])
+        hlengths = np.array([-2, 2])
+        result = prep_indel_size_distribution(
+            hdensity=hdensity,
+            hlengths=hlengths,
+            center_index=0,
+            n_this_category=100,
+            ref_name='r',
+            ref_names=['r'],
+            plot_root='/tmp/t',
+            save_also_png=False,
+            plot_histogram_outliers=True,
+        )
+        assert result['xmin'] == snapshot(-15)
+        assert result['xmax'] == snapshot(15)
+
+    def test_title_with_multi_ref(self):
+        hdensity = np.array([100])
+        hlengths = np.array([0])
+        result = prep_indel_size_distribution(
+            hdensity=hdensity,
+            hlengths=hlengths,
+            center_index=0,
+            n_this_category=100,
+            ref_name='FANC',
+            ref_names=['FANC', 'HDR'],
+            plot_root='/tmp/t',
+            save_also_png=False,
+            plot_histogram_outliers=False,
+        )
+        assert result['title'] == snapshot('Indel size distribution: FANC')

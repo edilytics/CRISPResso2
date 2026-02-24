@@ -20,6 +20,63 @@ def _plot_title_with_ref_name(title, ref_name, num_refs):
     return title
 
 
+def _clip_to_percentile(values, counts, percentile=0.99):
+    """Find the value at which cumulative counts reach the given percentile.
+
+    Scans ``values`` and ``counts`` in order, returning the value where
+    the running sum of counts first exceeds ``percentile * total``.
+    If the cutoff is never reached, returns the last value.
+    """
+    total = counts.sum()
+    if total == 0:
+        return values[-1] if len(values) > 0 else 0
+    cutoff = percentile * total
+    running = 0
+    for val, cnt in zip(values, counts):
+        running += cnt
+        if running > cutoff:
+            return val
+    return values[-1]
+
+
+def prep_indel_size_distribution(hdensity, hlengths, center_index,
+                                 n_this_category, ref_name, ref_names,
+                                 plot_root, save_also_png,
+                                 plot_histogram_outliers):
+    """Prepare kwargs for plot_indel_size_distribution (plot_3a).
+
+    Computes xmin/xmax by clipping to the 99th percentile of the
+    density distribution (unless ``plot_histogram_outliers`` is True),
+    then clamping to at least ±15.
+    """
+    xmin = min(hlengths)
+    xmax = max(hlengths)
+
+    if not plot_histogram_outliers:
+        xmax = _clip_to_percentile(hlengths, hdensity, 0.99)
+        xmin = _clip_to_percentile(hlengths[::-1], hdensity[::-1], 0.99)
+
+    xmin = min(xmin, -15)
+    xmax = max(xmax, 15)
+
+    num_refs = len(ref_names)
+
+    return {
+        'hdensity': hdensity,
+        'hlengths': hlengths,
+        'center_index': center_index,
+        'n_this_category': n_this_category,
+        'xmin': xmin,
+        'xmax': xmax,
+        'title': _plot_title_with_ref_name(
+            'Indel size distribution', ref_name, num_refs,
+        ),
+        'plot_root': plot_root,
+        'save_also_png': save_also_png,
+        'ref_name': ref_name,
+    }
+
+
 def prep_amplicon_modifications(all_indelsub_count_vector, include_idxs_list,
                                 cut_points, plot_cut_points, sgRNA_intervals,
                                 N_TOTAL, n_this_category, ref_name, ref_names,
