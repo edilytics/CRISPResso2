@@ -212,8 +212,8 @@ class TestPlotContextConstruction:
 class TestPlotContextImport:
     """Test that PlotContext is importable from the plotting package."""
 
-    def test_import_from_package(self):
-        from CRISPResso2.plots import PlotContext
+    def test_import_from_module(self):
+        from CRISPResso2.plots.plot_context import PlotContext
         assert PlotContext is not None
 
     def test_import_from_module(self):
