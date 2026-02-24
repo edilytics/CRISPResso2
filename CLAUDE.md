@@ -120,38 +120,6 @@ See `design_docs/` for detailed write-ups on specific subsystems and past debugg
 
 - **`LEFT_NORMALIZATION.md`** - VCF indel left-normalization in `writers/vcf.py`: why it's needed, how the fix works, key data structures
 
-## Data Prep Extraction TODOs
-
-Extract non-trivial computation from `CRISPRessoCORE.py` plot section into `CRISPResso2/plots/data_prep.py`, with corresponding `data_func` in `CRISPRessoPro/plots/data_funcs.py` and registration in `builtin_plots.py`. Each is one commit per repo.
-
-### Done
-- [x] plot_3a: `prep_indel_size_distribution` — 99th percentile clipping of xmin/xmax
-- [x] plot_3b: `prep_frequency_deletions_insertions` — triple 99th percentile clipping (ins/del/mut)
-- [x] plot_4a: `prep_amplicon_modifications` — y_max computation, plot_titles
-- [x] plot_4b: `prep_modification_frequency` — plot_title with ref_name logic
-
-### Pattern B — Light/medium transforms
-- [ ] plot_1d: `prep_dsODN_piechart` — compute labels/sizes from df_alleles for dsODN detection
-- [ ] plot_2a: `prep_nucleotide_quilt` — build modification_percentage_summary_df + nuc_df_for_plot from count vectors
-- [ ] plot_2b: `prep_nucleotide_quilt_around_sgRNA` — window slicing of 2a's DataFrames + sgRNA interval adjustment (depends on 2a)
-- [ ] plot_4e/4f: `prep_global_modifications_reference` — conditional title/root based on ref_name == HDR
-
-### Pattern B — Base editor plots (require `--base_editor_output`)
-- [ ] plot_10d: `prep_log_nuc_freqs` — compute plot_quant_window_idxs from include_idxs
-- [ ] plot_10e/10f/10g: `prep_conversion_at_sel_nucs` — compute from_nuc_indices, just_sel_nuc_pcts from nuc percentages
-
-### Pattern C — Heavy cross-ref aggregation
-- [ ] plot_4g: `prep_hdr_nucleotide_quilt` — build HDR nuc/mod percentage DataFrames across multiple refs
-- [ ] plot_5a/6a/8a: `prep_global_frameshift_data` — aggregate frameshift/splice counts across all refs
-- [ ] plot_11a: `prep_pe_nucleotide_quilt` — PE nuc quilt DataFrame assembly (same shape as 4g)
-- [ ] plot_11b: `prep_pe_nucleotide_quilt_around_sgRNA` — PE window slicing (same shape as 2b)
-
-### Pattern D — Entangled with file writes / heavy DataFrame processing
-- [ ] plot_9: `prep_alleles_around_cut` — DataFrame slicing + prep_alleles_table + sgRNA interval recomputation
-- [ ] plot_9a: `prep_amino_acid_table` — amino acid DataFrame processing
-- [ ] plot_10h: `prep_base_edit_quilt` — base edit DataFrame + prep_alleles_table
-- [ ] plot_10i: `prep_base_edit_upset` — alignment + bp_substitutions computation
-
 ## Key Constraints
 
 - **Python 3 only**
