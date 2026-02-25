@@ -64,6 +64,7 @@ jobs:
         with:
           repository: edilytics/CRISPResso2_tests
           path: CRISPResso2_tests
+          ref: cole/update-expected-plots
 
       - name: Checkout CRISPRessoPro
         if: matrix.pro
@@ -80,4 +81,4 @@ jobs:
       - name: Run Tests
         run: |
           pixi run -e test -- pytest CRISPResso2_tests/test_cli.py \
-            -k "${{ matrix.group.filter }}" -v ${{ matrix.pro && '--pro' || '' }} --test --print
+            -k "${{ matrix.group.filter }}" -v ${{ matrix.pro && '--pro' || '' }} --test --diff_plots --print
