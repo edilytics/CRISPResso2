@@ -86,6 +86,15 @@
 	<div class="jumbotron" style="background:rgba(0,0,0,0.0); padding:0px" >
 		<div id='jumbotron_content' >
 			{{ render_partial('shared/partials/guardrail_warnings.html', report_data=report_data) | safe}}
+			{% if C2PRO_INSTALLED and report_data.get('folder_id') %}
+			<div class="text-end mb-2">
+				<a href="/plot-assistant/{{ report_data['folder_id'] }}"
+				   class="btn btn-outline-primary btn-sm"
+				   title="Create custom plots with AI">
+				  <i class="fas fa-magic"></i> AI Plot Assistant
+				</a>
+			</div>
+			{% endif %}
 			<div class='card text-center mb-2'>
 				<div class='card-header'>
 					{% if report_data['report_display_name'] != '' %}
