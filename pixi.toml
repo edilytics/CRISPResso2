@@ -26,9 +26,11 @@ gcc_linux-64 = "*"
 gxx_linux-64 = "*"
 
 [feature.test.dependencies]
+matplotlib = "==3.10.8"
 pytest = "*"
 pytest-cov = "*"
 pytest-check = "*"
+pillow = "*"
 
 [feature.test.pypi-dependencies]
 ydiff = "*"
@@ -48,7 +50,7 @@ install = "pip install -e ."
 test = { cmd = "pytest tests --cov CRISPResso2", depends-on = ["install"] }
 
 [feature.test.tasks.integration]
-cmd = "pytest test_cli.py"
+cmd = "make $ARGS"
 cwd = "../CRISPResso2_tests"
 
 [feature.lint.tasks]
