@@ -20,9 +20,9 @@ jobs:
         pro: [false, true]
         group:
           - name: "Basic, Params, NHEJ"
-            filter: "basic or params or nhej_native_merge"
+            filter: "core"
           - name: "Editors"
-            filter: "prime_editor or base_editor"
+            filter: "editor"
           - name: "BAM"
             filter: "bam"
           - name: "Batch, Compare, Aggregate"
@@ -81,4 +81,4 @@ jobs:
       - name: Run Tests
         run: |
           pixi run -e test -- pytest CRISPResso2_tests/test_cli.py \
-            -k "${{ matrix.group.filter }}" -v ${{ matrix.pro && '--pro' || '' }} --test --diff-plots --print
+            -m "${{ matrix.group.filter }}" -v ${{ matrix.pro && '--pro' || '' }} --test --diff-plots --print
