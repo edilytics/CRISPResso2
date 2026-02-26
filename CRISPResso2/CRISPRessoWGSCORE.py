@@ -466,7 +466,7 @@ def main():
         # Load and validate the REGION FILE
         df_regions = pd.read_csv(args.region_file, names=[
                 'chr_id', 'bpstart', 'bpend', 'Name', 'sgRNA',
-                'Expected_HDR', 'Coding_sequence'], comment='#', sep='\t', dtype={'Name': str, 'chr_id': str})
+                'Expected_HDR', 'Coding_sequence', 'Coding_sequence_names'], comment='#', sep='\t', dtype={'Name': str, 'chr_id': str})
 
         # remove empty amplicons/lines
         df_regions.dropna(subset=['chr_id', 'bpstart', 'bpend'], inplace=True)
@@ -584,7 +584,7 @@ def main():
                 n_processes_for_wgs
             )
             df_regions.sort_values('region_number', inplace=True)
-            cols_to_print = ["chr_id", "bpstart", "bpend", "sgRNA", "Expected_HDR", "Coding_sequence", "sequence", "n_reads", "bam_file_with_reads_in_region", "fastq_file_trimmed_reads_in_region", "run_name"]
+            cols_to_print = ["chr_id", "bpstart", "bpend", "sgRNA", "Expected_HDR", "Coding_sequence", "Coding_sequence_names", "sequence", "n_reads", "bam_file_with_reads_in_region", "fastq_file_trimmed_reads_in_region", "run_name"]
             if args.gene_annotations:
                 cols_to_print.append('gene_overlapping')
             df_regions.infer_objects(copy=False).fillna('NA').to_csv(report_reads_aligned_filename, sep='\t', columns=cols_to_print, index_label="Name")
@@ -613,6 +613,9 @@ def main():
 
                 if row['Coding_sequence'] and not pd.isnull(row['Coding_sequence']):
                     crispresso_cmd += ' -c %s' % row['Coding_sequence']
+
+                if row['Coding_sequence_names'] and not pd.isnull(row['Coding_sequence_names']):
+                    crispresso_cmd += ' --coding_sequence_names %s' % row['Coding_sequence_names']
 
                 crispresso_cmd = CRISPRessoShared.overwrite_crispresso_options(cmd=crispresso_cmd, option_names_to_overwrite=crispresso_options_for_wgs, option_values=args)
 
