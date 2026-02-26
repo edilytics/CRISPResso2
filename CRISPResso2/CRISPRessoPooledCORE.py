@@ -614,6 +614,7 @@ def main():
 
         # possible column names accepted in amplicon input file
         default_input_amplicon_headers = ['amplicon_name', 'amplicon_seq', 'guide_seq', 'expected_hdr_amplicon_seq', 'coding_seq',
+                     'coding_sequence_names',
                      'prime_editing_pegRNA_spacer_seq', 'prime_editing_nicking_guide_seq',
                      'prime_editing_pegRNA_extension_seq', 'prime_editing_pegRNA_scaffold_seq',
                      'prime_editing_pegRNA_scaffold_min_match_length', 'prime_editing_override_prime_edited_ref_seq',
