@@ -66,8 +66,10 @@ jobs:
       - name: Install CRISPResso
         run: pixi run -e test install
 
-      - name: Clear matplotlib font cache
-        run: pixi run -e test -- python -c "import matplotlib; import shutil; shutil.rmtree(matplotlib.get_cachedir(), ignore_errors=True); print('Cleared', matplotlib.get_cachedir())"
+      - name: Rebuild pixi fontconfig cache and clear matplotlib font cache
+        run: |
+          pixi run -e test -- fc-cache -f
+          pixi run -e test -- python -c "import matplotlib; import shutil; shutil.rmtree(matplotlib.get_cachedir(), ignore_errors=True); print('Cleared', matplotlib.get_cachedir())"
 
       - name: Checkout CRISPResso2_tests
         uses: actions/checkout@v4
