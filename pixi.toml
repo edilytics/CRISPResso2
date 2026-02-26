@@ -26,7 +26,6 @@ gcc_linux-64 = "*"
 gxx_linux-64 = "*"
 
 [feature.test.dependencies]
-matplotlib = "==3.10.8"
 pytest = "*"
 pytest-cov = "*"
 pytest-check = "*"
