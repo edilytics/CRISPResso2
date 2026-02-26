@@ -33,6 +33,7 @@ else:
     C2PRO_INSTALLED = False
 
 from CRISPResso2 import CRISPResso2Align, CRISPRessoMultiProcessing
+from CRISPResso2.plots import data_prep as CRISPRessoPlotData
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -4894,7 +4895,7 @@ def main():
                 'N_READS_AFTER_PREPROCESSING': N_READS_AFTER_PREPROCESSING,
                 'N_TOTAL': N_TOTAL,
                 'fig_filename_root': plot_1a_root,
-                'save_png': save_png
+                'save_png': save_png,
             }
             debug('Plotting read bar plot', {'percent_complete': 42})
             plot(CRISPRessoPlot.plot_read_barplot, plot_1a_input)
@@ -4913,7 +4914,7 @@ def main():
                 'piechart_plot_root': plot_1b_root,
                 'barplot_plot_root': plot_1c_root,
                 'custom_colors': custom_config['colors'],
-                'save_png': save_png
+                'save_png': save_png,
             }
             crispresso2_info['results']['general_plots']['plot_1b_root'] = os.path.basename(plot_1b_root)
             crispresso2_info['results']['general_plots']['plot_1b_caption'] = "Figure 1b: Alignment and editing frequency of reads as determined by the percentage and number of sequence reads showing unmodified and modified alleles."
@@ -5146,43 +5147,22 @@ def main():
                 if counts_total[ref_name] < 1:
                     continue
 
-                xmin = min(hlengths)
-                xmax = max(hlengths)
-                # get 99% cutoff
-                if not args.plot_histogram_outliers:
-                    sum_cutoff = .99 * hdensity.sum()
-                    sum_so_far = 0
-                    for indel_len, indel_count in zip(hlengths, hdensity):
-                        sum_so_far += indel_count
-                        if sum_so_far > sum_cutoff:
-                            xmax = indel_len
-                            break
-                    sum_so_far = 0
-                    for indel_len, indel_count in zip(hlengths[::-1], hdensity[::-1]):
-                        sum_so_far += indel_count
-                        if sum_so_far > sum_cutoff:
-                            xmin = indel_len
-                            break
-                xmin = min(xmin, -15)
-                xmax = max(xmax, 15)
-
                 plot_root = _jp(
                     '3a.' + ref_plot_name + 'Indel_size_distribution',
                 )
-                plot_3a_input = {
-                    'hdensity': hdensity,
-                    'hlengths': hlengths,
-                    'center_index': center_index,
-                    'n_this_category': counts_total[ref_name],
-                    'xmin': xmin,
-                    'xmax': xmax,
-                    'title': get_plot_title_with_ref_name(
-                        'Indel size distribution', ref_name,
-                    ),
-                    'plot_root': plot_root,
-                    'save_also_png': save_png,
-                    'ref_name': ref_name,
-                }
+                plot_3a_input = CRISPRessoPlotData.prep_indel_size_distribution(
+                    hdensity=hdensity,
+                    hlengths=hlengths,
+                    center_index=center_index,
+                    n_this_category=counts_total[ref_name],
+                    ref_name=ref_name,
+                    ref_names=ref_names,
+                    plot_root=plot_root,
+                    save_also_png=save_png,
+                    plot_histogram_outliers=args.plot_histogram_outliers,
+                )
+                xmin = plot_3a_input['xmin']
+                xmax = plot_3a_input['xmax']
                 debug('Plotting indel size distribution for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_indel_size_distribution, plot_3a_input)
                 clipped_string = ""
@@ -5202,74 +5182,37 @@ def main():
                 # (3b) Modification plots with one plot each for insertion lengths, deletion lengths, and number of substitutions
                 # Note that the previous plot (3a) shows the effective lengths of reads, which could include multiple insertions or deletions. This plot separates these by insertion and deletion.
 
-                xmax_ins = max(x_bins_ins)
-                if not args.plot_histogram_outliers:
-                    sum_cutoff = 0.99 * hdensity.sum()
-                    sum_so_far = 0
-                    for indel_len, indel_count in zip(x_bins_ins, y_values_ins):
-                        sum_so_far += indel_count
-                        if sum_so_far > sum_cutoff:
-                            xmax_ins = indel_len
-                            break
-                xmax_ins = max(15, xmax_ins)
+                plot_root = _jp(
+                    '3b.' + ref_plot_name + 'Insertion_deletion_substitutions_size_hist',
+                )
+                plot_3b_input = CRISPRessoPlotData.prep_frequency_deletions_insertions(
+                    x_bins_ins=x_bins_ins,
+                    y_values_ins=y_values_ins,
+                    x_bins_del=x_bins_del,
+                    y_values_del=y_values_del,
+                    x_bins_mut=x_bins_mut,
+                    y_values_mut=y_values_mut,
+                    hdensity=hdensity,
+                    ref=refs[ref_name],
+                    counts_total=counts_total[ref_name],
+                    ref_name=ref_name,
+                    ref_names=ref_names,
+                    plot_root=plot_root,
+                    save_also_png=save_png,
+                    custom_colors=custom_config["colors"],
+                    plot_histogram_outliers=args.plot_histogram_outliers,
+                )
+                xmax_ins = plot_3b_input['xmax_ins']
+                xmax_del = plot_3b_input['xmax_del']
+                xmax_mut = plot_3b_input['xmax_mut']
 
                 clipped_string = ""
                 if xmax_ins < max(x_bins_ins):
                     clipped_string += " (Insertion maximum " + str(int(max(x_bins_ins))) + " not shown)"
-
-                xmax_del = max(x_bins_del)
-                if not args.plot_histogram_outliers:
-                    sum_cutoff = .99 * hdensity.sum()
-                    sum_so_far = 0
-                    for indel_len, indel_count in zip(x_bins_del, y_values_del):
-                        sum_so_far += indel_count
-                        if sum_so_far > sum_cutoff:
-                            xmax_del = indel_len
-                            break
-                xmax_del = max(15, xmax_del)
-
                 if xmax_del < max(x_bins_del):
                     clipped_string += " (Deletion minimum -" + str(int(max(x_bins_del))) + " not shown)"
-
-                xmax_mut = max(x_bins_mut)
-                if not args.plot_histogram_outliers:
-                    sum_cutoff = .99 * hdensity.sum()
-                    sum_so_far = 0
-                    for mut_num, mut_count in zip(x_bins_mut, y_values_mut):
-                        sum_so_far += mut_count
-                        if sum_so_far > sum_cutoff:
-                            xmax_mut = mut_num
-                            break
-                xmax_mut = max(15, xmax_mut)
-
                 if xmax_mut < max(x_bins_mut):
                     clipped_string += " (Mutation maximum " + str(int(max(x_bins_mut))) + " not shown)"
-
-                plot_root = _jp(
-                    '3b.' + ref_plot_name + 'Insertion_deletion_substitutions_size_hist',
-                )
-                plot_3b_input = {
-                    'ref': refs[ref_name],
-                    'counts_total': counts_total[ref_name],
-                    'plot_path': plot_root,
-                    'plot_titles': {
-                        'ins': get_plot_title_with_ref_name(
-                            'Insertions', ref_name,
-                        ),
-                        'del': get_plot_title_with_ref_name(
-                            'Deletions', ref_name,
-                        ),
-                        'mut': get_plot_title_with_ref_name(
-                            'Substitutions', ref_name,
-                        ),
-                    },
-                    'xmax_del': xmax_del,
-                    'xmax_ins': xmax_ins,
-                    'xmax_mut': xmax_mut,
-                    'save_also_png': save_png,
-                    'custom_colors': custom_config["colors"],
-                    'ref_name': ref_name,
-                }
                 debug('Plotting frequency deletions/insertions for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_frequency_deletions_insertions, plot_3b_input)
 
@@ -5288,34 +5231,25 @@ def main():
                 if modifiedName in class_counts:
                     n_this_category_modified = class_counts[modifiedName]
 
-                y_max = max(all_indelsub_count_vectors[ref_name]) * 1.1
                 plot_root = _jp(
                     '4a.' + ref_plot_name + 'Combined_insertion_deletion_substitution_locations',
                 )
-                plot_4a_input = {
-                    'all_indelsub_count_vectors': all_indelsub_count_vectors[ref_name],
-                    'include_idxs_list': include_idxs_list,
-                    'cut_points': cut_points,
-                    'plot_cut_points': plot_cut_points,
-                    'sgRNA_intervals': sgRNA_intervals,
-                    'n_total': N_TOTAL,
-                    'n_this_category': n_this_category,
-                    'ref_name': ref_name,
-                    'num_refs': len(ref_names),
-                    'ref_len': ref_len,
-                    'y_max': y_max,
-                    'plot_titles': {
-                        'combined': get_plot_title_with_ref_name(
-                            'Combined Insertions/Deletions/Substitutions', ref_name,
-                        ),
-                        'main': get_plot_title_with_ref_name(
-                            'Mutation position distribution', ref_name,
-                        ),
-                    },
-                    'plot_root': plot_root,
-                    'custom_colors': custom_config["colors"],
-                    'save_also_png': save_png,
-                }
+                plot_4a_input = CRISPRessoPlotData.prep_amplicon_modifications(
+                    all_indelsub_count_vector=all_indelsub_count_vectors[ref_name],
+                    include_idxs_list=include_idxs_list,
+                    cut_points=cut_points,
+                    plot_cut_points=plot_cut_points,
+                    sgRNA_intervals=sgRNA_intervals,
+                    N_TOTAL=N_TOTAL,
+                    n_this_category=n_this_category,
+                    ref_name=ref_name,
+                    ref_names=ref_names,
+                    ref_len=ref_len,
+                    plot_root=plot_root,
+                    custom_colors=custom_config["colors"],
+                    save_also_png=save_png,
+                )
+                y_max = plot_4a_input['y_max']
                 debug('Plotting amplication modifications for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_amplicon_modifications, plot_4a_input)
                 crispresso2_info['results']['refs'][ref_name]['plot_4a_root'] = os.path.basename(plot_root)
@@ -5325,27 +5259,24 @@ def main():
                 plot_root = _jp(
                     '4b.' + ref_plot_name + 'Insertion_deletion_substitution_locations',
                 )
-                plot_4b_input = {
-                    'include_idxs_list': include_idxs_list,
-                    'all_insertion_count_vectors': all_insertion_count_vectors[ref_name],
-                    'all_deletion_count_vectors': all_deletion_count_vectors[ref_name],
-                    'all_substitution_count_vectors': all_substitution_count_vectors[ref_name],
-                    'sgRNA_intervals': sgRNA_intervals,
-                    'ref_len': ref_len,
-                    'ref_name': ref_name,
-                    'num_refs': len(ref_names),
-                    'n_total': N_TOTAL,
-                    'n_this_category': n_this_category,
-                    'cut_points': cut_points,
-                    'plot_cut_points': plot_cut_points,
-                    'y_max': y_max,
-                    'plot_title': get_plot_title_with_ref_name(
-                        'Mutation position distribution', ref_name,
-                    ),
-                    'plot_root': plot_root,
-                    'custom_colors': custom_config["colors"],
-                    'save_also_png': save_png,
-                }
+                plot_4b_input = CRISPRessoPlotData.prep_modification_frequency(
+                    include_idxs_list=include_idxs_list,
+                    all_insertion_count_vector=all_insertion_count_vectors[ref_name],
+                    all_deletion_count_vector=all_deletion_count_vectors[ref_name],
+                    all_substitution_count_vector=all_substitution_count_vectors[ref_name],
+                    sgRNA_intervals=sgRNA_intervals,
+                    ref_len=ref_len,
+                    ref_name=ref_name,
+                    ref_names=ref_names,
+                    N_TOTAL=N_TOTAL,
+                    n_this_category=n_this_category,
+                    cut_points=cut_points,
+                    plot_cut_points=plot_cut_points,
+                    y_max=y_max,
+                    plot_root=plot_root,
+                    custom_colors=custom_config["colors"],
+                    save_also_png=save_png,
+                )
                 debug('Plotting modification frequency for {0}'.format(ref_name))
                 plot(CRISPRessoPlot.plot_modification_frequency, plot_4b_input)
                 crispresso2_info['results']['refs'][ref_name]['plot_4b_root'] = os.path.basename(plot_root)
@@ -6409,6 +6340,60 @@ def main():
 
         info('Done!')
 
+        # --- CRISPRessoPro plot hook ---
+        if C2PRO_INSTALLED:
+            try:
+                from CRISPResso2.plots.plot_context import PlotContext
+                from CRISPRessoPro import hooks as pro_hooks
+
+                plot_context = PlotContext(
+                    args=args,
+                    run_data=crispresso2_info,
+                    refs=crispresso2_info['results']['refs'],
+                    ref_names=ref_names,
+                    counts_total=counts_total,
+                    counts_modified=counts_modified,
+                    counts_unmodified=counts_unmodified,
+                    counts_discarded=counts_discarded,
+                    counts_insertion=counts_insertion,
+                    counts_deletion=counts_deletion,
+                    counts_substitution=counts_substitution,
+                    class_counts=class_counts,
+                    N_TOTAL=N_TOTAL,
+                    df_alleles=df_alleles,
+                    all_insertion_count_vectors=all_insertion_count_vectors,
+                    all_insertion_left_count_vectors=all_insertion_left_count_vectors,
+                    all_deletion_count_vectors=all_deletion_count_vectors,
+                    all_substitution_count_vectors=all_substitution_count_vectors,
+                    all_indelsub_count_vectors=all_indelsub_count_vectors,
+                    all_substitution_base_vectors=all_substitution_base_vectors,
+                    all_base_count_vectors=all_base_count_vectors,
+                    insertion_count_vectors=insertion_count_vectors,
+                    deletion_count_vectors=deletion_count_vectors,
+                    substitution_count_vectors=substitution_count_vectors,
+                    insertion_length_vectors=insertion_length_vectors,
+                    deletion_length_vectors=deletion_length_vectors,
+                    nucleotide_frequency_summary={},
+                    nucleotide_percentage_summary={},
+                    hists_frameshift=hists_frameshift,
+                    hists_inframe=hists_inframe,
+                    counts_modified_frameshift=counts_modified_frameshift,
+                    counts_modified_non_frameshift=counts_modified_non_frameshift,
+                    counts_non_modified_non_frameshift=counts_non_modified_non_frameshift,
+                    counts_splicing_sites_modified=counts_splicing_sites_modified,
+                    custom_config=custom_config,
+                    _jp=_jp,
+                    save_png=save_png,
+                    output_directory=OUTPUT_DIRECTORY,
+                )
+
+                pro_hooks.on_plots_complete(plot_context, logger)
+            except Exception as e:
+                if args.halt_on_plot_fail:
+                    raise
+                logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
+        # --- END CRISPRessoPro plot hook ---
+
         if not args.keep_intermediate:
             info('Removing Intermediate files...')
 
@@ -6466,7 +6451,13 @@ def main():
                 report_name = _jp("CRISPResso2_report.html")
             else:
                 report_name = OUTPUT_DIRECTORY + '.html'
-            CRISPRessoReport.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
+
+            if C2PRO_INSTALLED:
+                from CRISPRessoPro import hooks as pro_hooks
+                pro_hooks.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
+            else:
+                CRISPRessoReport.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
+
             crispresso2_info['running_info']['report_location'] = report_name
             crispresso2_info['running_info']['report_filename'] = os.path.basename(report_name)
 

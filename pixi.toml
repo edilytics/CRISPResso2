@@ -32,14 +32,26 @@ pytest-check = "*"
 
 [feature.test.pypi-dependencies]
 ydiff = "*"
+inline-snapshot = "*"
 
 [feature.lint.dependencies]
 ruff = "=0.14.13"
+
+[feature.pro.dependencies]
+pytest = "*"
+pytest-cov = "*"
+pytest-check = "*"
+
+[feature.pro.pypi-dependencies]
+kaleido = "*"
+ydiff = "*"
+inline-snapshot = "*"
 
 [environments]
 default = { features = [], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
 lint = { features = ["lint"], solve-group = "default" }
+pro = { features = ["pro"], solve-group = "default" }
 
 [tasks]
 install = "pip install -e ."
@@ -50,6 +62,14 @@ test = { cmd = "pytest tests --cov CRISPResso2", depends-on = ["install"] }
 [feature.test.tasks.integration]
 cmd = "pytest test_cli.py"
 cwd = "../CRISPResso2_tests"
+
+[feature.pro.tasks]
+install = "pip install -e . && pip install -e ../CRISPRessoPro"
+
+[feature.pro.tasks.test]
+cmd = "pytest tests --cov CRISPRessoPro"
+cwd = "../CRISPRessoPro"
+depends-on = ["install"]
 
 [feature.lint.tasks]
 lint = { cmd = "ruff check . --statistics" }
