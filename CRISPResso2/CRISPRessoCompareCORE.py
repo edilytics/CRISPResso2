@@ -407,10 +407,10 @@ def main():
                 is_base_edit = 'base_edit' in allele_file_1
                 if is_base_edit:
                     title_prefix = 'Base edit comparison enriched in '
-                    label_prefix = 'Base editing comparison of alleles.'
+                    label_prefix = 'Base editing target nucleotide composition alleles.'
                 else:
                     title_prefix = 'Alleles enriched in '
-                    label_prefix = 'Distribution comparison of alleles, limited to the conversion nucleotide from.'
+                    label_prefix = 'Distribution comparison of alleles.'
                 label_suffix = ' Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site. ' + \
                 'The proportion and number of reads is shown for each sample on the right, with the values for ' + sample_1_name + ' followed by the values for ' + sample_2_name + '.'
 
