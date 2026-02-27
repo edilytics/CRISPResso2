@@ -415,7 +415,7 @@ def main():
                 'The proportion and number of reads is shown for each sample on the right, with the values for ' + sample_1_name + ' followed by the values for ' + sample_2_name + '.'
 
                 plot_name = '3.' + args.crispresso_output_folder_root + '_top'
-                CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[True, False, False]), sample_1_name, sample_2_name, _jp(plot_name),
+                CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[False, False, False]), sample_1_name, sample_2_name, _jp(plot_name),
                             MIN_FREQUENCY=args.min_frequency_alleles_around_cut_to_plot, MAX_N_ROWS=args.max_rows_alleles_around_cut_to_plot, SAVE_ALSO_PNG=save_png)
                 crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
                 crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = title_prefix + sample_1_name
@@ -423,7 +423,7 @@ def main():
                 crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Allele comparison table', os.path.basename(allele_comparison_file))]
 
                 plot_name = '3.' + args.crispresso_output_folder_root + '_bottom'
-                CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[False, True, True]), sample_1_name, sample_2_name, _jp(plot_name),
+                CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[True, False, False]), sample_1_name, sample_2_name, _jp(plot_name),
                             MIN_FREQUENCY=args.min_frequency_alleles_around_cut_to_plot, MAX_N_ROWS=args.max_rows_alleles_around_cut_to_plot, SAVE_ALSO_PNG=save_png)
                 crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
                 crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = title_prefix + sample_2_name
