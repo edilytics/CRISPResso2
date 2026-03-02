@@ -4681,14 +4681,13 @@ def main():
 
         for ref_name in ref_names:
             ref_plot_name = refs[ref_name]['ref_plot_name']
+            crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'] = []
 
             # n_this_category = counts_total[ref_name]
             # if n_this_category < 1:
             #    continue
 
             if not args.suppress_plots:
-                crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'] = []
-
                 ins_pct_vector_filename = _jp(ref_plot_name + 'Effect_vector_insertion.txt')
                 save_vector_to_file(insertion_pct_vectors[ref_name], ins_pct_vector_filename)
                 crispresso2_info['results']['refs'][ref_name]['insertion_pct_vector_filename'] = os.path.basename(ins_pct_vector_filename)
@@ -6022,7 +6021,7 @@ def main():
                         crispresso2_info['results']['refs'][ref_name]['plot_10g_roots'].append(os.path.basename(fig_filename_root))
                         crispresso2_info['results']['refs'][ref_name]['plot_10g_captions'].append("Figure 10g: Non-reference base counts. For target nucleotides in the plotting window, this plot shows the number of non-reference (non-" + args.conversion_nuc_from + ") bases. The number of each target base is annotated on the reference sequence at the bottom of the plot.")
                         crispresso2_info['results']['refs'][ref_name]['plot_10g_datas'].append([('Nucleotide frequencies at ' + args.conversion_nuc_from + 's', os.path.basename(quant_window_sel_nuc_freq_filename))])
-                        wt_ref_name = ref_name
+                    wt_ref_name = ref_name
                     ref_seq = refs[wt_ref_name]['sequence']
                     target_seq = get_base_edit_target_sequence(ref_seq, df_alleles, args.base_editor_target_ref_skip_allele_count)
 
@@ -6085,42 +6084,43 @@ def main():
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.' + sgRNA_label + '.binary_allele_counts.txt')])
 
             if refs[ref_name]['contains_coding_seq']:
-                for i, coding_seq in enumerate(coding_seqs):
-                    fig_filename_root = _jp('9a.' + ref_plot_name + 'amino_acid_table_around_' + coding_seq)
-                    coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
-                    amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1) // 3
-                    df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
-                        df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
-                        refs[ref_name]['exon_intervals'][i][0],
-                        len(coding_seq_amino_acids),
-                        os.path.join(_ROOT, "BLOSUM62"),
-                        amino_acid_cut_point)
+                if not args.suppress_plots:
+                    for i, coding_seq in enumerate(coding_seqs):
+                        fig_filename_root = _jp('9a.' + ref_plot_name + 'amino_acid_table_around_' + coding_seq)
+                        coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
+                        amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1) // 3
+                        df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
+                            df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
+                            refs[ref_name]['exon_intervals'][i][0],
+                            len(coding_seq_amino_acids),
+                            os.path.join(_ROOT, "BLOSUM62"),
+                            amino_acid_cut_point)
 
-                    plot_9a_input = {
-                        'reference_seq': coding_seq_amino_acids,
-                        'df_alleles': df_to_plot,
-                        'fig_filename_root': fig_filename_root,
-                        'custom_colors': custom_config["colors"],
-                        'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
-                        'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
-                        'SAVE_ALSO_PNG': save_png,
-                        'plot_cut_point': plot_cut_point,
-                        'sgRNA_intervals': new_sgRNA_intervals,
-                        'sgRNA_names': sgRNA_names,
-                        'sgRNA_mismatches': sgRNA_mismatches,
-                        'annotate_wildtype_allele': args.annotate_wildtype_allele,
-                        'cut_point': amino_acid_cut_point,
-                    }
+                        plot_9a_input = {
+                            'reference_seq': coding_seq_amino_acids,
+                            'df_alleles': df_to_plot,
+                            'fig_filename_root': fig_filename_root,
+                            'custom_colors': custom_config["colors"],
+                            'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
+                            'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
+                            'SAVE_ALSO_PNG': save_png,
+                            'plot_cut_point': plot_cut_point,
+                            'sgRNA_intervals': new_sgRNA_intervals,
+                            'sgRNA_names': sgRNA_names,
+                            'sgRNA_mismatches': sgRNA_mismatches,
+                            'annotate_wildtype_allele': args.annotate_wildtype_allele,
+                            'cut_point': amino_acid_cut_point,
+                        }
 
-                    amino_acid_filename = _jp(ref_plot_name + 'amino_acid_table_for_' + coding_seq + '.txt')
-                    df_to_plot.to_csv(amino_acid_filename, sep='\t', header=True, index=True)
+                        amino_acid_filename = _jp(ref_plot_name + 'amino_acid_table_for_' + coding_seq + '.txt')
+                        df_to_plot.to_csv(amino_acid_filename, sep='\t', header=True, index=True)
 
-                    debug('Plotting amino acids for {0}'.format(ref_name))
-                    plot(CRISPRessoPlot.plot_amino_acid_table, plot_9a_input)
-                    crispresso2_info['results']['refs'][ref_name]['plot_9a_roots'].append(os.path.basename(fig_filename_root))
-                    crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'].append(
-                        "Figure 9a: Visualization of the distribution of identified amino acids based on the coding sequence (" + coding_seq + "). The vertical dashed line indicates the predicted cleavage site.")
-                    crispresso2_info['results']['refs'][ref_name]['plot_9a_datas'].append([('Amino Acid table', os.path.basename(amino_acid_filename))])
+                        debug('Plotting amino acids for {0}'.format(ref_name))
+                        plot(CRISPRessoPlot.plot_amino_acid_table, plot_9a_input)
+                        crispresso2_info['results']['refs'][ref_name]['plot_9a_roots'].append(os.path.basename(fig_filename_root))
+                        crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'].append(
+                            "Figure 9a: Visualization of the distribution of identified amino acids based on the coding sequence (" + coding_seq + "). The vertical dashed line indicates the predicted cleavage site.")
+                        crispresso2_info['results']['refs'][ref_name]['plot_9a_datas'].append([('Amino Acid table', os.path.basename(amino_acid_filename))])
 
             info('Done!')
 
