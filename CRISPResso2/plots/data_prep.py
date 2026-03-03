@@ -397,6 +397,7 @@ def prep_hdr_nucleotide_quilt(
     ref1_all_indelsub_count_vectors : dict
         ref_name → numpy array of per-position modification counts aligned
         to ref1's coordinate system.
+
     """
     ref0 = ref_names_for_hdr[0]
     ref_seq = refs[ref0]['sequence']
@@ -611,6 +612,7 @@ def prep_global_modifications_reference(
     ----------
     _jp : callable
         Path-joining function that prepends the output directory.
+
     """
     ref0 = ref_names[0]
 
@@ -667,6 +669,7 @@ def prep_log_nuc_freqs(
     ----------
     plot_idxs : list of int
         Indices into the full-amplicon sequence selected for the plot window.
+
     """
     is_window = np.zeros(ref_len)
     for include_idx in include_idxs_list:
