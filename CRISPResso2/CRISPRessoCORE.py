@@ -6083,7 +6083,7 @@ def main():
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'].append(f"Figure 10i: Upset plot of Base Edits for {args.conversion_nuc_from} around cut site for {sgRNA_legend}. Each dot matrix at the bottom represents a specific combination of base edits (colored by target position), and the bar plot at the top shows the number of reads with each combination.")
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.' + sgRNA_label + '.binary_allele_counts.txt')])
 
-            if refs[ref_name]['contains_coding_seq'] and not args.supress_plots:
+            if refs[ref_name]['contains_coding_seq'] and not args.suppress_plots:
                 for i, coding_seq in enumerate(coding_seqs):
                     fig_filename_root = _jp('9a.' + ref_plot_name + 'amino_acid_table_around_' + coding_seq)
                     coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
