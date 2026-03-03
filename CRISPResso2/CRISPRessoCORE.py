@@ -6176,34 +6176,24 @@ def main():
                         sgRNA_legend = sgRNA_name + " (" + sgRNA + ")"
                     sgRNA_label = CRISPRessoShared.slugify(sgRNA_label)
 
-                    # get nucleotide columns to print for this sgRNA
-                    sel_cols = [0, 1]
-                    plot_half_window = max(1, args.plot_window_size)
-                    new_sel_cols_start = max(2, cut_point - plot_half_window + 1)
-                    new_sel_cols_end = min(pe_ref_len, cut_point + plot_half_window + 1)
-                    sel_cols.extend(list(range(new_sel_cols_start + 2, new_sel_cols_end + 2)))  # +2 because the first two columns are Batch and Nucleotide
-                    # get new intervals
-                    new_sgRNA_intervals = []
-                    # add annotations for each sgRNA (to be plotted on this sgRNA's plot)
-                    for (int_start, int_end) in refs[ref_names[0]]['sgRNA_intervals']:
-                        new_sgRNA_intervals += [(int_start - new_sel_cols_start, int_end - new_sel_cols_start)]
-                    new_include_idx = []
-                    for x in pe_include_idxs_list:
-                        new_include_idx += [x - new_sel_cols_start]
                     plot_root = _jp('11b.Nucleotide_percentage_quilt_around_' + sgRNA_label)
                     pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
-                    plot_11b_input = {
-                        'nuc_pct_df': pe_nucleotide_percentage_summary_df.iloc[:, sel_cols],
-                        'mod_pct_df': pe_modification_percentage_summary_df.iloc[:, sel_cols],
-                        'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
-                        'save_also_png': save_png,
-                        'sgRNA_intervals': new_sgRNA_intervals,
-                        'sgRNA_names': sgRNA_names,
-                        'sgRNA_mismatches': sgRNA_mismatches,
-                        'sgRNA_sequences': sgRNA_sequences,
-                        'quantification_window_idxs': new_include_idx,
-                        'custom_colors': custom_config['colors']
-                    }
+                    plot_11b_input = CRISPRessoPlotData.prep_pe_nucleotide_quilt_around_sgRNA(
+                        nuc_df_for_plot=pe_nucleotide_percentage_summary_df,
+                        mod_df_for_plot=pe_modification_percentage_summary_df,
+                        cut_point=cut_point,
+                        plot_half_window=max(1, args.plot_window_size),
+                        ref_len=pe_ref_len,
+                        sgRNA_intervals=refs[ref_names[0]]['sgRNA_intervals'],
+                        include_idxs_list=pe_include_idxs_list,
+                        sgRNA_names=sgRNA_names,
+                        sgRNA_mismatches=sgRNA_mismatches,
+                        sgRNA_sequences=sgRNA_sequences,
+                        plot_root=plot_root,
+                        save_also_png=save_png,
+                        custom_colors=custom_config['colors'],
+                    )
+                    plot_11b_input['fig_filename_root'] = f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root
                     info('Plotting nucleotide quilt', {'percent_complete': 97})
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11b_input)
                     crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_roots'].append(os.path.basename(plot_root))

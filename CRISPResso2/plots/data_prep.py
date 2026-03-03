@@ -480,6 +480,44 @@ def prep_pe_nucleotide_quilt(
     return result
 
 
+def prep_pe_nucleotide_quilt_around_sgRNA(
+    nuc_df_for_plot,
+    mod_df_for_plot,
+    cut_point,
+    plot_half_window,
+    ref_len,
+    sgRNA_intervals,
+    include_idxs_list,
+    sgRNA_names,
+    sgRNA_mismatches,
+    sgRNA_sequences,
+    plot_root,
+    save_also_png,
+    custom_colors,
+):
+    """Prepare kwargs for plot_nucleotide_quilt around one sgRNA for PE (plot_11b).
+
+    Same window-slicing computation as ``prep_nucleotide_quilt_around_sgRNA``
+    (plot_2b), but applied to multi-batch PE DataFrames from
+    ``prep_pe_nucleotide_quilt``.
+    """
+    return prep_nucleotide_quilt_around_sgRNA(
+        nuc_df_for_plot=nuc_df_for_plot,
+        mod_df_for_plot=mod_df_for_plot,
+        cut_point=cut_point,
+        plot_half_window=plot_half_window,
+        ref_len=ref_len,
+        sgRNA_intervals=sgRNA_intervals,
+        include_idxs_list=include_idxs_list,
+        sgRNA_names=sgRNA_names,
+        sgRNA_mismatches=sgRNA_mismatches,
+        sgRNA_sequences=sgRNA_sequences,
+        plot_root=plot_root,
+        save_also_png=save_also_png,
+        custom_colors=custom_colors,
+    )
+
+
 def prep_global_frameshift_data(
     ref_names,
     refs,
