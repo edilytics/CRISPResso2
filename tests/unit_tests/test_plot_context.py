@@ -215,7 +215,3 @@ class TestPlotContextImport:
     def test_import_from_module(self):
         from CRISPResso2.plots.plot_context import PlotContext
         assert PlotContext is not None
-
-    def test_import_from_module(self):
-        from CRISPResso2.plots.plot_context import PlotContext
-        assert PlotContext is not None

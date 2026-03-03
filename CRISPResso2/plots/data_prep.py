@@ -2,7 +2,9 @@
 
 Each function takes raw analysis data and returns the kwargs dict
 that the corresponding CRISPRessoPlot function expects. These are
-pure functions — no file I/O, no side effects.
+pure functions — no file I/O, no side effects — with the exception
+of ``prep_alleles_around_cut`` and ``prep_base_edit_quilt`` which
+intentionally mutate their input DataFrames (see their docstrings).
 
 Only functions with non-trivial computation are extracted here.
 Trivial pass-through plots (where the dict is just packaging existing
@@ -734,44 +736,45 @@ def prep_amino_acid_table(
     }
 
 
-def prep_alleles_around_cut(
+def _prep_windowed_alleles(
     df_alleles_around_cut,
     cut_point,
-    plot_half_window_left,
-    plot_half_window_right,
+    window_left,
+    window_right,
     ref_sequence,
     sgRNA_intervals,
     count_total,
     allele_plot_pcts_only_for_assigned_reference,
     expand_allele_plots_by_quantification,
 ):
-    """Prepare alleles-around-cut data for plot_9 and CSV export.
+    """Shared logic for ``prep_alleles_around_cut`` and ``prep_base_edit_quilt``.
 
-    Takes the already-sliced DataFrame from
-    ``CRISPRessoShared.get_dataframe_around_cut_asymmetrical`` and applies:
+    .. warning::
+
+        **Mutates** *df_alleles_around_cut* in place when
+        *allele_plot_pcts_only_for_assigned_reference* is True (adds a
+        ``%AllReads`` column and overwrites ``%Reads``).  CORE relies on
+        this mutation — it reads the modified DataFrame back from the
+        returned dict for CSV writing.
+
+    Applies:
 
     1. Optional percentage adjustment when
-       ``allele_plot_pcts_only_for_assigned_reference`` is True
+       *allele_plot_pcts_only_for_assigned_reference* is True
     2. Reference sequence slicing for the window
-    3. Optional groupby collapse (when ``expand_allele_plots_by_quantification``
+    3. Optional groupby collapse (when *expand_allele_plots_by_quantification*
        is False)
     4. sgRNA interval coordinate adjustment to the local window frame
 
-    Returns a dict with:
-
-    - ``df_alleles_around_cut``: DataFrame with pct adjustment applied (for CSV)
-    - ``df_to_plot``: after optional groupby collapse (for ``prep_alleles_table``)
-    - ``ref_seq_around_cut``: reference sequence in the window
-    - ``new_sgRNA_intervals``: sgRNA intervals in local coordinates
-    - ``new_cut_point``: cut point in local coordinates, or None if the cut
-      point is not inside any sgRNA interval
+    Returns ``(df_alleles_around_cut, df_to_plot, ref_seq_around_cut,
+    new_sgRNA_intervals, new_sel_cols_start)``.
     """
     if allele_plot_pcts_only_for_assigned_reference:
         df_alleles_around_cut['%AllReads'] = df_alleles_around_cut['%Reads']
         df_alleles_around_cut['%Reads'] = df_alleles_around_cut['#Reads'] / count_total * 100
 
     ref_seq_around_cut = ref_sequence[
-        cut_point - plot_half_window_left + 1:cut_point + plot_half_window_right + 1
+        cut_point - window_left + 1:cut_point + window_right + 1
     ]
 
     df_to_plot = df_alleles_around_cut
@@ -786,12 +789,74 @@ def prep_alleles_around_cut(
         )
 
     new_sgRNA_intervals = []
-    new_cut_point = None
-    new_sel_cols_start = cut_point - plot_half_window_left
+    new_sel_cols_start = cut_point - window_left
     for (int_start, int_end) in sgRNA_intervals:
         new_sgRNA_intervals.append(
             (int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1),
         )
+
+    return (
+        df_alleles_around_cut,
+        df_to_plot,
+        ref_seq_around_cut,
+        new_sgRNA_intervals,
+        new_sel_cols_start,
+    )
+
+
+def prep_alleles_around_cut(
+    df_alleles_around_cut,
+    cut_point,
+    plot_half_window_left,
+    plot_half_window_right,
+    ref_sequence,
+    sgRNA_intervals,
+    count_total,
+    allele_plot_pcts_only_for_assigned_reference,
+    expand_allele_plots_by_quantification,
+):
+    """Prepare alleles-around-cut data for plot_9 and CSV export.
+
+    Takes the already-sliced DataFrame from
+    ``CRISPRessoShared.get_dataframe_around_cut_asymmetrical`` and applies
+    percentage adjustment, window slicing, optional groupby collapse, and
+    sgRNA interval recomputation via ``_prep_windowed_alleles``.
+
+    .. warning::
+
+        **Mutates** *df_alleles_around_cut* in place when
+        *allele_plot_pcts_only_for_assigned_reference* is True.
+        See ``_prep_windowed_alleles`` for details.
+
+    Returns a dict with:
+
+    - ``df_alleles_around_cut``: the (possibly mutated) input DataFrame
+    - ``df_to_plot``: after optional groupby collapse (for ``prep_alleles_table``)
+    - ``ref_seq_around_cut``: reference sequence in the window
+    - ``new_sgRNA_intervals``: sgRNA intervals in local coordinates
+    - ``new_cut_point``: cut point in local coordinates, or None if the cut
+      point is not inside any sgRNA interval
+    """
+    (
+        df_alleles_around_cut,
+        df_to_plot,
+        ref_seq_around_cut,
+        new_sgRNA_intervals,
+        new_sel_cols_start,
+    ) = _prep_windowed_alleles(
+        df_alleles_around_cut=df_alleles_around_cut,
+        cut_point=cut_point,
+        window_left=plot_half_window_left,
+        window_right=plot_half_window_right,
+        ref_sequence=ref_sequence,
+        sgRNA_intervals=sgRNA_intervals,
+        count_total=count_total,
+        allele_plot_pcts_only_for_assigned_reference=allele_plot_pcts_only_for_assigned_reference,
+        expand_allele_plots_by_quantification=expand_allele_plots_by_quantification,
+    )
+
+    new_cut_point = None
+    for (int_start, int_end) in sgRNA_intervals:
         if int_start <= cut_point <= int_end:
             new_cut_point = cut_point - new_sel_cols_start - 1
 
@@ -817,47 +882,46 @@ def prep_base_edit_quilt(
 ):
     """Prepare base edit quilt data for plot_10h and CSV export.
 
-    Similar to ``prep_alleles_around_cut`` but uses a symmetric window and
+    Same windowing logic as ``prep_alleles_around_cut`` (via the shared
+    ``_prep_windowed_alleles`` helper) but uses a symmetric window and
     computes ``x_labels`` — the 1-indexed positions of the conversion
     nucleotide in the full reference sequence.
 
     Takes the already-sliced DataFrame from
     ``CRISPRessoShared.get_base_edit_dataframe_around_cut``.
 
+    .. warning::
+
+        **Mutates** *df_alleles_around_cut* in place when
+        *allele_plot_pcts_only_for_assigned_reference* is True.
+        See ``_prep_windowed_alleles`` for details.
+
     Returns a dict with:
 
-    - ``df_alleles_around_cut``: DataFrame with pct adjustment (for CSV)
+    - ``df_alleles_around_cut``: the (possibly mutated) input DataFrame
     - ``df_to_plot``: after optional groupby collapse (for ``prep_alleles_table``)
     - ``ref_seq_around_cut``: reference sequence in the window
     - ``new_sgRNA_intervals``: sgRNA intervals in local coordinates
     - ``x_labels``: 1-indexed positions of ``conversion_nuc_from`` in the
       full reference
     """
-    if allele_plot_pcts_only_for_assigned_reference:
-        df_alleles_around_cut['%AllReads'] = df_alleles_around_cut['%Reads']
-        df_alleles_around_cut['%Reads'] = df_alleles_around_cut['#Reads'] / count_total * 100
-
-    ref_seq_around_cut = ref_sequence[
-        cut_point - plot_half_window + 1:cut_point + plot_half_window + 1
-    ]
-
-    df_to_plot = df_alleles_around_cut
-    if not expand_allele_plots_by_quantification:
-        df_to_plot = df_alleles_around_cut.groupby(
-            ['Aligned_Sequence', 'Reference_Sequence'],
-        ).sum().reset_index().set_index('Aligned_Sequence')
-        df_to_plot.sort_values(
-            by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'],
-            inplace=True,
-            ascending=[False, True, True],
-        )
-
-    new_sgRNA_intervals = []
-    new_sel_cols_start = cut_point - plot_half_window
-    for (int_start, int_end) in sgRNA_intervals:
-        new_sgRNA_intervals.append(
-            (int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1),
-        )
+    (
+        df_alleles_around_cut,
+        df_to_plot,
+        ref_seq_around_cut,
+        new_sgRNA_intervals,
+        _new_sel_cols_start,
+    ) = _prep_windowed_alleles(
+        df_alleles_around_cut=df_alleles_around_cut,
+        cut_point=cut_point,
+        window_left=plot_half_window,
+        window_right=plot_half_window,
+        ref_sequence=ref_sequence,
+        sgRNA_intervals=sgRNA_intervals,
+        count_total=count_total,
+        allele_plot_pcts_only_for_assigned_reference=allele_plot_pcts_only_for_assigned_reference,
+        expand_allele_plots_by_quantification=expand_allele_plots_by_quantification,
+    )
 
     x_labels = [
         ind for ind, a in enumerate(ref_sequence, start=1)
