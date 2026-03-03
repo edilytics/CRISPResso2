@@ -16,6 +16,7 @@ from CRISPResso2.plots.data_prep import (
     prep_hdr_nucleotide_quilt,
     prep_indel_size_distribution,
     prep_modification_frequency,
+    prep_pe_nucleotide_quilt,
 )
 
 
@@ -718,3 +719,77 @@ class TestPrepGlobalFrameshiftData:
         result = prep_global_frameshift_data(**inputs)
         assert result['global_modified_frameshift'] == snapshot(0)
         assert result['global_count_total'] == snapshot(0)
+
+
+class TestPrepPeNucleotideQuilt:
+    """prep_pe_nucleotide_quilt (plot_11a) — cross-ref nuc/mod DataFrames with include_idxs."""
+
+    def _make_inputs(self, ref_seq='ACGT'):
+        n = len(ref_seq)
+        ref_names = ['Prime-edited', 'Scaffold-incorporated']
+        counts_total = {'Prime-edited': 100, 'Scaffold-incorporated': 20}
+        ref1_all_base_count_vectors = {}
+        for rn in ref_names:
+            for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
+                ref1_all_base_count_vectors[rn + '_' + nuc] = np.zeros(n)
+            for i, base in enumerate(ref_seq):
+                ref1_all_base_count_vectors[rn + '_' + base][i] = counts_total[rn]
+
+        ref1_all_insertion_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+        ref1_all_insertion_left_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+        ref1_all_deletion_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+        ref1_all_substitution_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+        ref1_all_indelsub_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+
+        refs = {
+            'Prime-edited': {
+                'sequence': ref_seq,
+                'sequence_length': n,
+                'sgRNA_intervals': [(1, 2)],
+                'sgRNA_names': ['sg1'],
+                'sgRNA_mismatches': [0],
+                'sgRNA_sequences': ['ACGT'],
+                'include_idxs': [1, 2],
+            },
+            'Scaffold-incorporated': {
+                'sequence': ref_seq,
+                'sequence_length': n,
+                'sgRNA_intervals': [(1, 2)],
+                'sgRNA_names': ['sg1'],
+                'sgRNA_mismatches': [0],
+                'sgRNA_sequences': ['ACGT'],
+                'include_idxs': [1, 2],
+            },
+        }
+
+        return dict(
+            ref_names_for_pe=ref_names,
+            ref_names=ref_names,
+            counts_total=counts_total,
+            refs=refs,
+            ref1_all_base_count_vectors=ref1_all_base_count_vectors,
+            ref1_all_insertion_count_vectors=ref1_all_insertion_count_vectors,
+            ref1_all_insertion_left_count_vectors=ref1_all_insertion_left_count_vectors,
+            ref1_all_deletion_count_vectors=ref1_all_deletion_count_vectors,
+            ref1_all_substitution_count_vectors=ref1_all_substitution_count_vectors,
+            ref1_all_indelsub_count_vectors=ref1_all_indelsub_count_vectors,
+            custom_colors={},
+            save_also_png=False,
+        )
+
+    def test_basic_structure(self):
+        result = prep_pe_nucleotide_quilt(**self._make_inputs())
+        # Same shape as HDR quilt
+        assert result['nuc_pct_df'].shape == snapshot((12, 6))
+        assert result['mod_pct_df'].shape == snapshot((12, 6))
+        # PE includes quantification window from first ref (not empty like HDR)
+        assert result['quantification_window_idxs'] == snapshot([1, 2])
+
+    def test_nuc_percentages_sum_to_one_per_batch(self):
+        result = prep_pe_nucleotide_quilt(**self._make_inputs())
+        nuc_df = result['nuc_pct_df']
+        for batch in nuc_df['Batch'].unique():
+            batch_df = nuc_df[nuc_df['Batch'] == batch]
+            seq_cols = batch_df.columns[2:]
+            col_sums = batch_df[seq_cols].sum(axis=0)
+            np.testing.assert_allclose(col_sums.values, 1.0)

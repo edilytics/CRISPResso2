@@ -443,6 +443,43 @@ def prep_hdr_nucleotide_quilt(
     }
 
 
+def prep_pe_nucleotide_quilt(
+    ref_names_for_pe,
+    ref_names,
+    counts_total,
+    refs,
+    ref1_all_base_count_vectors,
+    ref1_all_insertion_count_vectors,
+    ref1_all_insertion_left_count_vectors,
+    ref1_all_deletion_count_vectors,
+    ref1_all_substitution_count_vectors,
+    ref1_all_indelsub_count_vectors,
+    custom_colors,
+    save_also_png,
+):
+    """Prepare kwargs for plot_nucleotide_quilt for PE comparison (plot_11a).
+
+    Same computation as ``prep_hdr_nucleotide_quilt`` but uses the first
+    reference's ``include_idxs`` for ``quantification_window_idxs`` (PE
+    amplicons share the same quantification window, unlike HDR).
+    """
+    result = prep_hdr_nucleotide_quilt(
+        ref_names_for_hdr=ref_names_for_pe,
+        counts_total=counts_total,
+        refs=refs,
+        ref1_all_base_count_vectors=ref1_all_base_count_vectors,
+        ref1_all_insertion_count_vectors=ref1_all_insertion_count_vectors,
+        ref1_all_insertion_left_count_vectors=ref1_all_insertion_left_count_vectors,
+        ref1_all_deletion_count_vectors=ref1_all_deletion_count_vectors,
+        ref1_all_substitution_count_vectors=ref1_all_substitution_count_vectors,
+        ref1_all_indelsub_count_vectors=ref1_all_indelsub_count_vectors,
+        custom_colors=custom_colors,
+        save_also_png=save_also_png,
+    )
+    result['quantification_window_idxs'] = refs[ref_names[0]]['include_idxs']
+    return result
+
+
 def prep_global_frameshift_data(
     ref_names,
     refs,

@@ -6119,47 +6119,30 @@ def main():
 
             # if pegRNA extension seq and plotting, plot summary plots
             if not args.suppress_plots:
-                nuc_pcts = []
                 ref_names_for_pe = [r for r in ref_names if counts_total[r] > 0]
-                for ref_name in ref_names_for_pe:
-                    tot = float(counts_total[ref_name])
-                    for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
-                        nuc_pcts.append(np.concatenate(([ref_name, nuc], np.array(ref1_all_base_count_vectors[ref_name + "_" + nuc]).astype(float) / tot)))
-                colnames = ['Batch', 'Nucleotide'] + list(refs[ref_names[0]]['sequence'])
-                pe_nucleotide_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(nuc_pcts, columns=colnames), {'Batch', 'Nucleotide'})
-
-                mod_pcts = []
-                for ref_name in ref_names_for_pe:
-                    tot = float(counts_total[ref_name])
-                    mod_pcts.append(np.concatenate(([ref_name, 'Insertions'], np.array(ref1_all_insertion_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate(([ref_name, 'Insertions_Left'], np.array(ref1_all_insertion_left_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate(([ref_name, 'Deletions'], np.array(ref1_all_deletion_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate(([ref_name, 'Substitutions'], np.array(ref1_all_substitution_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate(([ref_name, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name]).astype(float) / tot)))
-                    mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]] * refs[ref_names[0]]['sequence_length'])))
-                colnames = ['Batch', 'Modification'] + list(refs[ref_names[0]]['sequence'])
-                pe_modification_percentage_summary_df = to_numeric_ignore_columns(pd.DataFrame(mod_pcts, columns=colnames), {'Batch', 'Modification'})
-
-                sgRNA_intervals = refs[ref_names[0]]['sgRNA_intervals']
-                sgRNA_names = refs[ref_names[0]]['sgRNA_names']
-                sgRNA_mismatches = refs[ref_names[0]]['sgRNA_mismatches']
-                sgRNA_sequences = refs[ref_names[0]]['sgRNA_sequences']
-                include_idxs_list = refs[ref_names[0]]['include_idxs']
+                plot_11a_input = CRISPRessoPlotData.prep_pe_nucleotide_quilt(
+                    ref_names_for_pe=ref_names_for_pe,
+                    ref_names=ref_names,
+                    counts_total=counts_total,
+                    refs=refs,
+                    ref1_all_base_count_vectors=ref1_all_base_count_vectors,
+                    ref1_all_insertion_count_vectors=ref1_all_insertion_count_vectors,
+                    ref1_all_insertion_left_count_vectors=ref1_all_insertion_left_count_vectors,
+                    ref1_all_deletion_count_vectors=ref1_all_deletion_count_vectors,
+                    ref1_all_substitution_count_vectors=ref1_all_substitution_count_vectors,
+                    ref1_all_indelsub_count_vectors=ref1_all_indelsub_count_vectors,
+                    custom_colors=custom_config['colors'],
+                    save_also_png=save_png,
+                )
+                pe_nucleotide_percentage_summary_df = plot_11a_input['nuc_pct_df']
+                pe_modification_percentage_summary_df = plot_11a_input['mod_pct_df']
+                sgRNA_names = plot_11a_input['sgRNA_names']
+                sgRNA_mismatches = plot_11a_input['sgRNA_mismatches']
+                sgRNA_sequences = plot_11a_input['sgRNA_sequences']
 
                 plot_root = _jp('11a.Prime_editing_nucleotide_percentage_quilt')
                 pro_output_name = f'plot_{os.path.basename(plot_root)}.json'
-                plot_11a_input = {
-                    'nuc_pct_df': pe_nucleotide_percentage_summary_df,
-                    'mod_pct_df': pe_modification_percentage_summary_df,
-                    'fig_filename_root': f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root,
-                    'save_also_png': save_png,
-                    'sgRNA_intervals': sgRNA_intervals,
-                    'sgRNA_names': sgRNA_names,
-                    'sgRNA_mismatches': sgRNA_mismatches,
-                    'sgRNA_sequences': sgRNA_sequences,
-                    'quantification_window_idxs': include_idxs_list,
-                    'custom_colors': custom_config['colors']
-                }
+                plot_11a_input['fig_filename_root'] = f'{_jp(pro_output_name)}' if not args.use_matplotlib and C2PRO_INSTALLED else plot_root
                 info('Plotting prime editing nucleotide percentage quilt', {'percent_complete': 96})
                 plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11a_input)
                 crispresso2_info['results']['refs'][ref_names[0]]['plot_11a_root'] = os.path.basename(plot_root)
