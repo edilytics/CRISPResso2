@@ -12,6 +12,7 @@ from CRISPResso2.plots.data_prep import (
     prep_amplicon_modifications,
     prep_dsODN_piechart,
     prep_frequency_deletions_insertions,
+    prep_hdr_nucleotide_quilt,
     prep_indel_size_distribution,
     prep_modification_frequency,
 )
@@ -534,3 +535,104 @@ class TestPrepConversionAtSelNucs:
         )
         assert result['from_nuc_indices'] == snapshot([])
         assert result['just_sel_nuc_pcts'].shape == snapshot((6, 0))
+
+
+class TestPrepHdrNucleotideQuilt:
+    """prep_hdr_nucleotide_quilt (plot_4g) — cross-ref nuc/mod DataFrames."""
+
+    def _make_inputs(self, ref_seq='ACGT'):
+        n = len(ref_seq)
+        ref_names = ['FANC', 'HDR']
+        counts_total = {'FANC': 100, 'HDR': 50}
+        # Base counts: all reads match the reference at each position
+        ref1_all_base_count_vectors = {}
+        for rn in ref_names:
+            for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
+                ref1_all_base_count_vectors[rn + '_' + nuc] = np.zeros(n)
+            # Put all counts on the matching base at each position
+            for i, base in enumerate(ref_seq):
+                ref1_all_base_count_vectors[rn + '_' + base][i] = counts_total[rn]
+
+        ref1_all_insertion_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+        ref1_all_insertion_left_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+        ref1_all_deletion_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+        ref1_all_substitution_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+        ref1_all_indelsub_count_vectors = {rn: np.zeros(n) for rn in ref_names}
+
+        refs = {
+            'FANC': {
+                'sequence': ref_seq,
+                'sequence_length': n,
+                'sgRNA_intervals': [(1, 2)],
+                'sgRNA_names': ['sg1'],
+                'sgRNA_mismatches': [0],
+                'sgRNA_sequences': ['ACGT'],
+            },
+            'HDR': {
+                'sequence': ref_seq,
+                'sequence_length': n,
+                'sgRNA_intervals': [(1, 2)],
+                'sgRNA_names': ['sg1'],
+                'sgRNA_mismatches': [0],
+                'sgRNA_sequences': ['ACGT'],
+            },
+        }
+
+        return dict(
+            ref_names_for_hdr=ref_names,
+            counts_total=counts_total,
+            refs=refs,
+            ref1_all_base_count_vectors=ref1_all_base_count_vectors,
+            ref1_all_insertion_count_vectors=ref1_all_insertion_count_vectors,
+            ref1_all_insertion_left_count_vectors=ref1_all_insertion_left_count_vectors,
+            ref1_all_deletion_count_vectors=ref1_all_deletion_count_vectors,
+            ref1_all_substitution_count_vectors=ref1_all_substitution_count_vectors,
+            ref1_all_indelsub_count_vectors=ref1_all_indelsub_count_vectors,
+            custom_colors={},
+            save_also_png=False,
+        )
+
+    def test_basic_structure(self):
+        result = prep_hdr_nucleotide_quilt(**self._make_inputs())
+        assert list(result.keys()) == snapshot(
+            [
+                "nuc_pct_df",
+                "mod_pct_df",
+                "fig_filename_root",
+                "save_also_png",
+                "sgRNA_intervals",
+                "sgRNA_names",
+                "sgRNA_mismatches",
+                "sgRNA_sequences",
+                "quantification_window_idxs",
+                "custom_colors",
+            ]
+        )
+        # 2 refs × 6 nucleotides = 12 rows; 4 positions + Batch + Nucleotide = 6 cols
+        assert result['nuc_pct_df'].shape == snapshot((12, 6))
+        # 2 refs × 6 mod types = 12 rows
+        assert result['mod_pct_df'].shape == snapshot((12, 6))
+        # quantification window should be empty (different amplicons may differ)
+        assert result['quantification_window_idxs'] == snapshot([])
+
+    def test_nuc_percentages_sum_to_one_per_batch(self):
+        result = prep_hdr_nucleotide_quilt(**self._make_inputs())
+        nuc_df = result['nuc_pct_df']
+        for batch in nuc_df['Batch'].unique():
+            batch_df = nuc_df[nuc_df['Batch'] == batch]
+            seq_cols = batch_df.columns[2:]
+            col_sums = batch_df[seq_cols].sum(axis=0)
+            np.testing.assert_allclose(col_sums.values, 1.0)
+
+    def test_single_ref(self):
+        inputs = self._make_inputs()
+        inputs['ref_names_for_hdr'] = ['FANC']
+        result = prep_hdr_nucleotide_quilt(**inputs)
+        # 1 ref × 6 nucleotides = 6 rows
+        assert result['nuc_pct_df'].shape == snapshot((6, 6))
+        assert result['mod_pct_df'].shape == snapshot((6, 6))
+
+    def test_sgRNA_from_first_ref(self):
+        result = prep_hdr_nucleotide_quilt(**self._make_inputs())
+        assert result['sgRNA_intervals'] == snapshot([(1, 2)])
+        assert result['sgRNA_names'] == snapshot(['sg1'])

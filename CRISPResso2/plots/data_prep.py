@@ -360,6 +360,87 @@ def prep_nucleotide_quilt_around_sgRNA(
     }
 
 
+def prep_hdr_nucleotide_quilt(
+    ref_names_for_hdr,
+    counts_total,
+    refs,
+    ref1_all_base_count_vectors,
+    ref1_all_insertion_count_vectors,
+    ref1_all_insertion_left_count_vectors,
+    ref1_all_deletion_count_vectors,
+    ref1_all_substitution_count_vectors,
+    ref1_all_indelsub_count_vectors,
+    custom_colors,
+    save_also_png,
+):
+    """Prepare kwargs for plot_nucleotide_quilt for HDR comparison (plot_4g).
+
+    Builds multi-batch ``nuc_pct_df`` and ``mod_pct_df`` across all references
+    with non-zero read counts, aligned to the first reference's coordinate
+    system.
+
+    Parameters
+    ----------
+    ref_names_for_hdr : list of str
+        Reference names with counts > 0.
+    counts_total : dict
+        ref_name → total read count.
+    refs : dict
+        ref_name → dict with 'sequence', 'sequence_length', sgRNA metadata.
+    ref1_all_base_count_vectors : dict
+        Keys like ``"FANC_A"``, ``"HDR_C"`` → numpy array of per-position
+        base counts aligned to ref1's coordinate system.
+    ref1_all_insertion_count_vectors, ref1_all_insertion_left_count_vectors,
+    ref1_all_deletion_count_vectors, ref1_all_substitution_count_vectors,
+    ref1_all_indelsub_count_vectors : dict
+        ref_name → numpy array of per-position modification counts aligned
+        to ref1's coordinate system.
+    """
+    ref0 = ref_names_for_hdr[0]
+    ref_seq = refs[ref0]['sequence']
+    seq_len = refs[ref0]['sequence_length']
+
+    nuc_pcts = []
+    for ref_name in ref_names_for_hdr:
+        tot = float(counts_total[ref_name])
+        for nuc in ['A', 'C', 'G', 'T', 'N', '-']:
+            nuc_pcts.append(np.concatenate(
+                ([ref_name, nuc],
+                 np.array(ref1_all_base_count_vectors[ref_name + '_' + nuc]).astype(float) / tot),
+            ))
+    colnames = ['Batch', 'Nucleotide'] + list(ref_seq)
+    nuc_pct_df = _to_numeric_ignore_columns(
+        pd.DataFrame(nuc_pcts, columns=colnames), {'Batch', 'Nucleotide'},
+    )
+
+    mod_pcts = []
+    for ref_name in ref_names_for_hdr:
+        tot = float(counts_total[ref_name])
+        mod_pcts.append(np.concatenate(([ref_name, 'Insertions'], np.array(ref1_all_insertion_count_vectors[ref_name]).astype(float) / tot)))
+        mod_pcts.append(np.concatenate(([ref_name, 'Insertions_Left'], np.array(ref1_all_insertion_left_count_vectors[ref_name]).astype(float) / tot)))
+        mod_pcts.append(np.concatenate(([ref_name, 'Deletions'], np.array(ref1_all_deletion_count_vectors[ref_name]).astype(float) / tot)))
+        mod_pcts.append(np.concatenate(([ref_name, 'Substitutions'], np.array(ref1_all_substitution_count_vectors[ref_name]).astype(float) / tot)))
+        mod_pcts.append(np.concatenate(([ref_name, 'All_modifications'], np.array(ref1_all_indelsub_count_vectors[ref_name]).astype(float) / tot)))
+        mod_pcts.append(np.concatenate(([ref_name, 'Total'], [counts_total[ref_name]] * seq_len)))
+    colnames = ['Batch', 'Modification'] + list(ref_seq)
+    mod_pct_df = _to_numeric_ignore_columns(
+        pd.DataFrame(mod_pcts, columns=colnames), {'Batch', 'Modification'},
+    )
+
+    return {
+        'nuc_pct_df': nuc_pct_df,
+        'mod_pct_df': mod_pct_df,
+        'fig_filename_root': '',  # caller sets this
+        'save_also_png': save_also_png,
+        'sgRNA_intervals': refs[ref0]['sgRNA_intervals'],
+        'sgRNA_names': refs[ref0]['sgRNA_names'],
+        'sgRNA_mismatches': refs[ref0]['sgRNA_mismatches'],
+        'sgRNA_sequences': refs[ref0]['sgRNA_sequences'],
+        'quantification_window_idxs': [],  # windows may differ between amplicons
+        'custom_colors': custom_colors,
+    }
+
+
 def prep_global_modifications_reference(
     ref_name,
     ref_names,
