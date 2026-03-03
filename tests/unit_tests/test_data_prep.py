@@ -10,6 +10,7 @@ from inline_snapshot import snapshot
 
 from CRISPResso2.plots.data_prep import (
     prep_alleles_around_cut,
+    prep_amino_acid_table,
     prep_amplicon_modifications,
     prep_base_edit_quilt,
     prep_dsODN_piechart,
@@ -1072,3 +1073,61 @@ class TestPrepBaseEditQuilt:
         # new_sel_cols_start = 5 - 3 = 2
         # new intervals = [(3-2-1, 7-2-1)] = [(0, 4)]
         assert result['new_sgRNA_intervals'] == [(0, 4)]
+
+
+class TestPrepAminoAcidTable:
+    """prep_amino_acid_table (plot_9a) — amino acid conversion + cut point."""
+
+    def test_amino_acid_cut_point(self):
+        """Cut point is converted from nucleotide to amino acid coordinates."""
+        # Empty df to avoid needing real alleles data
+        df = pd.DataFrame(columns=[
+            'Aligned_Sequence', 'Reference_Sequence', 'Read_Status',
+            'n_deleted', 'n_inserted', 'n_mutated',
+            '#Reads', '%Reads', 'ref_positions', 'Reference_Name',
+        ])
+        result = prep_amino_acid_table(
+            coding_seq='ATGATGATG',  # 3 codons = 3 amino acids
+            cut_point=10,
+            exon_positions_start=2,
+            df_alleles_for_ref=df,
+            exon_interval_start=0,
+            blosum_path='/tmp/BLOSUM62',
+        )
+        # amino_acid_cut_point = (10 - 2 + 1) // 3 = 3
+        assert result['amino_acid_cut_point'] == 3
+
+    def test_coding_seq_amino_acids(self):
+        """Nucleotide coding sequence is converted to amino acids."""
+        df = pd.DataFrame(columns=[
+            'Aligned_Sequence', 'Reference_Sequence', 'Read_Status',
+            'n_deleted', 'n_inserted', 'n_mutated',
+            '#Reads', '%Reads', 'ref_positions', 'Reference_Name',
+        ])
+        result = prep_amino_acid_table(
+            coding_seq='ATGATGATG',  # Met-Met-Met
+            cut_point=5,
+            exon_positions_start=0,
+            df_alleles_for_ref=df,
+            exon_interval_start=0,
+            blosum_path='/tmp/BLOSUM62',
+        )
+        assert result['coding_seq_amino_acids'] == 'MMM'
+
+    def test_return_keys(self):
+        df = pd.DataFrame(columns=[
+            'Aligned_Sequence', 'Reference_Sequence', 'Read_Status',
+            'n_deleted', 'n_inserted', 'n_mutated',
+            '#Reads', '%Reads', 'ref_positions', 'Reference_Name',
+        ])
+        result = prep_amino_acid_table(
+            coding_seq='ATGATG',
+            cut_point=3,
+            exon_positions_start=0,
+            df_alleles_for_ref=df,
+            exon_interval_start=0,
+            blosum_path='/tmp/BLOSUM62',
+        )
+        assert 'coding_seq_amino_acids' in result
+        assert 'amino_acid_cut_point' in result
+        assert 'df_to_plot' in result

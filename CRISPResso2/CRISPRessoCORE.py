@@ -5952,17 +5952,18 @@ def main():
             if refs[ref_name]['contains_coding_seq']:
                 for i, coding_seq in enumerate(coding_seqs):
                     fig_filename_root = _jp('9a.' + ref_plot_name + 'amino_acid_table_around_' + coding_seq)
-                    coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
-                    amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1) // 3
-                    df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
-                        df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
-                        refs[ref_name]['exon_intervals'][i][0],
-                        len(coding_seq_amino_acids),
-                        os.path.join(_ROOT, "BLOSUM62"),
-                        amino_acid_cut_point)
+                    amino_acid_data = CRISPRessoPlotData.prep_amino_acid_table(
+                        coding_seq=coding_seq,
+                        cut_point=cut_point,
+                        exon_positions_start=refs[ref_name]['exon_positions'][0],
+                        df_alleles_for_ref=df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
+                        exon_interval_start=refs[ref_name]['exon_intervals'][i][0],
+                        blosum_path=os.path.join(_ROOT, "BLOSUM62"),
+                    )
+                    df_to_plot = amino_acid_data['df_to_plot']
 
                     plot_9a_input = {
-                        'reference_seq': coding_seq_amino_acids,
+                        'reference_seq': amino_acid_data['coding_seq_amino_acids'],
                         'df_alleles': df_to_plot,
                         'fig_filename_root': fig_filename_root,
                         'custom_colors': custom_config["colors"],
@@ -5974,7 +5975,7 @@ def main():
                         'sgRNA_names': sgRNA_names,
                         'sgRNA_mismatches': sgRNA_mismatches,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
-                        'cut_point': amino_acid_cut_point,
+                        'cut_point': amino_acid_data['amino_acid_cut_point'],
                     }
 
                     amino_acid_filename = _jp(ref_plot_name + 'amino_acid_table_for_' + coding_seq + '.txt')

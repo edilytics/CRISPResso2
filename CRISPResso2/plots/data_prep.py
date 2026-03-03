@@ -696,6 +696,44 @@ def prep_log_nuc_freqs(
     }
 
 
+def prep_amino_acid_table(
+    coding_seq,
+    cut_point,
+    exon_positions_start,
+    df_alleles_for_ref,
+    exon_interval_start,
+    blosum_path,
+):
+    """Prepare amino acid table data for plot_9a and CSV export.
+
+    Converts a nucleotide coding sequence to amino acids, computes the
+    amino acid cut point, and builds the amino acid allele DataFrame via
+    ``CRISPRessoShared.get_amino_acid_dataframe``.
+
+    Returns a dict with:
+
+    - ``coding_seq_amino_acids``: amino acid string for the coding sequence
+    - ``amino_acid_cut_point``: cut point in amino acid coordinates
+    - ``df_to_plot``: DataFrame of amino acid alleles (for CSV and plot)
+    """
+    from CRISPResso2 import CRISPRessoShared
+
+    coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
+    amino_acid_cut_point = (cut_point - exon_positions_start + 1) // 3
+    df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
+        df_alleles_for_ref,
+        exon_interval_start,
+        len(coding_seq_amino_acids),
+        blosum_path,
+        amino_acid_cut_point,
+    )
+    return {
+        'coding_seq_amino_acids': coding_seq_amino_acids,
+        'amino_acid_cut_point': amino_acid_cut_point,
+        'df_to_plot': df_to_plot,
+    }
+
+
 def prep_alleles_around_cut(
     df_alleles_around_cut,
     cut_point,
