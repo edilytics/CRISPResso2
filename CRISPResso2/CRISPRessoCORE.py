@@ -6005,53 +6005,27 @@ def main():
 
         # (5, 6) GLOBAL frameshift analyses plots
         if args.coding_seq:
-            global_MODIFIED_FRAMESHIFT = 0
-            global_MODIFIED_NON_FRAMESHIFT = 0
-            global_NON_MODIFIED_NON_FRAMESHIFT = 0
-            global_SPLICING_SITES_MODIFIED = 0
-
-            global_hists_frameshift = Counter()
-            global_hists_frameshift[0] = 0  # fill with at least the zero value (in case there are no others)
-            global_hists_inframe = Counter()
-            global_hists_inframe[0] = 0
-
-            global_count_total = 0
-            global_count_modified = 0
-            global_count_unmodified = 0
-            global_exon_len_mods = []
-
-            for ref_name in ref_names:
-                if refs[ref_name]['contains_coding_seq']:  # PERFORM FRAMESHIFT ANALYSIS
-                    if ref_name == "HDR":
-                        global_MODIFIED_FRAMESHIFT += counts_modified_frameshift[ref_name]
-                        global_MODIFIED_NON_FRAMESHIFT += counts_modified_non_frameshift[ref_name]
-                        global_NON_MODIFIED_NON_FRAMESHIFT += counts_non_modified_non_frameshift[ref_name]
-                        global_SPLICING_SITES_MODIFIED += counts_splicing_sites_modified[ref_name]
-
-                        # for HDR, add all unmodified reads to those that have modifications not in exons
-                        global_NON_MODIFIED_NON_FRAMESHIFT += counts_unmodified[ref_name]
-                    else:
-                        global_MODIFIED_FRAMESHIFT += counts_modified_frameshift[ref_name]
-                        global_MODIFIED_NON_FRAMESHIFT += counts_modified_non_frameshift[ref_name]
-                        global_NON_MODIFIED_NON_FRAMESHIFT += counts_non_modified_non_frameshift[ref_name]
-                        global_SPLICING_SITES_MODIFIED += counts_splicing_sites_modified[ref_name]
-
-                    for (exon_len, count) in hists_frameshift[ref_name].items():
-                        global_hists_frameshift[exon_len] += count
-                    for (exon_len, count) in hists_inframe[ref_name].items():
-                        global_hists_inframe[exon_len] += count
-
-                    global_count_total += counts_total[ref_name]
-                    global_count_modified += counts_modified[ref_name]
-                    global_count_unmodified += counts_unmodified[ref_name]
+            global_frameshift = CRISPRessoPlotData.prep_global_frameshift_data(
+                ref_names=ref_names,
+                refs=refs,
+                counts_modified_frameshift=counts_modified_frameshift,
+                counts_modified_non_frameshift=counts_modified_non_frameshift,
+                counts_non_modified_non_frameshift=counts_non_modified_non_frameshift,
+                counts_splicing_sites_modified=counts_splicing_sites_modified,
+                counts_total=counts_total,
+                counts_modified=counts_modified,
+                counts_unmodified=counts_unmodified,
+                hists_frameshift=hists_frameshift,
+                hists_inframe=hists_inframe,
+            )
 
             if not args.suppress_plots:
-                if (global_MODIFIED_FRAMESHIFT + global_MODIFIED_NON_FRAMESHIFT + global_NON_MODIFIED_NON_FRAMESHIFT) > 0:
+                if (global_frameshift['global_modified_frameshift'] + global_frameshift['global_modified_non_frameshift'] + global_frameshift['global_non_modified_non_frameshift']) > 0:
                     plot_root = _jp('5a.Global_frameshift_in-frame_mutations_pie_chart')
                     plot_5a_input = {
-                        'global_modified_frameshift': global_MODIFIED_FRAMESHIFT,
-                        'global_modified_non_frameshift': global_MODIFIED_NON_FRAMESHIFT,
-                        'global_non_modified_non_frameshift': global_NON_MODIFIED_NON_FRAMESHIFT,
+                        'global_modified_frameshift': global_frameshift['global_modified_frameshift'],
+                        'global_modified_non_frameshift': global_frameshift['global_modified_non_frameshift'],
+                        'global_non_modified_non_frameshift': global_frameshift['global_non_modified_non_frameshift'],
                         'plot_root': plot_root,
                         'save_also_png': save_png,
                         'custom_colors': custom_config['colors'],
@@ -6068,8 +6042,8 @@ def main():
                  # profiles-----------------------------------------------------------------------------------
                 plot_root = _jp('6a.Global_frameshift_in-frame_mutation_profiles')
                 plot_6a_input = {
-                    'global_hists_frameshift': global_hists_frameshift,
-                    'global_hists_inframe': global_hists_inframe,
+                    'global_hists_frameshift': global_frameshift['global_hists_frameshift'],
+                    'global_hists_inframe': global_frameshift['global_hists_inframe'],
                     'plot_root': plot_root,
                     'save_also_png': save_png,
                 }
@@ -6080,7 +6054,7 @@ def main():
                 )
 
                 crispresso2_info['results']['general_plots']['plot_6a_root'] = os.path.basename(plot_root)
-                crispresso2_info['results']['general_plots']['plot_6a_caption'] = "Figure 6a: Frameshift and in-frame mutagenesis profiles for all reads indicating position affected by modification. The y axis shows the number of reads and percentage of all reads in that category (frameshifted (top) or in-frame (bottom)). %d reads with no length modifications are not shown." % global_hists_inframe[0]
+                crispresso2_info['results']['general_plots']['plot_6a_caption'] = "Figure 6a: Frameshift and in-frame mutagenesis profiles for all reads indicating position affected by modification. The y axis shows the number of reads and percentage of all reads in that category (frameshifted (top) or in-frame (bottom)). %d reads with no length modifications are not shown." % global_frameshift['global_hists_inframe'][0]
                 crispresso2_info['results']['general_plots']['plot_6a_data'] = []
                 for ref_name in ref_names:
                     if 'indel_histogram_filename' in crispresso2_info['results']['refs'][ref_name]:
@@ -6089,8 +6063,8 @@ def main():
                 # -----------------------------------------------------------------------------------------------------------
                 plot_root = _jp('8a.Global_potential_splice_sites_pie_chart')
                 plot_8a_input = {
-                    'global_splicing_sites_modified': global_SPLICING_SITES_MODIFIED,
-                    'global_count_total': global_count_total,
+                    'global_splicing_sites_modified': global_frameshift['global_splicing_sites_modified'],
+                    'global_count_total': global_frameshift['global_count_total'],
                     'plot_root': plot_root,
                     'save_also_png': save_png,
                     'custom_colors': custom_config['colors'],

@@ -12,6 +12,7 @@ from CRISPResso2.plots.data_prep import (
     prep_amplicon_modifications,
     prep_dsODN_piechart,
     prep_frequency_deletions_insertions,
+    prep_global_frameshift_data,
     prep_hdr_nucleotide_quilt,
     prep_indel_size_distribution,
     prep_modification_frequency,
@@ -636,3 +637,84 @@ class TestPrepHdrNucleotideQuilt:
         result = prep_hdr_nucleotide_quilt(**self._make_inputs())
         assert result['sgRNA_intervals'] == snapshot([(1, 2)])
         assert result['sgRNA_names'] == snapshot(['sg1'])
+
+
+class TestPrepGlobalFrameshiftData:
+    """prep_global_frameshift_data (plot_5a/6a/8a) — cross-ref aggregation."""
+
+    def _make_inputs(self):
+        from collections import Counter
+        ref_names = ['FANC', 'HDR']
+        refs = {
+            'FANC': {'contains_coding_seq': True},
+            'HDR': {'contains_coding_seq': True},
+        }
+        counts_modified_frameshift = {'FANC': 10, 'HDR': 5}
+        counts_modified_non_frameshift = {'FANC': 20, 'HDR': 8}
+        counts_non_modified_non_frameshift = {'FANC': 30, 'HDR': 12}
+        counts_splicing_sites_modified = {'FANC': 2, 'HDR': 1}
+        counts_total = {'FANC': 100, 'HDR': 50}
+        counts_modified = {'FANC': 30, 'HDR': 13}
+        counts_unmodified = {'FANC': 70, 'HDR': 37}
+        hists_frameshift = {
+            'FANC': Counter({0: 5, 1: 3, -1: 2}),
+            'HDR': Counter({0: 2, 2: 1}),
+        }
+        hists_inframe = {
+            'FANC': Counter({0: 10, 3: 5}),
+            'HDR': Counter({0: 4, -3: 2}),
+        }
+        return dict(
+            ref_names=ref_names,
+            refs=refs,
+            counts_modified_frameshift=counts_modified_frameshift,
+            counts_modified_non_frameshift=counts_modified_non_frameshift,
+            counts_non_modified_non_frameshift=counts_non_modified_non_frameshift,
+            counts_splicing_sites_modified=counts_splicing_sites_modified,
+            counts_total=counts_total,
+            counts_modified=counts_modified,
+            counts_unmodified=counts_unmodified,
+            hists_frameshift=hists_frameshift,
+            hists_inframe=hists_inframe,
+        )
+
+    def test_basic_aggregation(self):
+        result = prep_global_frameshift_data(**self._make_inputs())
+        # FANC: not HDR, so standard aggregation
+        # HDR: adds unmodified reads to non_modified_non_frameshift
+        assert result['global_modified_frameshift'] == snapshot(15)  # 10 + 5
+        assert result['global_modified_non_frameshift'] == snapshot(28)  # 20 + 8
+        # FANC: 30, HDR: 12 + 37 (unmodified added for HDR)
+        assert result['global_non_modified_non_frameshift'] == snapshot(79)
+        assert result['global_splicing_sites_modified'] == snapshot(3)  # 2 + 1
+        assert result['global_count_total'] == snapshot(150)
+        assert result['global_count_modified'] == snapshot(43)
+        assert result['global_count_unmodified'] == snapshot(107)
+
+    def test_histogram_aggregation(self):
+        from collections import Counter
+        result = prep_global_frameshift_data(**self._make_inputs())
+        # Frameshift histograms: FANC {0:5, 1:3, -1:2} + HDR {0:2, 2:1}
+        assert result['global_hists_frameshift'] == snapshot(
+            Counter({0: 7, 1: 3, -1: 2, 2: 1})
+        )
+        # Inframe histograms: FANC {0:10, 3:5} + HDR {0:4, -3:2}
+        assert result['global_hists_inframe'] == snapshot(
+            Counter({0: 14, 3: 5, -3: 2})
+        )
+
+    def test_non_coding_refs_skipped(self):
+        inputs = self._make_inputs()
+        inputs['refs']['FANC']['contains_coding_seq'] = False
+        result = prep_global_frameshift_data(**inputs)
+        # Only HDR counts
+        assert result['global_modified_frameshift'] == snapshot(5)
+        assert result['global_count_total'] == snapshot(50)
+
+    def test_no_coding_refs(self):
+        inputs = self._make_inputs()
+        inputs['refs']['FANC']['contains_coding_seq'] = False
+        inputs['refs']['HDR']['contains_coding_seq'] = False
+        result = prep_global_frameshift_data(**inputs)
+        assert result['global_modified_frameshift'] == snapshot(0)
+        assert result['global_count_total'] == snapshot(0)

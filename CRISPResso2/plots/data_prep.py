@@ -12,6 +12,8 @@ CORE calls these to build plot inputs. CRISPRessoPro can call them
 from PlotContext to generate plots independently.
 """
 
+from collections import Counter
+
 import numpy as np
 import pandas as pd
 
@@ -438,6 +440,76 @@ def prep_hdr_nucleotide_quilt(
         'sgRNA_sequences': refs[ref0]['sgRNA_sequences'],
         'quantification_window_idxs': [],  # windows may differ between amplicons
         'custom_colors': custom_colors,
+    }
+
+
+def prep_global_frameshift_data(
+    ref_names,
+    refs,
+    counts_modified_frameshift,
+    counts_modified_non_frameshift,
+    counts_non_modified_non_frameshift,
+    counts_splicing_sites_modified,
+    counts_total,
+    counts_modified,
+    counts_unmodified,
+    hists_frameshift,
+    hists_inframe,
+):
+    """Aggregate frameshift/splice/inframe counts across all coding-seq refs.
+
+    Used by plots 5a (global frameshift pie), 6a (global frameshift profiles),
+    and 8a (global splice sites). For HDR refs, unmodified reads are added to
+    the non-modified-non-frameshift bucket.
+
+    Returns a dict with all aggregated values needed by the three plot
+    functions.
+    """
+    global_MODIFIED_FRAMESHIFT = 0
+    global_MODIFIED_NON_FRAMESHIFT = 0
+    global_NON_MODIFIED_NON_FRAMESHIFT = 0
+    global_SPLICING_SITES_MODIFIED = 0
+
+    global_hists_frameshift = Counter()
+    global_hists_frameshift[0] = 0
+    global_hists_inframe = Counter()
+    global_hists_inframe[0] = 0
+
+    global_count_total = 0
+    global_count_modified = 0
+    global_count_unmodified = 0
+
+    for ref_name in ref_names:
+        if refs[ref_name]['contains_coding_seq']:
+            global_MODIFIED_FRAMESHIFT += counts_modified_frameshift[ref_name]
+            global_MODIFIED_NON_FRAMESHIFT += counts_modified_non_frameshift[ref_name]
+            global_NON_MODIFIED_NON_FRAMESHIFT += counts_non_modified_non_frameshift[ref_name]
+            global_SPLICING_SITES_MODIFIED += counts_splicing_sites_modified[ref_name]
+
+            if ref_name == "HDR":
+                # for HDR, add all unmodified reads to those that have
+                # modifications not in exons
+                global_NON_MODIFIED_NON_FRAMESHIFT += counts_unmodified[ref_name]
+
+            for exon_len, count in hists_frameshift[ref_name].items():
+                global_hists_frameshift[exon_len] += count
+            for exon_len, count in hists_inframe[ref_name].items():
+                global_hists_inframe[exon_len] += count
+
+            global_count_total += counts_total[ref_name]
+            global_count_modified += counts_modified[ref_name]
+            global_count_unmodified += counts_unmodified[ref_name]
+
+    return {
+        'global_modified_frameshift': global_MODIFIED_FRAMESHIFT,
+        'global_modified_non_frameshift': global_MODIFIED_NON_FRAMESHIFT,
+        'global_non_modified_non_frameshift': global_NON_MODIFIED_NON_FRAMESHIFT,
+        'global_splicing_sites_modified': global_SPLICING_SITES_MODIFIED,
+        'global_hists_frameshift': global_hists_frameshift,
+        'global_hists_inframe': global_hists_inframe,
+        'global_count_total': global_count_total,
+        'global_count_modified': global_count_modified,
+        'global_count_unmodified': global_count_unmodified,
     }
 
 
