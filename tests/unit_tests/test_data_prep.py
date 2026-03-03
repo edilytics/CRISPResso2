@@ -9,6 +9,7 @@ import numpy as np
 from inline_snapshot import snapshot
 
 from CRISPResso2.plots.data_prep import (
+    prep_alleles_around_cut,
     prep_amplicon_modifications,
     prep_dsODN_piechart,
     prep_frequency_deletions_insertions,
@@ -16,9 +17,12 @@ from CRISPResso2.plots.data_prep import (
     prep_hdr_nucleotide_quilt,
     prep_indel_size_distribution,
     prep_modification_frequency,
+    prep_nucleotide_quilt,
     prep_pe_nucleotide_quilt,
     prep_pe_nucleotide_quilt_around_sgRNA,
 )
+
+import pandas as pd
 
 
 def _to_serializable(obj):
@@ -877,3 +881,122 @@ class TestPrepPeNucleotideQuiltAroundSgRNA:
         )
         assert result['sgRNA_intervals'] == snapshot([(-2, 0)])
         assert result['quantification_window_idxs'] == snapshot([-1])
+
+
+class TestPrepAllelesAroundCut:
+    """prep_alleles_around_cut (plot_9) — pct adjustment + groupby + sgRNA intervals."""
+
+    def _make_df(self):
+        """Build a DataFrame matching output of get_dataframe_around_cut_asymmetrical."""
+        df = pd.DataFrame({
+            'Reference_Sequence': ['ACGT', 'ACGT', 'ACGT'],
+            'Unedited': [True, False, False],
+            'n_deleted': [0, 1, 0],
+            'n_inserted': [0, 0, 1],
+            'n_mutated': [0, 0, 1],
+            '#Reads': [60, 30, 10],
+            '%Reads': [60.0, 30.0, 10.0],
+        })
+        df.index = pd.Index(['ACGT', 'ACCT', 'ACGN'], name='Aligned_Sequence')
+        return df
+
+    def test_basic_structure(self):
+        df = self._make_df()
+        result = prep_alleles_around_cut(
+            df_alleles_around_cut=df,
+            cut_point=5,
+            plot_half_window_left=3,
+            plot_half_window_right=3,
+            ref_sequence='AACCGGTTACGT',
+            sgRNA_intervals=[(3, 7)],
+            count_total=100,
+            allele_plot_pcts_only_for_assigned_reference=False,
+            expand_allele_plots_by_quantification=True,
+        )
+        assert 'df_alleles_around_cut' in result
+        assert 'df_to_plot' in result
+        assert 'ref_seq_around_cut' in result
+        assert 'new_sgRNA_intervals' in result
+        assert 'new_cut_point' in result
+        # ref_seq_around_cut = ref_sequence[5-3+1:5+3+1] = ref_sequence[3:9] = 'CGGTTA'
+        assert result['ref_seq_around_cut'] == 'CGGTTA'
+
+    def test_pct_adjustment(self):
+        df = self._make_df()
+        result = prep_alleles_around_cut(
+            df_alleles_around_cut=df,
+            cut_point=5,
+            plot_half_window_left=3,
+            plot_half_window_right=3,
+            ref_sequence='AACCGGTTACGT',
+            sgRNA_intervals=[(3, 7)],
+            count_total=200,
+            allele_plot_pcts_only_for_assigned_reference=True,
+            expand_allele_plots_by_quantification=True,
+        )
+        # %AllReads should be set to original %Reads values
+        assert result['df_alleles_around_cut']['%AllReads'].tolist() == [60.0, 30.0, 10.0]
+        # %Reads should be recalculated as #Reads/count_total*100
+        assert result['df_alleles_around_cut']['%Reads'].tolist() == [30.0, 15.0, 5.0]
+
+    def test_groupby_collapse(self):
+        """Two rows with same Aligned_Sequence+Reference_Sequence are collapsed."""
+        df = pd.DataFrame({
+            'Reference_Sequence': ['ACGT', 'ACGT', 'ACGT'],
+            'Unedited': [True, False, False],
+            'n_deleted': [0, 1, 0],
+            'n_inserted': [0, 0, 1],
+            'n_mutated': [0, 0, 1],
+            '#Reads': [60, 30, 10],
+            '%Reads': [60.0, 30.0, 10.0],
+        })
+        df.index = pd.Index(['ACGT', 'ACCT', 'ACGT'], name='Aligned_Sequence')
+        result = prep_alleles_around_cut(
+            df_alleles_around_cut=df,
+            cut_point=5,
+            plot_half_window_left=3,
+            plot_half_window_right=3,
+            ref_sequence='AACCGGTTACGT',
+            sgRNA_intervals=[(3, 7)],
+            count_total=100,
+            allele_plot_pcts_only_for_assigned_reference=False,
+            expand_allele_plots_by_quantification=False,
+        )
+        # After groupby: ACGT/ACGT -> #Reads=60+10=70, ACCT/ACGT -> #Reads=30
+        assert result['df_to_plot'].shape[0] == 2
+        # Sorted by #Reads descending
+        assert result['df_to_plot']['#Reads'].iloc[0] == 70
+
+    def test_sgRNA_interval_recomputation(self):
+        df = self._make_df()
+        result = prep_alleles_around_cut(
+            df_alleles_around_cut=df,
+            cut_point=5,
+            plot_half_window_left=3,
+            plot_half_window_right=3,
+            ref_sequence='AACCGGTTACGT',
+            sgRNA_intervals=[(3, 7)],
+            count_total=100,
+            allele_plot_pcts_only_for_assigned_reference=False,
+            expand_allele_plots_by_quantification=True,
+        )
+        # new_sel_cols_start = 5 - 3 = 2
+        # new intervals = [(3-2-1, 7-2-1)] = [(0, 4)]
+        assert result['new_sgRNA_intervals'] == [(0, 4)]
+        # cut_point=5 is inside (3,7), so new_cut_point = 5-2-1 = 2
+        assert result['new_cut_point'] == 2
+
+    def test_cut_point_not_in_sgRNA(self):
+        df = self._make_df()
+        result = prep_alleles_around_cut(
+            df_alleles_around_cut=df,
+            cut_point=5,
+            plot_half_window_left=3,
+            plot_half_window_right=3,
+            ref_sequence='AACCGGTTACGT',
+            sgRNA_intervals=[(0, 2)],
+            count_total=100,
+            allele_plot_pcts_only_for_assigned_reference=False,
+            expand_allele_plots_by_quantification=True,
+        )
+        assert result['new_cut_point'] is None

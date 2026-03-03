@@ -696,6 +696,76 @@ def prep_log_nuc_freqs(
     }
 
 
+def prep_alleles_around_cut(
+    df_alleles_around_cut,
+    cut_point,
+    plot_half_window_left,
+    plot_half_window_right,
+    ref_sequence,
+    sgRNA_intervals,
+    count_total,
+    allele_plot_pcts_only_for_assigned_reference,
+    expand_allele_plots_by_quantification,
+):
+    """Prepare alleles-around-cut data for plot_9 and CSV export.
+
+    Takes the already-sliced DataFrame from
+    ``CRISPRessoShared.get_dataframe_around_cut_asymmetrical`` and applies:
+
+    1. Optional percentage adjustment when
+       ``allele_plot_pcts_only_for_assigned_reference`` is True
+    2. Reference sequence slicing for the window
+    3. Optional groupby collapse (when ``expand_allele_plots_by_quantification``
+       is False)
+    4. sgRNA interval coordinate adjustment to the local window frame
+
+    Returns a dict with:
+
+    - ``df_alleles_around_cut``: DataFrame with pct adjustment applied (for CSV)
+    - ``df_to_plot``: after optional groupby collapse (for ``prep_alleles_table``)
+    - ``ref_seq_around_cut``: reference sequence in the window
+    - ``new_sgRNA_intervals``: sgRNA intervals in local coordinates
+    - ``new_cut_point``: cut point in local coordinates, or None if the cut
+      point is not inside any sgRNA interval
+    """
+    if allele_plot_pcts_only_for_assigned_reference:
+        df_alleles_around_cut['%AllReads'] = df_alleles_around_cut['%Reads']
+        df_alleles_around_cut['%Reads'] = df_alleles_around_cut['#Reads'] / count_total * 100
+
+    ref_seq_around_cut = ref_sequence[
+        cut_point - plot_half_window_left + 1:cut_point + plot_half_window_right + 1
+    ]
+
+    df_to_plot = df_alleles_around_cut
+    if not expand_allele_plots_by_quantification:
+        df_to_plot = df_alleles_around_cut.groupby(
+            ['Aligned_Sequence', 'Reference_Sequence'],
+        ).sum().reset_index().set_index('Aligned_Sequence')
+        df_to_plot.sort_values(
+            by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'],
+            inplace=True,
+            ascending=[False, True, True],
+        )
+
+    new_sgRNA_intervals = []
+    new_cut_point = None
+    new_sel_cols_start = cut_point - plot_half_window_left
+    for (int_start, int_end) in sgRNA_intervals:
+        new_sgRNA_intervals.append(
+            (int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1),
+        )
+        if int_start <= cut_point <= int_end:
+            new_cut_point = cut_point - new_sel_cols_start - 1
+
+    return {
+        'df_alleles_around_cut': df_alleles_around_cut,
+        'df_to_plot': df_to_plot,
+        'ref_seq_around_cut': ref_seq_around_cut,
+        'new_sgRNA_intervals': new_sgRNA_intervals,
+        'new_cut_point': new_cut_point,
+    }
+
+
 def prep_conversion_at_sel_nucs(plot_nuc_pcts, plot_nuc_freqs, conversion_nuc_from):
     """Compute from_nuc_indices and selected-nucleotide DataFrames for plots 10e/10f/10g.
 
