@@ -63,10 +63,6 @@ class PlotContext:
     insertion_length_vectors: dict
     deletion_length_vectors: dict
 
-    # Nucleotide frequency data (ref_name -> DataFrame)
-    nucleotide_frequency_summary: dict
-    nucleotide_percentage_summary: dict
-
     # Histograms (ref_name -> Counter)
     hists_frameshift: dict
     hists_inframe: dict
@@ -76,6 +72,13 @@ class PlotContext:
     counts_modified_non_frameshift: dict
     counts_non_modified_non_frameshift: dict
     counts_splicing_sites_modified: dict
+
+    # === Fields with defaults (must follow all required fields) ===
+
+    # Nucleotide frequency data (ref_name -> DataFrame)
+    # Not populated by CRISPRessoCORE (always {}); reserved for Batch/Aggregate.
+    nucleotide_frequency_summary: dict = field(default_factory=dict)
+    nucleotide_percentage_summary: dict = field(default_factory=dict)
 
     # HDR / ref1-aligned vectors (populated when expected_hdr_amplicon_seq is set)
     ref1_all_insertion_count_vectors: dict = field(default_factory=dict)

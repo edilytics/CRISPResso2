@@ -5306,6 +5306,13 @@ def main():
                 ###############################################################################################################################################
 
                 if args.expected_hdr_amplicon_seq != "" and (ref_name == ref_names[0] or ref_name == "HDR"):
+                    ref0 = ref_names[0]
+                    if ref_name == ref0:
+                        mod_plot_root = _jp('4e.' + ref0 + '.Global_mutations_in_all_reads')
+                        mod_plot_title = 'Mutation position distribution in all reads with reference to %s' % ref0
+                    else:
+                        mod_plot_root = _jp('4f.' + ref0 + '.Global_mutations_in_HDR_reads_with_reference_to_' + ref0)
+                        mod_plot_title = 'Mutation position distribution in %s reads with reference to %s' % (ref_name, ref0)
                     plot_4e_input = CRISPRessoPlotData.prep_global_modifications_reference(
                         ref_name=ref_name,
                         ref_names=ref_names,
@@ -5318,7 +5325,8 @@ def main():
                         ref_len=ref_len,
                         custom_colors=custom_config["colors"],
                         save_also_png=save_png,
-                        _jp=_jp,
+                        plot_root=mod_plot_root,
+                        plot_title=mod_plot_title,
                     )
                     plot_root = plot_4e_input['plot_root']
                     if ref_name == ref_names[0]:
@@ -6207,6 +6215,19 @@ def main():
                 from CRISPResso2.plots.plot_context import PlotContext
                 from CRISPRessoPro import hooks as pro_hooks
 
+                # HDR / prime-editing vectors are only in scope when
+                # expected_hdr_amplicon_seq or prime_editing_pegRNA_extension_seq is set.
+                hdr_kwargs = {}
+                if args.expected_hdr_amplicon_seq != "" or args.prime_editing_pegRNA_extension_seq != "":
+                    hdr_kwargs = dict(
+                        ref1_all_insertion_count_vectors=ref1_all_insertion_count_vectors,
+                        ref1_all_deletion_count_vectors=ref1_all_deletion_count_vectors,
+                        ref1_all_substitution_count_vectors=ref1_all_substitution_count_vectors,
+                        ref1_all_indelsub_count_vectors=ref1_all_indelsub_count_vectors,
+                        ref1_all_insertion_left_count_vectors=ref1_all_insertion_left_count_vectors,
+                        ref1_all_base_count_vectors=ref1_all_base_count_vectors,
+                    )
+
                 plot_context = PlotContext(
                     args=args,
                     run_data=crispresso2_info,
@@ -6234,8 +6255,6 @@ def main():
                     substitution_count_vectors=substitution_count_vectors,
                     insertion_length_vectors=insertion_length_vectors,
                     deletion_length_vectors=deletion_length_vectors,
-                    nucleotide_frequency_summary={},
-                    nucleotide_percentage_summary={},
                     hists_frameshift=hists_frameshift,
                     hists_inframe=hists_inframe,
                     counts_modified_frameshift=counts_modified_frameshift,
@@ -6246,6 +6265,7 @@ def main():
                     _jp=_jp,
                     save_png=save_png,
                     output_directory=OUTPUT_DIRECTORY,
+                    **hdr_kwargs,
                 )
 
                 pro_hooks.on_plots_complete(plot_context, logger)

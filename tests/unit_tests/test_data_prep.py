@@ -426,12 +426,9 @@ class TestPrepNucleotideQuiltAroundSgRNA:
 
 
 class TestPrepGlobalModificationsReference:
-    """prep_global_modifications_reference (plot_4e/4f) — conditional title/root."""
+    """prep_global_modifications_reference (plot_4e/4f) — passes through plot_root/plot_title."""
 
-    def _jp(self, suffix):
-        return '/out/' + suffix
-
-    def _inputs(self, ref_name, ref_names):
+    def _inputs(self, ref_name, ref_names, plot_root, plot_title):
         return dict(
             ref_name=ref_name,
             ref_names=ref_names,
@@ -444,20 +441,31 @@ class TestPrepGlobalModificationsReference:
             ref_len=3,
             custom_colors={},
             save_also_png=False,
-            _jp=self._jp,
+            plot_root=plot_root,
+            plot_title=plot_title,
         )
 
     def test_primary_ref_uses_4e(self):
         from CRISPResso2.plots.data_prep import prep_global_modifications_reference
         result = _to_serializable(prep_global_modifications_reference(
-            **self._inputs(ref_name='FANC', ref_names=['FANC', 'HDR'])
+            **self._inputs(
+                ref_name='FANC',
+                ref_names=['FANC', 'HDR'],
+                plot_root='/out/4e.FANC.Global_mutations_in_all_reads',
+                plot_title='Mutation position distribution in all reads with reference to FANC',
+            )
         ))
         assert result == snapshot({'custom_colors': {}, 'include_idxs_list': [0, 1, 2], 'n_total': 100, 'plot_root': '/out/4e.FANC.Global_mutations_in_all_reads', 'plot_title': 'Mutation position distribution in all reads with reference to FANC', 'ref1': {'include_idxs': [0, 1, 2], 'sequence': 'ACG'}, 'ref1_all_deletion_count_vectors': [0, 1, 0], 'ref1_all_insertion_count_vectors': [1, 2, 3], 'ref1_all_substitution_count_vectors': [0, 0, 1], 'ref_len': 3, 'ref_name': 'FANC', 'save_also_png': False})
 
     def test_hdr_ref_uses_4f(self):
         from CRISPResso2.plots.data_prep import prep_global_modifications_reference
         result = _to_serializable(prep_global_modifications_reference(
-            **self._inputs(ref_name='HDR', ref_names=['FANC', 'HDR'])
+            **self._inputs(
+                ref_name='HDR',
+                ref_names=['FANC', 'HDR'],
+                plot_root='/out/4f.FANC.Global_mutations_in_HDR_reads_with_reference_to_FANC',
+                plot_title='Mutation position distribution in HDR reads with reference to FANC',
+            )
         ))
         assert result == snapshot({'custom_colors': {}, 'include_idxs_list': [0, 1, 2], 'n_total': 100, 'plot_root': '/out/4f.FANC.Global_mutations_in_HDR_reads_with_reference_to_FANC', 'plot_title': 'Mutation position distribution in HDR reads with reference to FANC', 'ref1': {'include_idxs': [0, 1, 2], 'sequence': 'ACG'}, 'ref1_all_deletion_count_vectors': [0, 1, 0], 'ref1_all_insertion_count_vectors': [1, 2, 3], 'ref1_all_substitution_count_vectors': [0, 0, 1], 'ref_len': 3, 'ref_name': 'FANC', 'save_also_png': False})
 
