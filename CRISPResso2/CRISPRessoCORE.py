@@ -5576,43 +5576,35 @@ def main():
 
                     plot_half_window = max(1, args.plot_window_size)
                     df_alleles_around_cut = CRISPRessoShared.get_base_edit_dataframe_around_cut(df_alleles.loc[df_alleles['Reference_Name'] == ref_name], args.conversion_nuc_from)
-                    count_total = counts_total[ref_name]
-                    if args.allele_plot_pcts_only_for_assigned_reference:
-                        df_alleles_around_cut['%AllReads'] = df_alleles_around_cut['%Reads']
-                        df_alleles_around_cut['%Reads'] = df_alleles_around_cut['#Reads'] / count_total * 100
+                    base_edit_data = CRISPRessoPlotData.prep_base_edit_quilt(
+                        df_alleles_around_cut=df_alleles_around_cut,
+                        cut_point=cut_point,
+                        plot_half_window=plot_half_window,
+                        ref_sequence=refs[ref_name]['sequence'],
+                        sgRNA_intervals=refs[ref_name]['sgRNA_intervals'],
+                        count_total=counts_total[ref_name],
+                        allele_plot_pcts_only_for_assigned_reference=args.allele_plot_pcts_only_for_assigned_reference,
+                        expand_allele_plots_by_quantification=args.expand_allele_plots_by_quantification,
+                        conversion_nuc_from=args.conversion_nuc_from,
+                    )
+                    df_alleles_around_cut = base_edit_data['df_alleles_around_cut']
+                    ref_seq_around_cut = base_edit_data['ref_seq_around_cut']
 
                     # write alleles table to file
                     base_edit_allele_filename = _jp(ref_plot_name + 'base_edit_' + args.conversion_nuc_from + 's_quilt.txt')
                     df_alleles_around_cut.to_csv(base_edit_allele_filename, sep='\t', header=True)
                     crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'].append(os.path.basename(base_edit_allele_filename))
 
-                    ref_seq_around_cut = refs[ref_name]['sequence'][cut_point - plot_half_window + 1:cut_point + plot_half_window + 1]
                     fig_filename_root = _jp('10h.' + ref_plot_name + 'base_edit_' + args.conversion_nuc_from + 's_quilt')
                     n_good = df_alleles_around_cut[df_alleles_around_cut['%Reads'] >= args.min_frequency_alleles_around_cut_to_plot].shape[0]
                     if n_good > 0:
                         # Plot 10h: Edit Quilt around cut site
-                        df_to_plot = df_alleles_around_cut
-                        if not args.expand_allele_plots_by_quantification:
-                            df_to_plot = df_alleles_around_cut.groupby(['Aligned_Sequence', 'Reference_Sequence']).sum().reset_index().set_index('Aligned_Sequence')
-                            df_to_plot.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
-
-                        new_sgRNA_intervals = []
-                        # adjust coordinates of sgRNAs
-                        new_sel_cols_start = cut_point - plot_half_window
-                        for (int_start, int_end) in refs[ref_name]['sgRNA_intervals']:
-                            new_sgRNA_intervals += [(int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1)]
-
                         prepped_df_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws, is_reference = CRISPRessoPlot.prep_alleles_table(
-                            df_to_plot,
+                            base_edit_data['df_to_plot'],
                             ref_seq_around_cut,
                             args.max_rows_alleles_around_cut_to_plot,
                             args.min_frequency_alleles_around_cut_to_plot,
                         )
-
-                        x_labels = []
-                        for ind, a in enumerate(refs[ref_name]['sequence'], start=1):
-                            if a == args.conversion_nuc_from:
-                                x_labels.append(ind)
 
                         plot_10h_input = {
                             'reference_seq': ref_seq_around_cut,
@@ -5631,7 +5623,7 @@ def main():
                             'sgRNA_mismatches': None,
                             'annotate_wildtype_allele': '',
                             'plot_reference_sequence_above': False,
-                            'x_labels': x_labels,
+                            'x_labels': base_edit_data['x_labels'],
                         }
                         debug('Plotting allele distribution around cut for {0}'.format(ref_name))
                         plot(CRISPRessoPlot.plot_alleles_table_prepped, plot_10h_input)

@@ -11,6 +11,7 @@ from inline_snapshot import snapshot
 from CRISPResso2.plots.data_prep import (
     prep_alleles_around_cut,
     prep_amplicon_modifications,
+    prep_base_edit_quilt,
     prep_dsODN_piechart,
     prep_frequency_deletions_insertions,
     prep_global_frameshift_data,
@@ -1000,3 +1001,74 @@ class TestPrepAllelesAroundCut:
             expand_allele_plots_by_quantification=True,
         )
         assert result['new_cut_point'] is None
+
+
+class TestPrepBaseEditQuilt:
+    """prep_base_edit_quilt (plot_10h) — base edit DataFrame + x_labels."""
+
+    def _make_df(self):
+        df = pd.DataFrame({
+            'Reference_Sequence': ['C-GT', 'C-GT'],
+            'Unedited': [True, False],
+            'n_deleted': [0, 1],
+            'n_inserted': [0, 0],
+            'n_mutated': [0, 0],
+            '#Reads': [70, 30],
+            '%Reads': [70.0, 30.0],
+        })
+        df.index = pd.Index(['C-GT', 'C-AT'], name='Aligned_Sequence')
+        return df
+
+    def test_basic_structure(self):
+        df = self._make_df()
+        result = prep_base_edit_quilt(
+            df_alleles_around_cut=df,
+            cut_point=5,
+            plot_half_window=3,
+            ref_sequence='AACCGGTTACGT',
+            sgRNA_intervals=[(3, 7)],
+            count_total=100,
+            allele_plot_pcts_only_for_assigned_reference=False,
+            expand_allele_plots_by_quantification=True,
+            conversion_nuc_from='C',
+        )
+        assert 'df_alleles_around_cut' in result
+        assert 'df_to_plot' in result
+        assert 'ref_seq_around_cut' in result
+        assert 'new_sgRNA_intervals' in result
+        assert 'x_labels' in result
+        # ref_seq_around_cut = ref_sequence[5-3+1:5+3+1] = ref_sequence[3:9] = 'CGGTTA'
+        assert result['ref_seq_around_cut'] == 'CGGTTA'
+
+    def test_x_labels(self):
+        df = self._make_df()
+        result = prep_base_edit_quilt(
+            df_alleles_around_cut=df,
+            cut_point=5,
+            plot_half_window=3,
+            ref_sequence='AACCGGTTACGT',
+            sgRNA_intervals=[],
+            count_total=100,
+            allele_plot_pcts_only_for_assigned_reference=False,
+            expand_allele_plots_by_quantification=True,
+            conversion_nuc_from='C',
+        )
+        # C at index 2,3,9 → positions 3,4,10 (1-indexed)
+        assert result['x_labels'] == [3, 4, 10]
+
+    def test_sgRNA_interval_recomputation(self):
+        df = self._make_df()
+        result = prep_base_edit_quilt(
+            df_alleles_around_cut=df,
+            cut_point=5,
+            plot_half_window=3,
+            ref_sequence='AACCGGTTACGT',
+            sgRNA_intervals=[(3, 7)],
+            count_total=100,
+            allele_plot_pcts_only_for_assigned_reference=False,
+            expand_allele_plots_by_quantification=True,
+            conversion_nuc_from='C',
+        )
+        # new_sel_cols_start = 5 - 3 = 2
+        # new intervals = [(3-2-1, 7-2-1)] = [(0, 4)]
+        assert result['new_sgRNA_intervals'] == [(0, 4)]
