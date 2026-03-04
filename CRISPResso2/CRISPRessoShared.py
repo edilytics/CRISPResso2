@@ -179,27 +179,42 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
         "float": float,
     }
 
-    for key, value in args_dict.items():
-        tools = value.get('tools', [])  # Default to empty list if 'tools' is not found
-        if tool in tools:
-            action = value.get('action')  # Use None as default if 'action' is not found
-            required = value.get('required', False)  # Use False as default if 'required' is not found
-            default = value.get('default')  # Use None as default if 'default' is not found
-            type_value = value.get('type', 'str')  # Assume 'str' as default type if 'type' is not specified
-            arg_help = value.get('help', '') if value.get('help') != "SUPPRESS" else argparse.SUPPRESS
+    def _add_args_from_dict(args_dict, tool, parser, type_mapper):
+        """Add arguments from a parsed JSON args dict to the parser."""
+        for key, value in args_dict.items():
+            tools = value.get('tools', [])
+            if tool in tools:
+                action = value.get('action')
+                required = value.get('required', False)
+                default = value.get('default')
+                type_value = value.get('type', 'str')
+                arg_help = value.get('help', '') if value.get('help') != "SUPPRESS" else argparse.SUPPRESS
 
-            # Determine the correct function based on conditions
-            if action:
-                parser.add_argument(*value['keys'], help=arg_help, action=action)
-            elif required and default is None:  # Checks if 'required' is true and 'default' is not provided
-                parser.add_argument(*value['keys'], help=arg_help, type=type_mapper[type_value], required=True)
-            elif required:  # Checks if 'required' is true (default is provided, as checked above)
-                parser.add_argument(*value['keys'], help=arg_help, default=default, type=type_mapper[type_value], required=True)
-            else:  # Case when neither 'action' nor 'required' conditions are met
-                # Here, it handles the case where default might be None, which is a valid scenario
-                kwargs = {'help': arg_help, 'type': type_mapper[type_value]}
-                if default is not None: kwargs['default'] = default  # Add 'default' only if it's specified
-                parser.add_argument(*value['keys'], **kwargs)
+                if action:
+                    parser.add_argument(*value['keys'], help=arg_help, action=action)
+                elif required and default is None:
+                    parser.add_argument(*value['keys'], help=arg_help, type=type_mapper[type_value], required=True)
+                elif required:
+                    parser.add_argument(*value['keys'], help=arg_help, default=default, type=type_mapper[type_value], required=True)
+                else:
+                    kwargs = {'help': arg_help, 'type': type_mapper[type_value]}
+                    if default is not None: kwargs['default'] = default
+                    parser.add_argument(*value['keys'], **kwargs)
+
+    _add_args_from_dict(args_dict, tool, parser, type_mapper)
+
+    # Load CRISPRessoPro args if installed
+    try:
+        import CRISPRessoPro
+        pro_args_path = Path(CRISPRessoPro.__file__).parent / 'args.json'
+        if pro_args_path.exists():
+            with open(pro_args_path, 'r') as f:
+                pro_args_dict = json.load(f)
+            pro_args_dict = pro_args_dict.get("CRISPRessoPro_args", {})
+            _add_args_from_dict(pro_args_dict, tool, parser, type_mapper)
+    except ImportError:
+        pass
+
     return parser
 
 
