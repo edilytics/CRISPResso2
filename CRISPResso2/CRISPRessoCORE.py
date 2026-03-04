@@ -4851,23 +4851,89 @@ def main():
 
             ############
 
-        if n_processes > 1:
-            process_pool = ProcessPoolExecutor(n_processes)
-            process_futures = {}
-        else:
-            process_pool = None
-            process_futures = None
+        # --- CRISPRessoPro plot hook ---
+        if C2PRO_INSTALLED:
+            try:
+                from CRISPResso2.plots.plot_context import PlotContext
+                from CRISPRessoPro import hooks as pro_hooks
 
-        plot = partial(
-            CRISPRessoMultiProcessing.run_plot,
-            num_processes=n_processes,
-            process_pool=process_pool,
-            process_futures=process_futures,
-            halt_on_plot_fail=args.halt_on_plot_fail,
-        )
-        ###############################################################################################################################################
-        # FIGURE 1: Alignment
-        if not args.suppress_plots:
+                # HDR / prime-editing vectors are only in scope when
+                # expected_hdr_amplicon_seq or prime_editing_pegRNA_extension_seq is set.
+                hdr_kwargs = {}
+                if args.expected_hdr_amplicon_seq != "" or args.prime_editing_pegRNA_extension_seq != "":
+                    hdr_kwargs = dict(
+                        ref1_all_insertion_count_vectors=ref1_all_insertion_count_vectors,
+                        ref1_all_deletion_count_vectors=ref1_all_deletion_count_vectors,
+                        ref1_all_substitution_count_vectors=ref1_all_substitution_count_vectors,
+                        ref1_all_indelsub_count_vectors=ref1_all_indelsub_count_vectors,
+                        ref1_all_insertion_left_count_vectors=ref1_all_insertion_left_count_vectors,
+                        ref1_all_base_count_vectors=ref1_all_base_count_vectors,
+                    )
+
+                plot_context = PlotContext(
+                    args=args,
+                    run_data=crispresso2_info,
+                    refs=crispresso2_info['results']['refs'],
+                    ref_names=ref_names,
+                    counts_total=counts_total,
+                    counts_modified=counts_modified,
+                    counts_unmodified=counts_unmodified,
+                    counts_discarded=counts_discarded,
+                    counts_insertion=counts_insertion,
+                    counts_deletion=counts_deletion,
+                    counts_substitution=counts_substitution,
+                    class_counts=class_counts,
+                    N_TOTAL=N_TOTAL,
+                    df_alleles=df_alleles,
+                    all_insertion_count_vectors=all_insertion_count_vectors,
+                    all_insertion_left_count_vectors=all_insertion_left_count_vectors,
+                    all_deletion_count_vectors=all_deletion_count_vectors,
+                    all_substitution_count_vectors=all_substitution_count_vectors,
+                    all_indelsub_count_vectors=all_indelsub_count_vectors,
+                    all_substitution_base_vectors=all_substitution_base_vectors,
+                    all_base_count_vectors=all_base_count_vectors,
+                    insertion_count_vectors=insertion_count_vectors,
+                    deletion_count_vectors=deletion_count_vectors,
+                    substitution_count_vectors=substitution_count_vectors,
+                    insertion_length_vectors=insertion_length_vectors,
+                    deletion_length_vectors=deletion_length_vectors,
+                    hists_frameshift=hists_frameshift,
+                    hists_inframe=hists_inframe,
+                    counts_modified_frameshift=counts_modified_frameshift,
+                    counts_modified_non_frameshift=counts_modified_non_frameshift,
+                    counts_non_modified_non_frameshift=counts_non_modified_non_frameshift,
+                    counts_splicing_sites_modified=counts_splicing_sites_modified,
+                    custom_config=custom_config,
+                    _jp=_jp,
+                    save_png=save_png,
+                    output_directory=OUTPUT_DIRECTORY,
+                    **hdr_kwargs,
+                )
+
+                pro_hooks.on_plots_complete(plot_context, logger)
+            except Exception as e:
+                if args.halt_on_plot_fail:
+                    raise
+                logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
+        # --- END CRISPRessoPro plot hook ---
+        elif not args.suppress_plots:
+            if n_processes > 1:
+                process_pool = ProcessPoolExecutor(n_processes)
+                process_futures = {}
+            else:
+                process_pool = None
+                process_futures = None
+
+            plot = partial(
+                CRISPRessoMultiProcessing.run_plot,
+                num_processes=n_processes,
+                process_pool=process_pool,
+                process_futures=process_futures,
+                halt_on_plot_fail=args.halt_on_plot_fail,
+            )
+            ###############################################################################################################################################
+            # FIGURE 1: Alignment
+
             plot_1a_root = _jp("1a.Read_barplot")
             plot_1a_input = {
                 'N_READS_INPUT': N_READS_INPUT,
@@ -6208,72 +6274,6 @@ def main():
             process_pool.shutdown()
 
         info('Done!')
-
-        # --- CRISPRessoPro plot hook ---
-        if C2PRO_INSTALLED:
-            try:
-                from CRISPResso2.plots.plot_context import PlotContext
-                from CRISPRessoPro import hooks as pro_hooks
-
-                # HDR / prime-editing vectors are only in scope when
-                # expected_hdr_amplicon_seq or prime_editing_pegRNA_extension_seq is set.
-                hdr_kwargs = {}
-                if args.expected_hdr_amplicon_seq != "" or args.prime_editing_pegRNA_extension_seq != "":
-                    hdr_kwargs = dict(
-                        ref1_all_insertion_count_vectors=ref1_all_insertion_count_vectors,
-                        ref1_all_deletion_count_vectors=ref1_all_deletion_count_vectors,
-                        ref1_all_substitution_count_vectors=ref1_all_substitution_count_vectors,
-                        ref1_all_indelsub_count_vectors=ref1_all_indelsub_count_vectors,
-                        ref1_all_insertion_left_count_vectors=ref1_all_insertion_left_count_vectors,
-                        ref1_all_base_count_vectors=ref1_all_base_count_vectors,
-                    )
-
-                plot_context = PlotContext(
-                    args=args,
-                    run_data=crispresso2_info,
-                    refs=crispresso2_info['results']['refs'],
-                    ref_names=ref_names,
-                    counts_total=counts_total,
-                    counts_modified=counts_modified,
-                    counts_unmodified=counts_unmodified,
-                    counts_discarded=counts_discarded,
-                    counts_insertion=counts_insertion,
-                    counts_deletion=counts_deletion,
-                    counts_substitution=counts_substitution,
-                    class_counts=class_counts,
-                    N_TOTAL=N_TOTAL,
-                    df_alleles=df_alleles,
-                    all_insertion_count_vectors=all_insertion_count_vectors,
-                    all_insertion_left_count_vectors=all_insertion_left_count_vectors,
-                    all_deletion_count_vectors=all_deletion_count_vectors,
-                    all_substitution_count_vectors=all_substitution_count_vectors,
-                    all_indelsub_count_vectors=all_indelsub_count_vectors,
-                    all_substitution_base_vectors=all_substitution_base_vectors,
-                    all_base_count_vectors=all_base_count_vectors,
-                    insertion_count_vectors=insertion_count_vectors,
-                    deletion_count_vectors=deletion_count_vectors,
-                    substitution_count_vectors=substitution_count_vectors,
-                    insertion_length_vectors=insertion_length_vectors,
-                    deletion_length_vectors=deletion_length_vectors,
-                    hists_frameshift=hists_frameshift,
-                    hists_inframe=hists_inframe,
-                    counts_modified_frameshift=counts_modified_frameshift,
-                    counts_modified_non_frameshift=counts_modified_non_frameshift,
-                    counts_non_modified_non_frameshift=counts_non_modified_non_frameshift,
-                    counts_splicing_sites_modified=counts_splicing_sites_modified,
-                    custom_config=custom_config,
-                    _jp=_jp,
-                    save_png=save_png,
-                    output_directory=OUTPUT_DIRECTORY,
-                    **hdr_kwargs,
-                )
-
-                pro_hooks.on_plots_complete(plot_context, logger)
-            except Exception as e:
-                if args.halt_on_plot_fail:
-                    raise
-                logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
-        # --- END CRISPRessoPro plot hook ---
 
         if not args.keep_intermediate:
             info('Removing Intermediate files...')
