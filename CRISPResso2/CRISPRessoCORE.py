@@ -4615,6 +4615,8 @@ def main():
             outfile.write('READS IN INPUTS\tREADS AFTER PREPROCESSING\tREADS ALIGNED\tN_COMPUTED_ALN\tN_CACHED_ALN\tN_COMPUTED_NOTALN\tN_CACHED_NOTALN\n')
             outfile.write("\t".join([str(x) for x in [N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL, aln_stats['N_COMPUTED_ALN'], aln_stats['N_CACHED_ALN'], aln_stats['N_COMPUTED_NOTALN'], aln_stats['N_CACHED_NOTALN']]]) + "\n")
         crispresso2_info['running_info']['alignment_stats'] = aln_stats
+        crispresso2_info['running_info']['alignment_stats']['N_READS_INPUT'] = N_READS_INPUT
+        crispresso2_info['running_info']['alignment_stats']['N_READS_AFTER_PREPROCESSING'] = N_READS_AFTER_PREPROCESSING
         crispresso2_info['running_info']['mapping_stats_filename'] = os.path.basename(mapping_stats_filename)
 
         def save_vector_to_file(vector, filename):
