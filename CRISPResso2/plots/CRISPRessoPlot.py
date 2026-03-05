@@ -4200,56 +4200,28 @@ def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
     plt.close()
 
 
-def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
-                                    expected_hdr_amplicon_seq, N_TOTAL,
-                                    piechart_plot_root=None, barplot_plot_root=None, custom_colors=None, save_png=False, **kwargs):
-    """Plot a pie chart and barplot of class assignments for reads.
-
-       Class assignments include: 'MODIFIED','UNMODIFIED','HDR',etc.
+def plot_class_piechart(labels, sizes, N_TOTAL, plot_root=None,
+                        custom_colors=None, save_png=False, **kwargs):
+    """Plot pie chart of class assignments (plot_1b).
 
     Parameters
     ----------
-    class_counts_order : list
-        List of classes ordered by the reference as provided by the user
-    class_counts : dict
-        Dict of number of reads in each class e.g. "ref1_UMODIFIDED"->50
-    ref_names : list
-        List of reference names provided by user
-    expected_hdr_amplicon_seq : str
-        Sequence of the expected hdr amplicon
+    labels : list
+        Display labels for each class slice.
+    sizes : list
+        Percentage sizes for each class slice.
     N_TOTAL : int
-        Number of total reads used by CRISPResso
-    piechart_plot_root : str
-        Root to plot barplot output file (suffixes ".pdf" and ".png" will be added)
-    barplot_plot_root : str
-        Root to plot barplot output file (suffixes ".pdf" and ".png" will be added)
-    custom_colors : dict
-        Dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
+        Total number of reads.
+    plot_root : str, optional
+        Root path for output file (suffixes ".pdf" and ".png" will be added).
+    custom_colors : dict, optional
+        Dict of colors to plot.
     save_png : bool
-        if True, png will be saved as well as pdf
-
+        If True, png will be saved as well as pdf.
     """
     if custom_colors is None:
         custom_config = CRISPRessoShared.check_custom_config(None)
         custom_colors = custom_config['colors']
-
-    labels = []
-    sizes = []
-    for class_name in class_counts_order:
-        if expected_hdr_amplicon_seq != "" and class_name == ref_names[0] + "_MODIFIED":
-            labels.append("NHEJ" + "\n(" + str(class_counts[class_name]) + " reads)")
-        elif expected_hdr_amplicon_seq != "" and class_name == "HDR_MODIFIED":
-            labels.append("Imperfect HDR" + "\n(" + str(class_counts[class_name]) + " reads)")
-        elif expected_hdr_amplicon_seq != "" and class_name == "HDR_UNMODIFIED":
-            labels.append("HDR" + "\n(" + str(class_counts[class_name]) + " reads)")
-        else:
-            display_class_name = class_name
-            if len(ref_names) == 1:
-                display_class_name = display_class_name.replace('Reference_', '')
-
-            labels.append(display_class_name + "\n(" + str(class_counts[class_name]) + " reads)")
-
-        sizes.append(100 * class_counts[class_name] / float(N_TOTAL))
 
     plt.figure(figsize=(12, 12))
     ax = plt.subplot(111)
@@ -4258,15 +4230,38 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
     plt.axis('off')
     plt.axis("equal")
 
-    if piechart_plot_root is None:
+    if plot_root is None:
         plt.show()
     else:
-        plt.savefig(piechart_plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+        plt.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
         if save_png:
-            plt.savefig(piechart_plot_root + '.png', bbox_inches='tight')
+            plt.savefig(plot_root + '.png', bbox_inches='tight')
     plt.close()
 
-    # Now the barchart of classes
+
+def plot_class_barplot(labels, sizes, N_TOTAL, plot_root=None,
+                       custom_colors=None, save_png=False, **kwargs):
+    """Plot bar chart of class assignments (plot_1c).
+
+    Parameters
+    ----------
+    labels : list
+        Display labels for each class bar.
+    sizes : list
+        Percentage sizes for each class bar.
+    N_TOTAL : int
+        Total number of reads.
+    plot_root : str, optional
+        Root path for output file (suffixes ".pdf" and ".png" will be added).
+    custom_colors : dict, optional
+        Dict of colors to plot.
+    save_png : bool
+        If True, png will be saved as well as pdf.
+    """
+    if custom_colors is None:
+        custom_config = CRISPRessoShared.check_custom_config(None)
+        custom_colors = custom_config['colors']
+
     plt.figure(figsize=(12, 12))
     ax = plt.subplot(111)
 
@@ -4275,7 +4270,6 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
     for rect in rects:
         height = rect.get_height()
         if len(sizes) > 4:
-            # ax.text(rect.get_x() + rect.get_width()/2, height + 0.05,"%.2f%%"%height, ha='center', va='bottom',fontsize=12)
             ax.text(rect.get_x() + rect.get_width() / 2, height + 0.05, "%.2f%%" % height, ha='center', va='bottom')
         else:
             ax.text(rect.get_x() + rect.get_width() / 2, height + 0.05, "%.2f%%" % height, ha='center', va='bottom')
@@ -4290,7 +4284,6 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
     ax.set_yticklabels(['%.1f%% (%.0f)' % (pct, pct / 100 * N_TOTAL) for pct in y_label_values])
     # if too many barplots, flip the labels
     if len(sizes) > 4:
-        # plt.setp(ax.get_xticklabels(), fontsize=12, rotation='vertical',multialignment='right')
         plt.setp(ax.get_xticklabels(), rotation='vertical', multialignment='right')
     plt.ylim(0, max(sizes) * 1.1)
 
@@ -4300,13 +4293,60 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
     plt.tick_params(left=True)
     plt.tight_layout()
 
-    if barplot_plot_root is None:
+    if plot_root is None:
         plt.show()
     else:
-        plt.savefig(barplot_plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+        plt.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
         if save_png:
-            plt.savefig(barplot_plot_root + '.png', bbox_inches='tight')
+            plt.savefig(plot_root + '.png', bbox_inches='tight')
     plt.close()
+
+
+def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
+                                    expected_hdr_amplicon_seq, N_TOTAL,
+                                    piechart_plot_root=None, barplot_plot_root=None, custom_colors=None, save_png=False, **kwargs):
+    """Backward-compat wrapper that calls both plot_class_piechart and plot_class_barplot.
+
+    Computes labels and sizes from class_counts, then delegates to the
+    two independent plot functions.
+
+    Parameters
+    ----------
+    class_counts_order : list
+        List of classes ordered by the reference as provided by the user
+    class_counts : dict
+        Dict of number of reads in each class e.g. "ref1_UMODIFIDED"->50
+    ref_names : list
+        List of reference names provided by user
+    expected_hdr_amplicon_seq : str
+        Sequence of the expected hdr amplicon
+    N_TOTAL : int
+        Number of total reads used by CRISPResso
+    piechart_plot_root : str
+        Root to plot piechart output file (suffixes ".pdf" and ".png" will be added)
+    barplot_plot_root : str
+        Root to plot barplot output file (suffixes ".pdf" and ".png" will be added)
+    custom_colors : dict
+        Dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
+    save_png : bool
+        if True, png will be saved as well as pdf
+    """
+    from CRISPResso2.plots.data_prep import prep_class_piechart_and_barplot
+
+    data = prep_class_piechart_and_barplot(
+        class_counts_order, class_counts, ref_names,
+        expected_hdr_amplicon_seq, N_TOTAL,
+    )
+    plot_class_piechart(
+        labels=data['labels'], sizes=data['sizes'], N_TOTAL=data['N_TOTAL'],
+        plot_root=piechart_plot_root, custom_colors=custom_colors,
+        save_png=save_png,
+    )
+    plot_class_barplot(
+        labels=data['labels'], sizes=data['sizes'], N_TOTAL=data['N_TOTAL'],
+        plot_root=barplot_plot_root, custom_colors=custom_colors,
+        save_png=save_png,
+    )
 
 
 def plot_class_dsODN_piechart(sizes, labels, plot_root=None, save_also_png=False, **kwargs):
