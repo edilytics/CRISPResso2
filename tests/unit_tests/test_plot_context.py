@@ -113,6 +113,15 @@ class TestPlotContextConstruction:
         assert ctx._jp is None
         assert ctx.save_png is False
         assert ctx.output_directory == ""
+        # New data fields default to empty
+        assert ctx.class_counts_order == []
+        assert ctx.homology_scores == []
+        assert ctx.homology_counts == []
+        assert ctx.insertion_count_vectors_noncoding == {}
+        assert ctx.deletion_count_vectors_noncoding == {}
+        assert ctx.substitution_count_vectors_noncoding == {}
+        assert ctx.substitution_base_vectors == {}
+        assert ctx.df_scaffold_insertion_sizes is None
         # Scope fields default to None
         assert ctx.ref_name is None
         assert ctx.sgRNA_ind is None
@@ -134,6 +143,28 @@ class TestPlotContextConstruction:
         ctx.sgRNA_ind = 1
         assert ctx.ref_name == 'amp2'
         assert ctx.sgRNA_ind == 1
+
+    def test_new_fields_construction(self):
+        """PlotContext can be constructed with the 8 new data fields."""
+        from CRISPResso2.plots.plot_context import PlotContext
+        import numpy as np
+
+        ctx = PlotContext(**_make_required_kwargs(
+            class_counts_order=['Ref_UNMODIFIED', 'Ref_MODIFIED'],
+            homology_scores=[95.0, 80.0, 60.0],
+            homology_counts=[100, 50, 10],
+            insertion_count_vectors_noncoding={'ref1': np.array([0, 1])},
+            deletion_count_vectors_noncoding={'ref1': np.array([1, 0])},
+            substitution_count_vectors_noncoding={'ref1': np.array([0, 0])},
+            substitution_base_vectors={'ref1_A': [1, 2], 'ref1_C': [0, 0]},
+            df_scaffold_insertion_sizes='fake_df',
+        ))
+        assert ctx.class_counts_order == ['Ref_UNMODIFIED', 'Ref_MODIFIED']
+        assert ctx.homology_scores == [95.0, 80.0, 60.0]
+        assert ctx.homology_counts == [100, 50, 10]
+        assert len(ctx.insertion_count_vectors_noncoding) == 1
+        assert ctx.substitution_base_vectors == {'ref1_A': [1, 2], 'ref1_C': [0, 0]}
+        assert ctx.df_scaffold_insertion_sizes == 'fake_df'
 
     def test_references_not_copied(self):
         """PlotContext holds references, not copies, of data structures."""

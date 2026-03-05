@@ -96,7 +96,29 @@ class PlotContext:
     save_png: bool = False
     output_directory: str = ""
 
+    # === Additional data fields (populated by CORE when available) ===
+
+    # Allele classification ordering (for plot_1b/1c)
+    class_counts_order: list = field(default_factory=list)
+
+    # Allele homology data (for plot_1e)
+    homology_scores: list = field(default_factory=list)
+    homology_counts: list = field(default_factory=list)
+
+    # Noncoding modification vectors (for plot_7; ref_name → numpy array)
+    insertion_count_vectors_noncoding: dict = field(default_factory=dict)
+    deletion_count_vectors_noncoding: dict = field(default_factory=dict)
+    substitution_count_vectors_noncoding: dict = field(default_factory=dict)
+
+    # Quantification-window substitution base vectors (for plot_10c)
+    # Same shape as all_substitution_base_vectors but window-only
+    substitution_base_vectors: dict = field(default_factory=dict)
+
+    # Scaffold insertion sizes DataFrame (for plot_11c)
+    df_scaffold_insertion_sizes: object = None  # pd.DataFrame or None
+
     # === Scope fields (set by Pro during iteration) ===
 
     ref_name: Optional[str] = None
     sgRNA_ind: Optional[int] = None
+    coding_seq_ind: Optional[int] = None
