@@ -85,6 +85,7 @@ jobs:
         with:
           repository: edilytics/CRISPResso2_tests
           path: CRISPResso2_tests
+          ref: cole/plot-plugin
 
       - name: Checkout CRISPRessoPro
         if: matrix.pro
