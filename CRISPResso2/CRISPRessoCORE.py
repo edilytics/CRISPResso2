@@ -4819,12 +4819,9 @@ def main():
             save_png = False
 
         n_refs = len(ref_names)
-        # helper function .. if there is only one reference, don't print the name on the top of every plot
 
         def get_plot_title_with_ref_name(plotTitle, ref_name):
-            if n_refs > 1:
-                return (plotTitle + ": " + ref_name)
-            return plotTitle
+            return CRISPRessoPlotData.plot_title_with_ref_name(plotTitle, ref_name, n_refs)
 
         def count_alternate_alleles(sub_base_vectors, ref_name, ref_sequence, ref_total_aln_reads):
             # create vectors with all allele frequencies -- not just the substitution (the reference allele will not be 0)
@@ -5097,7 +5094,7 @@ def main():
                     if not args.suppress_plots:
                         plot_context.ref_name = ref_name
                         plot_2a_input = CRISPRessoPlotData.prep_nucleotide_quilt(plot_context)
-                        plot_root = plot_2a_input['fig_filename_root']
+                        plot_root = plot_2a_input['plot_root']
                         debug('Plotting nucleotide quilt across amplicon')
                         plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2a_input)
                         crispresso2_info['results']['refs'][ref_name]['plot_2a_root'] = os.path.basename(plot_root)
@@ -5121,7 +5118,7 @@ def main():
 
                             plot_context.sgRNA_ind = i
                             plot_2b_input = CRISPRessoPlotData.prep_nucleotide_quilt_around_sgRNA(plot_context)
-                            plot_root = plot_2b_input['fig_filename_root']
+                            plot_root = plot_2b_input['plot_root']
                             debug('Plotting nucleotide distribuition around {0} for {1}'.format(sgRNA_legend, ref_name))
                             plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_2b_input)
                             crispresso2_info['results']['refs'][ref_name]['plot_2b_roots'].append(os.path.basename(plot_root))
@@ -5153,7 +5150,7 @@ def main():
                     # Note that the previous plot (3a) shows the effective lengths of reads, which could include multiple insertions or deletions. This plot separates these by insertion and deletion.
 
                     plot_3b_input = CRISPRessoPlotData.prep_frequency_deletions_insertions(plot_context)
-                    plot_root = plot_3b_input['plot_path']
+                    plot_root = plot_3b_input['plot_root']
                     debug('Plotting frequency deletions/insertions for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_frequency_deletions_insertions, plot_3b_input)
                     clipped_string = plot_3b_input['clipped_string']
@@ -5288,7 +5285,7 @@ def main():
                         nuc_freq_filename = _jp(ref_plot_name + 'Reads_from_all_amplicons_nucleotide_percent_table.txt')
                         hdr_nucleotide_percentage_summary_df.rename(columns={'Batch': 'Amplicon'}).to_csv(nuc_freq_filename, sep='\t', header=True, index=False)
 
-                        plot_root = plot_4g_input['fig_filename_root']
+                        plot_root = plot_4g_input['plot_root']
                         debug('Plotting HDR nucleotide quilt')
                         plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_4g_input)
                         crispresso2_info['results']['refs'][ref_names_for_hdr[0]]['plot_4g_root'] = os.path.basename(plot_root)
@@ -5660,10 +5657,10 @@ def main():
 
                         if not args.suppress_plots:
                             plot_10d_input = CRISPRessoPlotData.prep_log_nuc_freqs(plot_context)
-                            fig_filename_root = plot_10d_input['fig_filename_root']
+                            plot_root = plot_10d_input['plot_root']
                             debug('Plotting log2 nucleotide frequency for {0}'.format(ref_name))
                             plot(CRISPRessoPlot.plot_log_nuc_freqs, plot_10d_input)
-                            crispresso2_info['results']['refs'][ref_name]['plot_10d_roots'].append(os.path.basename(fig_filename_root))
+                            crispresso2_info['results']['refs'][ref_name]['plot_10d_roots'].append(os.path.basename(plot_root))
                             crispresso2_info['results']['refs'][ref_name]['plot_10d_captions'].append("Figure 10d: Log2 nucleotide frequencies for each position in the plotting window around the " + sgRNA_legend + ". The quantification window is outlined by the dotted box.")
                             crispresso2_info['results']['refs'][ref_name]['plot_10d_datas'].append([])
 
@@ -5946,7 +5943,7 @@ def main():
                     sgRNA_mismatches = plot_11a_input['sgRNA_mismatches']
                     sgRNA_sequences = plot_11a_input['sgRNA_sequences']
 
-                    plot_root = plot_11a_input['fig_filename_root']
+                    plot_root = plot_11a_input['plot_root']
                     info('Plotting prime editing nucleotide percentage quilt', {'percent_complete': 96})
                     plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11a_input)
                     crispresso2_info['results']['refs'][ref_names[0]]['plot_11a_root'] = os.path.basename(plot_root)
@@ -5982,7 +5979,7 @@ def main():
 
                         plot_context.sgRNA_ind = i
                         plot_11b_input = CRISPRessoPlotData.prep_pe_nucleotide_quilt_around_sgRNA(plot_context)
-                        plot_root = plot_11b_input['fig_filename_root']
+                        plot_root = plot_11b_input['plot_root']
                         info('Plotting nucleotide quilt', {'percent_complete': 97})
                         plot(CRISPRessoPlot.plot_nucleotide_quilt, plot_11b_input)
                         crispresso2_info['results']['refs'][ref_names[0]]['plot_11b_roots'].append(os.path.basename(plot_root))

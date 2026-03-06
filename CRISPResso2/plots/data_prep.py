@@ -44,7 +44,7 @@ def _to_numeric_ignore_columns(df, ignore_columns):
     return df
 
 
-def _plot_title_with_ref_name(title, ref_name, num_refs):
+def plot_title_with_ref_name(title, ref_name, num_refs):
     """Add ref_name suffix to plot title when there are multiple references."""
     if num_refs > 1:
         return title + ": " + ref_name
@@ -262,7 +262,7 @@ def prep_indel_size_distribution(ctx: PlotContext):
         'n_this_category': n_this_category,
         'xmin': xmin,
         'xmax': xmax,
-        'title': _plot_title_with_ref_name(
+        'title': plot_title_with_ref_name(
             'Indel size distribution', ref_name, num_refs,
         ),
         'plot_root': plot_root,
@@ -324,11 +324,11 @@ def prep_frequency_deletions_insertions(ctx: PlotContext):
     return {
         'ref': ref,
         'counts_total': counts_total,
-        'plot_path': plot_root,
+        'plot_root': plot_root,
         'plot_titles': {
-            'ins': _plot_title_with_ref_name('Insertions', ref_name, num_refs),
-            'del': _plot_title_with_ref_name('Deletions', ref_name, num_refs),
-            'mut': _plot_title_with_ref_name('Substitutions', ref_name, num_refs),
+            'ins': plot_title_with_ref_name('Insertions', ref_name, num_refs),
+            'del': plot_title_with_ref_name('Deletions', ref_name, num_refs),
+            'mut': plot_title_with_ref_name('Substitutions', ref_name, num_refs),
         },
         'xmax_ins': xmax_ins,
         'xmax_del': xmax_del,
@@ -378,10 +378,10 @@ def prep_amplicon_modifications(ctx: PlotContext):
         'ref_len': ref_len,
         'y_max': y_max,
         'plot_titles': {
-            'combined': _plot_title_with_ref_name(
+            'combined': plot_title_with_ref_name(
                 'Combined Insertions/Deletions/Substitutions', ref_name, num_refs,
             ),
-            'main': _plot_title_with_ref_name(
+            'main': plot_title_with_ref_name(
                 'Mutation position distribution', ref_name, num_refs,
             ),
         },
@@ -424,7 +424,7 @@ def prep_modification_frequency(ctx: PlotContext):
         'cut_points': ref['sgRNA_cut_points'],
         'plot_cut_points': ref['sgRNA_plot_cut_points'],
         'y_max': y_max,
-        'plot_title': _plot_title_with_ref_name(
+        'plot_title': plot_title_with_ref_name(
             'Mutation position distribution', ref_name, num_refs,
         ),
         'plot_root': plot_root,
@@ -478,31 +478,16 @@ def prep_nucleotide_quilt(ctx: PlotContext):
     ref_seq = ref['sequence']
     tot = float(ctx.counts_total[ref_name])
 
-    df_nuc_freq_all = pd.DataFrame([
-        ctx.all_base_count_vectors[ref_name + '_A'],
-        ctx.all_base_count_vectors[ref_name + '_C'],
-        ctx.all_base_count_vectors[ref_name + '_G'],
-        ctx.all_base_count_vectors[ref_name + '_T'],
-        ctx.all_base_count_vectors[ref_name + '_N'],
-        ctx.all_base_count_vectors[ref_name + '_-'],
-    ])
-    df_nuc_freq_all.index = ['A', 'C', 'G', 'T', 'N', '-']
-    df_nuc_freq_all.columns = list(ref_seq)
-    df_nuc_pct_all = df_nuc_freq_all.divide(tot)
+    _df_nuc_freq_all, df_nuc_pct_all = _build_nuc_freq_df(ctx)
 
-    all_insertion_count_vectors = ctx.all_insertion_count_vectors[ref_name]
-    all_insertion_left_count_vectors = ctx.all_insertion_left_count_vectors[ref_name]
-    all_deletion_count_vectors = ctx.all_deletion_count_vectors[ref_name]
-    all_substitution_count_vectors = ctx.all_substitution_count_vectors[ref_name]
-    all_indelsub_count_vectors = ctx.all_indelsub_count_vectors[ref_name]
     counts_total = ctx.counts_total[ref_name]
 
     mod_pcts = []
-    mod_pcts.append(np.concatenate((['Insertions'], np.array(all_insertion_count_vectors).astype(float) / tot)))
-    mod_pcts.append(np.concatenate((['Insertions_Left'], np.array(all_insertion_left_count_vectors).astype(float) / tot)))
-    mod_pcts.append(np.concatenate((['Deletions'], np.array(all_deletion_count_vectors).astype(float) / tot)))
-    mod_pcts.append(np.concatenate((['Substitutions'], np.array(all_substitution_count_vectors).astype(float) / tot)))
-    mod_pcts.append(np.concatenate((['All_modifications'], np.array(all_indelsub_count_vectors).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['Insertions'], np.array(ctx.all_insertion_count_vectors[ref_name]).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['Insertions_Left'], np.array(ctx.all_insertion_left_count_vectors[ref_name]).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['Deletions'], np.array(ctx.all_deletion_count_vectors[ref_name]).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['Substitutions'], np.array(ctx.all_substitution_count_vectors[ref_name]).astype(float) / tot)))
+    mod_pcts.append(np.concatenate((['All_modifications'], np.array(ctx.all_indelsub_count_vectors[ref_name]).astype(float) / tot)))
     mod_pcts.append(np.concatenate((['Total'], [counts_total] * len(ref_seq))))
     colnames = ['Modification'] + list(ref_seq)
     modification_percentage_summary_df = _to_numeric_ignore_columns(
@@ -521,7 +506,7 @@ def prep_nucleotide_quilt(ctx: PlotContext):
     return {
         'nuc_pct_df': nuc_df_for_plot,
         'mod_pct_df': mod_df_for_plot,
-        'fig_filename_root': plot_root,
+        'plot_root': plot_root,
         'save_also_png': ctx.save_png,
         'sgRNA_intervals': ref['sgRNA_intervals'],
         'sgRNA_names': ref['sgRNA_names'],
@@ -575,7 +560,7 @@ def prep_nucleotide_quilt_around_sgRNA(ctx: PlotContext):
     return {
         'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
         'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
-        'fig_filename_root': plot_root,
+        'plot_root': plot_root,
         'save_also_png': ctx.save_png,
         'sgRNA_intervals': new_sgRNA_intervals,
         'sgRNA_names': ref['sgRNA_names'],
@@ -632,7 +617,7 @@ def prep_hdr_nucleotide_quilt(ctx: PlotContext):
     return {
         'nuc_pct_df': nuc_pct_df,
         'mod_pct_df': mod_pct_df,
-        'fig_filename_root': plot_root,
+        'plot_root': plot_root,
         'save_also_png': ctx.save_png,
         'sgRNA_intervals': ctx.refs[ref0]['sgRNA_intervals'],
         'sgRNA_names': ctx.refs[ref0]['sgRNA_names'],
@@ -654,7 +639,7 @@ def prep_pe_nucleotide_quilt(ctx: PlotContext):
     """
     result = prep_hdr_nucleotide_quilt(ctx)
     result['quantification_window_idxs'] = ctx.refs[ctx.ref_names[0]]['include_idxs']
-    result['fig_filename_root'] = _make_plot_root(
+    result['plot_root'] = _make_plot_root(
         ctx, '11a.Prime_editing_nucleotide_percentage_quilt',
     )
     return result
@@ -710,7 +695,7 @@ def prep_pe_nucleotide_quilt_around_sgRNA(ctx: PlotContext):
     return {
         'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
         'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
-        'fig_filename_root': plot_root,
+        'plot_root': plot_root,
         'save_also_png': ctx.save_png,
         'sgRNA_intervals': new_sgRNA_intervals,
         'sgRNA_names': pe_data['sgRNA_names'],
@@ -851,7 +836,7 @@ def prep_log_nuc_freqs(ctx: PlotContext):
     num_refs = len(ctx.ref_names)
     sgRNA_leg = _sgRNA_legend(ctx)
 
-    fig_filename_root = _make_plot_root(
+    plot_root = _make_plot_root(
         ctx,
         '10d.' + _ref_plot_name(ctx) + 'Log2_nucleotide_frequency_around_' + _sgRNA_label(ctx),
     )
@@ -859,12 +844,12 @@ def prep_log_nuc_freqs(ctx: PlotContext):
     return {
         'df_nuc_freq': df_nuc_freq,
         'tot_aln_reads': tot_aln_reads,
-        'plot_title': _plot_title_with_ref_name(
+        'plot_title': plot_title_with_ref_name(
             'Log2 Nucleotide Frequencies Around the ' + sgRNA_leg,
             ref_name,
             num_refs,
         ),
-        'fig_filename_root': fig_filename_root,
+        'plot_root': plot_root,
         'save_also_png': ctx.save_png,
         'quantification_window_idxs': plot_quant_window_idxs,
     }

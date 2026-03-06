@@ -513,7 +513,7 @@ ___________________________________
                                 nucleotide_quilt_input = {
                                     'nuc_pct_df': sub_nucleotide_percentage_summary_df,
                                     'mod_pct_df': sub_modification_percentage_summary_df,
-                                    'fig_filename_root': this_window_nuc_pct_quilt_plot_name,
+                                    'plot_root': this_window_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': sub_sgRNA_intervals,
                                     'sgRNA_sequences': consensus_guides,
@@ -550,7 +550,7 @@ ___________________________________
                                 nucleotide_quilt_input = {
                                     'nuc_pct_df': nucleotide_percentage_summary_df.iloc[this_nuc_start_ind:this_nuc_end_ind, :],
                                     'mod_pct_df': modification_percentage_summary_df.iloc[this_mod_start_ind:this_mod_end_ind, :],
-                                    'fig_filename_root': this_nuc_pct_quilt_plot_name,
+                                    'plot_root': this_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': consensus_sgRNA_intervals,
                                     'sgRNA_sequences': consensus_guides,
@@ -590,7 +590,7 @@ ___________________________________
                             nucleotide_quilt_input = {
                                 'nuc_pct_df': nucleotide_percentage_summary_df.iloc[this_nuc_start_ind:this_nuc_end_ind, :],
                                 'mod_pct_df': modification_percentage_summary_df.iloc[this_mod_start_ind:this_mod_end_ind, :],
-                                'fig_filename_root': this_nuc_pct_quilt_plot_name,
+                                'plot_root': this_nuc_pct_quilt_plot_name,
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': consensus_sgRNA_intervals,
                                 'sgRNA_sequences': consensus_guides,
@@ -797,7 +797,7 @@ ___________________________________
                 plot_root = _jp("CRISPRessoAggregate_reads_summary")
                 debug('Plotting reads summary...', {'percent_complete': 94})
                 reads_total_input = {
-                    'fig_filename_root': plot_root,
+                    'plot_root': plot_root,
                     'df_summary_quantification': df_summary_quantification,
                     'save_png': save_png,
                     'cutoff': args.min_reads_for_inclusion,
@@ -814,7 +814,7 @@ ___________________________________
                 plot_root = _jp("CRISPRessoAggregate_quantification_of_editing_frequency")
 
                 unmod_mod_pcts_input = {
-                    'fig_filename_root': plot_root,
+                    'plot_root': plot_root,
                     'df_summary_quantification': df_summary_quantification,
                     'save_png': save_png,
                     'cutoff': args.min_reads_for_inclusion,

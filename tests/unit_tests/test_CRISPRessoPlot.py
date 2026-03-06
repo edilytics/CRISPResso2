@@ -828,7 +828,7 @@ def test_plot_nucleotide_quilt():
         CRISPRessoPlot.plot_nucleotide_quilt(
             nuc_pct_df,
             mod_pct_df,
-            fig_filename_root=fig_root,
+            plot_root=fig_root,
             save_also_png=False,
         )
         assert os.path.exists(fig_root + ".pdf")
@@ -966,7 +966,7 @@ def test_plot_frequency_deletions_insertions():
                 'del': 'Deletions',
                 'mut': 'Substitutions',
             },
-            plot_path=plot_path,
+            plot_root=plot_path,
             xmax_del=5,
             xmax_ins=5,
             xmax_mut=5,

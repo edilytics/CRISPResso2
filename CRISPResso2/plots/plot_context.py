@@ -4,8 +4,14 @@ This is the ONLY part of the plugin architecture that lives in CRISPResso2.
 CRISPRessoPro and plugins consume this to generate custom plots.
 """
 
+from __future__ import annotations
+
+import argparse
 from dataclasses import dataclass, field
 from typing import Callable, Optional
+
+import numpy as np
+import pandas as pd
 
 
 @dataclass
@@ -18,60 +24,61 @@ class PlotContext:
 
     .. warning::
 
-        All fields except ``ref_name`` and ``sgRNA_ind`` should be treated
-        as read-only. Mutating the underlying dicts, arrays, or DataFrames
-        will corrupt the analysis results and the output report. Python
-        cannot enforce this at runtime -- it is a contract.
+        All fields except ``ref_name``, ``sgRNA_ind``, and
+        ``coding_seq_ind`` should be treated as read-only. Mutating the
+        underlying dicts, arrays, or DataFrames will corrupt the analysis
+        results and the output report. Python cannot enforce this at
+        runtime -- it is a contract.
     """
 
     # === Run-level data (always available) ===
 
-    args: object                    # argparse.Namespace -- all CLI arguments
+    args: argparse.Namespace        # All CLI arguments
     run_data: dict                  # crispresso2_info dict
     refs: dict                      # Per-amplicon reference data
-    ref_names: list                 # Ordered list of amplicon/reference names
+    ref_names: list[str]            # Ordered list of amplicon/reference names
 
     # Alignment counts (ref_name -> int)
-    counts_total: dict
-    counts_modified: dict
-    counts_unmodified: dict
-    counts_discarded: dict
-    counts_insertion: dict
-    counts_deletion: dict
-    counts_substitution: dict
+    counts_total: dict[str, int]
+    counts_modified: dict[str, int]
+    counts_unmodified: dict[str, int]
+    counts_discarded: dict[str, int]
+    counts_insertion: dict[str, int]
+    counts_deletion: dict[str, int]
+    counts_substitution: dict[str, int]
 
     # Class counts (class_name -> count)
-    class_counts: dict
+    class_counts: dict[str, int]
     N_TOTAL: int
 
     # Allele data
-    df_alleles: object              # pd.DataFrame
+    df_alleles: pd.DataFrame
 
     # Per-position count vectors (ref_name -> numpy array)
-    all_insertion_count_vectors: dict
-    all_insertion_left_count_vectors: dict
-    all_deletion_count_vectors: dict
-    all_substitution_count_vectors: dict
-    all_indelsub_count_vectors: dict
-    all_substitution_base_vectors: dict
-    all_base_count_vectors: dict
+    all_insertion_count_vectors: dict[str, np.ndarray]
+    all_insertion_left_count_vectors: dict[str, np.ndarray]
+    all_deletion_count_vectors: dict[str, np.ndarray]
+    all_substitution_count_vectors: dict[str, np.ndarray]
+    all_indelsub_count_vectors: dict[str, np.ndarray]
+    all_substitution_base_vectors: dict[str, np.ndarray]
+    all_base_count_vectors: dict[str, np.ndarray]
 
     # Quantification window vectors
-    insertion_count_vectors: dict
-    deletion_count_vectors: dict
-    substitution_count_vectors: dict
-    insertion_length_vectors: dict
-    deletion_length_vectors: dict
+    insertion_count_vectors: dict[str, np.ndarray]
+    deletion_count_vectors: dict[str, np.ndarray]
+    substitution_count_vectors: dict[str, np.ndarray]
+    insertion_length_vectors: dict[str, np.ndarray]
+    deletion_length_vectors: dict[str, np.ndarray]
 
     # Histograms (ref_name -> Counter)
     hists_frameshift: dict
     hists_inframe: dict
 
     # Frameshift / coding counts (ref_name -> int)
-    counts_modified_frameshift: dict
-    counts_modified_non_frameshift: dict
-    counts_non_modified_non_frameshift: dict
-    counts_splicing_sites_modified: dict
+    counts_modified_frameshift: dict[str, int]
+    counts_modified_non_frameshift: dict[str, int]
+    counts_non_modified_non_frameshift: dict[str, int]
+    counts_splicing_sites_modified: dict[str, int]
 
     # === Fields with defaults (must follow all required fields) ===
 
@@ -81,41 +88,41 @@ class PlotContext:
     nucleotide_percentage_summary: dict = field(default_factory=dict)
 
     # HDR / ref1-aligned vectors (populated when expected_hdr_amplicon_seq is set)
-    ref1_all_insertion_count_vectors: dict = field(default_factory=dict)
-    ref1_all_deletion_count_vectors: dict = field(default_factory=dict)
-    ref1_all_substitution_count_vectors: dict = field(default_factory=dict)
-    ref1_all_indelsub_count_vectors: dict = field(default_factory=dict)
-    ref1_all_insertion_left_count_vectors: dict = field(default_factory=dict)
-    ref1_all_base_count_vectors: dict = field(default_factory=dict)
+    ref1_all_insertion_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
+    ref1_all_deletion_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
+    ref1_all_substitution_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
+    ref1_all_indelsub_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
+    ref1_all_insertion_left_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
+    ref1_all_base_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
 
     # Configuration
     custom_config: dict = field(default_factory=dict)
 
     # Utility
-    _jp: Optional[Callable] = None  # Joins path with output directory
+    _jp: Optional[Callable[[str], str]] = None  # Joins path with output directory
     save_png: bool = False
     output_directory: str = ""
 
     # === Additional data fields (populated by CORE when available) ===
 
     # Allele classification ordering (for plot_1b/1c)
-    class_counts_order: list = field(default_factory=list)
+    class_counts_order: list[str] = field(default_factory=list)
 
     # Allele homology data (for plot_1e)
-    homology_scores: list = field(default_factory=list)
-    homology_counts: list = field(default_factory=list)
+    homology_scores: list[float] = field(default_factory=list)
+    homology_counts: list[int] = field(default_factory=list)
 
     # Noncoding modification vectors (for plot_7; ref_name → numpy array)
-    insertion_count_vectors_noncoding: dict = field(default_factory=dict)
-    deletion_count_vectors_noncoding: dict = field(default_factory=dict)
-    substitution_count_vectors_noncoding: dict = field(default_factory=dict)
+    insertion_count_vectors_noncoding: dict[str, np.ndarray] = field(default_factory=dict)
+    deletion_count_vectors_noncoding: dict[str, np.ndarray] = field(default_factory=dict)
+    substitution_count_vectors_noncoding: dict[str, np.ndarray] = field(default_factory=dict)
 
     # Quantification-window substitution base vectors (for plot_10c)
     # Same shape as all_substitution_base_vectors but window-only
-    substitution_base_vectors: dict = field(default_factory=dict)
+    substitution_base_vectors: dict[str, np.ndarray] = field(default_factory=dict)
 
     # Scaffold insertion sizes DataFrame (for plot_11c)
-    df_scaffold_insertion_sizes: object = None  # pd.DataFrame or None
+    df_scaffold_insertion_sizes: Optional[pd.DataFrame] = None
 
     # === Scope fields (set by Pro during iteration) ===
 

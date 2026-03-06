@@ -210,14 +210,14 @@ def hex_to_rgb(value):
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
 
 
-def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom_colors=None, save_also_png=False,
+def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, plot_root=None, custom_colors=None, save_also_png=False,
                           min_text_pct=0.5, max_text_pct=0.95, quantification_window_idxs=None,
                           sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None,
                           shade_unchanged=True, group_column='Batch', **kwargs):
     """Plots a nucleotide quilt with each square showing the percentage of each base at that position in the reference
     nuc_pct_df: dataframe with percents of each base (ACTGN-) at each position
     mod_pct_df: dataframe with percents of modifications at each position (this function uses 'Insertions_Left' to plot insertions)
-    fig_filename_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
+    plot_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
     custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha ). If None, uses the default colors from the CRISPResso2 config.
     save_also_png: whether png should also be saved
     sgRNA_intervals: ranges for sgRNA annotation on plot
@@ -431,12 +431,12 @@ def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom
 #    else:
 #        fig.tight_layout()
 
-    if fig_filename_root is None:
+    if plot_root is None:
         plt.show()
     else:
-        fig.savefig(fig_filename_root + '.pdf', bbox_inches='tight')
+        fig.savefig(plot_root + '.pdf', bbox_inches='tight')
         if save_also_png:
-            fig.savefig(fig_filename_root + '.png', bbox_inches='tight', pad_inches=0.1)
+            fig.savefig(plot_root + '.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
 
@@ -501,7 +501,7 @@ def plot_frequency_deletions_insertions(
     ref,
     counts_total,
     plot_titles,
-    plot_path,
+    plot_root,
     xmax_del,
     xmax_ins,
     xmax_mut,
@@ -635,9 +635,9 @@ def plot_frequency_deletions_insertions(
 
     ax.tick_params(left=True, bottom=True)
     fig.tight_layout()
-    fig.savefig(plot_path + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_path + '.png', bbox_inches='tight')
+        fig.savefig(plot_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -2606,14 +2606,14 @@ def plot_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root=Non
     plt.close()
 
 
-def plot_log_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root=None, save_also_png=False, quantification_window_idxs=None, **kwargs):
+def plot_log_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, plot_root=None, save_also_png=False, quantification_window_idxs=None, **kwargs):
     """Plots a heatmap of the percentage of reads that had each nucletide at each base in the reference
     Positions in the reference that have more than one allele can be spotted using this plot
 
     :param df_nuc_freq: DataFrame with nucleotide frequencies indexed by nucleotide
     :param tot_aln_reads: total number of reads aligned to the reference sequence
     :param plot_title: title of the plot
-    :param fig_filename_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
+    :param plot_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
     :param save_also_png: whether to save the plot as a png as well as pdf
     :param quantification_window_idxs: indices for quantification window annotation on plot (if None, no quantification window will be annotated)
     """
@@ -2643,12 +2643,12 @@ def plot_log_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root
             patches.Rectangle((2 + lastStart, q_win_y_start), 1 + (lastIdx - lastStart), q_win_y_height, fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2)
             )
 
-    if fig_filename_root is None:
+    if plot_root is None:
         plt.show()
     else:
-        fig.savefig(fig_filename_root + '.pdf', bbox_inches='tight')
+        fig.savefig(plot_root + '.pdf', bbox_inches='tight')
         if save_also_png:
-            fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
+            fig.savefig(plot_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -3935,13 +3935,13 @@ def plot_alleles_table_compare(reference_seq, df_alleles, sample_name_1, sample_
                          sgRNA_mismatches=sgRNA_mismatches)
 
 
-def plot_nucleotide_quilt_from_folder(crispresso_output_folder, fig_filename_root=None, custom_colors=None, save_also_png=False, min_text_pct=0.5, max_text_pct=0.95, shade_unchanged=True, **kwargs):
+def plot_nucleotide_quilt_from_folder(crispresso_output_folder, plot_root=None, custom_colors=None, save_also_png=False, min_text_pct=0.5, max_text_pct=0.95, shade_unchanged=True, **kwargs):
     """Plots an allele table for each sgRNA/amplicon in a CRISPResso run (useful for plotting after running using the plot harness)
     This function is only used for one-off plotting purposes and not for the general CRISPResso analysis
 
     input:
     crispresso2 output folder
-    fig_filename_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
+    plot_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
     custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha ). If None, uses the default colors from the CRISPResso2 config.
     save_also_png: boolean to save png as well as pdf
     min_text_pct: add text annotation if the percent is greater than this number
@@ -4013,7 +4013,7 @@ def plot_nucleotide_quilt_from_folder(crispresso_output_folder, fig_filename_roo
             for idx in quantification_window_idxs:
                 new_quant_window_idxs.append(idx - new_sel_cols_start - 1)
 
-            plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=fig_filename_root, custom_colors=custom_colors, save_also_png=save_also_png,
+            plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, plot_root=plot_root, custom_colors=custom_colors, save_also_png=save_also_png,
                                   min_text_pct=min_text_pct, max_text_pct=max_text_pct, quantification_window_idxs=new_quant_window_idxs,
                                   sgRNA_intervals=new_sgRNA_intervals, sgRNA_names=sgRNA_names, sgRNA_mismatches=sgRNA_mismatches, shade_unchanged=shade_unchanged)
             plot_count += 1
