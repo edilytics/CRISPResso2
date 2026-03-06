@@ -1209,6 +1209,7 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
         Dict with 'bp_substitutions_arr' and 'binary_allele_counts',
         or None if no target sequence found, quantification_window_coordinates
         is set, or no substitutions detected.
+
     """
     from CRISPResso2.CRISPRessoCORE import (
         get_base_edit_target_sequence,

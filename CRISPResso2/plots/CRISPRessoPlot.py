@@ -4218,6 +4218,7 @@ def plot_class_piechart(labels, sizes, N_TOTAL, plot_root=None,
         Dict of colors to plot.
     save_png : bool
         If True, png will be saved as well as pdf.
+
     """
     if custom_colors is None:
         custom_config = CRISPRessoShared.check_custom_config(None)
@@ -4257,6 +4258,7 @@ def plot_class_barplot(labels, sizes, N_TOTAL, plot_root=None,
         Dict of colors to plot.
     save_png : bool
         If True, png will be saved as well as pdf.
+
     """
     if custom_colors is None:
         custom_config = CRISPRessoShared.check_custom_config(None)
@@ -4330,6 +4332,7 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
         Dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
     save_png : bool
         if True, png will be saved as well as pdf
+
     """
     from CRISPResso2.plots.data_prep import prep_class_piechart_and_barplot
 

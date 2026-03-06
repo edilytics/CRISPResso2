@@ -2576,7 +2576,6 @@ def normalize_name(name, fastq_r1, fastq_r2, bam_input):
         return clean_name
 
 
-
 def get_scores_and_counts(variant_dict):
     homology_scores = []
     counts = []
