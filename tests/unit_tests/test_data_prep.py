@@ -11,9 +11,13 @@ from types import SimpleNamespace
 
 from CRISPResso2.plots.data_prep import (
     _prep_windowed_alleles,
+    amino_acids_to_numbers,
     prep_alleles_around_cut,
+    prep_alleles_table,
+    prep_alleles_table_compare,
     prep_alternate_allele_counts,
     prep_amino_acid_table,
+    prep_amino_acid_table_for_plot,
     prep_amplicon_modifications,
     prep_class_piechart_and_barplot,
     prep_base_edit_quilt,
@@ -849,3 +853,240 @@ class TestPlotRootGeneration:
         ctx.ref_name = 'r'
         result = prep_indel_size_distribution(ctx)
         assert result['plot_root'] == '3a.Indel_size_distribution'
+
+
+# =============================================================================
+# Tests for amino_acids_to_numbers
+# =============================================================================
+
+
+def test_amino_acids_to_numbers_basic():
+    """Test amino_acids_to_numbers with basic sequence."""
+    result = amino_acids_to_numbers("MA")
+    assert result == [11, 1]
+
+
+def test_amino_acids_to_numbers_stop():
+    """Test amino_acids_to_numbers with stop codon."""
+    result = amino_acids_to_numbers("*")
+    assert len(result) == 1
+    assert result[0] == 0  # Stop codon is first in list
+
+
+def test_amino_acids_to_numbers_gap():
+    """Test amino_acids_to_numbers with gap."""
+    result = amino_acids_to_numbers("-")
+    assert result == [22]
+
+
+def test_amino_acids_to_numbers_all_standard():
+    """Test amino_acids_to_numbers with all standard amino acids."""
+    all_aa = "ACDEFGHIKLMNPQRSTVWY"
+    result = amino_acids_to_numbers(all_aa)
+    assert result == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    # All should be unique
+    assert len(set(result)) == 20
+
+
+def test_amino_acids_to_numbers_empty():
+    """Test amino_acids_to_numbers with empty sequence."""
+    result = amino_acids_to_numbers("")
+    assert result == []
+
+
+def test_amino_acids_to_numbers_with_special():
+    """Test amino_acids_to_numbers with special characters."""
+    result = amino_acids_to_numbers("*-")
+    assert len(result) == 2
+    assert result[0] == 0  # * is first
+    assert result[1] == 22  # - is last
+
+
+# =============================================================================
+# Tests for prep_alleles_table
+# =============================================================================
+
+
+def test_prep_alleles_table_basic():
+    """Test prep_alleles_table with basic data."""
+    df = pd.DataFrame({
+        '%Reads': [50.0, 30.0, 20.0],
+        '#Reads': [500, 300, 200],
+        'Reference_Sequence': ['ATCG', 'ATCG', 'ATCG'],
+    }, index=['ATCG', 'ATGG', 'A-CG'])
+
+    X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = \
+        prep_alleles_table(df, 'ATCG', MAX_N_ROWS=10, MIN_FREQUENCY=0)
+
+    assert X == [[1, 2, 3, 4], [1, 2, 4, 4], [1, 0, 3, 4]]
+    assert annot == [['A', 'T', 'C', 'G'], ['A', 'T', 'G', 'G'], ['A', '-', 'C', 'G']]
+    assert y_labels == ['50.00% (500 reads)', '30.00% (300 reads)', '20.00% (200 reads)']
+    assert is_reference == [True, False, False]
+
+
+def test_prep_alleles_table_empty():
+    """Test prep_alleles_table with empty dataframe after filtering."""
+    df = pd.DataFrame({
+        '%Reads': [0.1],
+        '#Reads': [1],
+        'Reference_Sequence': ['ATCG'],
+    }, index=['ATCG'])
+
+    X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = \
+        prep_alleles_table(df, 'ATCG', MAX_N_ROWS=10, MIN_FREQUENCY=1.0)
+
+    assert len(X) == 0
+    assert len(annot) == 0
+
+
+def test_prep_alleles_table_max_rows():
+    """Test prep_alleles_table respects MAX_N_ROWS."""
+    df = pd.DataFrame({
+        '%Reads': [30.0, 25.0, 20.0, 15.0, 10.0],
+        '#Reads': [300, 250, 200, 150, 100],
+        'Reference_Sequence': ['ATCG', 'ATCG', 'ATCG', 'ATCG', 'ATCG'],
+    }, index=['ATCG', 'ATGG', 'TTCG', 'ATCA', 'GGGG'])
+
+    X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = \
+        prep_alleles_table(df, 'ATCG', MAX_N_ROWS=3, MIN_FREQUENCY=0)
+
+    assert X == [[1, 2, 3, 4], [1, 2, 4, 4], [2, 2, 3, 4]]
+    assert annot == [['A', 'T', 'C', 'G'], ['A', 'T', 'G', 'G'], ['T', 'T', 'C', 'G']]
+    assert y_labels == ['30.00% (300 reads)', '25.00% (250 reads)', '20.00% (200 reads)']
+
+
+def test_prep_alleles_table_with_insertions():
+    """Test prep_alleles_table detects insertions."""
+    # Reference with gap indicates insertion in read
+    df = pd.DataFrame({
+        '%Reads': [50.0],
+        '#Reads': [500],
+        'Reference_Sequence': ['AT--CG'],
+    }, index=['ATGGCG'])
+
+    X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = \
+        prep_alleles_table(df, 'ATGGCG', MAX_N_ROWS=10, MIN_FREQUENCY=0)
+
+    # Should detect insertion
+    assert 0 in insertion_dict
+    assert len(insertion_dict[0]) > 0
+
+
+def test_prep_alleles_table_with_substitution():
+    """Test prep_alleles_table detects substitutions."""
+    df = pd.DataFrame({
+        '%Reads': [50.0],
+        '#Reads': [500],
+        'Reference_Sequence': ['ATCG'],  # Reference
+    }, index=['GTCG'])  # G at position 0 instead of A
+
+    X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = \
+        prep_alleles_table(df, 'ATCG', MAX_N_ROWS=10, MIN_FREQUENCY=0)
+
+    assert len(X) == 1
+    assert is_reference[0] is False  # Different from reference
+    # Should have bold annotation for substitution
+    assert len(per_element_annot_kws[0]) > 0
+
+
+def test_prep_alleles_table_all_reference():
+    """Test prep_alleles_table with all reference sequences."""
+    df = pd.DataFrame({
+        '%Reads': [100.0],
+        '#Reads': [1000],
+        'Reference_Sequence': ['ATCG'],
+    }, index=['ATCG'])
+
+    X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference = \
+        prep_alleles_table(df, 'ATCG', MAX_N_ROWS=10, MIN_FREQUENCY=0)
+
+    assert len(is_reference) == 1
+    assert is_reference[0] is True
+
+
+# =============================================================================
+# Tests for prep_alleles_table_compare
+# =============================================================================
+
+
+def test_prep_alleles_table_compare_basic():
+    """Test prep_alleles_table_compare with basic data."""
+    # Create merged allele dataframe
+    df = pd.DataFrame({
+        '%Reads_sample1': [50.0, 30.0],
+        '%Reads_sample2': [40.0, 35.0],
+        '#Reads_sample1': [500, 300],
+        '#Reads_sample2': [400, 350],
+        'Reference_Sequence': ['ATCG', 'ATCG'],
+    }, index=['ATCG', 'ATGG'])
+
+    X, annot, y_labels, insertion_dict, per_element_annot_kws = \
+        prep_alleles_table_compare(
+            df, 'sample1', 'sample2', MAX_N_ROWS=10, MIN_FREQUENCY=0
+        )
+
+    assert X == [[1, 2, 3, 4], [1, 2, 4, 4]]
+    assert annot == [['A', 'T', 'C', 'G'], ['A', 'T', 'G', 'G']]
+    assert y_labels == [
+        '50.00% (500 reads) 40.00% (400 reads) ',
+        '30.00% (300 reads) 35.00% (350 reads) ',
+    ]
+
+
+def test_prep_alleles_table_compare_with_insertion():
+    """Test prep_alleles_table_compare detects insertions."""
+    df = pd.DataFrame({
+        '%Reads_s1': [50.0],
+        '%Reads_s2': [50.0],
+        '#Reads_s1': [500],
+        '#Reads_s2': [500],
+        'Reference_Sequence': ['AT--CG'],  # Insertion markers
+    }, index=['ATGGCG'])
+
+    X, annot, y_labels, insertion_dict, per_element_annot_kws = \
+        prep_alleles_table_compare(
+            df, 's1', 's2', MAX_N_ROWS=10, MIN_FREQUENCY=0
+        )
+
+    # Should detect insertion
+    assert 0 in insertion_dict
+    assert len(insertion_dict[0]) > 0
+
+
+# =============================================================================
+# Tests for prep_amino_acid_table_for_plot
+# =============================================================================
+
+
+def test_prep_amino_acid_table_for_plot_basic():
+    """Test prep_amino_acid_table_for_plot with basic data."""
+    df = pd.DataFrame({
+        '%Reads': [60.0, 40.0],
+        '#Reads': [600, 400],
+        'Reference_Sequence': ['MAS', 'MAS'],
+        'silent_edit_inds': [[], []],
+    }, index=['MAS', 'MAT'])
+
+    X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, is_reference, ref_seq = \
+        prep_amino_acid_table_for_plot(df, 'MAS', MAX_N_ROWS=10, MIN_FREQUENCY=0)
+
+    assert len(X) == 2
+    assert is_reference[0] is True  # First row matches reference
+    assert ref_seq == 'MAS'
+
+
+def test_prep_amino_acid_table_for_plot_with_silent_edits():
+    """Test prep_amino_acid_table_for_plot with silent edits."""
+    df = pd.DataFrame({
+        '%Reads': [50.0],
+        '#Reads': [500],
+        'Reference_Sequence': ['MAS'],
+        'silent_edit_inds': [[1]],  # Silent edit at position 1
+    }, index=['MAS'])
+
+    X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, is_reference, ref_seq = \
+        prep_amino_acid_table_for_plot(df, 'MAS', MAX_N_ROWS=10, MIN_FREQUENCY=0)
+
+    # Should have silent edit at row 0, position 1
+    assert 0 in silent_edit_dict
+    assert 1 in silent_edit_dict[0]

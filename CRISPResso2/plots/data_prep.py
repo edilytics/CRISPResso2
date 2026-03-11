@@ -1,17 +1,21 @@
-"""Extracted data preparation functions for CRISPResso2 plots.
+"""Data preparation functions for CRISPResso2 plots.
 
-Each function takes a :class:`PlotContext` as its only argument and returns
-the kwargs dict that the corresponding CRISPRessoPlot function expects.
-These are pure functions — no file I/O, no side effects — with the exception
-of ``prep_alleles_around_cut`` and ``prep_base_edit_quilt`` which
-intentionally mutate their input DataFrames (see their docstrings).
-
-Only functions with non-trivial computation are extracted here.
-Trivial pass-through plots (where the dict is just packaging existing
-variables) stay inline in CORE — there's nothing to reuse.
+Every built-in plot has a corresponding prep function here. Each
+PlotContext-based prep takes a single :class:`PlotContext` argument and
+returns the kwargs dict that the corresponding CRISPRessoPlot function
+expects. These are pure functions — no file I/O, no side effects — with
+the exception of ``prep_alleles_around_cut`` and ``prep_base_edit_quilt``
+which intentionally mutate their input DataFrames (see their docstrings).
 
 CORE calls these to build plot inputs. CRISPRessoPro can call them
 from PlotContext to generate plots independently.
+
+This module also contains serialization-boundary helper functions
+(``prep_alleles_table``, ``prep_alleles_table_compare``,
+``prep_amino_acid_table_for_plot``) that reduce DataFrame size before
+dispatching to plot worker threads. These are not PlotContext-based —
+they take explicit arguments and are called by the PlotContext-based
+prep functions or directly from CRISPRessoPlot's combined plot functions.
 
 Scope fields on PlotContext
 ---------------------------
@@ -24,7 +28,8 @@ is being processed). Functions that operate per-sgRNA additionally require
 from __future__ import annotations
 
 import os
-from collections import Counter
+import re
+from collections import Counter, defaultdict
 import numpy as np
 import pandas as pd
 
@@ -211,6 +216,230 @@ def _compute_half_windows(cut_point, plot_window_size, ref_len):
         right = ref_len - cut_point - 1
         window_truncated = True
     return left, right, window_truncated
+
+
+# =============================================================================
+# Serialization-boundary helpers (not PlotContext-based)
+#
+# These run in the main thread to shrink DataFrames before sending to
+# plot worker threads.  They are called by PlotContext-based prep
+# functions and by CRISPRessoPlot's combined plot functions.
+# =============================================================================
+
+# Shared DNA-to-number mapping used by prep_alleles_table and friends.
+_DNA_TO_NUMBERS = {'-': 0, 'A': 1, 'T': 2, 'C': 3, 'G': 4, 'N': 5}
+
+# Shared regex for finding insertions (runs of dashes in the reference).
+_RE_FIND_INDELS = re.compile(r"(-*-)")
+
+
+def _seq_to_numbers(seq):
+    """Convert a DNA sequence string to a list of integers."""
+    return [_DNA_TO_NUMBERS[x] for x in seq]
+
+
+# Amino acid alphabet used by prep_amino_acid_table_for_plot.
+_AMINO_ACIDS = [
+    '*', 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
+    'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y', '', '-',
+]
+_AA_TO_NUMBERS = {aa: i for i, aa in enumerate(_AMINO_ACIDS)}
+
+
+def amino_acids_to_numbers(seq):
+    """Convert an amino acid sequence to a list of integers.
+
+    Used by :func:`prep_amino_acid_table_for_plot` and by
+    ``CRISPRessoPlot.plot_amino_acid_heatmap``.
+    """
+    return [_AA_TO_NUMBERS[aa] for aa in seq]
+
+
+def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
+    """Prepare a DataFrame of alleles for heatmap plotting.
+
+    Converts aligned sequences to numeric arrays, detects insertions and
+    substitutions, and builds annotation metadata.  Runs in the main thread
+    so that only the compact output (not the full DataFrame) is serialised
+    to plot worker threads.
+
+    Parameters
+    ----------
+    df_alleles : pd.DataFrame
+        Allele table indexed by ``Aligned_Sequence``, with columns
+        ``Reference_Sequence``, ``#Reads``, ``%Reads``.
+    reference_seq : str
+        The unmodified reference sequence for this window.
+    MAX_N_ROWS : int
+        Maximum rows to include.
+    MIN_FREQUENCY : float
+        Minimum ``%Reads`` for a row to be included.
+
+    Returns
+    -------
+    tuple
+        ``(X, annot, y_labels, insertion_dict, per_element_annot_kws,
+        is_reference)``
+    """
+    X = []
+    annot = []
+    y_labels = []
+    insertion_dict = defaultdict(list)
+    per_element_annot_kws = []
+    is_reference = []
+
+    idx_row = 0
+    for idx, row in df_alleles[df_alleles['%Reads'] >= MIN_FREQUENCY][:MAX_N_ROWS].iterrows():
+        X.append(_seq_to_numbers(idx.upper()))
+        annot.append(list(idx))
+
+        has_indels = False
+        for p in _RE_FIND_INDELS.finditer(row['Reference_Sequence']):
+            has_indels = True
+            insertion_dict[idx_row].append((p.start(), p.end()))
+
+        y_labels.append('%.2f%% (%d reads)' % (row['%Reads'], row['#Reads']))
+        if idx == reference_seq and not has_indels:
+            is_reference.append(True)
+        else:
+            is_reference.append(False)
+
+        idx_row += 1
+
+        idxs_sub = [i_sub for i_sub in range(len(idx)) if
+                   (row['Reference_Sequence'][i_sub] != idx[i_sub]) and
+                   (row['Reference_Sequence'][i_sub] != '-') and
+                   (idx[i_sub] != '-')]
+        to_append = np.array([{}] * len(idx), dtype=object)
+        to_append[idxs_sub] = {'weight': 'bold', 'color': 'black', 'size': 16}
+        per_element_annot_kws.append(to_append)
+
+    return X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference
+
+
+def prep_alleles_table_compare(df_alleles, sample_name_1, sample_name_2,
+                               MAX_N_ROWS, MIN_FREQUENCY):
+    """Prepare a merged allele table for comparison heatmap plotting.
+
+    Same shape as :func:`prep_alleles_table` but labels rows with counts
+    from both samples.  Used by CRISPRessoCompare.
+
+    Parameters
+    ----------
+    df_alleles : pd.DataFrame
+        Merged allele table with columns ``#Reads_<sample>``,
+        ``%Reads_<sample>`` for each sample.
+    sample_name_1, sample_name_2 : str
+        Sample names (column suffixes).
+    MAX_N_ROWS : int
+        Maximum rows to include.
+    MIN_FREQUENCY : float
+        Minimum combined ``%Reads`` for a row to be included.
+
+    Returns
+    -------
+    tuple
+        ``(X, annot, y_labels, insertion_dict, per_element_annot_kws)``
+    """
+    X = []
+    annot = []
+    y_labels = []
+    insertion_dict = defaultdict(list)
+    per_element_annot_kws = []
+
+    idx_row = 0
+    for idx, row in df_alleles[df_alleles['%Reads_' + sample_name_1] + df_alleles['%Reads_' + sample_name_2] >= MIN_FREQUENCY][:MAX_N_ROWS].iterrows():
+        X.append(_seq_to_numbers(idx.upper()))
+        annot.append(list(idx))
+        y_labels.append('%.2f%% (%d reads) %.2f%% (%d reads) ' % (
+            row['%Reads_' + sample_name_1], row['#Reads_' + sample_name_1],
+            row['%Reads_' + sample_name_2], row['#Reads_' + sample_name_2],
+        ))
+
+        for p in _RE_FIND_INDELS.finditer(row['Reference_Sequence']):
+            insertion_dict[idx_row].append((p.start(), p.end()))
+
+        idx_row += 1
+
+        idxs_sub = [i_sub for i_sub in range(len(idx)) if
+                   (row['Reference_Sequence'][i_sub] != idx[i_sub]) and
+                   (row['Reference_Sequence'][i_sub] != '-') and
+                   (idx[i_sub] != '-')]
+        to_append = np.array([{}] * len(idx), dtype=object)
+        to_append[idxs_sub] = {'weight': 'bold', 'color': 'black', 'size': 16}
+        per_element_annot_kws.append(to_append)
+
+    return X, annot, y_labels, insertion_dict, per_element_annot_kws
+
+
+def prep_amino_acid_table_for_plot(df_alleles, reference_seq, MAX_N_ROWS,
+                                   MIN_FREQUENCY):
+    """Prepare an amino acid allele table for heatmap plotting.
+
+    Same role as :func:`prep_alleles_table` but for amino acid sequences.
+    Detects silent edits in addition to insertions and substitutions.
+
+    Parameters
+    ----------
+    df_alleles : pd.DataFrame
+        Amino acid allele table indexed by amino acid sequence, with
+        columns ``Reference_Sequence``, ``#Reads``, ``%Reads``,
+        ``silent_edit_inds``.
+    reference_seq : str
+        The unmodified reference amino acid sequence.
+    MAX_N_ROWS : int
+        Maximum rows to include.
+    MIN_FREQUENCY : float
+        Minimum ``%Reads`` for a row to be included.
+
+    Returns
+    -------
+    tuple
+        ``(X, annot, y_labels, insertion_dict, silent_edit_dict,
+        per_element_annot_kws, is_reference, reference_seq)``
+    """
+    X = []
+    annot = []
+    y_labels = []
+    insertion_dict = defaultdict(list)
+    silent_edit_dict = defaultdict(list)
+    per_element_annot_kws = []
+    is_reference = []
+
+    idx_row = 0
+
+    for seq, row in df_alleles[df_alleles['%Reads'] >= MIN_FREQUENCY][:MAX_N_ROWS].iterrows():
+        X.append(amino_acids_to_numbers(seq))
+        annot.append(list(seq))
+
+        silent_edit_dict[idx_row] = row['silent_edit_inds']
+
+        has_indels = False
+        for p in _RE_FIND_INDELS.finditer(row['Reference_Sequence']):
+            has_indels = True
+            insertion_dict[idx_row].append((p.start(), p.end()))
+
+        y_labels.append('%.2f%% (%d reads)' % (row['%Reads'], row['#Reads']))
+        if seq == reference_seq and not has_indels:
+            is_reference.append(True)
+        else:
+            is_reference.append(False)
+
+        idx_row += 1
+
+        idxs_sub = [i_sub for i_sub in range(len(seq)) if
+                   (row['Reference_Sequence'][i_sub] != seq[i_sub].upper()) and
+                   (row['Reference_Sequence'][i_sub] != '-') and
+                   (seq[i_sub] != '-')]
+        to_append = np.array([{}] * len(seq), dtype=object)
+        to_append[idxs_sub] = {'weight': 'bold', 'color': 'black', 'size': 16}
+        per_element_annot_kws.append(to_append)
+
+    for i, (x, a) in enumerate(zip(X, annot)):
+        X[i] = x + amino_acids_to_numbers([''] * (len(reference_seq) - len(a)))
+        annot[i] = a + [''] * (len(reference_seq) - len(a))
+
+    return X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, is_reference, reference_seq
 
 
 # =============================================================================
@@ -861,14 +1090,18 @@ def prep_amino_acid_table(ctx: PlotContext):
     Requires ``ctx.ref_name``, ``ctx.sgRNA_ind``, and ``ctx.coding_seq_ind``.
 
     Converts a nucleotide coding sequence to amino acids, computes the
-    amino acid cut point, and builds the amino acid allele DataFrame via
-    ``CRISPRessoShared.get_amino_acid_dataframe``.
+    amino acid cut point, builds the amino acid allele DataFrame via
+    ``CRISPRessoShared.get_amino_acid_dataframe``, and calls
+    :func:`prep_amino_acid_table_for_plot` to produce a
+    serialization-friendly representation for the plot worker thread.
 
     Returns a dict with:
 
     - ``coding_seq_amino_acids``: amino acid string for the coding sequence
     - ``amino_acid_cut_point``: cut point in amino acid coordinates
-    - ``df_to_plot``: DataFrame of amino acid alleles (for CSV and plot)
+    - ``df_to_plot``: DataFrame of amino acid alleles (for CSV export)
+    - ``plot_input``: dict of kwargs for ``plot_amino_acid_heatmap``, or
+      ``None`` if no rows pass the frequency threshold
     """
     from CRISPResso2 import CRISPRessoShared
 
@@ -895,10 +1128,57 @@ def prep_amino_acid_table(ctx: PlotContext):
         blosum_path,
         amino_acid_cut_point,
     )
+
+    # Build serialization-friendly plot input
+    n_good = df_to_plot[
+        df_to_plot['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
+    ].shape[0]
+
+    plot_input = None
+    if n_good > 0:
+        X, annot, y_labels, insertion_dict, silent_edit_dict, per_element_annot_kws, is_reference, ref_seq_aa = \
+            prep_amino_acid_table_for_plot(
+                df_to_plot,
+                coding_seq_amino_acids,
+                ctx.args.max_rows_alleles_around_cut_to_plot,
+                ctx.args.min_frequency_alleles_around_cut_to_plot,
+            )
+
+        # Apply wildtype allele annotation (same logic as plot_amino_acid_table bundle)
+        annotate_wt = ctx.args.annotate_wildtype_allele
+        if annotate_wt != '':
+            for ix, is_ref in enumerate(is_reference):
+                if is_ref:
+                    y_labels[ix] += annotate_wt
+
+        plot_root = _make_plot_root(
+            ctx,
+            '9a.' + _ref_plot_name(ctx) + 'amino_acid_table_around_' + coding_seq,
+        )
+
+        plot_input = {
+            'reference_seq_amino_acids': ref_seq_aa,
+            'fig_filename_root': plot_root,
+            'X': X,
+            'annot': annot,
+            'y_labels': y_labels,
+            'insertion_dict': insertion_dict,
+            'silent_edit_dict': silent_edit_dict,
+            'per_element_annot_kws': per_element_annot_kws,
+            'custom_colors': ctx.custom_config.get('colors', {}),
+            'SAVE_ALSO_PNG': ctx.save_png,
+            'plot_cut_point': ref['sgRNA_plot_cut_points'][ctx.sgRNA_ind],
+            'sgRNA_intervals': ref['sgRNA_intervals'],
+            'sgRNA_names': ref['sgRNA_names'],
+            'sgRNA_mismatches': ref['sgRNA_mismatches'],
+            'amino_acid_cut_point': amino_acid_cut_point,
+        }
+
     return {
         'coding_seq_amino_acids': coding_seq_amino_acids,
         'amino_acid_cut_point': amino_acid_cut_point,
         'df_to_plot': df_to_plot,
+        'plot_input': plot_input,
     }
 
 
@@ -980,6 +1260,10 @@ def prep_alleles_around_cut(ctx: PlotContext):
     percentage adjustment, optional groupby collapse, and sgRNA interval
     recomputation via ``_prep_windowed_alleles``.
 
+    Internally calls :func:`prep_alleles_table` to produce a
+    serialization-friendly representation for the plot worker thread.
+    If no rows pass the frequency threshold, ``plot_input`` is ``None``.
+
     .. warning::
 
         **Mutates** the intermediate ``df_alleles_around_cut`` in place when
@@ -989,15 +1273,14 @@ def prep_alleles_around_cut(ctx: PlotContext):
     Returns a dict with:
 
     - ``df_alleles_around_cut``: the (possibly mutated) alleles DataFrame
-    - ``df_to_plot``: after optional groupby collapse (for ``prep_alleles_table``)
     - ``ref_seq_around_cut``: reference sequence in the window
     - ``new_sgRNA_intervals``: sgRNA intervals in local coordinates
     - ``new_cut_point``: cut point in local coordinates, or None if the cut
       point is not inside any sgRNA interval
     - ``window_truncated``: True if the window was truncated due to proximity
       to amplicon edges
-    - ``plot_half_window_left``: computed left window size
-    - ``plot_half_window_right``: computed right window size
+    - ``plot_input``: dict of kwargs for ``plot_alleles_table_prepped``, or
+      ``None`` if no rows pass the frequency threshold
     """
     from CRISPResso2 import CRISPRessoShared
 
@@ -1006,6 +1289,7 @@ def prep_alleles_around_cut(ctx: PlotContext):
     sgRNA_ind = ctx.sgRNA_ind
 
     cut_point = ref['sgRNA_cut_points'][sgRNA_ind]
+    plot_cut_point = ref['sgRNA_plot_cut_points'][sgRNA_ind]
     ref_len = ref['sequence_length']
     plot_window_size = ctx.args.plot_window_size
 
@@ -1042,15 +1326,51 @@ def prep_alleles_around_cut(ctx: PlotContext):
         if int_start <= cut_point <= int_end:
             new_cut_point = cut_point - new_sel_cols_start - 1
 
+    # Build serialization-friendly plot input via prep_alleles_table
+    n_good = df_alleles_around_cut[
+        df_alleles_around_cut['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
+    ].shape[0]
+
+    plot_input = None
+    if n_good > 0:
+        prepped_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws, is_reference = prep_alleles_table(
+            df_to_plot,
+            ref_seq_around_cut,
+            ctx.args.max_rows_alleles_around_cut_to_plot,
+            ctx.args.min_frequency_alleles_around_cut_to_plot,
+        )
+
+        plot_root = _make_plot_root(
+            ctx,
+            '9.' + _ref_plot_name(ctx) + 'Alleles_frequency_table_around_' + _sgRNA_label(ctx),
+        )
+
+        plot_input = {
+            'reference_seq': ref_seq_around_cut,
+            'prepped_df_alleles': prepped_alleles,
+            'annotations': annotations,
+            'y_labels': y_labels,
+            'insertion_dict': insertion_dict,
+            'per_element_annot_kws': per_element_annot_kws,
+            'is_reference': is_reference,
+            'fig_filename_root': plot_root,
+            'custom_colors': ctx.custom_config.get('colors', {}),
+            'SAVE_ALSO_PNG': ctx.save_png,
+            'plot_cut_point': plot_cut_point,
+            'cut_point_ind': new_cut_point if window_truncated else None,
+            'sgRNA_intervals': new_sgRNA_intervals,
+            'sgRNA_names': ref['sgRNA_names'],
+            'sgRNA_mismatches': ref['sgRNA_mismatches'],
+            'annotate_wildtype_allele': ctx.args.annotate_wildtype_allele,
+        }
+
     return {
         'df_alleles_around_cut': df_alleles_around_cut,
-        'df_to_plot': df_to_plot,
         'ref_seq_around_cut': ref_seq_around_cut,
         'new_sgRNA_intervals': new_sgRNA_intervals,
         'new_cut_point': new_cut_point,
         'window_truncated': window_truncated,
-        'plot_half_window_left': plot_half_window_left,
-        'plot_half_window_right': plot_half_window_right,
+        'plot_input': plot_input,
     }
 
 
@@ -1062,6 +1382,10 @@ def prep_base_edit_quilt(ctx: PlotContext):
     Internally calls ``CRISPRessoShared.get_base_edit_dataframe_around_cut``
     to produce the sliced DataFrame, then applies the same windowing logic
     as ``prep_alleles_around_cut`` (via ``_prep_windowed_alleles``).
+
+    Internally calls :func:`prep_alleles_table` to produce a
+    serialization-friendly representation for the plot worker thread.
+    If no rows pass the frequency threshold, ``plot_input`` is ``None``.
 
     Uses a symmetric window (``args.plot_window_size``) and computes
     ``x_labels`` — the 1-indexed positions of the conversion nucleotide in
@@ -1076,11 +1400,9 @@ def prep_base_edit_quilt(ctx: PlotContext):
     Returns a dict with:
 
     - ``df_alleles_around_cut``: the (possibly mutated) alleles DataFrame
-    - ``df_to_plot``: after optional groupby collapse (for ``prep_alleles_table``)
     - ``ref_seq_around_cut``: reference sequence in the window
-    - ``new_sgRNA_intervals``: sgRNA intervals in local coordinates
-    - ``x_labels``: 1-indexed positions of ``conversion_nuc_from`` in the
-      full reference
+    - ``plot_input``: dict of kwargs for ``plot_alleles_table_prepped``, or
+      ``None`` if no rows pass the frequency threshold
     """
     from CRISPResso2 import CRISPRessoShared
 
@@ -1119,12 +1441,49 @@ def prep_base_edit_quilt(ctx: PlotContext):
         if a == conversion_nuc_from
     ]
 
+    # Build serialization-friendly plot input via prep_alleles_table
+    n_good = df_alleles_around_cut[
+        df_alleles_around_cut['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
+    ].shape[0]
+
+    plot_input = None
+    if n_good > 0:
+        prepped_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws, is_reference = prep_alleles_table(
+            df_to_plot,
+            ref_seq_around_cut,
+            ctx.args.max_rows_alleles_around_cut_to_plot,
+            ctx.args.min_frequency_alleles_around_cut_to_plot,
+        )
+
+        plot_root = _make_plot_root(
+            ctx,
+            '10h.' + _ref_plot_name(ctx) + 'base_edit_' + conversion_nuc_from + 's_quilt',
+        )
+
+        plot_input = {
+            'reference_seq': ref_seq_around_cut,
+            'prepped_df_alleles': prepped_alleles,
+            'annotations': annotations,
+            'y_labels': y_labels,
+            'insertion_dict': insertion_dict,
+            'per_element_annot_kws': per_element_annot_kws,
+            'is_reference': is_reference,
+            'fig_filename_root': plot_root,
+            'custom_colors': ctx.custom_config.get('colors', {}),
+            'SAVE_ALSO_PNG': ctx.save_png,
+            'plot_cut_point': None,
+            'sgRNA_intervals': None,
+            'sgRNA_names': None,
+            'sgRNA_mismatches': None,
+            'annotate_wildtype_allele': '',
+            'plot_reference_sequence_above': False,
+            'x_labels': x_labels,
+        }
+
     return {
         'df_alleles_around_cut': df_alleles_around_cut,
-        'df_to_plot': df_to_plot,
         'ref_seq_around_cut': ref_seq_around_cut,
-        'new_sgRNA_intervals': new_sgRNA_intervals,
-        'x_labels': x_labels,
+        'plot_input': plot_input,
     }
 
 
@@ -1322,4 +1681,494 @@ def prep_conversion_at_sel_nucs(ctx: PlotContext):
         'from_nuc_indices': from_nuc_indices,
         'just_sel_nuc_pcts': just_sel_nuc_pcts,
         'just_sel_nuc_freqs': just_sel_nuc_freqs,
+    }
+
+
+# =============================================================================
+# Remaining prep functions — packaging for uniform prep → plot → metadata shape
+# =============================================================================
+
+
+def prep_read_barplot(ctx: PlotContext):
+    """Prepare kwargs for plot_read_barplot (plot_1a)."""
+    aln_stats = ctx.run_data['running_info']['alignment_stats']
+    plot_root = _make_plot_root(ctx, '1a.Read_barplot')
+    return {
+        'N_READS_INPUT': aln_stats['N_READS_INPUT'],
+        'N_READS_AFTER_PREPROCESSING': aln_stats['N_READS_AFTER_PREPROCESSING'],
+        'N_TOTAL': ctx.N_TOTAL,
+        'fig_filename_root': plot_root,
+        'save_png': ctx.save_png,
+    }
+
+
+def prep_class_piechart_and_barplot_plot(ctx: PlotContext):
+    """Prepare kwargs for plot_class_piechart_and_barplot (plot_1b/1c)."""
+    plot_root_pie = _make_plot_root(ctx, '1b.Alignment_pie_chart')
+    plot_root_bar = _make_plot_root(ctx, '1c.Alignment_barplot')
+    return {
+        'class_counts_order': ctx.class_counts_order,
+        'class_counts': ctx.class_counts,
+        'ref_names': ctx.ref_names,
+        'expected_hdr_amplicon_seq': ctx.args.expected_hdr_amplicon_seq,
+        'N_TOTAL': ctx.N_TOTAL,
+        'piechart_plot_root': plot_root_pie,
+        'barplot_plot_root': plot_root_bar,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+        'save_png': ctx.save_png,
+    }
+
+
+def prep_alleles_homology_histogram(ctx: PlotContext):
+    """Prepare kwargs for plot_alleles_homology_histogram (plot_1e)."""
+    plot_root = _make_plot_root(ctx, '1e.Allele_homology_histogram')
+    return {
+        'fig_root': plot_root,
+        'homology_scores': ctx.homology_scores,
+        'counts': ctx.homology_counts,
+        'min_homology': ctx.args.default_min_aln_score,
+        'save_also_png': ctx.save_png,
+    }
+
+
+def prep_quantification_window_locations(ctx: PlotContext):
+    """Prepare kwargs for plot_quantification_window_locations (plot_4c).
+
+    Requires ``ctx.ref_name``.
+    """
+    ref_name = ctx.ref_name
+    ref = _ref(ctx)
+    num_refs = len(ctx.ref_names)
+
+    plot_root = _make_plot_root(
+        ctx,
+        '4c.' + _ref_plot_name(ctx) + 'Quantification_window_insertion_deletion_substitution_locations',
+    )
+
+    return {
+        'insertion_count_vectors': ctx.insertion_count_vectors[ref_name],
+        'deletion_count_vectors': ctx.deletion_count_vectors[ref_name],
+        'substitution_count_vectors': ctx.substitution_count_vectors[ref_name],
+        'include_idxs_list': ref['include_idxs'],
+        'cut_points': ref['sgRNA_cut_points'],
+        'plot_cut_points': ref['sgRNA_plot_cut_points'],
+        'sgRNA_intervals': ref['sgRNA_intervals'],
+        'ref_len': ref['sequence_length'],
+        'num_refs': num_refs,
+        'n_total': ctx.N_TOTAL,
+        'n_this_category': ctx.counts_total[ref_name],
+        'plot_title': plot_title_with_ref_name(
+            'Mutation position distribution', ref_name, num_refs,
+        ),
+        'ref_name': ref_name,
+        'plot_root': plot_root,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+        'save_also_png': ctx.save_png,
+    }
+
+
+def prep_position_dependent_indels(ctx: PlotContext):
+    """Prepare kwargs for plot_position_dependent_indels (plot_4d).
+
+    Requires ``ctx.ref_name``.
+    """
+    ref_name = ctx.ref_name
+    ref = _ref(ctx)
+    num_refs = len(ctx.ref_names)
+
+    plot_root = _make_plot_root(
+        ctx,
+        '4d.' + _ref_plot_name(ctx) + 'Position_dependent_average_indel_size',
+    )
+
+    return {
+        'insertion_length_vectors': ctx.insertion_length_vectors[ref_name],
+        'deletion_length_vectors': ctx.deletion_length_vectors[ref_name],
+        'cut_points': ref['sgRNA_cut_points'],
+        'plot_cut_points': ref['sgRNA_plot_cut_points'],
+        'ref_len': ref['sequence_length'],
+        'plot_titles': {
+            'ins': plot_title_with_ref_name(
+                'Position dependent insertion size', ref_name, num_refs,
+            ),
+            'del': plot_title_with_ref_name(
+                'Position dependent deletion size', ref_name, num_refs,
+            ),
+        },
+        'plot_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'ref_name': ref_name,
+    }
+
+
+def prep_frameshift_analysis(ctx: PlotContext):
+    """Prepare kwargs for plot_frameshift_analysis (plot_5).
+
+    Requires ``ctx.ref_name``.
+    """
+    ref_name = ctx.ref_name
+    ref = _ref(ctx)
+
+    plot_root = _make_plot_root(
+        ctx,
+        '5.' + _ref_plot_name(ctx) + 'Frameshift_in-frame_mutations_pie_chart',
+    )
+
+    return {
+        'modified_frameshift': ctx.counts_modified_frameshift[ref_name],
+        'modified_non_frameshift': ctx.counts_modified_non_frameshift[ref_name],
+        'non_modified_non_frameshift': ctx.counts_non_modified_non_frameshift[ref_name],
+        'cut_points': ref['sgRNA_cut_points'],
+        'plot_cut_points': ref['sgRNA_plot_cut_points'],
+        'sgRNA_intervals': ref['sgRNA_intervals'],
+        'exon_intervals': ref['exon_intervals'],
+        'ref_len': ref['sequence_length'],
+        'ref_name': ref_name,
+        'plot_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
+def prep_frameshift_frequency(ctx: PlotContext):
+    """Prepare kwargs for plot_frameshift_frequency (plot_6).
+
+    Requires ``ctx.ref_name``.
+    """
+    ref_name = ctx.ref_name
+    num_refs = len(ctx.ref_names)
+
+    plot_root = _make_plot_root(
+        ctx,
+        '6.' + _ref_plot_name(ctx) + 'Frameshift_in-frame_mutation_profiles',
+    )
+
+    return {
+        'hists_frameshift': ctx.hists_frameshift[ref_name],
+        'hists_inframe': ctx.hists_inframe[ref_name],
+        'plot_titles': {
+            'fs': plot_title_with_ref_name('Frameshift profile', ref_name, num_refs),
+            'if': plot_title_with_ref_name('In-frame profile', ref_name, num_refs),
+        },
+        'plot_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'ref_name': ref_name,
+    }
+
+
+def prep_non_coding_mutations(ctx: PlotContext):
+    """Prepare kwargs for plot_non_coding_mutations (plot_7).
+
+    Requires ``ctx.ref_name``.
+    """
+    ref_name = ctx.ref_name
+    ref = _ref(ctx)
+    num_refs = len(ctx.ref_names)
+
+    plot_root = _make_plot_root(
+        ctx,
+        '7.' + _ref_plot_name(ctx) + 'Insertion_deletion_substitution_locations_noncoding',
+    )
+
+    return {
+        'insertion_count_vectors_noncoding': ctx.insertion_count_vectors_noncoding[ref_name],
+        'deletion_count_vectors_noncoding': ctx.deletion_count_vectors_noncoding[ref_name],
+        'substitution_count_vectors_noncoding': ctx.substitution_count_vectors_noncoding[ref_name],
+        'include_idxs_list': ref['include_idxs'],
+        'cut_points': ref['sgRNA_cut_points'],
+        'plot_cut_points': ref['sgRNA_plot_cut_points'],
+        'ref_len': ref['sequence_length'],
+        'sgRNA_intervals': ref['sgRNA_intervals'],
+        'plot_title': plot_title_with_ref_name(
+            'Noncoding mutation position distribution', ref_name, num_refs,
+        ),
+        'plot_root': plot_root,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+        'save_also_png': ctx.save_png,
+        'ref_name': ref_name,
+    }
+
+
+def prep_potential_splice_sites(ctx: PlotContext):
+    """Prepare kwargs for plot_potential_splice_sites (plot_8).
+
+    Requires ``ctx.ref_name``.
+    """
+    ref_name = ctx.ref_name
+
+    plot_root = _make_plot_root(
+        ctx,
+        '8.' + _ref_plot_name(ctx) + 'Potential_splice_sites_pie_chart',
+    )
+
+    return {
+        'splicing_sites_modified': ctx.counts_splicing_sites_modified[ref_name],
+        'count_total': ctx.counts_total[ref_name],
+        'plot_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'ref_name': ref_name,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
+def prep_subs_across_ref(ctx: PlotContext):
+    """Prepare kwargs for plot_subs_across_ref (plot_10a).
+
+    Requires ``ctx.ref_name``.
+    """
+    ref_name = ctx.ref_name
+    ref = _ref(ctx)
+    num_refs = len(ctx.ref_names)
+
+    plot_root = _make_plot_root(
+        ctx,
+        '10a.' + _ref_plot_name(ctx) + 'Substitution_frequencies_at_each_bp',
+    )
+
+    return {
+        'ref_len': ref['sequence_length'],
+        'ref_seq': ref['sequence'],
+        'ref_name': ref_name,
+        'ref_count': ctx.counts_total[ref_name],
+        'all_substitution_base_vectors': ctx.all_substitution_base_vectors,
+        'plot_title': plot_title_with_ref_name(
+            'Substitution frequency', ref_name, num_refs,
+        ),
+        'fig_filename_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'quantification_window_idxs': ref['include_idxs'],
+        'custom_colors': ctx.custom_config.get('colors', {}),
+        'ref_name': ref_name,
+    }
+
+
+def prep_sub_freq_barplot(ctx: PlotContext):
+    """Prepare kwargs for plot_sub_freqs — full amplicon (plot_10b).
+
+    Requires ``ctx.ref_name``. Uses ``ctx.alt_nuc_counts_all``.
+    """
+    ref_name = ctx.ref_name
+    num_refs = len(ctx.ref_names)
+
+    plot_root = _make_plot_root(
+        ctx,
+        '10b.' + _ref_plot_name(ctx) + 'Substitution_frequency_barplot',
+    )
+
+    return {
+        'alt_nuc_counts': ctx.alt_nuc_counts_all[ref_name],
+        'plot_title': plot_title_with_ref_name(
+            'Substitution frequency\nin entire amplicon', ref_name, num_refs,
+        ),
+        'fig_filename_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
+def prep_sub_freq_barplot_quant_window(ctx: PlotContext):
+    """Prepare kwargs for plot_sub_freqs — quantification window (plot_10c).
+
+    Requires ``ctx.ref_name``. Uses ``ctx.alt_nuc_counts``.
+    """
+    ref_name = ctx.ref_name
+    num_refs = len(ctx.ref_names)
+
+    plot_root = _make_plot_root(
+        ctx,
+        '10c.' + _ref_plot_name(ctx) + 'Substitution_frequency_barplot_in_quantification_window',
+    )
+
+    return {
+        'alt_nuc_counts': ctx.alt_nuc_counts[ref_name],
+        'plot_title': plot_title_with_ref_name(
+            'Substitution frequency\nin quantification window', ref_name, num_refs,
+        ),
+        'fig_filename_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
+def prep_conversion_at_sel_nucs_plot(ctx: PlotContext):
+    """Prepare kwargs for plot_conversion_at_sel_nucs (plot_10e).
+
+    Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
+
+    Builds nucleotide percentage DataFrame sliced to the sgRNA plot window.
+    """
+    ref_name = ctx.ref_name
+    ref = _ref(ctx)
+    num_refs = len(ctx.ref_names)
+    plot_idxs = ref['sgRNA_plot_idxs'][ctx.sgRNA_ind]
+
+    _df_nuc_freq_all, df_nuc_pct_all = _build_nuc_freq_df(ctx)
+    plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
+
+    # Use ref_seq_around_cut from the alleles prep as plot_ref_seq
+    # But we can just slice the reference sequence to the plot window
+    ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
+
+    plot_root = _make_plot_root(
+        ctx,
+        '10e.' + _ref_plot_name(ctx) + 'Selected_conversion_at_'
+        + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
+    )
+
+    return {
+        'df_subs': plot_nuc_pcts,
+        'ref_name': ref_name,
+        'ref_sequence': ref_seq_slice,
+        'plot_title': plot_title_with_ref_name(
+            'Substitution Frequencies at ' + ctx.args.conversion_nuc_from
+            + 's around the ' + _sgRNA_legend(ctx),
+            ref_name, num_refs,
+        ),
+        'conversion_nuc_from': ctx.args.conversion_nuc_from,
+        'fig_filename_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
+def prep_conversion_at_sel_nucs_not_include_ref(ctx: PlotContext):
+    """Prepare kwargs for plot_conversion_at_sel_nucs_not_include_ref (plot_10f).
+
+    Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
+    """
+    ref_name = ctx.ref_name
+    ref = _ref(ctx)
+    num_refs = len(ctx.ref_names)
+    plot_idxs = ref['sgRNA_plot_idxs'][ctx.sgRNA_ind]
+
+    _df_nuc_freq_all, df_nuc_pct_all = _build_nuc_freq_df(ctx)
+    plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
+    ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
+
+    plot_root = _make_plot_root(
+        ctx,
+        '10f.' + _ref_plot_name(ctx) + 'Selected_conversion_no_ref_at_'
+        + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
+    )
+
+    return {
+        'df_subs': plot_nuc_pcts,
+        'ref_name': ref_name,
+        'ref_sequence': ref_seq_slice,
+        'plot_title': plot_title_with_ref_name(
+            'Substitution Frequencies at ' + ctx.args.conversion_nuc_from
+            + 's around the ' + _sgRNA_legend(ctx),
+            ref_name, num_refs,
+        ),
+        'conversion_nuc_from': ctx.args.conversion_nuc_from,
+        'fig_filename_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
+def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: PlotContext):
+    """Prepare kwargs for plot_conversion_at_sel_nucs_not_include_ref_scaled (plot_10g).
+
+    Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
+    """
+    ref_name = ctx.ref_name
+    ref = _ref(ctx)
+    num_refs = len(ctx.ref_names)
+    plot_idxs = ref['sgRNA_plot_idxs'][ctx.sgRNA_ind]
+
+    _df_nuc_freq_all, df_nuc_pct_all = _build_nuc_freq_df(ctx)
+    plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
+    ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
+
+    plot_root = _make_plot_root(
+        ctx,
+        '10g.' + _ref_plot_name(ctx) + 'Selected_conversion_no_ref_scaled_at_'
+        + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
+    )
+
+    return {
+        'df_subs': plot_nuc_pcts,
+        'ref_name': ref_name,
+        'ref_sequence': ref_seq_slice,
+        'plot_title': plot_title_with_ref_name(
+            'Substitution Frequencies at ' + ctx.args.conversion_nuc_from
+            + 's around the ' + _sgRNA_legend(ctx),
+            ref_name, num_refs,
+        ),
+        'conversion_nuc_from': ctx.args.conversion_nuc_from,
+        'fig_filename_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
+def prep_global_frameshift_analysis(ctx: PlotContext):
+    """Prepare kwargs for plot_global_frameshift_analysis (plot_5a).
+
+    Requires ``prep_global_frameshift_data`` to have been called first;
+    reads from that result passed as part of PlotContext (or called inline).
+    """
+    global_data = prep_global_frameshift_data(ctx)
+
+    plot_root = _make_plot_root(
+        ctx, '5a.Global_frameshift_in-frame_mutations_pie_chart',
+    )
+
+    return {
+        'global_modified_frameshift': global_data['global_modified_frameshift'],
+        'global_modified_non_frameshift': global_data['global_modified_non_frameshift'],
+        'global_non_modified_non_frameshift': global_data['global_non_modified_non_frameshift'],
+        'plot_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+        '_global_data': global_data,  # pass through for sibling plots
+    }
+
+
+def prep_global_frameshift_in_frame_mutations(ctx: PlotContext):
+    """Prepare kwargs for plot_global_frameshift_in_frame_mutations (plot_6a)."""
+    global_data = prep_global_frameshift_data(ctx)
+
+    plot_root = _make_plot_root(
+        ctx, '6a.Global_frameshift_in-frame_mutation_profiles',
+    )
+
+    return {
+        'global_hists_frameshift': global_data['global_hists_frameshift'],
+        'global_hists_inframe': global_data['global_hists_inframe'],
+        'plot_root': plot_root,
+        'save_also_png': ctx.save_png,
+        '_global_data': global_data,
+    }
+
+
+def prep_impact_on_splice_sites(ctx: PlotContext):
+    """Prepare kwargs for plot_impact_on_splice_sites (plot_8a)."""
+    global_data = prep_global_frameshift_data(ctx)
+
+    plot_root = _make_plot_root(
+        ctx, '8a.Global_potential_splice_sites_pie_chart',
+    )
+
+    return {
+        'global_splicing_sites_modified': global_data['global_splicing_sites_modified'],
+        'global_count_total': global_data['global_count_total'],
+        'plot_root': plot_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+        '_global_data': global_data,
+    }
+
+
+def prep_scaffold_indel_lengths(ctx: PlotContext):
+    """Prepare kwargs for plot_scaffold_indel_lengths (plot_11c)."""
+    plot_root = _make_plot_root(
+        ctx, '11c.Prime_editing_scaffold_insertion_sizes',
+    )
+
+    return {
+        'df_scaffold_insertion_sizes': ctx.df_scaffold_insertion_sizes,
+        'plot_root': plot_root,
+        'save_also_png': ctx.save_png,
     }
