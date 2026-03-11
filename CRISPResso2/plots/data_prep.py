@@ -1,10 +1,14 @@
 """Data preparation functions for CRISPResso2 plots.
 
-Every built-in plot has a corresponding prep function here. Each
-PlotContext-based prep takes a single :class:`PlotContext` argument and
+**Every built-in plot has a corresponding prep function here — no exceptions.**
+
+Each PlotContext-based prep takes a single :class:`PlotContext` argument and
 returns the kwargs dict that the corresponding CRISPRessoPlot function
-expects. These are pure functions — no file I/O, no side effects — with
-the exception of ``prep_alleles_around_cut`` and ``prep_base_edit_quilt``
+expects, giving every plot a uniform ``prep(ctx) → csv write → plot →
+metadata`` shape in CORE.
+
+These are pure functions — no file I/O, no side effects — with the
+exception of ``prep_alleles_around_cut`` and ``prep_base_edit_quilt``
 which intentionally mutate their input DataFrames (see their docstrings).
 
 CORE calls these to build plot inputs. CRISPRessoPro can call them
