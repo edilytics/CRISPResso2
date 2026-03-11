@@ -253,9 +253,9 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
         )
 
         df_comp[
-            '({0}-{1})_Unmodified%%'.format(sample_1_name, args.sample_2_name)
-        ] = df_comp['Unmodified%%_{0}'.format(sample_1_name)] - df_comp[
-            'Unmodified%%_{0}'.format(args.sample_2_name)
+            '({0}-{1})_Unmodified%'.format(sample_1_name, sample_2_name)
+        ] = df_comp['Unmodified%_{0}'.format(sample_1_name)] - df_comp[
+            'Unmodified%_{0}'.format(sample_2_name)
         ]
 
         df_comp.fillna('NA').to_csv(_jp('COMPARISON_SAMPLES_QUANTIFICATION_SUMMARIES.txt'), sep='\t')
@@ -271,7 +271,7 @@ increase the memory required to run CRISPResso. Can be set to 'max'.
             if row.isnull().any():
                 warn('Skipping sample {0} since it was not processed in one or both conditions'.format(idx))
             else:
-                processed_regions.add(idx)
+                processed_regions.append(idx)
                 crispresso_output_folder_1 = os.path.join(
                     args.crispresso_pooled_wgs_output_folder_1,
                     'CRISPResso_on_{0}'.format(idx),
