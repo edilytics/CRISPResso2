@@ -54,6 +54,7 @@ default = { features = [], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
 lint = { features = ["lint"], solve-group = "default" }
 pro = { features = ["pro"], solve-group = "default" }
+test-pro = { features = ["test", "pro"], solve-group = "default" }
 
 [tasks]
 install = "pip install -e ."
@@ -68,7 +69,7 @@ cwd = "../CRISPResso2_tests"
 [feature.pro.tasks]
 install = "pip install -e . && pip install -e ../CRISPRessoPro"
 
-[feature.pro.tasks.test]
+[feature.pro.tasks.pro-unit-test]
 cmd = "pytest tests --cov CRISPRessoPro"
 cwd = "../CRISPRessoPro"
 depends-on = ["install"]
