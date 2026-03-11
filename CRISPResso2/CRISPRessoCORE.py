@@ -4852,6 +4852,22 @@ def main():
             alleles_homology_scores_filename,
         )
 
+        # --- Pre-compute alternate allele counts (for plots 10b/10c) ---
+        alt_nuc_counts_by_ref = {}
+        alt_nuc_counts_all_by_ref = {}
+        if args.base_editor_output:
+            from CRISPResso2.plots.data_prep import prep_alternate_allele_counts
+            for ref_name in ref_names:
+                if counts_total[ref_name] > 0:
+                    include_idxs = refs[ref_name]['include_idxs']
+                    qw_ref_seq = [list(refs[ref_name]['sequence'])[x] for x in include_idxs]
+                    alt_nuc_counts_by_ref[ref_name] = prep_alternate_allele_counts(
+                        substitution_base_vectors, ref_name, qw_ref_seq,
+                    )
+                    alt_nuc_counts_all_by_ref[ref_name] = prep_alternate_allele_counts(
+                        all_substitution_base_vectors, ref_name, refs[ref_name]['sequence'],
+                    )
+
         # --- Build PlotContext (shared by CRISPRessoPro hook and built-in plots) ---
         # HDR / prime-editing vectors are only in scope when
         # expected_hdr_amplicon_seq or prime_editing_pegRNA_extension_seq is set.
@@ -4910,6 +4926,8 @@ def main():
             deletion_count_vectors_noncoding=deletion_count_vectors_noncoding,
             substitution_count_vectors_noncoding=substitution_count_vectors_noncoding,
             substitution_base_vectors=substitution_base_vectors,
+            alt_nuc_counts=alt_nuc_counts_by_ref,
+            alt_nuc_counts_all=alt_nuc_counts_all_by_ref,
             **hdr_kwargs,
         )
 

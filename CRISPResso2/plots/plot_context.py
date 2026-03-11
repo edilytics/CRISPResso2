@@ -124,6 +124,11 @@ class PlotContext:
     # Scaffold insertion sizes DataFrame (for plot_11c)
     df_scaffold_insertion_sizes: Optional[pd.DataFrame] = None
 
+    # Alternate allele counts (for plots 10b/10c; populated when base_editor_output)
+    # ref_name → {ref_nuc: {obs_nuc: count}}
+    alt_nuc_counts: dict[str, dict] = field(default_factory=dict)       # quantification window
+    alt_nuc_counts_all: dict[str, dict] = field(default_factory=dict)   # full amplicon
+
     # === Scope fields (set by Pro during iteration) ===
 
     ref_name: Optional[str] = None
