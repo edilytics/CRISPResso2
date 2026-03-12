@@ -406,6 +406,7 @@ def find_closest_sgRNA_cut_point(exon_start, exon_end, sgRNA_cut_points, sgRNA_p
         closest sgRNA cut point (or exon midpoint if no guides), and
         best_plot_cut_point is the corresponding plot cut point (or False if
         no guides).
+
     """
     best_cut_point = (exon_start + exon_end) // 2  # default to exon midpoint if no guides
     best_plot_cut_point = False
