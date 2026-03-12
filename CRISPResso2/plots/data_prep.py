@@ -2126,7 +2126,6 @@ def prep_global_frameshift_analysis(ctx: PlotContext):
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
-        '_global_data': global_data,  # pass through for sibling plots
     }
 
 
@@ -2160,7 +2159,6 @@ def prep_impact_on_splice_sites(ctx: PlotContext):
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
-        '_global_data': global_data,
     }
 
 

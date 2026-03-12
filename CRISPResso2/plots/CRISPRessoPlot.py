@@ -18,7 +18,13 @@ import re
 from matplotlib import colors as colors_mpl
 import seaborn as sns
 from CRISPResso2.plots import upsetplot
-from CRISPResso2.plots.data_prep import amino_acids_to_numbers
+from CRISPResso2.plots.data_prep import (
+    amino_acids_to_numbers,
+    prep_alleles_table,
+    prep_alleles_table_compare,
+    prep_amino_acid_table_for_plot as prep_amino_acid_table,
+    prep_class_piechart_and_barplot,
+)
 
 from CRISPResso2 import CRISPRessoShared
 
@@ -2993,8 +2999,6 @@ def custom_heatmap(data, vmin=None, vmax=None, cmap=None, center=None, robust=Fa
     return ax
 
 
-from CRISPResso2.plots.data_prep import prep_amino_acid_table_for_plot as prep_amino_acid_table  # noqa: E402
-
 
 def plot_amino_acid_heatmap(
         reference_seq_amino_acids,
@@ -3125,9 +3129,6 @@ def plot_amino_acid_heatmap(
         fig.savefig(fig_filename_root + '.png', bbox_inches='tight', bbox_extra_artists=(lgd,))
     plt.close(fig)
 
-
-from CRISPResso2.plots.data_prep import prep_alleles_table  # noqa: E402
-from CRISPResso2.plots.data_prep import prep_alleles_table_compare  # noqa: E402
 
 
 def plot_alleles_heatmap(
@@ -4168,8 +4169,6 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
         if True, png will be saved as well as pdf
 
     """
-    from CRISPResso2.plots.data_prep import prep_class_piechart_and_barplot
-
     data = prep_class_piechart_and_barplot(
         class_counts_order, class_counts, ref_names,
         expected_hdr_amplicon_seq, N_TOTAL,
