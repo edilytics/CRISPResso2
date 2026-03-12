@@ -202,14 +202,14 @@ def hex_to_rgb(value):
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
 
 
-def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, plot_root=None, custom_colors=None, save_also_png=False,
+def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=None, custom_colors=None, save_also_png=False,
                           min_text_pct=0.5, max_text_pct=0.95, quantification_window_idxs=None,
                           sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None,
                           shade_unchanged=True, group_column='Batch', **kwargs):
     """Plots a nucleotide quilt with each square showing the percentage of each base at that position in the reference
     nuc_pct_df: dataframe with percents of each base (ACTGN-) at each position
     mod_pct_df: dataframe with percents of modifications at each position (this function uses 'Insertions_Left' to plot insertions)
-    plot_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
+    fig_filename_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
     custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha ). If None, uses the default colors from the CRISPResso2 config.
     save_also_png: whether png should also be saved
     sgRNA_intervals: ranges for sgRNA annotation on plot
@@ -423,12 +423,12 @@ def plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, plot_root=None, custom_colors=
 #    else:
 #        fig.tight_layout()
 
-    if plot_root is None:
+    if fig_filename_root is None:
         plt.show()
     else:
-        fig.savefig(plot_root + '.pdf', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.pdf', bbox_inches='tight')
         if save_also_png:
-            fig.savefig(plot_root + '.png', bbox_inches='tight', pad_inches=0.1)
+            fig.savefig(fig_filename_root + '.png', bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
 
 
@@ -440,7 +440,7 @@ def plot_indel_size_distribution(
     xmin,
     xmax,
     title,
-    plot_root,
+    fig_filename_root,
     save_also_png=False,
     **kwargs,
 ):
@@ -483,9 +483,9 @@ def plot_indel_size_distribution(
         lgd.legend_handles[1].set_height(3)
 
     ax.tick_params(left=True, bottom=True)
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -493,7 +493,7 @@ def plot_frequency_deletions_insertions(
     ref,
     counts_total,
     plot_titles,
-    plot_root,
+    fig_filename_root,
     xmax_del,
     xmax_ins,
     xmax_mut,
@@ -627,9 +627,9 @@ def plot_frequency_deletions_insertions(
 
     ax.tick_params(left=True, bottom=True)
     fig.tight_layout()
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -646,7 +646,7 @@ def plot_amplicon_modifications(
     ref_len,
     y_max,
     plot_titles,
-    plot_root,
+    fig_filename_root,
     custom_colors=None,
     save_also_png=False,
     **kwargs,
@@ -665,7 +665,7 @@ def plot_amplicon_modifications(
     :param ref_len: Length of the reference sequence
     :param y_max: Maximum y-axis value for the plot
     :param plot_titles: Dictionary containing titles for the plot
-    :param plot_root: Root path for saving the plot
+    :param fig_filename_root: Root path for saving the plot
     :param custom_colors: Dictionary of custom colors (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
     :param save_also_png: Whether to save the plot as a PNG file in addition to PDF
     """
@@ -797,11 +797,11 @@ def plot_amplicon_modifications(
     ax.tick_params(left=True, bottom=True)
 
     fig.savefig(
-        plot_root + '.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight',
+        fig_filename_root + '.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight',
     )
     if save_also_png:
         fig.savefig(
-            plot_root + '.png', bbox_extra_artists=(lgd,), bbox_inches='tight',
+            fig_filename_root + '.png', bbox_extra_artists=(lgd,), bbox_inches='tight',
         )
     plt.close(fig)
 
@@ -821,7 +821,7 @@ def plot_modification_frequency(
     plot_cut_points,
     y_max,
     plot_title,
-    plot_root,
+    fig_filename_root,
     custom_colors=None,
     save_also_png=False,
     **kwargs,
@@ -842,7 +842,7 @@ def plot_modification_frequency(
     :param plot_cut_points: Boolean list indicating whether to plot each cut point
     :param y_max: Maximum y-axis value for the plot
     :param plot_title: Title for the plot
-    :param plot_root: Root path for saving the plot (without file extension)
+    :param fig_filename_root: Root path for saving the plot (without file extension)
     :param custom_colors: Dictionary of custom colors (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha )
     :param save_also_png: Whether to save the plot as a PNG file in addition to PDF
 
@@ -988,14 +988,14 @@ def plot_modification_frequency(
     ax.set_title(plot_title)
 
     fig.savefig(
-        plot_root + '.pdf',
+        fig_filename_root + '.pdf',
         bbox_extra_artists=(lgd,),
         pad_inches=1,
         bbox_inches='tight',
     )
     if save_also_png:
         fig.savefig(
-            plot_root + '.png',
+            fig_filename_root + '.png',
             bbox_extra_artists=(lgd,),
             bbox_inches='tight',
         )
@@ -1016,7 +1016,7 @@ def plot_quantification_window_locations(
     n_this_category,
     ref_name,
     plot_title,
-    plot_root,
+    fig_filename_root,
     custom_colors=None,
     save_also_png=False,
     **kwargs,
@@ -1037,7 +1037,7 @@ def plot_quantification_window_locations(
     :param n_this_category: Number of sequences in the current category.
     :param ref_name: Name of the reference sequence.
     :param plot_title: Title for the plot.
-    :param plot_root: Root path for saving the plot.
+    :param fig_filename_root: Root path for saving the plot.
     :param custom_colors: Dictionary of custom colors for insertions, deletions, and substitutions.
     :param save_also_png: Boolean indicating whether to save the plot as a PNG file.
     """
@@ -1188,14 +1188,14 @@ def plot_quantification_window_locations(
     ax.set_xlim(0, ref_len - 1)
     ax.set_title(plot_title)
     fig.savefig(
-        plot_root + '.pdf',
+        fig_filename_root + '.pdf',
         bbox_extra_artists=(lgd,),
         pad_inches=1,
         bbox_inches='tight',
     )
     if save_also_png:
         fig.savefig(
-            plot_root + '.png',
+            fig_filename_root + '.png',
             bbox_extra_artists=(lgd,),
             bbox_inches='tight',
         )
@@ -1209,7 +1209,7 @@ def plot_position_dependent_indels(
     plot_cut_points,
     ref_len,
     plot_titles,
-    plot_root,
+    fig_filename_root,
     save_also_png,
     **kwargs,
 ):
@@ -1221,7 +1221,7 @@ def plot_position_dependent_indels(
     :param plot_cut_points: Boolean list indicating whether to plot each cut point.
     :param ref_len: Length of the reference amplicon.
     :param plot_titles: Dictionary containing titles for the plot (one for 'ins' and one for 'del').
-    :param plot_root: Root path for saving the plot (without file extension).
+    :param fig_filename_root: Root path for saving the plot (without file extension).
     :param save_also_png: Boolean indicating whether to save the plot as a PNG file (in addition to pdf).
     """
     fig, ax = plt.subplots(1, 2, figsize=(24, 10))
@@ -1309,9 +1309,9 @@ def plot_position_dependent_indels(
     fig.tight_layout()
     ax2.tick_params(left=True, bottom=True)
 
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -1325,7 +1325,7 @@ def plot_global_modifications_reference(
     ref_len,
     ref_name,
     plot_title,
-    plot_root,
+    fig_filename_root,
     custom_colors=None,
     save_also_png=False,
     **kwargs,
@@ -1341,7 +1341,7 @@ def plot_global_modifications_reference(
     :param ref_len: Length of the reference amplicon.
     :param ref_name: Name of the specified reference sequence.
     :param plot_title: Title for the plot.
-    :param plot_root: Root path for saving the plot (without file extension).
+    :param fig_filename_root: Root path for saving the plot (without file extension).
     :param custom_colors: Dictionary of custom colors for insertions, deletions, and substitutions.
     :param save_also_png: Boolean indicating whether to save the plot as a PNG file (in addition to pdf).
     """
@@ -1483,14 +1483,14 @@ def plot_global_modifications_reference(
     ax.set_xlim(0, ref_len - 1)
     ax.tick_params(left=True, bottom=True)
     fig.savefig(
-        plot_root + '.pdf',
+        fig_filename_root + '.pdf',
         bbox_extra_artists=(lgd,),
         pad_inches=1,
         bbox_inches='tight',
     )
     if save_also_png:
         fig.savefig(
-            plot_root + '.png',
+            fig_filename_root + '.png',
             bbox_extra_artists=(lgd,),
             bbox_inches='tight',
         )
@@ -1507,11 +1507,11 @@ def plot_frameshift_analysis(
     exon_intervals,
     ref_len,
     ref_name,
-    plot_root,
+    fig_filename_root,
     save_also_png=False,
     **kwargs,
 ):
-    """Plot 5: Plot a pie chart to plot_root showing classification of reads with regard to coding region for a specific reference sequence, also including a diagram of where the coding region is within the amplicon.
+    """Plot 5: Plot a pie chart to fig_filename_root showing classification of reads with regard to coding region for a specific reference sequence, also including a diagram of where the coding region is within the amplicon.
 
     Parameters
     ----------
@@ -1533,7 +1533,7 @@ def plot_frameshift_analysis(
         Length of reference sequence
     ref_name : string
         Name of this reference
-    plot_root : string
+    fig_filename_root : string
         String of output plot file (.pdf and/or .png will be appended)
     save_also_png : boolean
         Whether to plot the .png (in addition to the .pdf)
@@ -1646,9 +1646,9 @@ def plot_frameshift_analysis(
     )
     ax2.set_xlim(0, ref_len)
     ax2.set_axis_off()
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -1656,7 +1656,7 @@ def plot_frameshift_frequency(
     hists_frameshift,
     hists_inframe,
     plot_titles,
-    plot_root,
+    fig_filename_root,
     save_also_png=False,
     **kwargs,
 ):
@@ -1742,9 +1742,9 @@ def plot_frameshift_frequency(
     ax2.tick_params(axis='both', which='minor', labelsize=24)
     ax2.tick_params(left=True, bottom=True)
     fig.tight_layout()
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -1752,7 +1752,7 @@ def plot_global_frameshift_analysis(
     global_modified_frameshift,
     global_modified_non_frameshift,
     global_non_modified_non_frameshift,
-    plot_root,
+    fig_filename_root,
     save_also_png=False,
     **kwargs,
 ):
@@ -1780,16 +1780,16 @@ def plot_global_frameshift_analysis(
 
     ax.set_axis_off()
     ax.axis('equal')
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
 def plot_global_frameshift_in_frame_mutations(
     global_hists_frameshift,
     global_hists_inframe,
-    plot_root,
+    fig_filename_root,
     save_also_png=False,
     **kwargs,
 ):
@@ -1797,7 +1797,7 @@ def plot_global_frameshift_in_frame_mutations(
 
     :param global_hists_frameshift: Dictionary showing counts of frameshifts for this reference.
     :param global_hists_inframe: Dictionary showing counts of inframe mutations for this reference.
-    :param plot_root: Root path for saving the plot (without file extension).
+    :param fig_filename_root: Root path for saving the plot (without file extension).
     :param save_also_png: Boolean indicating whether to save the plot as a PNG file (in addition to pdf).
     """
     fig, axs = plt.subplots(2, 1, figsize=(22, 10))
@@ -1884,16 +1884,16 @@ def plot_global_frameshift_in_frame_mutations(
     ax2.tick_params(axis='both', which='major', labelsize=24)
     ax2.tick_params(axis='both', which='minor', labelsize=24)
     fig.tight_layout()
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
 def plot_impact_on_splice_sites(
     global_splicing_sites_modified,
     global_count_total,
-    plot_root,
+    fig_filename_root,
     save_also_png=False,
     **kwargs,
 ):
@@ -1916,9 +1916,9 @@ def plot_impact_on_splice_sites(
     )
     ax.set_axis_off()
     ax.axis('equal')
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -1932,7 +1932,7 @@ def plot_non_coding_mutations(
     ref_len,
     sgRNA_intervals,
     plot_title,
-    plot_root,
+    fig_filename_root,
     custom_colors=None,
     save_also_png=False,
     **kwargs,
@@ -1948,7 +1948,7 @@ def plot_non_coding_mutations(
     :param ref_len: Length of the reference amplicon.
     :param sgRNA_intervals: List of (start, stop) coordinates for sgRNAs.
     :param plot_title: Title for the plot.
-    :param plot_root: Root path for saving the plot (without file extension).
+    :param fig_filename_root: Root path for saving the plot (without file extension).
     :param custom_colors: Dictionary of custom colors for insertions, deletions, and substitutions.
     :param save_also_png: Boolean indicating whether to save the plot as a PNG file (in addition to pdf).
     """
@@ -2076,14 +2076,14 @@ def plot_non_coding_mutations(
     ax.tick_params(left=True, bottom=True)
 
     fig.savefig(
-        plot_root + '.pdf',
+        fig_filename_root + '.pdf',
         bbox_extra_artists=(lgd,),
         pad_inches=1,
         bbox_inches='tight',
     )
     if save_also_png:
         fig.savefig(
-            plot_root + '.png',
+            fig_filename_root + '.png',
             bbox_extra_artists=(lgd,),
             bbox_inches='tight',
         )
@@ -2093,7 +2093,7 @@ def plot_non_coding_mutations(
 def plot_potential_splice_sites(
     splicing_sites_modified,
     count_total,
-    plot_root,
+    fig_filename_root,
     save_also_png=False,
     **kwargs,
 ):
@@ -2101,7 +2101,7 @@ def plot_potential_splice_sites(
 
     :param splicing_sites_modified: Number of reads modified at potential splice sites.
     :param count_total: Total number of reads considered.
-    :param plot_root: Root path for saving the plot (without file extension).
+    :param fig_filename_root: Root path for saving the plot (without file extension).
     :param save_also_png: Boolean indicating whether to save the plot as a PNG file (in addition to pdf).
     """
     fig, ax = plt.subplots(figsize=(12, 12))
@@ -2123,15 +2123,15 @@ def plot_potential_splice_sites(
     )
     ax.set_axis_off()
     ax.axis('equal')
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
 def plot_scaffold_indel_lengths(
     df_scaffold_insertion_sizes,
-    plot_root,
+    fig_filename_root,
     save_also_png=False,
     **kwargs,
 ):
@@ -2166,9 +2166,9 @@ def plot_scaffold_indel_lengths(
         shadow=True,
     )
     ax.tick_params(left=True, bottom=True)
-    fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+    fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
     if save_also_png:
-        fig.savefig(plot_root + '.png', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -2598,14 +2598,14 @@ def plot_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root=Non
     plt.close()
 
 
-def plot_log_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, plot_root=None, save_also_png=False, quantification_window_idxs=None, **kwargs):
+def plot_log_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, fig_filename_root=None, save_also_png=False, quantification_window_idxs=None, **kwargs):
     """Plots a heatmap of the percentage of reads that had each nucletide at each base in the reference
     Positions in the reference that have more than one allele can be spotted using this plot
 
     :param df_nuc_freq: DataFrame with nucleotide frequencies indexed by nucleotide
     :param tot_aln_reads: total number of reads aligned to the reference sequence
     :param plot_title: title of the plot
-    :param plot_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
+    :param fig_filename_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
     :param save_also_png: whether to save the plot as a png as well as pdf
     :param quantification_window_idxs: indices for quantification window annotation on plot (if None, no quantification window will be annotated)
     """
@@ -2635,12 +2635,12 @@ def plot_log_nuc_freqs(df_nuc_freq, tot_aln_reads, plot_title, plot_root=None, s
             patches.Rectangle((2 + lastStart, q_win_y_start), 1 + (lastIdx - lastStart), q_win_y_height, fill=None, edgecolor=(0, 0, 0, 0.25), linestyle=(0, (5, 2)), linewidth=2)
             )
 
-    if plot_root is None:
+    if fig_filename_root is None:
         plt.show()
     else:
-        fig.savefig(plot_root + '.pdf', bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.pdf', bbox_inches='tight')
         if save_also_png:
-            fig.savefig(plot_root + '.png', bbox_inches='tight')
+            fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -3769,13 +3769,13 @@ def plot_alleles_table_compare(reference_seq, df_alleles, sample_name_1, sample_
                          sgRNA_mismatches=sgRNA_mismatches)
 
 
-def plot_nucleotide_quilt_from_folder(crispresso_output_folder, plot_root=None, custom_colors=None, save_also_png=False, min_text_pct=0.5, max_text_pct=0.95, shade_unchanged=True, **kwargs):
+def plot_nucleotide_quilt_from_folder(crispresso_output_folder, fig_filename_root=None, custom_colors=None, save_also_png=False, min_text_pct=0.5, max_text_pct=0.95, shade_unchanged=True, **kwargs):
     """Plots an allele table for each sgRNA/amplicon in a CRISPResso run (useful for plotting after running using the plot harness)
     This function is only used for one-off plotting purposes and not for the general CRISPResso analysis
 
     input:
     crispresso2 output folder
-    plot_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
+    fig_filename_root: figure filename to plot (not including '.pdf' or '.png'). If None, plots are shown interactively.
     custom_colors: dict of colors to plot (e.g. colors['A'] = (1,0,0,0.4) # red,blue,green,alpha ). If None, uses the default colors from the CRISPResso2 config.
     save_also_png: boolean to save png as well as pdf
     min_text_pct: add text annotation if the percent is greater than this number
@@ -3847,7 +3847,7 @@ def plot_nucleotide_quilt_from_folder(crispresso_output_folder, plot_root=None, 
             for idx in quantification_window_idxs:
                 new_quant_window_idxs.append(idx - new_sel_cols_start - 1)
 
-            plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, plot_root=plot_root, custom_colors=custom_colors, save_also_png=save_also_png,
+            plot_nucleotide_quilt(nuc_pct_df, mod_pct_df, fig_filename_root=fig_filename_root, custom_colors=custom_colors, save_also_png=save_also_png,
                                   min_text_pct=min_text_pct, max_text_pct=max_text_pct, quantification_window_idxs=new_quant_window_idxs,
                                   sgRNA_intervals=new_sgRNA_intervals, sgRNA_names=sgRNA_names, sgRNA_mismatches=sgRNA_mismatches, shade_unchanged=shade_unchanged)
             plot_count += 1
@@ -4034,7 +4034,7 @@ def plot_read_barplot(N_READS_INPUT, N_READS_AFTER_PREPROCESSING, N_TOTAL,
     plt.close()
 
 
-def plot_class_piechart(labels, sizes, N_TOTAL, plot_root=None,
+def plot_class_piechart(labels, sizes, N_TOTAL, fig_filename_root=None,
                         custom_colors=None, save_png=False, **kwargs):
     """Plot pie chart of class assignments (plot_1b).
 
@@ -4046,7 +4046,7 @@ def plot_class_piechart(labels, sizes, N_TOTAL, plot_root=None,
         Percentage sizes for each class slice.
     N_TOTAL : int
         Total number of reads.
-    plot_root : str, optional
+    fig_filename_root : str, optional
         Root path for output file (suffixes ".pdf" and ".png" will be added).
     custom_colors : dict, optional
         Dict of colors to plot.
@@ -4065,16 +4065,16 @@ def plot_class_piechart(labels, sizes, N_TOTAL, plot_root=None,
     plt.axis('off')
     plt.axis("equal")
 
-    if plot_root is None:
+    if fig_filename_root is None:
         plt.show()
     else:
-        plt.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+        plt.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
         if save_png:
-            plt.savefig(plot_root + '.png', bbox_inches='tight')
+            plt.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close()
 
 
-def plot_class_barplot(labels, sizes, N_TOTAL, plot_root=None,
+def plot_class_barplot(labels, sizes, N_TOTAL, fig_filename_root=None,
                        custom_colors=None, save_png=False, **kwargs):
     """Plot bar chart of class assignments (plot_1c).
 
@@ -4086,7 +4086,7 @@ def plot_class_barplot(labels, sizes, N_TOTAL, plot_root=None,
         Percentage sizes for each class bar.
     N_TOTAL : int
         Total number of reads.
-    plot_root : str, optional
+    fig_filename_root : str, optional
         Root path for output file (suffixes ".pdf" and ".png" will be added).
     custom_colors : dict, optional
         Dict of colors to plot.
@@ -4129,12 +4129,12 @@ def plot_class_barplot(labels, sizes, N_TOTAL, plot_root=None,
     plt.tick_params(left=True)
     plt.tight_layout()
 
-    if plot_root is None:
+    if fig_filename_root is None:
         plt.show()
     else:
-        plt.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+        plt.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
         if save_png:
-            plt.savefig(plot_root + '.png', bbox_inches='tight')
+            plt.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close()
 
 
@@ -4176,29 +4176,29 @@ def plot_class_piechart_and_barplot(class_counts_order, class_counts, ref_names,
     )
     plot_class_piechart(
         labels=data['labels'], sizes=data['sizes'], N_TOTAL=data['N_TOTAL'],
-        plot_root=piechart_plot_root, custom_colors=custom_colors,
+        fig_filename_root=piechart_plot_root, custom_colors=custom_colors,
         save_png=save_png,
     )
     plot_class_barplot(
         labels=data['labels'], sizes=data['sizes'], N_TOTAL=data['N_TOTAL'],
-        plot_root=barplot_plot_root, custom_colors=custom_colors,
+        fig_filename_root=barplot_plot_root, custom_colors=custom_colors,
         save_png=save_png,
     )
 
 
-def plot_class_dsODN_piechart(sizes, labels, plot_root=None, save_also_png=False, **kwargs):
+def plot_class_dsODN_piechart(sizes, labels, fig_filename_root=None, save_also_png=False, **kwargs):
     fig, ax = plt.subplots(figsize=(12, 12))
     patches, texts, autotexts = ax.pie(sizes, labels=labels, autopct='%1.2f%%')
 
     ax.set_axis_off()
     ax.set_aspect('equal')
 
-    if plot_root is None:
+    if fig_filename_root is None:
         plt.show()
     else:
-        fig.savefig(plot_root + '.pdf', pad_inches=1, bbox_inches='tight')
+        fig.savefig(fig_filename_root + '.pdf', pad_inches=1, bbox_inches='tight')
         if save_also_png:
-            fig.savefig(plot_root + '.png', bbox_inches='tight')
+            fig.savefig(fig_filename_root + '.png', bbox_inches='tight')
     plt.close(fig)
 
 

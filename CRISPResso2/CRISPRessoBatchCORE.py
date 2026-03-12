@@ -638,7 +638,7 @@ def main():
                             nucleotide_quilt_input = {
                                 'nuc_pct_df': sub_nucleotide_percentage_summary_df,
                                 'mod_pct_df': sub_modification_percentage_summary_df,
-                                'plot_root': f'{this_window_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_window_nuc_pct_quilt_plot_name,
+                                'fig_filename_root': f'{this_window_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_window_nuc_pct_quilt_plot_name,
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': sub_sgRNA_intervals,
                                 'sgRNA_sequences': sub_consensus_guides,
@@ -660,7 +660,7 @@ def main():
                                 this_window_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_conversion_map_around_sgRNA_' + sgRNA)
                                 conversion_map_input = {
                                     'nuc_pct_df': sub_nucleotide_percentage_summary_df,
-                                    'plot_root': this_window_nuc_conv_plot_name,
+                                    'fig_filename_root': this_window_nuc_conv_plot_name,
                                     'conversion_nuc_from': args.conversion_nuc_from,
                                     'conversion_nuc_to': args.conversion_nuc_to,
                                     'save_also_png': save_png,
@@ -689,7 +689,7 @@ def main():
                         nucleotide_quilt_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
                             'mod_pct_df': modification_percentage_summary_df,
-                            'plot_root': f'{this_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_nuc_pct_quilt_plot_name,
+                            'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_nuc_pct_quilt_plot_name,
                             'save_also_png': save_png,
                             'sgRNA_intervals': consensus_sgRNA_intervals,
                             'sgRNA_sequences': consensus_guides,
@@ -712,7 +712,7 @@ def main():
                             this_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_conversion_map')
                             conversion_map_input = {
                                 'nuc_pct_df': nucleotide_percentage_summary_df,
-                                'plot_root': this_nuc_conv_plot_name,
+                                'fig_filename_root': this_nuc_conv_plot_name,
                                 'conversion_nuc_from': args.conversion_nuc_from,
                                 'conversion_nuc_to': args.conversion_nuc_to,
                                 'save_also_png': save_png,
@@ -739,7 +739,7 @@ def main():
                     nucleotide_quilt_input = {
                         'nuc_pct_df': nucleotide_percentage_summary_df,
                         'mod_pct_df': modification_percentage_summary_df,
-                        'plot_root': f'{this_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_nuc_pct_quilt_plot_name,
+                        'fig_filename_root': f'{this_nuc_pct_quilt_plot_name}.json' if not args.use_matplotlib and C2PRO_INSTALLED else this_nuc_pct_quilt_plot_name,
                         'save_also_png': save_png,
                         'custom_colors': custom_config['colors'],
                     }
@@ -756,7 +756,7 @@ def main():
                         this_nuc_conv_plot_name = _jp(amplicon_plot_name + 'Nucleotide_conversion_map')
                         conversion_map_input = {
                             'nuc_pct_df': nucleotide_percentage_summary_df,
-                            'plot_root': this_nuc_conv_plot_name,
+                            'fig_filename_root': this_nuc_conv_plot_name,
                             'conversion_nuc_from': args.conversion_nuc_from,
                             'conversion_nuc_to': args.conversion_nuc_to,
                             'save_also_png': save_png,

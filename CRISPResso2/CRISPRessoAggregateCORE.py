@@ -243,9 +243,9 @@ ___________________________________
                 run_data = crispresso2_folder_infos[crispresso2_folder]
                 for ref_name in run_data['results']['ref_names']:
                     if 'plot_2a_root' in run_data['results']['refs'][ref_name]:
-                        plot_root = run_data['results']['refs'][ref_name]['plot_2a_root']
+                        fig_filename_root = run_data['results']['refs'][ref_name]['plot_2a_root']
                         quilt_plots_to_show[this_folder_name + " " + ref_name] = {'href': os.path.abspath(this_sub_html_file),
-                                'img': os.path.abspath(os.path.join(crispresso2_folder, plot_root + ".png"))}
+                                'img': os.path.abspath(os.path.join(crispresso2_folder, fig_filename_root + ".png"))}
 
             all_amplicons = set()
             amplicon_names = {}  # sequence -> ref name (to check for amplicons with the same name but different sequences)
@@ -513,7 +513,7 @@ ___________________________________
                                 nucleotide_quilt_input = {
                                     'nuc_pct_df': sub_nucleotide_percentage_summary_df,
                                     'mod_pct_df': sub_modification_percentage_summary_df,
-                                    'plot_root': this_window_nuc_pct_quilt_plot_name,
+                                    'fig_filename_root': this_window_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': sub_sgRNA_intervals,
                                     'sgRNA_sequences': consensus_guides,
@@ -550,7 +550,7 @@ ___________________________________
                                 nucleotide_quilt_input = {
                                     'nuc_pct_df': nucleotide_percentage_summary_df.iloc[this_nuc_start_ind:this_nuc_end_ind, :],
                                     'mod_pct_df': modification_percentage_summary_df.iloc[this_mod_start_ind:this_mod_end_ind, :],
-                                    'plot_root': this_nuc_pct_quilt_plot_name,
+                                    'fig_filename_root': this_nuc_pct_quilt_plot_name,
                                     'save_also_png': save_png,
                                     'sgRNA_intervals': consensus_sgRNA_intervals,
                                     'sgRNA_sequences': consensus_guides,
@@ -590,7 +590,7 @@ ___________________________________
                             nucleotide_quilt_input = {
                                 'nuc_pct_df': nucleotide_percentage_summary_df.iloc[this_nuc_start_ind:this_nuc_end_ind, :],
                                 'mod_pct_df': modification_percentage_summary_df.iloc[this_mod_start_ind:this_mod_end_ind, :],
-                                'plot_root': this_nuc_pct_quilt_plot_name,
+                                'fig_filename_root': this_nuc_pct_quilt_plot_name,
                                 'save_also_png': save_png,
                                 'sgRNA_intervals': consensus_sgRNA_intervals,
                                 'sgRNA_sequences': consensus_guides,
@@ -794,34 +794,34 @@ ___________________________________
             df_summary_quantification.set_index('Name')
 
             if not args.suppress_plots:
-                plot_root = _jp("CRISPRessoAggregate_reads_summary")
+                fig_filename_root = _jp("CRISPRessoAggregate_reads_summary")
                 debug('Plotting reads summary...', {'percent_complete': 94})
                 reads_total_input = {
-                    'plot_root': plot_root,
+                    'fig_filename_root': fig_filename_root,
                     'df_summary_quantification': df_summary_quantification,
                     'save_png': save_png,
                     'cutoff': args.min_reads_for_inclusion,
                 }
                 plot(CRISPRessoPlot.plot_reads_total, reads_total_input)
 
-                plot_name = os.path.basename(plot_root)
+                plot_name = os.path.basename(fig_filename_root)
                 crispresso2_info['results']['general_plots']['summary_plot_root'] = plot_name
                 crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
                 crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'CRISPRessoAggregate Mapping Statistics Summary'
                 crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Each bar shows the total number of reads in each sample. The vertical line shows the cutoff for analysis, set using the --min_reads_for_inclusion parameter.'
                 crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('CRISPRessoAggregate summary', os.path.basename(samples_quantification_summary_filename)), ('CRISPRessoAggregate summary by amplicon', os.path.basename(samples_quantification_summary_by_amplicon_filename))]
 
-                plot_root = _jp("CRISPRessoAggregate_quantification_of_editing_frequency")
+                fig_filename_root = _jp("CRISPRessoAggregate_quantification_of_editing_frequency")
 
                 unmod_mod_pcts_input = {
-                    'plot_root': plot_root,
+                    'fig_filename_root': fig_filename_root,
                     'df_summary_quantification': df_summary_quantification,
                     'save_png': save_png,
                     'cutoff': args.min_reads_for_inclusion,
                 }
                 plot(CRISPRessoPlot.plot_unmod_mod_pcts, unmod_mod_pcts_input)
 
-                plot_name = os.path.basename(plot_root)
+                plot_name = os.path.basename(fig_filename_root)
                 crispresso2_info['results']['general_plots']['summary_plot_root'] = plot_name
                 crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
                 crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'CRISPRessoAggregate Modification Summary'

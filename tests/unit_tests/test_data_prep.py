@@ -763,7 +763,7 @@ class TestPrepGlobalModificationsReference:
         )
         ctx.ref_name = 'FANC'
         result = prep_global_modifications_reference(ctx)
-        assert '4e' in result['plot_root']
+        assert '4e' in result['fig_filename_root']
         assert 'all reads' in result['plot_title']
 
     def test_hdr_is_4f(self):
@@ -780,7 +780,7 @@ class TestPrepGlobalModificationsReference:
         )
         ctx.ref_name = 'HDR'
         result = prep_global_modifications_reference(ctx)
-        assert '4f' in result['plot_root']
+        assert '4f' in result['fig_filename_root']
         assert 'HDR' in result['plot_title']
 
 
@@ -826,7 +826,7 @@ class TestPrepConversionAtSelNucs:
 
 
 class TestPlotRootGeneration:
-    """Verify that plot_root/fig_filename_root is generated from ctx._jp."""
+    """Verify that fig_filename_root/fig_filename_root is generated from ctx._jp."""
 
     def test_indel_size_uses_jp(self):
         def fake_jp(name):
@@ -841,7 +841,7 @@ class TestPlotRootGeneration:
         )
         ctx.ref_name = 'r'
         result = prep_indel_size_distribution(ctx)
-        assert result['plot_root'] == '/output/3a.R.Indel_size_distribution'
+        assert result['fig_filename_root'] == '/output/3a.R.Indel_size_distribution'
 
     def test_no_jp_falls_back_to_filename(self):
         ctx = _make_ctx(
@@ -852,7 +852,7 @@ class TestPlotRootGeneration:
         )
         ctx.ref_name = 'r'
         result = prep_indel_size_distribution(ctx)
-        assert result['plot_root'] == '3a.Indel_size_distribution'
+        assert result['fig_filename_root'] == '3a.Indel_size_distribution'
 
 
 # =============================================================================

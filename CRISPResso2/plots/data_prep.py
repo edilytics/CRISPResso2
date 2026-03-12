@@ -92,8 +92,8 @@ def _clip_to_percentile(values, counts, percentile=0.99, total=None):
 # =============================================================================
 
 
-def _make_plot_root(ctx: PlotContext, filename: str) -> str:
-    """Construct plot root path, or return *filename* if _jp is unavailable."""
+def _make_fig_filename_root(ctx: PlotContext, filename: str) -> str:
+    """Construct fig_filename_root path, or return *filename* if _jp is unavailable."""
     if ctx._jp is not None:
         return ctx._jp(filename)
     return filename
@@ -484,7 +484,7 @@ def prep_indel_size_distribution(ctx: PlotContext):
     clipped_string = _build_indel_clipped_string(xmin, xmax, raw_xmin, raw_xmax)
 
     num_refs = len(ctx.ref_names)
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx, '3a.' + _ref_plot_name(ctx) + 'Indel_size_distribution',
     )
 
@@ -498,7 +498,7 @@ def prep_indel_size_distribution(ctx: PlotContext):
         'title': plot_title_with_ref_name(
             'Indel size distribution', ref_name, num_refs,
         ),
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
         'clipped_string': clipped_string,
@@ -549,7 +549,7 @@ def prep_frequency_deletions_insertions(ctx: PlotContext):
     )
 
     num_refs = len(ctx.ref_names)
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '3b.' + _ref_plot_name(ctx) + 'Insertion_deletion_substitutions_size_hist',
     )
@@ -557,7 +557,7 @@ def prep_frequency_deletions_insertions(ctx: PlotContext):
     return {
         'ref': ref,
         'counts_total': counts_total,
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'plot_titles': {
             'ins': plot_title_with_ref_name('Insertions', ref_name, num_refs),
             'del': plot_title_with_ref_name('Deletions', ref_name, num_refs),
@@ -593,7 +593,7 @@ def prep_amplicon_modifications(ctx: PlotContext):
 
     y_max = max(all_indelsub_count_vector) * 1.1
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '4a.' + _ref_plot_name(ctx) + 'Combined_insertion_deletion_substitution_locations',
     )
@@ -618,7 +618,7 @@ def prep_amplicon_modifications(ctx: PlotContext):
                 'Mutation position distribution', ref_name, num_refs,
             ),
         },
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
     }
@@ -638,7 +638,7 @@ def prep_modification_frequency(ctx: PlotContext):
 
     y_max = max(ctx.all_indelsub_count_vectors[ref_name]) * 1.1
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '4b.' + _ref_plot_name(ctx) + 'Insertion_deletion_substitution_locations',
     )
@@ -660,7 +660,7 @@ def prep_modification_frequency(ctx: PlotContext):
         'plot_title': plot_title_with_ref_name(
             'Mutation position distribution', ref_name, num_refs,
         ),
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
     }
@@ -675,7 +675,7 @@ def prep_dsODN_piechart(ctx: PlotContext):
     """
     df_alleles = ctx.df_alleles
     N_TOTAL = ctx.N_TOTAL
-    plot_root = _make_plot_root(ctx, '1d.Detection_of_dsODN')
+    fig_filename_root = _make_fig_filename_root(ctx, '1d.Detection_of_dsODN')
 
     n_contain = df_alleles[df_alleles['contains dsODN'] == True]['#Reads'].sum()
     n_not_contain = df_alleles[df_alleles['contains dsODN'] == False]['#Reads'].sum()
@@ -690,7 +690,7 @@ def prep_dsODN_piechart(ctx: PlotContext):
     return {
         'sizes': sizes,
         'labels': labels,
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
     }
 
@@ -732,14 +732,14 @@ def prep_nucleotide_quilt(ctx: PlotContext):
     mod_df_for_plot = modification_percentage_summary_df.copy()
     mod_df_for_plot.insert(0, 'Batch', ref_name)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx, '2a.' + _ref_plot_name(ctx) + 'Nucleotide_percentage_quilt',
     )
 
     return {
         'nuc_pct_df': nuc_df_for_plot,
         'mod_pct_df': mod_df_for_plot,
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'sgRNA_intervals': ref['sgRNA_intervals'],
         'sgRNA_names': ref['sgRNA_names'],
@@ -785,7 +785,7 @@ def prep_nucleotide_quilt_around_sgRNA(ctx: PlotContext):
     ]
     new_include_idx = [x - new_sel_cols_start for x in include_idxs_list]
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '2b.' + _ref_plot_name(ctx) + 'Nucleotide_percentage_quilt_around_' + _sgRNA_label(ctx),
     )
@@ -793,7 +793,7 @@ def prep_nucleotide_quilt_around_sgRNA(ctx: PlotContext):
     return {
         'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
         'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'sgRNA_intervals': new_sgRNA_intervals,
         'sgRNA_names': ref['sgRNA_names'],
@@ -845,12 +845,12 @@ def prep_hdr_nucleotide_quilt(ctx: PlotContext):
         pd.DataFrame(mod_pcts, columns=colnames), {'Batch', 'Modification'},
     )
 
-    plot_root = _make_plot_root(ctx, '4g.HDR_nucleotide_percentage_quilt')
+    fig_filename_root = _make_fig_filename_root(ctx, '4g.HDR_nucleotide_percentage_quilt')
 
     return {
         'nuc_pct_df': nuc_pct_df,
         'mod_pct_df': mod_pct_df,
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'sgRNA_intervals': ctx.refs[ref0]['sgRNA_intervals'],
         'sgRNA_names': ctx.refs[ref0]['sgRNA_names'],
@@ -872,7 +872,7 @@ def prep_pe_nucleotide_quilt(ctx: PlotContext):
     """
     result = prep_hdr_nucleotide_quilt(ctx)
     result['quantification_window_idxs'] = ctx.refs[ctx.ref_names[0]]['include_idxs']
-    result['plot_root'] = _make_plot_root(
+    result['fig_filename_root'] = _make_fig_filename_root(
         ctx, '11a.Prime_editing_nucleotide_percentage_quilt',
     )
     return result
@@ -921,14 +921,14 @@ def prep_pe_nucleotide_quilt_around_sgRNA(ctx: PlotContext):
         label = sgRNA_name
     label = CRISPRessoShared.slugify(label)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx, '11b.Nucleotide_percentage_quilt_around_' + label,
     )
 
     return {
         'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
         'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'sgRNA_intervals': new_sgRNA_intervals,
         'sgRNA_names': pe_data['sgRNA_names'],
@@ -1011,10 +1011,10 @@ def prep_global_modifications_reference(ctx: PlotContext):
     ref0 = ctx.ref_names[0]
 
     if ref_name == ref0:
-        plot_root = _make_plot_root(ctx, '4e.' + ref0 + '.Global_mutations_in_all_reads')
+        fig_filename_root = _make_fig_filename_root(ctx, '4e.' + ref0 + '.Global_mutations_in_all_reads')
         plot_title = 'Mutation position distribution in all reads with reference to %s' % ref0
     else:
-        plot_root = _make_plot_root(
+        fig_filename_root = _make_fig_filename_root(
             ctx,
             '4f.' + ref0 + '.Global_mutations_in_HDR_reads_with_reference_to_' + ref0,
         )
@@ -1032,7 +1032,7 @@ def prep_global_modifications_reference(ctx: PlotContext):
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
         'plot_title': plot_title,
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
     }
 
 
@@ -1069,7 +1069,7 @@ def prep_log_nuc_freqs(ctx: PlotContext):
     num_refs = len(ctx.ref_names)
     sgRNA_leg = _sgRNA_legend(ctx)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '10d.' + _ref_plot_name(ctx) + 'Log2_nucleotide_frequency_around_' + _sgRNA_label(ctx),
     )
@@ -1082,7 +1082,7 @@ def prep_log_nuc_freqs(ctx: PlotContext):
             ref_name,
             num_refs,
         ),
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'quantification_window_idxs': plot_quant_window_idxs,
     }
@@ -1155,14 +1155,14 @@ def prep_amino_acid_table(ctx: PlotContext):
                 if is_ref:
                     y_labels[ix] += annotate_wt
 
-        plot_root = _make_plot_root(
+        fig_filename_root = _make_fig_filename_root(
             ctx,
             '9a.' + _ref_plot_name(ctx) + 'amino_acid_table_around_' + coding_seq,
         )
 
         plot_input = {
             'reference_seq_amino_acids': ref_seq_aa,
-            'fig_filename_root': plot_root,
+            'fig_filename_root': fig_filename_root,
             'X': X,
             'annot': annot,
             'y_labels': y_labels,
@@ -1344,7 +1344,7 @@ def prep_alleles_around_cut(ctx: PlotContext):
             ctx.args.min_frequency_alleles_around_cut_to_plot,
         )
 
-        plot_root = _make_plot_root(
+        fig_filename_root = _make_fig_filename_root(
             ctx,
             '9.' + _ref_plot_name(ctx) + 'Alleles_frequency_table_around_' + _sgRNA_label(ctx),
         )
@@ -1357,7 +1357,7 @@ def prep_alleles_around_cut(ctx: PlotContext):
             'insertion_dict': insertion_dict,
             'per_element_annot_kws': per_element_annot_kws,
             'is_reference': is_reference,
-            'fig_filename_root': plot_root,
+            'fig_filename_root': fig_filename_root,
             'custom_colors': ctx.custom_config.get('colors', {}),
             'SAVE_ALSO_PNG': ctx.save_png,
             'plot_cut_point': plot_cut_point,
@@ -1459,7 +1459,7 @@ def prep_base_edit_quilt(ctx: PlotContext):
             ctx.args.min_frequency_alleles_around_cut_to_plot,
         )
 
-        plot_root = _make_plot_root(
+        fig_filename_root = _make_fig_filename_root(
             ctx,
             '10h.' + _ref_plot_name(ctx) + 'base_edit_' + conversion_nuc_from + 's_quilt',
         )
@@ -1472,7 +1472,7 @@ def prep_base_edit_quilt(ctx: PlotContext):
             'insertion_dict': insertion_dict,
             'per_element_annot_kws': per_element_annot_kws,
             'is_reference': is_reference,
-            'fig_filename_root': plot_root,
+            'fig_filename_root': fig_filename_root,
             'custom_colors': ctx.custom_config.get('colors', {}),
             'SAVE_ALSO_PNG': ctx.save_png,
             'plot_cut_point': None,
@@ -1696,28 +1696,28 @@ def prep_conversion_at_sel_nucs(ctx: PlotContext):
 def prep_read_barplot(ctx: PlotContext):
     """Prepare kwargs for plot_read_barplot (plot_1a)."""
     aln_stats = ctx.run_data['running_info']['alignment_stats']
-    plot_root = _make_plot_root(ctx, '1a.Read_barplot')
+    fig_filename_root = _make_fig_filename_root(ctx, '1a.Read_barplot')
     return {
         'N_READS_INPUT': aln_stats['N_READS_INPUT'],
         'N_READS_AFTER_PREPROCESSING': aln_stats['N_READS_AFTER_PREPROCESSING'],
         'N_TOTAL': ctx.N_TOTAL,
-        'fig_filename_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_png': ctx.save_png,
     }
 
 
 def prep_class_piechart_and_barplot_plot(ctx: PlotContext):
     """Prepare kwargs for plot_class_piechart_and_barplot (plot_1b/1c)."""
-    plot_root_pie = _make_plot_root(ctx, '1b.Alignment_pie_chart')
-    plot_root_bar = _make_plot_root(ctx, '1c.Alignment_barplot')
+    piechart_plot_root = _make_fig_filename_root(ctx, '1b.Alignment_pie_chart')
+    barplot_plot_root = _make_fig_filename_root(ctx, '1c.Alignment_barplot')
     return {
         'class_counts_order': ctx.class_counts_order,
         'class_counts': ctx.class_counts,
         'ref_names': ctx.ref_names,
         'expected_hdr_amplicon_seq': ctx.args.expected_hdr_amplicon_seq,
         'N_TOTAL': ctx.N_TOTAL,
-        'piechart_plot_root': plot_root_pie,
-        'barplot_plot_root': plot_root_bar,
+        'piechart_plot_root': piechart_plot_root,
+        'barplot_plot_root': barplot_plot_root,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_png': ctx.save_png,
     }
@@ -1725,9 +1725,9 @@ def prep_class_piechart_and_barplot_plot(ctx: PlotContext):
 
 def prep_alleles_homology_histogram(ctx: PlotContext):
     """Prepare kwargs for plot_alleles_homology_histogram (plot_1e)."""
-    plot_root = _make_plot_root(ctx, '1e.Allele_homology_histogram')
+    fig_filename_root = _make_fig_filename_root(ctx, '1e.Allele_homology_histogram')
     return {
-        'fig_root': plot_root,
+        'fig_root': fig_filename_root,
         'homology_scores': ctx.homology_scores,
         'counts': ctx.homology_counts,
         'min_homology': ctx.args.default_min_aln_score,
@@ -1744,7 +1744,7 @@ def prep_quantification_window_locations(ctx: PlotContext):
     ref = _ref(ctx)
     num_refs = len(ctx.ref_names)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '4c.' + _ref_plot_name(ctx) + 'Quantification_window_insertion_deletion_substitution_locations',
     )
@@ -1765,7 +1765,7 @@ def prep_quantification_window_locations(ctx: PlotContext):
             'Mutation position distribution', ref_name, num_refs,
         ),
         'ref_name': ref_name,
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
     }
@@ -1780,7 +1780,7 @@ def prep_position_dependent_indels(ctx: PlotContext):
     ref = _ref(ctx)
     num_refs = len(ctx.ref_names)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '4d.' + _ref_plot_name(ctx) + 'Position_dependent_average_indel_size',
     )
@@ -1799,7 +1799,7 @@ def prep_position_dependent_indels(ctx: PlotContext):
                 'Position dependent deletion size', ref_name, num_refs,
             ),
         },
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
     }
@@ -1813,7 +1813,7 @@ def prep_frameshift_analysis(ctx: PlotContext):
     ref_name = ctx.ref_name
     ref = _ref(ctx)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '5.' + _ref_plot_name(ctx) + 'Frameshift_in-frame_mutations_pie_chart',
     )
@@ -1828,7 +1828,7 @@ def prep_frameshift_analysis(ctx: PlotContext):
         'exon_intervals': ref['exon_intervals'],
         'ref_len': ref['sequence_length'],
         'ref_name': ref_name,
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
     }
@@ -1842,7 +1842,7 @@ def prep_frameshift_frequency(ctx: PlotContext):
     ref_name = ctx.ref_name
     num_refs = len(ctx.ref_names)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '6.' + _ref_plot_name(ctx) + 'Frameshift_in-frame_mutation_profiles',
     )
@@ -1854,7 +1854,7 @@ def prep_frameshift_frequency(ctx: PlotContext):
             'fs': plot_title_with_ref_name('Frameshift profile', ref_name, num_refs),
             'if': plot_title_with_ref_name('In-frame profile', ref_name, num_refs),
         },
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
     }
@@ -1869,7 +1869,7 @@ def prep_non_coding_mutations(ctx: PlotContext):
     ref = _ref(ctx)
     num_refs = len(ctx.ref_names)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '7.' + _ref_plot_name(ctx) + 'Insertion_deletion_substitution_locations_noncoding',
     )
@@ -1886,7 +1886,7 @@ def prep_non_coding_mutations(ctx: PlotContext):
         'plot_title': plot_title_with_ref_name(
             'Noncoding mutation position distribution', ref_name, num_refs,
         ),
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
@@ -1900,7 +1900,7 @@ def prep_potential_splice_sites(ctx: PlotContext):
     """
     ref_name = ctx.ref_name
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '8.' + _ref_plot_name(ctx) + 'Potential_splice_sites_pie_chart',
     )
@@ -1908,7 +1908,7 @@ def prep_potential_splice_sites(ctx: PlotContext):
     return {
         'splicing_sites_modified': ctx.counts_splicing_sites_modified[ref_name],
         'count_total': ctx.counts_total[ref_name],
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
         'custom_colors': ctx.custom_config.get('colors', {}),
@@ -1924,7 +1924,7 @@ def prep_subs_across_ref(ctx: PlotContext):
     ref = _ref(ctx)
     num_refs = len(ctx.ref_names)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '10a.' + _ref_plot_name(ctx) + 'Substitution_frequencies_at_each_bp',
     )
@@ -1938,7 +1938,7 @@ def prep_subs_across_ref(ctx: PlotContext):
         'plot_title': plot_title_with_ref_name(
             'Substitution frequency', ref_name, num_refs,
         ),
-        'fig_filename_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'quantification_window_idxs': ref['include_idxs'],
         'custom_colors': ctx.custom_config.get('colors', {}),
@@ -1954,7 +1954,7 @@ def prep_sub_freq_barplot(ctx: PlotContext):
     ref_name = ctx.ref_name
     num_refs = len(ctx.ref_names)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '10b.' + _ref_plot_name(ctx) + 'Substitution_frequency_barplot',
     )
@@ -1964,7 +1964,7 @@ def prep_sub_freq_barplot(ctx: PlotContext):
         'plot_title': plot_title_with_ref_name(
             'Substitution frequency\nin entire amplicon', ref_name, num_refs,
         ),
-        'fig_filename_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
     }
@@ -1978,7 +1978,7 @@ def prep_sub_freq_barplot_quant_window(ctx: PlotContext):
     ref_name = ctx.ref_name
     num_refs = len(ctx.ref_names)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '10c.' + _ref_plot_name(ctx) + 'Substitution_frequency_barplot_in_quantification_window',
     )
@@ -1988,7 +1988,7 @@ def prep_sub_freq_barplot_quant_window(ctx: PlotContext):
         'plot_title': plot_title_with_ref_name(
             'Substitution frequency\nin quantification window', ref_name, num_refs,
         ),
-        'fig_filename_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
     }
@@ -2013,7 +2013,7 @@ def prep_conversion_at_sel_nucs_plot(ctx: PlotContext):
     # But we can just slice the reference sequence to the plot window
     ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '10e.' + _ref_plot_name(ctx) + 'Selected_conversion_at_'
         + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
@@ -2029,7 +2029,7 @@ def prep_conversion_at_sel_nucs_plot(ctx: PlotContext):
             ref_name, num_refs,
         ),
         'conversion_nuc_from': ctx.args.conversion_nuc_from,
-        'fig_filename_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
     }
@@ -2049,7 +2049,7 @@ def prep_conversion_at_sel_nucs_not_include_ref(ctx: PlotContext):
     plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
     ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '10f.' + _ref_plot_name(ctx) + 'Selected_conversion_no_ref_at_'
         + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
@@ -2065,7 +2065,7 @@ def prep_conversion_at_sel_nucs_not_include_ref(ctx: PlotContext):
             ref_name, num_refs,
         ),
         'conversion_nuc_from': ctx.args.conversion_nuc_from,
-        'fig_filename_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
     }
@@ -2085,7 +2085,7 @@ def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: PlotContext):
     plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
     ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx,
         '10g.' + _ref_plot_name(ctx) + 'Selected_conversion_no_ref_scaled_at_'
         + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
@@ -2101,7 +2101,7 @@ def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: PlotContext):
             ref_name, num_refs,
         ),
         'conversion_nuc_from': ctx.args.conversion_nuc_from,
-        'fig_filename_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
     }
@@ -2115,7 +2115,7 @@ def prep_global_frameshift_analysis(ctx: PlotContext):
     """
     global_data = prep_global_frameshift_data(ctx)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx, '5a.Global_frameshift_in-frame_mutations_pie_chart',
     )
 
@@ -2123,7 +2123,7 @@ def prep_global_frameshift_analysis(ctx: PlotContext):
         'global_modified_frameshift': global_data['global_modified_frameshift'],
         'global_modified_non_frameshift': global_data['global_modified_non_frameshift'],
         'global_non_modified_non_frameshift': global_data['global_non_modified_non_frameshift'],
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
         '_global_data': global_data,  # pass through for sibling plots
@@ -2134,16 +2134,15 @@ def prep_global_frameshift_in_frame_mutations(ctx: PlotContext):
     """Prepare kwargs for plot_global_frameshift_in_frame_mutations (plot_6a)."""
     global_data = prep_global_frameshift_data(ctx)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx, '6a.Global_frameshift_in-frame_mutation_profiles',
     )
 
     return {
         'global_hists_frameshift': global_data['global_hists_frameshift'],
         'global_hists_inframe': global_data['global_hists_inframe'],
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
-        '_global_data': global_data,
     }
 
 
@@ -2151,14 +2150,14 @@ def prep_impact_on_splice_sites(ctx: PlotContext):
     """Prepare kwargs for plot_impact_on_splice_sites (plot_8a)."""
     global_data = prep_global_frameshift_data(ctx)
 
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx, '8a.Global_potential_splice_sites_pie_chart',
     )
 
     return {
         'global_splicing_sites_modified': global_data['global_splicing_sites_modified'],
         'global_count_total': global_data['global_count_total'],
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
         '_global_data': global_data,
@@ -2167,12 +2166,12 @@ def prep_impact_on_splice_sites(ctx: PlotContext):
 
 def prep_scaffold_indel_lengths(ctx: PlotContext):
     """Prepare kwargs for plot_scaffold_indel_lengths (plot_11c)."""
-    plot_root = _make_plot_root(
+    fig_filename_root = _make_fig_filename_root(
         ctx, '11c.Prime_editing_scaffold_insertion_sizes',
     )
 
     return {
         'df_scaffold_insertion_sizes': ctx.df_scaffold_insertion_sizes,
-        'plot_root': plot_root,
+        'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
     }

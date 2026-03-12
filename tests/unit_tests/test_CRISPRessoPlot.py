@@ -530,7 +530,7 @@ def test_plot_nucleotide_quilt():
         CRISPRessoPlot.plot_nucleotide_quilt(
             nuc_pct_df,
             mod_pct_df,
-            plot_root=fig_root,
+            fig_filename_root=fig_root,
             save_also_png=False,
         )
         assert os.path.exists(fig_root + ".pdf")
@@ -543,7 +543,7 @@ def test_plot_indel_size_distribution():
     import os
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        plot_root = os.path.join(tmpdir, "test_indel")
+        fig_filename_root = os.path.join(tmpdir, "test_indel")
         CRISPRessoPlot.plot_indel_size_distribution(
             hdensity=np.array([100, 50, 20, 10, 5]),
             hlengths=np.array([-2, -1, 0, 1, 2]),
@@ -552,10 +552,10 @@ def test_plot_indel_size_distribution():
             xmin=-3,
             xmax=3,
             title="Indel Size Distribution",
-            plot_root=plot_root,
+            fig_filename_root=fig_filename_root,
             save_also_png=False,
         )
-        assert os.path.exists(plot_root + ".pdf")
+        assert os.path.exists(fig_filename_root + ".pdf")
 
 
 def test_plot_read_barplot():
@@ -668,7 +668,7 @@ def test_plot_frequency_deletions_insertions():
                 'del': 'Deletions',
                 'mut': 'Substitutions',
             },
-            plot_root=plot_path,
+            fig_filename_root=plot_path,
             xmax_del=5,
             xmax_ins=5,
             xmax_mut=5,
@@ -712,7 +712,7 @@ def test_plot_amplicon_modifications():
     import os
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        plot_root = os.path.join(tmpdir, "test_amp_mod")
+        fig_filename_root = os.path.join(tmpdir, "test_amp_mod")
         CRISPRessoPlot.plot_amplicon_modifications(
             all_indelsub_count_vectors=np.zeros(20),
             include_idxs_list=list(range(5, 15)),
@@ -729,7 +729,7 @@ def test_plot_amplicon_modifications():
                 'main': 'Modification Frequency',
                 'combined': 'All modifications',
             },
-            plot_root=plot_root,
+            fig_filename_root=fig_filename_root,
             save_also_png=False,
         )
-        assert os.path.exists(plot_root + ".pdf")
+        assert os.path.exists(fig_filename_root + ".pdf")
