@@ -2503,7 +2503,7 @@ def test_write_base_edit_counts():
 
 
 def test_coding_seq_filename_uses_name_when_provided():
-    """When coding_sequence_names is provided, those names are used in filenames."""
+    """When coding_seq_names is provided, those names are used in filenames."""
     coding_seq_names = ['Exon1', 'Exon2']
     ref_plot_name = 'Reference.'
 
@@ -2518,7 +2518,7 @@ def test_coding_seq_filename_uses_name_when_provided():
 
 
 def test_coding_seq_filename_uses_index_when_no_name():
-    """When coding_sequence_names is not provided, 0-based index is used in filenames."""
+    """When coding_seq_names is not provided, 0-based index is used in filenames."""
     coding_seq_names = ['0', '1', '2']
     ref_plot_name = 'Reference.'
 
@@ -2556,19 +2556,19 @@ def test_coding_seq_filename_never_too_long():
 
 
 # =============================================================================
-# Tests for coding_sequence_names parsing logic
+# Tests for coding_seq_names parsing logic
 # =============================================================================
 
 
-def _parse_coding_seq_names(coding_seqs, coding_sequence_names_str):
-    """Replicate the coding_sequence_names parsing logic from CRISPRessoCORE.
+def _parse_coding_seq_names(coding_seqs, coding_seq_names_str):
+    """Replicate the coding_seq_names parsing logic from CRISPRessoCORE.
 
     This helper mirrors the parsing block in CRISPRessoCORE.main() so we
     can unit-test naming/indexing without running the full pipeline.
     """
     coding_seq_names = [str(i) for i in range(len(coding_seqs))]
-    if coding_sequence_names_str:
-        coding_seq_name_arr = coding_sequence_names_str.split(",")
+    if coding_seq_names_str:
+        coding_seq_name_arr = coding_seq_names_str.split(",")
         if len(coding_seq_name_arr) > len(coding_seqs):
             raise CRISPRessoShared.BadParameterException(
                 "More coding sequence names were given than coding sequences. "
@@ -2601,14 +2601,14 @@ def test_coding_seq_names_more_names_than_seqs_raises():
 
 
 def test_coding_seq_names_empty_string_uses_indices():
-    """An empty coding_sequence_names string defaults to index-based names."""
+    """An empty coding_seq_names string defaults to index-based names."""
     coding_seqs = ['ATCGATCG', 'GCTAGCTA']
     result = _parse_coding_seq_names(coding_seqs, '')
     assert result == ['0', '1']
 
 
 def test_coding_seq_names_none_uses_indices():
-    """None coding_sequence_names defaults to index-based names."""
+    """None coding_seq_names defaults to index-based names."""
     coding_seqs = ['ATCGATCG', 'GCTAGCTA']
     result = _parse_coding_seq_names(coding_seqs, None)
     assert result == ['0', '1']

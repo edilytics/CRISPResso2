@@ -2875,8 +2875,8 @@ def main():
 
         # Parse coding sequence names (parallel to guide_names parsing)
         coding_seq_names = [str(i) for i in range(len(coding_seqs))]
-        if args.coding_sequence_names:
-            coding_seq_name_arr = args.coding_sequence_names.split(",")
+        if args.coding_seq_name:
+            coding_seq_name_arr = args.coding_seq_name.split(",")
             if len(coding_seq_name_arr) > len(coding_seqs):
                 raise CRISPRessoShared.BadParameterException(
                     "More coding sequence names were given than coding sequences. "
