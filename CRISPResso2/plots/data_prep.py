@@ -203,6 +203,44 @@ def _build_nuc_freq_df(ctx: PlotContext, ref_name: str | None = None):
     return df_nuc_freq, df_nuc_pct
 
 
+def _build_mod_pct_rows(
+    ref_name: str,
+    total: float,
+    seq_len: int,
+    insertion_vectors: dict,
+    insertion_left_vectors: dict,
+    deletion_vectors: dict,
+    substitution_vectors: dict,
+    indelsub_vectors: dict,
+    counts_total: dict,
+    include_batch_label: bool = True,
+):
+    """Build the 6 modification-percentage rows for one reference.
+
+    Returns a list of 6 ``np.ndarray`` rows (one per modification type).
+    When *include_batch_label* is True (default), each row is prefixed
+    with ``[ref_name, label, ...]``; when False, each row is prefixed
+    with ``[label, ...]`` only.
+
+    The caller can concatenate rows from multiple references and wrap
+    them in a DataFrame.
+
+    Used by :func:`prep_nucleotide_quilt` (single-ref, ``all_*`` vectors)
+    and :func:`prep_hdr_nucleotide_quilt` (multi-ref, ``ref1_all_*``
+    vectors) to avoid duplicating the row-construction logic.
+    """
+    tot = float(total)
+    prefix = [ref_name] if include_batch_label else []
+    return [
+        np.concatenate((prefix + ['Insertions'], np.array(insertion_vectors[ref_name]).astype(float) / tot)),
+        np.concatenate((prefix + ['Insertions_Left'], np.array(insertion_left_vectors[ref_name]).astype(float) / tot)),
+        np.concatenate((prefix + ['Deletions'], np.array(deletion_vectors[ref_name]).astype(float) / tot)),
+        np.concatenate((prefix + ['Substitutions'], np.array(substitution_vectors[ref_name]).astype(float) / tot)),
+        np.concatenate((prefix + ['All_modifications'], np.array(indelsub_vectors[ref_name]).astype(float) / tot)),
+        np.concatenate((prefix + ['Total'], [counts_total[ref_name]] * seq_len)),
+    ]
+
+
 def _compute_half_windows(cut_point, plot_window_size, ref_len):
     """Compute asymmetric left/right window sizes, clamping to amplicon bounds.
 
@@ -709,19 +747,21 @@ def prep_nucleotide_quilt(ctx: PlotContext):
     ref_name = ctx.ref_name
     ref = _ref(ctx)
     ref_seq = ref['sequence']
-    tot = float(ctx.counts_total[ref_name])
 
     _df_nuc_freq_all, df_nuc_pct_all = _build_nuc_freq_df(ctx)
 
-    counts_total = ctx.counts_total[ref_name]
-
-    mod_pcts = []
-    mod_pcts.append(np.concatenate((['Insertions'], np.array(ctx.all_insertion_count_vectors[ref_name]).astype(float) / tot)))
-    mod_pcts.append(np.concatenate((['Insertions_Left'], np.array(ctx.all_insertion_left_count_vectors[ref_name]).astype(float) / tot)))
-    mod_pcts.append(np.concatenate((['Deletions'], np.array(ctx.all_deletion_count_vectors[ref_name]).astype(float) / tot)))
-    mod_pcts.append(np.concatenate((['Substitutions'], np.array(ctx.all_substitution_count_vectors[ref_name]).astype(float) / tot)))
-    mod_pcts.append(np.concatenate((['All_modifications'], np.array(ctx.all_indelsub_count_vectors[ref_name]).astype(float) / tot)))
-    mod_pcts.append(np.concatenate((['Total'], [counts_total] * len(ref_seq))))
+    mod_pcts = _build_mod_pct_rows(
+        ref_name=ref_name,
+        total=ctx.counts_total[ref_name],
+        seq_len=len(ref_seq),
+        insertion_vectors=ctx.all_insertion_count_vectors,
+        insertion_left_vectors=ctx.all_insertion_left_count_vectors,
+        deletion_vectors=ctx.all_deletion_count_vectors,
+        substitution_vectors=ctx.all_substitution_count_vectors,
+        indelsub_vectors=ctx.all_indelsub_count_vectors,
+        counts_total=ctx.counts_total,
+        include_batch_label=False,
+    )
     colnames = ['Modification'] + list(ref_seq)
     modification_percentage_summary_df = _to_numeric_ignore_columns(
         pd.DataFrame(mod_pcts, columns=colnames), {'Modification'},
@@ -833,13 +873,17 @@ def prep_hdr_nucleotide_quilt(ctx: PlotContext):
 
     mod_pcts = []
     for rn in ref_names_for_hdr:
-        tot = float(ctx.counts_total[rn])
-        mod_pcts.append(np.concatenate(([rn, 'Insertions'], np.array(ctx.ref1_all_insertion_count_vectors[rn]).astype(float) / tot)))
-        mod_pcts.append(np.concatenate(([rn, 'Insertions_Left'], np.array(ctx.ref1_all_insertion_left_count_vectors[rn]).astype(float) / tot)))
-        mod_pcts.append(np.concatenate(([rn, 'Deletions'], np.array(ctx.ref1_all_deletion_count_vectors[rn]).astype(float) / tot)))
-        mod_pcts.append(np.concatenate(([rn, 'Substitutions'], np.array(ctx.ref1_all_substitution_count_vectors[rn]).astype(float) / tot)))
-        mod_pcts.append(np.concatenate(([rn, 'All_modifications'], np.array(ctx.ref1_all_indelsub_count_vectors[rn]).astype(float) / tot)))
-        mod_pcts.append(np.concatenate(([rn, 'Total'], [ctx.counts_total[rn]] * seq_len)))
+        mod_pcts.extend(_build_mod_pct_rows(
+            ref_name=rn,
+            total=ctx.counts_total[rn],
+            seq_len=seq_len,
+            insertion_vectors=ctx.ref1_all_insertion_count_vectors,
+            insertion_left_vectors=ctx.ref1_all_insertion_left_count_vectors,
+            deletion_vectors=ctx.ref1_all_deletion_count_vectors,
+            substitution_vectors=ctx.ref1_all_substitution_count_vectors,
+            indelsub_vectors=ctx.ref1_all_indelsub_count_vectors,
+            counts_total=ctx.counts_total,
+        ))
     colnames = ['Batch', 'Modification'] + list(ref_seq)
     mod_pct_df = _to_numeric_ignore_columns(
         pd.DataFrame(mod_pcts, columns=colnames), {'Batch', 'Modification'},
@@ -1994,6 +2038,48 @@ def prep_sub_freq_barplot_quant_window(ctx: PlotContext):
     }
 
 
+def _prep_conversion_at_sel_nucs_common(ctx: PlotContext, plot_number: str, variant: str = ''):
+    """Shared logic for plots 10e, 10f, and 10g.
+
+    Builds the nucleotide percentage DataFrame sliced to the sgRNA plot
+    window and returns the common kwargs dict.  The three public
+    ``prep_conversion_at_sel_nucs_*`` functions differ only in the
+    *plot_number* (e.g. ``'10e'``) and optional *variant* infix
+    (e.g. ``'no_ref_'``) they pass here.
+
+    Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
+    """
+    ref_name = ctx.ref_name
+    ref = _ref(ctx)
+    num_refs = len(ctx.ref_names)
+    plot_idxs = ref['sgRNA_plot_idxs'][ctx.sgRNA_ind]
+
+    _df_nuc_freq_all, df_nuc_pct_all = _build_nuc_freq_df(ctx)
+    plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
+    ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
+
+    fig_filename_root = _make_fig_filename_root(
+        ctx,
+        plot_number + '.' + _ref_plot_name(ctx) + 'Selected_conversion_' + variant + 'at_'
+        + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
+    )
+
+    return {
+        'df_subs': plot_nuc_pcts,
+        'ref_name': ref_name,
+        'ref_sequence': ref_seq_slice,
+        'plot_title': plot_title_with_ref_name(
+            'Substitution Frequencies at ' + ctx.args.conversion_nuc_from
+            + 's around the ' + _sgRNA_legend(ctx),
+            ref_name, num_refs,
+        ),
+        'conversion_nuc_from': ctx.args.conversion_nuc_from,
+        'fig_filename_root': fig_filename_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
 def prep_conversion_at_sel_nucs_plot(ctx: PlotContext):
     """Prepare kwargs for plot_conversion_at_sel_nucs (plot_10e).
 
@@ -2001,38 +2087,7 @@ def prep_conversion_at_sel_nucs_plot(ctx: PlotContext):
 
     Builds nucleotide percentage DataFrame sliced to the sgRNA plot window.
     """
-    ref_name = ctx.ref_name
-    ref = _ref(ctx)
-    num_refs = len(ctx.ref_names)
-    plot_idxs = ref['sgRNA_plot_idxs'][ctx.sgRNA_ind]
-
-    _df_nuc_freq_all, df_nuc_pct_all = _build_nuc_freq_df(ctx)
-    plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
-
-    # Use ref_seq_around_cut from the alleles prep as plot_ref_seq
-    # But we can just slice the reference sequence to the plot window
-    ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
-
-    fig_filename_root = _make_fig_filename_root(
-        ctx,
-        '10e.' + _ref_plot_name(ctx) + 'Selected_conversion_at_'
-        + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
-    )
-
-    return {
-        'df_subs': plot_nuc_pcts,
-        'ref_name': ref_name,
-        'ref_sequence': ref_seq_slice,
-        'plot_title': plot_title_with_ref_name(
-            'Substitution Frequencies at ' + ctx.args.conversion_nuc_from
-            + 's around the ' + _sgRNA_legend(ctx),
-            ref_name, num_refs,
-        ),
-        'conversion_nuc_from': ctx.args.conversion_nuc_from,
-        'fig_filename_root': fig_filename_root,
-        'save_also_png': ctx.save_png,
-        'custom_colors': ctx.custom_config.get('colors', {}),
-    }
+    return _prep_conversion_at_sel_nucs_common(ctx, '10e')
 
 
 def prep_conversion_at_sel_nucs_not_include_ref(ctx: PlotContext):
@@ -2040,35 +2095,7 @@ def prep_conversion_at_sel_nucs_not_include_ref(ctx: PlotContext):
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
     """
-    ref_name = ctx.ref_name
-    ref = _ref(ctx)
-    num_refs = len(ctx.ref_names)
-    plot_idxs = ref['sgRNA_plot_idxs'][ctx.sgRNA_ind]
-
-    _df_nuc_freq_all, df_nuc_pct_all = _build_nuc_freq_df(ctx)
-    plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
-    ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
-
-    fig_filename_root = _make_fig_filename_root(
-        ctx,
-        '10f.' + _ref_plot_name(ctx) + 'Selected_conversion_no_ref_at_'
-        + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
-    )
-
-    return {
-        'df_subs': plot_nuc_pcts,
-        'ref_name': ref_name,
-        'ref_sequence': ref_seq_slice,
-        'plot_title': plot_title_with_ref_name(
-            'Substitution Frequencies at ' + ctx.args.conversion_nuc_from
-            + 's around the ' + _sgRNA_legend(ctx),
-            ref_name, num_refs,
-        ),
-        'conversion_nuc_from': ctx.args.conversion_nuc_from,
-        'fig_filename_root': fig_filename_root,
-        'save_also_png': ctx.save_png,
-        'custom_colors': ctx.custom_config.get('colors', {}),
-    }
+    return _prep_conversion_at_sel_nucs_common(ctx, '10f', variant='no_ref_')
 
 
 def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: PlotContext):
@@ -2076,44 +2103,18 @@ def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: PlotContext):
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
     """
-    ref_name = ctx.ref_name
-    ref = _ref(ctx)
-    num_refs = len(ctx.ref_names)
-    plot_idxs = ref['sgRNA_plot_idxs'][ctx.sgRNA_ind]
-
-    _df_nuc_freq_all, df_nuc_pct_all = _build_nuc_freq_df(ctx)
-    plot_nuc_pcts = df_nuc_pct_all.iloc[:, plot_idxs]
-    ref_seq_slice = ''.join([ref['sequence'][i] for i in plot_idxs])
-
-    fig_filename_root = _make_fig_filename_root(
-        ctx,
-        '10g.' + _ref_plot_name(ctx) + 'Selected_conversion_no_ref_scaled_at_'
-        + ctx.args.conversion_nuc_from + 's_around_' + _sgRNA_label(ctx),
-    )
-
-    return {
-        'df_subs': plot_nuc_pcts,
-        'ref_name': ref_name,
-        'ref_sequence': ref_seq_slice,
-        'plot_title': plot_title_with_ref_name(
-            'Substitution Frequencies at ' + ctx.args.conversion_nuc_from
-            + 's around the ' + _sgRNA_legend(ctx),
-            ref_name, num_refs,
-        ),
-        'conversion_nuc_from': ctx.args.conversion_nuc_from,
-        'fig_filename_root': fig_filename_root,
-        'save_also_png': ctx.save_png,
-        'custom_colors': ctx.custom_config.get('colors', {}),
-    }
+    return _prep_conversion_at_sel_nucs_common(ctx, '10g', variant='no_ref_scaled_')
 
 
-def prep_global_frameshift_analysis(ctx: PlotContext):
+def prep_global_frameshift_analysis(ctx: PlotContext, global_data: dict | None = None):
     """Prepare kwargs for plot_global_frameshift_analysis (plot_5a).
 
-    Requires ``prep_global_frameshift_data`` to have been called first;
-    reads from that result passed as part of PlotContext (or called inline).
+    *global_data* may be passed from a prior
+    :func:`prep_global_frameshift_data` call to avoid recomputing it.
+    If ``None``, it is computed here automatically.
     """
-    global_data = prep_global_frameshift_data(ctx)
+    if global_data is None:
+        global_data = prep_global_frameshift_data(ctx)
 
     fig_filename_root = _make_fig_filename_root(
         ctx, '5a.Global_frameshift_in-frame_mutations_pie_chart',
@@ -2129,9 +2130,15 @@ def prep_global_frameshift_analysis(ctx: PlotContext):
     }
 
 
-def prep_global_frameshift_in_frame_mutations(ctx: PlotContext):
-    """Prepare kwargs for plot_global_frameshift_in_frame_mutations (plot_6a)."""
-    global_data = prep_global_frameshift_data(ctx)
+def prep_global_frameshift_in_frame_mutations(ctx: PlotContext, global_data: dict | None = None):
+    """Prepare kwargs for plot_global_frameshift_in_frame_mutations (plot_6a).
+
+    *global_data* may be passed from a prior
+    :func:`prep_global_frameshift_data` call to avoid recomputing it.
+    If ``None``, it is computed here automatically.
+    """
+    if global_data is None:
+        global_data = prep_global_frameshift_data(ctx)
 
     fig_filename_root = _make_fig_filename_root(
         ctx, '6a.Global_frameshift_in-frame_mutation_profiles',
@@ -2145,9 +2152,15 @@ def prep_global_frameshift_in_frame_mutations(ctx: PlotContext):
     }
 
 
-def prep_impact_on_splice_sites(ctx: PlotContext):
-    """Prepare kwargs for plot_impact_on_splice_sites (plot_8a)."""
-    global_data = prep_global_frameshift_data(ctx)
+def prep_impact_on_splice_sites(ctx: PlotContext, global_data: dict | None = None):
+    """Prepare kwargs for plot_impact_on_splice_sites (plot_8a).
+
+    *global_data* may be passed from a prior
+    :func:`prep_global_frameshift_data` call to avoid recomputing it.
+    If ``None``, it is computed here automatically.
+    """
+    if global_data is None:
+        global_data = prep_global_frameshift_data(ctx)
 
     fig_filename_root = _make_fig_filename_root(
         ctx, '8a.Global_potential_splice_sites_pie_chart',

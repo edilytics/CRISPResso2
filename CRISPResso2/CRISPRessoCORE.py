@@ -4905,7 +4905,26 @@ def main():
             **hdr_kwargs,
         )
 
-        # --- CRISPRessoPro plot hook ---
+        # --- CRISPRessoPro / built-in plot branch ---
+        #
+        # Contract:
+        #   When CRISPRessoPro is installed (C2PRO_INSTALLED=True), the Pro
+        #   plugin takes **full ownership** of plot generation and CSV/metadata
+        #   export for the plots section.  ``plot_context`` (a PlotContext
+        #   dataclass populated above) is the single interface — Pro reads
+        #   the same data the built-in branch would, calls its own prep/plot
+        #   pipeline, and writes results into ``crispresso2_info`` via hooks.
+        #
+        #   The entire ``elif`` block below (built-in matplotlib plotting,
+        #   CSV writes, and ``crispresso2_info`` metadata population) is
+        #   **skipped** when Pro is active.  Any new plot or metadata added
+        #   to the ``elif`` block must therefore be mirrored in Pro's
+        #   ``hooks.on_plots_complete`` or it will be missing from Pro
+        #   output.
+        #
+        #   Similarly, ``hooks.make_report`` below replaces the built-in
+        #   ``CRISPRessoReport.make_report`` for HTML report generation.
+        #
         if C2PRO_INSTALLED:
             try:
                 from CRISPRessoPro import hooks as pro_hooks
@@ -4914,7 +4933,6 @@ def main():
                 if args.halt_on_plot_fail:
                     raise
                 logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
-        # --- END CRISPRessoPro plot hook ---
         elif not args.suppress_plots:
             if n_processes > 1:
                 process_pool = ProcessPoolExecutor(n_processes)
@@ -5496,7 +5514,7 @@ def main():
 
                 if not args.suppress_plots:
                     if (global_frameshift['global_modified_frameshift'] + global_frameshift['global_modified_non_frameshift'] + global_frameshift['global_non_modified_non_frameshift']) > 0:
-                        plot_5a_input = CRISPRessoPlotData.prep_global_frameshift_analysis(plot_context)
+                        plot_5a_input = CRISPRessoPlotData.prep_global_frameshift_analysis(plot_context, global_data=global_frameshift)
                         debug('Plotting global frameshift in-frame mutations pie chart', {'percent_complete': 90})
                         plot(CRISPRessoPlot.plot_global_frameshift_analysis, plot_5a_input)
                         crispresso2_info['results']['general_plots']['plot_5a_root'] = os.path.basename(plot_5a_input['fig_filename_root'])
@@ -5504,7 +5522,7 @@ def main():
                         crispresso2_info['results']['general_plots']['plot_5a_data'] = []
 
                     # profiles-----------------------------------------------------------------------------------
-                    plot_6a_input = CRISPRessoPlotData.prep_global_frameshift_in_frame_mutations(plot_context)
+                    plot_6a_input = CRISPRessoPlotData.prep_global_frameshift_in_frame_mutations(plot_context, global_data=global_frameshift)
                     debug('Plotting global frameshift in-frame mutation profiles', {'percent_complete': 92})
                     plot(CRISPRessoPlot.plot_global_frameshift_in_frame_mutations, plot_6a_input)
 
@@ -5516,7 +5534,7 @@ def main():
                             crispresso2_info['results']['general_plots']['plot_6a_data'].append(('Indel histogram for ' + ref_name, os.path.basename(crispresso2_info['results']['refs'][ref_name]['indel_histogram_filename'])))
 
                     # -----------------------------------------------------------------------------------------------------------
-                    plot_8a_input = CRISPRessoPlotData.prep_impact_on_splice_sites(plot_context)
+                    plot_8a_input = CRISPRessoPlotData.prep_impact_on_splice_sites(plot_context, global_data=global_frameshift)
                     debug('Plotting global potential splice sites pie chart', {'percent_complete': 94})
                     plot(CRISPRessoPlot.plot_impact_on_splice_sites, plot_8a_input)
                     crispresso2_info['results']['general_plots']['plot_8a_root'] = os.path.basename(plot_8a_input['fig_filename_root'])

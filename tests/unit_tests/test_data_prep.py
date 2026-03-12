@@ -1090,3 +1090,458 @@ def test_prep_amino_acid_table_for_plot_with_silent_edits():
     # Should have silent edit at row 0, position 1
     assert 0 in silent_edit_dict
     assert 1 in silent_edit_dict[0]
+
+
+# =============================================================================
+# Helper: Build a minimal df_alleles for integration-style prep tests
+# =============================================================================
+
+
+def _make_df_alleles(ref_name, aligned_seqs, ref_seq, reads, read_status=None):
+    """Build a df_alleles-like DataFrame suitable for CRISPRessoShared cut functions.
+
+    Parameters
+    ----------
+    ref_name : str
+        Reference name to populate ``Reference_Name``.
+    aligned_seqs : list[str]
+        Aligned read sequences (may contain ``-`` for deletions).
+    ref_seq : str
+        The aligned reference sequence (same length as each aligned_seq).
+    reads : list[int]
+        ``#Reads`` for each allele.
+    read_status : list[str] or None
+        ``Read_Status`` values; defaults to ``'MODIFIED'`` for all.
+
+    Returns a DataFrame with the columns expected by
+    ``CRISPRessoShared.get_dataframe_around_cut_asymmetrical`` et al.
+    """
+    total_reads = sum(reads)
+    n = len(aligned_seqs)
+    if read_status is None:
+        read_status = ['MODIFIED'] * n
+
+    # Build ref_positions: for each position in the alignment, what is the
+    # reference coordinate (0-indexed)?  Gaps in the reference get -1.
+    ref_positions = []
+    pos = 0
+    for c in ref_seq:
+        if c == '-':
+            ref_positions.append(-1)
+        else:
+            ref_positions.append(pos)
+            pos += 1
+
+    # Compute simple n_deleted / n_inserted / n_mutated per allele
+    rows = []
+    for i, (aln, status) in enumerate(zip(aligned_seqs, read_status)):
+        n_del = sum(1 for a, r in zip(aln, ref_seq) if a == '-' and r != '-')
+        n_ins = sum(1 for a, r in zip(aln, ref_seq) if a != '-' and r == '-')
+        n_mut = sum(1 for a, r in zip(aln, ref_seq) if a != '-' and r != '-' and a != r)
+        rows.append({
+            'Aligned_Sequence': aln,
+            'Reference_Sequence': ref_seq,
+            'ref_positions': ref_positions,
+            'Read_Status': status,
+            'n_deleted': n_del,
+            'n_inserted': n_ins,
+            'n_mutated': n_mut,
+            '#Reads': reads[i],
+            '%Reads': 100.0 * reads[i] / total_reads,
+            'Reference_Name': ref_name,
+        })
+    return pd.DataFrame(rows)
+
+
+# =============================================================================
+# Tests: prep_alleles_around_cut (plot 9)
+# =============================================================================
+
+
+class TestPrepAllelesAroundCut:
+
+    def test_basic(self):
+        """Smoke test: single allele, unmodified, returns expected keys."""
+        #                       0123456789
+        ref_sequence =         'AACCGGTTAA'
+        aligned_ref =          'AACCGGTTAA'
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=[ref_sequence],
+            ref_seq=aligned_ref,
+            reads=[100],
+            read_status=['UNMODIFIED'],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+                sgRNA_names=['sgRNA1'],
+                sgRNA_mismatches=[],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+                annotate_wildtype_allele='',
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_alleles_around_cut(ctx)
+
+        assert 'df_alleles_around_cut' in result
+        assert 'ref_seq_around_cut' in result
+        assert 'new_sgRNA_intervals' in result
+        assert 'new_cut_point' in result
+        assert 'window_truncated' in result
+        assert 'plot_input' in result
+        # Window of size 3 around cut_point=4 → positions 2..7 → 6 chars
+        assert len(result['ref_seq_around_cut']) <= 7
+
+    def test_with_substitution(self):
+        """Allele with a substitution produces plot_input with expected content."""
+        ref_sequence = 'AACCGGTTAA'
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=['AACCGGTTAA', 'AATCGGTTAA'],
+            ref_seq='AACCGGTTAA',
+            reads=[80, 20],
+            read_status=['UNMODIFIED', 'MODIFIED'],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+                sgRNA_names=['sgRNA1'],
+                sgRNA_mismatches=[],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+                annotate_wildtype_allele='',
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_alleles_around_cut(ctx)
+
+        assert result['plot_input'] is not None
+        pi = result['plot_input']
+        assert 'reference_seq' in pi
+        assert 'prepped_df_alleles' in pi
+        assert 'fig_filename_root' in pi
+        assert '9.' in pi['fig_filename_root']
+        # Two alleles in the window
+        assert len(pi['y_labels']) >= 1
+
+    def test_plot_input_none_below_threshold(self):
+        """When all alleles are below min_frequency, plot_input is None."""
+        ref_sequence = 'AACCGGTTAA'
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=['AACCGGTTAA'],
+            ref_seq='AACCGGTTAA',
+            reads=[100],
+            read_status=['UNMODIFIED'],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                min_frequency_alleles_around_cut_to_plot=99999,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+                annotate_wildtype_allele='',
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_alleles_around_cut(ctx)
+        assert result['plot_input'] is None
+
+    def test_window_truncation_near_edge(self):
+        """Window near amplicon edge sets window_truncated=True."""
+        ref_sequence = 'ACGT'
+        df = _make_df_alleles(
+            'r', aligned_seqs=['ACGT'], ref_seq='ACGT',
+            reads=[100], read_status=['UNMODIFIED'],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=4,
+                sgRNA_cut_points=[0],
+                sgRNA_plot_cut_points=[0],
+                sgRNA_intervals=[(0, 3)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=20,  # much larger than sequence
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+                annotate_wildtype_allele='',
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_alleles_around_cut(ctx)
+        assert result['window_truncated'] is True
+
+
+# =============================================================================
+# Tests: prep_base_edit_quilt (plot 10h)
+# =============================================================================
+
+
+class TestPrepBaseEditQuilt:
+
+    def test_basic(self):
+        """Smoke test: base edit quilt with one C position."""
+        #                 0123456789
+        ref_sequence =   'AACCGGTTAA'
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=['AACCGGTTAA', 'AATCGGTTAA'],
+            ref_seq='AACCGGTTAA',
+            reads=[80, 20],
+            read_status=['UNMODIFIED', 'MODIFIED'],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                conversion_nuc_from='C',
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_base_edit_quilt(ctx)
+
+        assert 'df_alleles_around_cut' in result
+        assert 'ref_seq_around_cut' in result
+        assert 'plot_input' in result
+
+    def test_plot_input_none_below_threshold(self):
+        """When all alleles are below min_frequency, plot_input is None."""
+        ref_sequence = 'AACCGGTTAA'
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=['AACCGGTTAA'],
+            ref_seq='AACCGGTTAA',
+            reads=[100],
+            read_status=['UNMODIFIED'],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                conversion_nuc_from='C',
+                min_frequency_alleles_around_cut_to_plot=99999,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_base_edit_quilt(ctx)
+        assert result['plot_input'] is None
+
+    def test_x_labels_are_conversion_nuc_positions(self):
+        """x_labels should be 1-indexed positions of conversion_nuc_from."""
+        ref_sequence = 'ACCA'
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=['ACCA', 'ATCA'],
+            ref_seq='ACCA',
+            reads=[70, 30],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=4,
+                sgRNA_cut_points=[1],
+                sgRNA_plot_cut_points=[1],
+                sgRNA_intervals=[(0, 3)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                conversion_nuc_from='C',
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_base_edit_quilt(ctx)
+        # 'ACCA' — C at positions 1 and 2 (0-indexed) → 1-indexed: [2, 3]
+        pi = result['plot_input']
+        if pi is not None:
+            assert pi['x_labels'] == [2, 3]
+
+
+# =============================================================================
+# Tests: prep_amino_acid_table (plot 9a)
+# =============================================================================
+
+
+class TestPrepAminoAcidTable:
+
+    def test_basic(self):
+        """Smoke test: amino acid table with a simple coding seq."""
+        # 9-base coding seq → 3 amino acids
+        coding_seq = 'ATGGCTTAA'  # M, A, *
+        # Build a ref that contains this coding seq starting at position 0
+        ref_sequence = coding_seq
+        ref_len = len(ref_sequence)
+
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=[ref_sequence, 'ATGACTTAA'],
+            ref_seq=ref_sequence,
+            reads=[80, 20],
+            read_status=['UNMODIFIED', 'MODIFIED'],
+        )
+
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=ref_len,
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+                sgRNA_names=['sgRNA1'],
+                sgRNA_mismatches=[],
+                contains_coding_seq=True,
+                exon_positions=list(range(ref_len)),
+                exon_intervals=[(0, ref_len - 1)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                annotate_wildtype_allele='',
+            ),
+            run_data={'running_info': {'coding_seqs': [coding_seq]}},
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+        ctx.coding_seq_ind = 0
+
+        result = prep_amino_acid_table(ctx)
+
+        assert 'coding_seq_amino_acids' in result
+        assert 'amino_acid_cut_point' in result
+        assert 'df_to_plot' in result
+        assert 'plot_input' in result
+        # Coding seq ATG GCT TAA → M A *
+        assert result['coding_seq_amino_acids'] == 'MA*'
+
+    def test_plot_input_none_below_threshold(self):
+        """When no rows pass threshold, plot_input is None."""
+        coding_seq = 'ATGGCTTAA'
+        ref_sequence = coding_seq
+
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=[ref_sequence],
+            ref_seq=ref_sequence,
+            reads=[100],
+            read_status=['UNMODIFIED'],
+        )
+
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+                contains_coding_seq=True,
+                exon_positions=list(range(len(ref_sequence))),
+                exon_intervals=[(0, len(ref_sequence) - 1)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                min_frequency_alleles_around_cut_to_plot=99999,
+                max_rows_alleles_around_cut_to_plot=10,
+                annotate_wildtype_allele='',
+            ),
+            run_data={'running_info': {'coding_seqs': [coding_seq]}},
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+        ctx.coding_seq_ind = 0
+
+        result = prep_amino_acid_table(ctx)
+        assert result['plot_input'] is None
