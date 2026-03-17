@@ -1,7 +1,20 @@
-"""PlotContext: view into CRISPRessoCORE's computed data for plugins.
+"""PlotContext hierarchy: typed data views for CRISPResso2 plot plugins.
 
-This is the ONLY part of the plugin architecture that lives in CRISPResso2.
-CRISPRessoPro and plugins consume this to generate custom plots.
+This module defines the base :class:`PlotContext` and mode-specific
+subclasses that CRISPRessoPro and plugins consume to generate custom
+plots.  Each CORE module constructs its corresponding context once per
+run, after analysis completes but before the plotting section begins.
+
+Hierarchy::
+
+    PlotContext (base — 6 required fields, no defaults)
+    ├── CorePlotContext      (single-sample CRISPR analysis)
+    ├── BatchPlotContext     (cross-batch summary data)
+    ├── AggregatePlotContext (cross-folder summary data)
+    ├── PooledPlotContext    (region summary)
+    ├── WGSPlotContext       (region summary)
+    └── ComparePlotContext   (paired-sample comparison)
+
 """
 
 from __future__ import annotations
@@ -14,27 +27,56 @@ import numpy as np
 import pandas as pd
 
 
+# =============================================================================
+# Base class — shared configuration / plumbing
+# =============================================================================
+
+
 @dataclass
 class PlotContext:
-    """View into CORE's computed data, passed to CRISPRessoPro and plugins.
+    """Base context shared by every CRISPResso2 mode.
 
-    Constructed once per run by CORE after the analysis and built-in plot
-    phases complete. Wraps references to CORE's local variables -- no data
-    is copied.
+    Contains only configuration and plumbing fields that are common to
+    all modes.  All fields are **required** (no defaults) so that
+    dataclass inheritance works on Python < 3.10 without ``kw_only``.
+
+    .. warning::
+
+        Contexts should be treated as read-only (except for scope
+        fields).  Mutating the underlying dicts, arrays, or DataFrames
+        will corrupt the analysis results and the output report.
+    """
+
+    args: argparse.Namespace            # All CLI arguments
+    run_data: dict                      # crispresso2_info dict
+    output_directory: str               # Output path
+    save_png: bool                      # Whether to save PNG alongside HTML/SVG
+    _jp: Callable[[str], str]           # Joins filename with output directory
+    custom_config: dict                 # Color/style configuration
+
+
+# =============================================================================
+# Core (single-sample) context
+# =============================================================================
+
+
+@dataclass
+class CorePlotContext(PlotContext):
+    """View into CRISPRessoCORE's computed data for a single-sample run.
+
+    Constructed once per run by CORE after the analysis phase completes.
+    Wraps references to CORE's local variables — no data is copied.
 
     .. warning::
 
         All fields except ``ref_name``, ``sgRNA_ind``, and
-        ``coding_seq_ind`` should be treated as read-only. Mutating the
+        ``coding_seq_ind`` should be treated as read-only.  Mutating the
         underlying dicts, arrays, or DataFrames will corrupt the analysis
-        results and the output report. Python cannot enforce this at
-        runtime -- it is a contract.
+        results and the output report.
     """
 
     # === Run-level data (always available) ===
 
-    args: argparse.Namespace        # All CLI arguments
-    run_data: dict                  # crispresso2_info dict
     refs: dict                      # Per-amplicon reference data
     ref_names: list[str]            # Ordered list of amplicon/reference names
 
@@ -82,11 +124,6 @@ class PlotContext:
 
     # === Fields with defaults (must follow all required fields) ===
 
-    # Nucleotide frequency data (ref_name -> DataFrame)
-    # Not populated by CRISPRessoCORE (always {}); reserved for Batch/Aggregate.
-    nucleotide_frequency_summary: dict = field(default_factory=dict)
-    nucleotide_percentage_summary: dict = field(default_factory=dict)
-
     # HDR / ref1-aligned vectors (populated when expected_hdr_amplicon_seq is set)
     ref1_all_insertion_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
     ref1_all_deletion_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
@@ -94,14 +131,6 @@ class PlotContext:
     ref1_all_indelsub_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
     ref1_all_insertion_left_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
     ref1_all_base_count_vectors: dict[str, np.ndarray] = field(default_factory=dict)
-
-    # Configuration
-    custom_config: dict = field(default_factory=dict)
-
-    # Utility
-    _jp: Optional[Callable[[str], str]] = None  # Joins path with output directory
-    save_png: bool = False
-    output_directory: str = ""
 
     # === Additional data fields (populated by CORE when available) ===
 
@@ -134,3 +163,145 @@ class PlotContext:
     ref_name: Optional[str] = None
     sgRNA_ind: Optional[int] = None
     coding_seq_ind: Optional[int] = None
+
+
+# =============================================================================
+# Batch context
+# =============================================================================
+
+
+@dataclass
+class BatchPlotContext(PlotContext):
+    """View into CRISPRessoBatchCORE's aggregated data for cross-batch plots.
+
+    Constructed once per run after per-amplicon summary DataFrames are
+    built.  All per-amplicon data is stored in dicts keyed by amplicon
+    name; the ``amplicon_name`` scope field selects the current slice
+    during iteration.
+    """
+
+    # === Run-level data ===
+
+    amplicon_names: list[str]                                   # All amplicon names in this batch
+
+    # Per-amplicon summary DataFrames (amplicon_name -> DataFrame)
+    nucleotide_frequency_summary_dfs: dict[str, pd.DataFrame]
+    nucleotide_percentage_summary_dfs: dict[str, pd.DataFrame]
+    modification_frequency_summary_dfs: dict[str, pd.DataFrame]
+    modification_percentage_summary_dfs: dict[str, pd.DataFrame]
+
+    # Per-amplicon consensus guide data (amplicon_name -> ...)
+    consensus_guides: dict[str, list[str]]
+    consensus_include_idxs: dict[str, np.ndarray]
+    consensus_sgRNA_intervals: dict[str, list[tuple]]
+    consensus_sgRNA_plot_idxs: dict[str, list[np.ndarray]]
+    guides_all_same: dict[str, bool]
+
+    # === Scope fields ===
+
+    amplicon_name: Optional[str] = None
+    sgRNA_ind: Optional[int] = None
+
+
+# =============================================================================
+# Aggregate context
+# =============================================================================
+
+
+@dataclass
+class AggregatePlotContext(PlotContext):
+    """View into CRISPRessoAggregateCORE's data for cross-folder plots.
+
+    Same per-amplicon dict structure as :class:`BatchPlotContext`, plus
+    ``df_summary_quantification`` for the reads-total / unmod-mod-pcts
+    summary plots and ``sample_count`` for pagination.
+    """
+
+    # === Run-level data ===
+
+    amplicon_names: list[str]
+
+    # Per-amplicon summary DataFrames (amplicon_name -> DataFrame)
+    nucleotide_frequency_summary_dfs: dict[str, pd.DataFrame]
+    nucleotide_percentage_summary_dfs: dict[str, pd.DataFrame]
+    modification_frequency_summary_dfs: dict[str, pd.DataFrame]
+    modification_percentage_summary_dfs: dict[str, pd.DataFrame]
+
+    # Per-amplicon consensus guide data (amplicon_name -> ...)
+    consensus_guides: dict[str, list[str]]
+    consensus_include_idxs: dict[str, np.ndarray]
+    consensus_sgRNA_intervals: dict[str, list[tuple]]
+    consensus_sgRNA_plot_idxs: dict[str, list[np.ndarray]]
+    guides_all_same: dict[str, bool]
+
+    # Summary quantification (for reads_total / unmod_mod_pcts plots)
+    df_summary_quantification: pd.DataFrame
+
+    # Per-amplicon sample count (for pagination)
+    sample_count: dict[str, int]
+
+    # === Scope fields ===
+
+    amplicon_name: Optional[str] = None
+    sgRNA_ind: Optional[int] = None
+
+
+# =============================================================================
+# Pooled context
+# =============================================================================
+
+
+@dataclass
+class PooledPlotContext(PlotContext):
+    """View into CRISPRessoPooledCORE's data for region summary plots.
+
+    Only carries ``df_summary_quantification`` — the two plots
+    (reads_total, unmod_mod_pcts) read everything else from ``ctx.args``.
+    """
+
+    df_summary_quantification: pd.DataFrame
+
+
+# =============================================================================
+# WGS context
+# =============================================================================
+
+
+@dataclass
+class WGSPlotContext(PlotContext):
+    """View into CRISPRessoWGSCORE's data for region summary plots.
+
+    Same shape as :class:`PooledPlotContext`; separate class for
+    independent evolution and plugin dispatch.
+    """
+
+    df_summary_quantification: pd.DataFrame
+
+
+# =============================================================================
+# Compare context
+# =============================================================================
+
+
+@dataclass
+class ComparePlotContext(PlotContext):
+    """View into CRISPRessoCompareCORE's data for paired-sample plots.
+
+    Holds raw inputs from both samples.  Per-amplicon derived data
+    (profiles, Fisher test results, merged allele tables) are computed
+    by prep functions, not stored on the context.
+    """
+
+    # === Run-level data ===
+
+    amplicon_names: list[str]           # Amplicon names present in both samples
+    sample_1_name: str
+    sample_2_name: str
+    run_info_1: dict                    # Full crispresso2_info from sample 1
+    run_info_2: dict                    # Full crispresso2_info from sample 2
+    amplicon_info_1: dict[str, dict]    # Per-amplicon quantification info, sample 1
+    amplicon_info_2: dict[str, dict]    # Per-amplicon quantification info, sample 2
+
+    # === Scope field ===
+
+    amplicon_name: Optional[str] = None

@@ -34,7 +34,7 @@ else:
 
 from CRISPResso2 import CRISPResso2Align, CRISPRessoMultiProcessing
 from CRISPResso2.plots import data_prep as CRISPRessoPlotData
-from CRISPResso2.plots.plot_context import PlotContext
+from CRISPResso2.plots.plot_context import CorePlotContext
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -4842,7 +4842,7 @@ def main():
                         all_substitution_base_vectors, ref_name, refs[ref_name]['sequence'],
                     )
 
-        # --- Build PlotContext (shared by CRISPRessoPro hook and built-in plots) ---
+        # --- Build CorePlotContext (shared by CRISPRessoPro hook and built-in plots) ---
         # HDR / prime-editing vectors are only in scope when
         # expected_hdr_amplicon_seq or prime_editing_pegRNA_extension_seq is set.
         hdr_kwargs = {}
@@ -4856,9 +4856,13 @@ def main():
                 ref1_all_base_count_vectors=ref1_all_base_count_vectors,
             )
 
-        plot_context = PlotContext(
+        plot_context = CorePlotContext(
             args=args,
             run_data=crispresso2_info,
+            output_directory=OUTPUT_DIRECTORY,
+            save_png=save_png,
+            _jp=_jp,
+            custom_config=custom_config,
             refs=crispresso2_info['results']['refs'],
             ref_names=ref_names,
             counts_total=counts_total,
@@ -4889,10 +4893,6 @@ def main():
             counts_modified_non_frameshift=counts_modified_non_frameshift,
             counts_non_modified_non_frameshift=counts_non_modified_non_frameshift,
             counts_splicing_sites_modified=counts_splicing_sites_modified,
-            custom_config=custom_config,
-            _jp=_jp,
-            save_png=save_png,
-            output_directory=OUTPUT_DIRECTORY,
             class_counts_order=class_counts_order,
             homology_scores=homology_scores,
             homology_counts=homology_counts,
@@ -4910,7 +4910,7 @@ def main():
         # Contract:
         #   When CRISPRessoPro is installed (C2PRO_INSTALLED=True), the Pro
         #   plugin takes **full ownership** of plot generation and CSV/metadata
-        #   export for the plots section.  ``plot_context`` (a PlotContext
+        #   export for the plots section.  ``plot_context`` (a CorePlotContext
         #   dataclass populated above) is the single interface — Pro reads
         #   the same data the built-in branch would, calls its own prep/plot
         #   pipeline, and writes results into ``crispresso2_info`` via hooks.

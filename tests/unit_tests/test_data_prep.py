@@ -1,6 +1,6 @@
 """Tests for CRISPResso2.plots.data_prep — extracted data preparation functions.
 
-Each prep function takes a PlotContext as its only argument and returns
+Each prep function takes a CorePlotContext as its only argument and returns
 the kwargs dict that the corresponding CRISPRessoPlot function expects.
 """
 
@@ -34,16 +34,16 @@ from CRISPResso2.plots.data_prep import (
     prep_pe_nucleotide_quilt_around_sgRNA,
     _to_numeric_ignore_columns,
 )
-from CRISPResso2.plots.plot_context import PlotContext
+from CRISPResso2.plots.plot_context import CorePlotContext
 
 
 # =============================================================================
-# Helper: Build minimal PlotContext for tests
+# Helper: Build minimal CorePlotContext for tests
 # =============================================================================
 
 
 def _make_ctx(**overrides):
-    """Build a minimal PlotContext, merging *overrides* into defaults."""
+    """Build a minimal CorePlotContext, merging *overrides* into defaults."""
     defaults = dict(
         args=SimpleNamespace(
             plot_histogram_outliers=False,
@@ -56,6 +56,10 @@ def _make_ctx(**overrides):
             coding_seq='',
         ),
         run_data={'running_info': {}},
+        output_directory='',
+        save_png=False,
+        _jp=lambda f: f,
+        custom_config={},
         refs={},
         ref_names=[],
         counts_total={},
@@ -88,7 +92,7 @@ def _make_ctx(**overrides):
         counts_splicing_sites_modified={},
     )
     defaults.update(overrides)
-    return PlotContext(**defaults)
+    return CorePlotContext(**defaults)
 
 
 def _ref_dict(**overrides):
@@ -643,7 +647,7 @@ class TestPrepWindowedAlleles:
 
 
 # =============================================================================
-# Tests: prep_class_piechart_and_barplot (utility, not PlotContext-based)
+# Tests: prep_class_piechart_and_barplot (utility, not CorePlotContext-based)
 # =============================================================================
 
 
@@ -684,7 +688,7 @@ class TestPrepClassPiechartAndBarplot:
 
 
 # =============================================================================
-# Tests: prep_alternate_allele_counts (utility, not PlotContext-based)
+# Tests: prep_alternate_allele_counts (utility, not CorePlotContext-based)
 # =============================================================================
 
 

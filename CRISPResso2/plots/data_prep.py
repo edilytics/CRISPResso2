@@ -2,27 +2,27 @@
 
 **Every built-in plot has a corresponding prep function here — no exceptions.**
 
-Each PlotContext-based prep takes a single :class:`PlotContext` argument and
-returns the kwargs dict that the corresponding CRISPRessoPlot function
-expects, giving every plot a uniform ``prep(ctx) → csv write → plot →
-metadata`` shape in CORE.
+Each CorePlotContext-based prep takes a single :class:`CorePlotContext`
+argument and returns the kwargs dict that the corresponding CRISPRessoPlot
+function expects, giving every plot a uniform ``prep(ctx) → csv write →
+plot → metadata`` shape in CORE.
 
 These are pure functions — no file I/O, no side effects — with the
 exception of ``prep_alleles_around_cut`` and ``prep_base_edit_quilt``
 which intentionally mutate their input DataFrames (see their docstrings).
 
 CORE calls these to build plot inputs. CRISPRessoPro can call them
-from PlotContext to generate plots independently.
+from CorePlotContext to generate plots independently.
 
 This module also contains serialization-boundary helper functions
 (``prep_alleles_table``, ``prep_alleles_table_compare``,
 ``prep_amino_acid_table_for_plot``) that reduce DataFrame size before
-dispatching to plot worker threads. These are not PlotContext-based —
-they take explicit arguments and are called by the PlotContext-based
+dispatching to plot worker threads. These are not CorePlotContext-based —
+they take explicit arguments and are called by the CorePlotContext-based
 prep functions or directly from CRISPRessoPlot's combined plot functions.
 
-Scope fields on PlotContext
----------------------------
+Scope fields on CorePlotContext
+-------------------------------
 Most functions require ``ctx.ref_name`` to be set (which reference amplicon
 is being processed). Functions that operate per-sgRNA additionally require
 ``ctx.sgRNA_ind``. ``prep_amino_acid_table`` also requires
@@ -37,7 +37,7 @@ from collections import Counter, defaultdict
 import numpy as np
 import pandas as pd
 
-from CRISPResso2.plots.plot_context import PlotContext
+from CRISPResso2.plots.plot_context import CorePlotContext
 
 
 # =============================================================================
@@ -88,28 +88,28 @@ def _clip_to_percentile(values, counts, percentile=0.99, total=None):
 
 
 # =============================================================================
-# New private helpers for PlotContext extraction
+# New private helpers for CorePlotContext extraction
 # =============================================================================
 
 
-def _make_fig_filename_root(ctx: PlotContext, filename: str) -> str:
+def _make_fig_filename_root(ctx: CorePlotContext, filename: str) -> str:
     """Construct fig_filename_root path, or return *filename* if _jp is unavailable."""
     if ctx._jp is not None:
         return ctx._jp(filename)
     return filename
 
 
-def _ref(ctx: PlotContext) -> dict:
+def _ref(ctx: CorePlotContext) -> dict:
     """Shortcut for the current reference's data dict."""
     return ctx.refs[ctx.ref_name]
 
 
-def _ref_plot_name(ctx: PlotContext) -> str:
+def _ref_plot_name(ctx: CorePlotContext) -> str:
     """Return the current reference's plot-name prefix."""
     return _ref(ctx)['ref_plot_name']
 
 
-def _sgRNA_label(ctx: PlotContext) -> str:
+def _sgRNA_label(ctx: CorePlotContext) -> str:
     """Compute the file-name label for the current sgRNA."""
     from CRISPResso2 import CRISPRessoShared
 
@@ -122,7 +122,7 @@ def _sgRNA_label(ctx: PlotContext) -> str:
     return CRISPRessoShared.slugify(label)
 
 
-def _sgRNA_legend(ctx: PlotContext) -> str:
+def _sgRNA_legend(ctx: CorePlotContext) -> str:
     """Compute the legend string for the current sgRNA."""
     ref = _ref(ctx)
     sgRNA = ref['sgRNA_orig_sequences'][ctx.sgRNA_ind]
@@ -177,7 +177,7 @@ def _build_freq_del_ins_clipped_string(xmax_ins, xmax_del, xmax_mut,
     return ""
 
 
-def _build_nuc_freq_df(ctx: PlotContext, ref_name: str | None = None):
+def _build_nuc_freq_df(ctx: CorePlotContext, ref_name: str | None = None):
     """Build nucleotide frequency and percentage DataFrames for a reference.
 
     Returns ``(df_nuc_freq, df_nuc_pct)`` where rows are nucleotides
@@ -261,10 +261,10 @@ def _compute_half_windows(cut_point, plot_window_size, ref_len):
 
 
 # =============================================================================
-# Serialization-boundary helpers (not PlotContext-based)
+# Serialization-boundary helpers (not CorePlotContext-based)
 #
 # These run in the main thread to shrink DataFrames before sending to
-# plot worker threads.  They are called by PlotContext-based prep
+# plot worker threads.  They are called by CorePlotContext-based prep
 # functions and by CRISPRessoPlot's combined plot functions.
 # =============================================================================
 
@@ -485,11 +485,11 @@ def prep_amino_acid_table_for_plot(df_alleles, reference_seq, MAX_N_ROWS,
 
 
 # =============================================================================
-# Public prep functions — each takes a single PlotContext
+# Public prep functions — each takes a single CorePlotContext
 # =============================================================================
 
 
-def prep_indel_size_distribution(ctx: PlotContext):
+def prep_indel_size_distribution(ctx: CorePlotContext):
     """Prepare kwargs for plot_indel_size_distribution (plot_3a).
 
     Requires ``ctx.ref_name``.
@@ -543,7 +543,7 @@ def prep_indel_size_distribution(ctx: PlotContext):
     }
 
 
-def prep_frequency_deletions_insertions(ctx: PlotContext):
+def prep_frequency_deletions_insertions(ctx: CorePlotContext):
     """Prepare kwargs for plot_frequency_deletions_insertions (plot_3b).
 
     Requires ``ctx.ref_name``.
@@ -611,7 +611,7 @@ def prep_frequency_deletions_insertions(ctx: PlotContext):
     }
 
 
-def prep_amplicon_modifications(ctx: PlotContext):
+def prep_amplicon_modifications(ctx: CorePlotContext):
     """Prepare kwargs for plot_amplicon_modifications (plot_4a).
 
     Requires ``ctx.ref_name``.
@@ -662,7 +662,7 @@ def prep_amplicon_modifications(ctx: PlotContext):
     }
 
 
-def prep_modification_frequency(ctx: PlotContext):
+def prep_modification_frequency(ctx: CorePlotContext):
     """Prepare kwargs for plot_modification_frequency (plot_4b).
 
     Requires ``ctx.ref_name``.
@@ -704,7 +704,7 @@ def prep_modification_frequency(ctx: PlotContext):
     }
 
 
-def prep_dsODN_piechart(ctx: PlotContext):
+def prep_dsODN_piechart(ctx: CorePlotContext):
     """Prepare kwargs for plot_class_dsODN_piechart (plot_1d).
 
     No scope fields required.
@@ -733,7 +733,7 @@ def prep_dsODN_piechart(ctx: PlotContext):
     }
 
 
-def prep_nucleotide_quilt(ctx: PlotContext):
+def prep_nucleotide_quilt(ctx: CorePlotContext):
     """Prepare kwargs for plot_nucleotide_quilt (plot_2a).
 
     Requires ``ctx.ref_name``.
@@ -790,7 +790,7 @@ def prep_nucleotide_quilt(ctx: PlotContext):
     }
 
 
-def prep_nucleotide_quilt_around_sgRNA(ctx: PlotContext):
+def prep_nucleotide_quilt_around_sgRNA(ctx: CorePlotContext):
     """Prepare kwargs for plot_nucleotide_quilt around one sgRNA (plot_2b).
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
@@ -844,7 +844,7 @@ def prep_nucleotide_quilt_around_sgRNA(ctx: PlotContext):
     }
 
 
-def prep_hdr_nucleotide_quilt(ctx: PlotContext):
+def prep_hdr_nucleotide_quilt(ctx: CorePlotContext):
     """Prepare kwargs for plot_nucleotide_quilt for HDR comparison (plot_4g).
 
     No scope fields required (iterates over all references with reads).
@@ -905,7 +905,7 @@ def prep_hdr_nucleotide_quilt(ctx: PlotContext):
     }
 
 
-def prep_pe_nucleotide_quilt(ctx: PlotContext):
+def prep_pe_nucleotide_quilt(ctx: CorePlotContext):
     """Prepare kwargs for plot_nucleotide_quilt for PE comparison (plot_11a).
 
     No scope fields required.
@@ -922,7 +922,7 @@ def prep_pe_nucleotide_quilt(ctx: PlotContext):
     return result
 
 
-def prep_pe_nucleotide_quilt_around_sgRNA(ctx: PlotContext):
+def prep_pe_nucleotide_quilt_around_sgRNA(ctx: CorePlotContext):
     """Prepare kwargs for plot_nucleotide_quilt around one sgRNA for PE (plot_11b).
 
     Requires ``ctx.sgRNA_ind``. Uses the first reference for sgRNA metadata.
@@ -983,7 +983,7 @@ def prep_pe_nucleotide_quilt_around_sgRNA(ctx: PlotContext):
     }
 
 
-def prep_global_frameshift_data(ctx: PlotContext):
+def prep_global_frameshift_data(ctx: CorePlotContext):
     """Aggregate frameshift/splice/inframe counts across all coding-seq refs.
 
     No scope fields required.
@@ -1043,7 +1043,7 @@ def prep_global_frameshift_data(ctx: PlotContext):
     }
 
 
-def prep_global_modifications_reference(ctx: PlotContext):
+def prep_global_modifications_reference(ctx: CorePlotContext):
     """Prepare kwargs for plot_global_modifications_reference (plot_4e/4f).
 
     Requires ``ctx.ref_name`` (either the primary amplicon or ``"HDR"``).
@@ -1080,7 +1080,7 @@ def prep_global_modifications_reference(ctx: PlotContext):
     }
 
 
-def prep_log_nuc_freqs(ctx: PlotContext):
+def prep_log_nuc_freqs(ctx: CorePlotContext):
     """Prepare kwargs for plot_log_nuc_freqs (plot_10d).
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
@@ -1132,7 +1132,7 @@ def prep_log_nuc_freqs(ctx: PlotContext):
     }
 
 
-def prep_amino_acid_table(ctx: PlotContext):
+def prep_amino_acid_table(ctx: CorePlotContext):
     """Prepare amino acid table data for plot_9a and CSV export.
 
     Requires ``ctx.ref_name``, ``ctx.sgRNA_ind``, and ``ctx.coding_seq_ind``.
@@ -1298,7 +1298,7 @@ def _prep_windowed_alleles(
     )
 
 
-def prep_alleles_around_cut(ctx: PlotContext):
+def prep_alleles_around_cut(ctx: CorePlotContext):
     """Prepare alleles-around-cut data for plot_9 and CSV export.
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
@@ -1422,7 +1422,7 @@ def prep_alleles_around_cut(ctx: PlotContext):
     }
 
 
-def prep_base_edit_quilt(ctx: PlotContext):
+def prep_base_edit_quilt(ctx: CorePlotContext):
     """Prepare base edit quilt data for plot_10h and CSV export.
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
@@ -1542,7 +1542,7 @@ def prep_alternate_allele_counts(sub_base_vectors, ref_name, ref_sequence):
     positions where that base appears. Returns a nested dict
     ``{ref_nuc: {obs_nuc: count}}``.
 
-    This is a low-level utility (not PlotContext-based) used by
+    This is a low-level utility (not CorePlotContext-based) used by
     ``count_alternate_alleles`` in CORE.
     """
     alph = ['A', 'C', 'G', 'T', 'N']
@@ -1561,7 +1561,7 @@ def prep_class_piechart_and_barplot(class_counts_order, class_counts,
                                     N_TOTAL):
     """Compute labels and sizes for class piechart/barplot (plot_1b/1c).
 
-    This is a standalone utility (not PlotContext-based) that transforms
+    This is a standalone utility (not CorePlotContext-based) that transforms
     raw class counts into display-ready labels and percentage sizes.
 
     Returns dict with 'labels', 'sizes', 'N_TOTAL'.
@@ -1591,7 +1591,7 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
     Finds the target sequence, aligns it to reference, identifies
     base changes, and computes combination counts.
 
-    This is a standalone utility (not PlotContext-based) that encapsulates
+    This is a standalone utility (not CorePlotContext-based) that encapsulates
     the inline logic from CRISPRessoCORE for plot_10i.
 
     Parameters
@@ -1685,7 +1685,7 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
     }
 
 
-def prep_conversion_at_sel_nucs(ctx: PlotContext):
+def prep_conversion_at_sel_nucs(ctx: CorePlotContext):
     """Compute from_nuc_indices and selected-nucleotide DataFrames for plots 10e/10f/10g.
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
@@ -1737,7 +1737,7 @@ def prep_conversion_at_sel_nucs(ctx: PlotContext):
 # =============================================================================
 
 
-def prep_read_barplot(ctx: PlotContext):
+def prep_read_barplot(ctx: CorePlotContext):
     """Prepare kwargs for plot_read_barplot (plot_1a)."""
     aln_stats = ctx.run_data['running_info']['alignment_stats']
     fig_filename_root = _make_fig_filename_root(ctx, '1a.Read_barplot')
@@ -1750,7 +1750,7 @@ def prep_read_barplot(ctx: PlotContext):
     }
 
 
-def prep_class_piechart_and_barplot_plot(ctx: PlotContext):
+def prep_class_piechart_and_barplot_plot(ctx: CorePlotContext):
     """Prepare kwargs for plot_class_piechart_and_barplot (plot_1b/1c)."""
     piechart_plot_root = _make_fig_filename_root(ctx, '1b.Alignment_pie_chart')
     barplot_plot_root = _make_fig_filename_root(ctx, '1c.Alignment_barplot')
@@ -1767,7 +1767,7 @@ def prep_class_piechart_and_barplot_plot(ctx: PlotContext):
     }
 
 
-def prep_alleles_homology_histogram(ctx: PlotContext):
+def prep_alleles_homology_histogram(ctx: CorePlotContext):
     """Prepare kwargs for plot_alleles_homology_histogram (plot_1e)."""
     fig_filename_root = _make_fig_filename_root(ctx, '1e.Allele_homology_histogram')
     return {
@@ -1779,7 +1779,7 @@ def prep_alleles_homology_histogram(ctx: PlotContext):
     }
 
 
-def prep_quantification_window_locations(ctx: PlotContext):
+def prep_quantification_window_locations(ctx: CorePlotContext):
     """Prepare kwargs for plot_quantification_window_locations (plot_4c).
 
     Requires ``ctx.ref_name``.
@@ -1815,7 +1815,7 @@ def prep_quantification_window_locations(ctx: PlotContext):
     }
 
 
-def prep_position_dependent_indels(ctx: PlotContext):
+def prep_position_dependent_indels(ctx: CorePlotContext):
     """Prepare kwargs for plot_position_dependent_indels (plot_4d).
 
     Requires ``ctx.ref_name``.
@@ -1849,7 +1849,7 @@ def prep_position_dependent_indels(ctx: PlotContext):
     }
 
 
-def prep_frameshift_analysis(ctx: PlotContext):
+def prep_frameshift_analysis(ctx: CorePlotContext):
     """Prepare kwargs for plot_frameshift_analysis (plot_5).
 
     Requires ``ctx.ref_name``.
@@ -1878,7 +1878,7 @@ def prep_frameshift_analysis(ctx: PlotContext):
     }
 
 
-def prep_frameshift_frequency(ctx: PlotContext):
+def prep_frameshift_frequency(ctx: CorePlotContext):
     """Prepare kwargs for plot_frameshift_frequency (plot_6).
 
     Requires ``ctx.ref_name``.
@@ -1904,7 +1904,7 @@ def prep_frameshift_frequency(ctx: PlotContext):
     }
 
 
-def prep_non_coding_mutations(ctx: PlotContext):
+def prep_non_coding_mutations(ctx: CorePlotContext):
     """Prepare kwargs for plot_non_coding_mutations (plot_7).
 
     Requires ``ctx.ref_name``.
@@ -1937,7 +1937,7 @@ def prep_non_coding_mutations(ctx: PlotContext):
     }
 
 
-def prep_potential_splice_sites(ctx: PlotContext):
+def prep_potential_splice_sites(ctx: CorePlotContext):
     """Prepare kwargs for plot_potential_splice_sites (plot_8).
 
     Requires ``ctx.ref_name``.
@@ -1959,7 +1959,7 @@ def prep_potential_splice_sites(ctx: PlotContext):
     }
 
 
-def prep_subs_across_ref(ctx: PlotContext):
+def prep_subs_across_ref(ctx: CorePlotContext):
     """Prepare kwargs for plot_subs_across_ref (plot_10a).
 
     Requires ``ctx.ref_name``.
@@ -1990,7 +1990,7 @@ def prep_subs_across_ref(ctx: PlotContext):
     }
 
 
-def prep_sub_freq_barplot(ctx: PlotContext):
+def prep_sub_freq_barplot(ctx: CorePlotContext):
     """Prepare kwargs for plot_sub_freqs — full amplicon (plot_10b).
 
     Requires ``ctx.ref_name``. Uses ``ctx.alt_nuc_counts_all``.
@@ -2014,7 +2014,7 @@ def prep_sub_freq_barplot(ctx: PlotContext):
     }
 
 
-def prep_sub_freq_barplot_quant_window(ctx: PlotContext):
+def prep_sub_freq_barplot_quant_window(ctx: CorePlotContext):
     """Prepare kwargs for plot_sub_freqs — quantification window (plot_10c).
 
     Requires ``ctx.ref_name``. Uses ``ctx.alt_nuc_counts``.
@@ -2038,7 +2038,7 @@ def prep_sub_freq_barplot_quant_window(ctx: PlotContext):
     }
 
 
-def _prep_conversion_at_sel_nucs_common(ctx: PlotContext, plot_number: str, variant: str = ''):
+def _prep_conversion_at_sel_nucs_common(ctx: CorePlotContext, plot_number: str, variant: str = ''):
     """Shared logic for plots 10e, 10f, and 10g.
 
     Builds the nucleotide percentage DataFrame sliced to the sgRNA plot
@@ -2080,7 +2080,7 @@ def _prep_conversion_at_sel_nucs_common(ctx: PlotContext, plot_number: str, vari
     }
 
 
-def prep_conversion_at_sel_nucs_plot(ctx: PlotContext):
+def prep_conversion_at_sel_nucs_plot(ctx: CorePlotContext):
     """Prepare kwargs for plot_conversion_at_sel_nucs (plot_10e).
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
@@ -2090,7 +2090,7 @@ def prep_conversion_at_sel_nucs_plot(ctx: PlotContext):
     return _prep_conversion_at_sel_nucs_common(ctx, '10e')
 
 
-def prep_conversion_at_sel_nucs_not_include_ref(ctx: PlotContext):
+def prep_conversion_at_sel_nucs_not_include_ref(ctx: CorePlotContext):
     """Prepare kwargs for plot_conversion_at_sel_nucs_not_include_ref (plot_10f).
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
@@ -2098,7 +2098,7 @@ def prep_conversion_at_sel_nucs_not_include_ref(ctx: PlotContext):
     return _prep_conversion_at_sel_nucs_common(ctx, '10f', variant='no_ref_')
 
 
-def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: PlotContext):
+def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: CorePlotContext):
     """Prepare kwargs for plot_conversion_at_sel_nucs_not_include_ref_scaled (plot_10g).
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
@@ -2106,7 +2106,7 @@ def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: PlotContext):
     return _prep_conversion_at_sel_nucs_common(ctx, '10g', variant='no_ref_scaled_')
 
 
-def prep_global_frameshift_analysis(ctx: PlotContext, global_data: dict | None = None):
+def prep_global_frameshift_analysis(ctx: CorePlotContext, global_data: dict | None = None):
     """Prepare kwargs for plot_global_frameshift_analysis (plot_5a).
 
     *global_data* may be passed from a prior
@@ -2130,7 +2130,7 @@ def prep_global_frameshift_analysis(ctx: PlotContext, global_data: dict | None =
     }
 
 
-def prep_global_frameshift_in_frame_mutations(ctx: PlotContext, global_data: dict | None = None):
+def prep_global_frameshift_in_frame_mutations(ctx: CorePlotContext, global_data: dict | None = None):
     """Prepare kwargs for plot_global_frameshift_in_frame_mutations (plot_6a).
 
     *global_data* may be passed from a prior
@@ -2152,7 +2152,7 @@ def prep_global_frameshift_in_frame_mutations(ctx: PlotContext, global_data: dic
     }
 
 
-def prep_impact_on_splice_sites(ctx: PlotContext, global_data: dict | None = None):
+def prep_impact_on_splice_sites(ctx: CorePlotContext, global_data: dict | None = None):
     """Prepare kwargs for plot_impact_on_splice_sites (plot_8a).
 
     *global_data* may be passed from a prior
@@ -2175,7 +2175,7 @@ def prep_impact_on_splice_sites(ctx: PlotContext, global_data: dict | None = Non
     }
 
 
-def prep_scaffold_indel_lengths(ctx: PlotContext):
+def prep_scaffold_indel_lengths(ctx: CorePlotContext):
     """Prepare kwargs for plot_scaffold_indel_lengths (plot_11c)."""
     fig_filename_root = _make_fig_filename_root(
         ctx, '11c.Prime_editing_scaffold_insertion_sizes',
