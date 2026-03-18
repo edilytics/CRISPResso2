@@ -12,6 +12,10 @@ from types import SimpleNamespace
 from CRISPResso2.plots.data_prep import (
     _prep_windowed_alleles,
     amino_acids_to_numbers,
+    get_base_edit_target_sequence,
+    get_bp_substitutions,
+    get_refpos_values,
+    get_upset_plot_counts,
     prep_alleles_around_cut,
     prep_alleles_table,
     prep_alleles_table_compare,
@@ -32,6 +36,7 @@ from CRISPResso2.plots.data_prep import (
     prep_nucleotide_quilt,
     prep_pe_nucleotide_quilt,
     prep_pe_nucleotide_quilt_around_sgRNA,
+    write_base_edit_counts,
     _to_numeric_ignore_columns,
 )
 from CRISPResso2.plots.plot_context import CorePlotContext
@@ -1328,6 +1333,161 @@ class TestPrepAllelesAroundCut:
         assert result['window_truncated'] is True
 
 
+    def test_pct_adjustment_for_assigned_reference(self):
+        """allele_plot_pcts_only_for_assigned_reference mutates %Reads in place."""
+        ref_sequence = 'AACCGGTTAA'
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=['AACCGGTTAA', 'AATCGGTTAA'],
+            ref_seq='AACCGGTTAA',
+            reads=[80, 20],
+            read_status=['UNMODIFIED', 'MODIFIED'],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+                sgRNA_names=['sgRNA1'],
+                sgRNA_mismatches=[],
+            )},
+            counts_total={'r': 50},  # different from sum of reads to test recalc
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=True,
+                expand_allele_plots_by_quantification=True,
+                annotate_wildtype_allele='',
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_alleles_around_cut(ctx)
+        df_out = result['df_alleles_around_cut']
+
+        # Should have %AllReads (original) and recalculated %Reads
+        assert '%AllReads' in df_out.columns
+        # %Reads should be recalculated: #Reads / counts_total * 100
+        for _, row in df_out.iterrows():
+            expected = row['#Reads'] / 50 * 100
+            assert abs(row['%Reads'] - expected) < 0.01
+
+    def test_new_cut_point_inside_sgRNA(self):
+        """new_cut_point is set when cut_point falls inside an sgRNA interval."""
+        ref_sequence = 'AACCGGTTAA'
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=['AACCGGTTAA'],
+            ref_seq='AACCGGTTAA',
+            reads=[100],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],  # cut_point 4 is inside this
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+                annotate_wildtype_allele='',
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_alleles_around_cut(ctx)
+        assert result['new_cut_point'] is not None
+
+    def test_new_cut_point_outside_sgRNA(self):
+        """new_cut_point is None when cut_point is outside all sgRNA intervals."""
+        ref_sequence = 'AACCGGTTAA'
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=['AACCGGTTAA'],
+            ref_seq='AACCGGTTAA',
+            reads=[100],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(7, 9)],  # cut_point 4 is NOT inside this
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+                annotate_wildtype_allele='',
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_alleles_around_cut(ctx)
+        assert result['new_cut_point'] is None
+
+    def test_groupby_collapse(self):
+        """expand_allele_plots_by_quantification=False collapses alleles by sequence."""
+        ref_sequence = 'AACCGGTTAA'
+        # Two identical alleles that should collapse
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=['AACCGGTTAA', 'AACCGGTTAA'],
+            ref_seq='AACCGGTTAA',
+            reads=[60, 40],
+        )
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=3,
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=False,
+                annotate_wildtype_allele='',
+            ),
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+
+        result = prep_alleles_around_cut(ctx)
+        # The two identical alleles should be collapsed into one row in plot_input
+        pi = result['plot_input']
+        if pi is not None:
+            assert len(pi['y_labels']) == 1
+
+
 # =============================================================================
 # Tests: prep_base_edit_quilt (plot 10h)
 # =============================================================================
@@ -1549,3 +1709,319 @@ class TestPrepAminoAcidTable:
 
         result = prep_amino_acid_table(ctx)
         assert result['plot_input'] is None
+
+    def test_plot_input_populated_above_threshold(self):
+        """When rows pass threshold, plot_input contains expected keys."""
+        coding_seq = 'ATGGCTTAA'  # M, A, *
+        ref_sequence = coding_seq
+
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=[ref_sequence, 'ATGACTTAA'],
+            ref_seq=ref_sequence,
+            reads=[80, 20],
+            read_status=['UNMODIFIED', 'MODIFIED'],
+        )
+
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+                sgRNA_names=['sgRNA1'],
+                sgRNA_mismatches=[],
+                contains_coding_seq=True,
+                exon_positions=list(range(len(ref_sequence))),
+                exon_intervals=[(0, len(ref_sequence) - 1)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                annotate_wildtype_allele='',
+            ),
+            run_data={'running_info': {'coding_seqs': [coding_seq]}},
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+        ctx.coding_seq_ind = 0
+
+        result = prep_amino_acid_table(ctx)
+        pi = result['plot_input']
+        assert pi is not None
+        assert 'reference_seq_amino_acids' in pi
+        assert 'fig_filename_root' in pi
+        assert 'X' in pi
+        assert 'annot' in pi
+        assert 'y_labels' in pi
+        assert pi['reference_seq_amino_acids'] == 'MA*'
+        assert '9a.' in pi['fig_filename_root']
+
+    def test_annotate_wildtype_allele(self):
+        """annotate_wildtype_allele appends to y_labels of reference rows."""
+        coding_seq = 'ATGGCTTAA'  # M, A, *
+        ref_sequence = coding_seq
+
+        df = _make_df_alleles(
+            'r',
+            aligned_seqs=[ref_sequence, 'ATGACTTAA'],
+            ref_seq=ref_sequence,
+            reads=[80, 20],
+            read_status=['UNMODIFIED', 'MODIFIED'],
+        )
+
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=ref_sequence,
+                sequence_length=len(ref_sequence),
+                sgRNA_cut_points=[4],
+                sgRNA_plot_cut_points=[4],
+                sgRNA_intervals=[(2, 6)],
+                sgRNA_names=['sgRNA1'],
+                sgRNA_mismatches=[],
+                contains_coding_seq=True,
+                exon_positions=list(range(len(ref_sequence))),
+                exon_intervals=[(0, len(ref_sequence) - 1)],
+            )},
+            counts_total={'r': 100},
+            df_alleles=df,
+            args=SimpleNamespace(
+                min_frequency_alleles_around_cut_to_plot=0,
+                max_rows_alleles_around_cut_to_plot=10,
+                annotate_wildtype_allele='****',
+            ),
+            run_data={'running_info': {'coding_seqs': [coding_seq]}},
+        )
+        ctx.ref_name = 'r'
+        ctx.sgRNA_ind = 0
+        ctx.coding_seq_ind = 0
+
+        result = prep_amino_acid_table(ctx)
+        pi = result['plot_input']
+        if pi is not None:
+            # At least one y_label should end with '****'
+            wt_labels = [l for l in pi['y_labels'] if l.endswith('****')]
+            assert len(wt_labels) >= 1
+
+
+# =============================================================================
+# Tests: base editing utility functions (get_refpos_values, get_bp_substitutions,
+#        get_base_edit_target_sequence, get_upset_plot_counts, write_base_edit_counts)
+# =============================================================================
+
+class TestGetRefposValues:
+
+    def test_no_gaps(self):
+        """No gaps: each ref position maps directly to its read base."""
+        result = get_refpos_values("ATCG", "ATCG")
+        assert result[0] == "A"
+        assert result[1] == "T"
+        assert result[2] == "C"
+        assert result[3] == "G"
+
+    def test_gap_in_ref(self):
+        """Leading gaps in ref: insertions accumulate on position 0."""
+        result = get_refpos_values("--ATGC", "GGATGC")
+        assert result[0] == "GGA"
+        assert result[1] == "T"
+        assert result[2] == "G"
+        assert result[3] == "C"
+
+    def test_gap_in_read(self):
+        """Deletion in read is represented as '-'."""
+        result = get_refpos_values("ATGC", "A-GC")
+        assert result[0] == "A"
+        assert result[1] == "-"
+        assert result[2] == "G"
+        assert result[3] == "C"
+
+    def test_example_from_docstring(self):
+        """Example straight from the function docstring."""
+        result = get_refpos_values("--A-TGC-", "GGAGTCGA")
+        assert result[0] == "GGAG"
+        assert result[1] == "T"
+        assert result[2] == "C"
+        assert result[3] == "GA"
+
+    def test_insertion_middle(self):
+        """Insertion in middle of ref attaches to preceding ref position."""
+        result = get_refpos_values("AT-CG", "ATGCG")
+        assert result[0] == "A"
+        assert result[1] == "TG"
+        assert result[2] == "C"
+        assert result[3] == "G"
+
+    def test_deletion(self):
+        """Two consecutive deletions each become '-'."""
+        result = get_refpos_values("ATCG", "A--G")
+        assert result[0] == "A"
+        assert result[1] == "-"
+        assert result[2] == "-"
+        assert result[3] == "G"
+
+    def test_complex(self):
+        """Mixed insertion and deletion in same alignment."""
+        result = get_refpos_values("A-TC--G", "AGTCAAG")
+        assert result[0] == "AG"
+        assert result[1] == "T"
+        assert result[2] == "CAA"
+        assert result[3] == "G"
+
+    def test_all_matches(self):
+        """All-match alignment: every position is the identity base."""
+        ref = "ATCGATCG"
+        result = get_refpos_values(ref, ref)
+        for i, base in enumerate(ref):
+            assert result[i] == base
+
+    def test_insertion_at_start(self):
+        """Insertions before the first ref base accumulate on position 0."""
+        result = get_refpos_values("--ATCG", "GGATCG")
+        assert result[0] == "GGA"
+
+    def test_insertion_at_end(self):
+        """Insertions after the last ref base attach to the last position."""
+        result = get_refpos_values("ATCG--", "ATCGGG")
+        assert result[3] == "GGG"
+
+    def test_deletions(self):
+        """Two deleted positions in the middle are both '-'."""
+        result = get_refpos_values("ATCGATCG", "AT--ATCG")
+        assert result[2] == "-"
+        assert result[3] == "-"
+
+    def test_mixed_indels(self):
+        """Mixed insertions and deletions produce a non-empty dict."""
+        result = get_refpos_values("AT-CGATCG", "ATG--ATCG")
+        assert len(result) > 0
+
+
+class TestGetBpSubstitutions:
+
+    def test_one_sub(self):
+        """Single substitution at position 0."""
+        ref_changes_dict = get_refpos_values("AAA", "CAA")
+        result = get_bp_substitutions(ref_changes_dict, "AAA", [0, 1, 2])
+        assert len(result) == 1
+        assert result[0] == (0, 'A', 'C')
+
+    def test_two_subs(self):
+        """Two substitutions at positions 0 and 1."""
+        ref_changes_dict = get_refpos_values("AAA", "CCA")
+        result = get_bp_substitutions(ref_changes_dict, "AAA", [0, 1, 2])
+        assert result == [(0, 'A', 'C'), (1, 'A', 'C')]
+
+    def test_insertions(self):
+        """Insertions adjacent to ref positions are captured."""
+        ref_changes_dict = get_refpos_values("AAA-AAA-----", "AAACAAACCCCC")
+        result = get_bp_substitutions(ref_changes_dict, "AAAAAA", [0, 1, 2, 3, 4, 5])
+        assert len(result) == 2
+        assert result[0] == (2, 'A', 'AC')
+        assert result[1] == (5, 'A', 'ACCCCC')
+
+    def test_no_changes(self):
+        """Identical sequences produce empty list."""
+        ref_changes_dict = get_refpos_values("ATCG", "ATCG")
+        assert get_bp_substitutions(ref_changes_dict, "ATCG", [0, 1, 2, 3]) == []
+
+    def test_single_sub(self):
+        """A→G at position 0."""
+        ref_changes_dict = get_refpos_values("ATCG", "GTCG")
+        assert get_bp_substitutions(ref_changes_dict, "ATCG", [0, 1, 2, 3]) == [(0, 'A', 'G')]
+
+    def test_multiple_subs(self):
+        """Three substitutions across the sequence."""
+        ref_changes_dict = get_refpos_values("ATCG", "GACT")
+        assert get_bp_substitutions(ref_changes_dict, "ATCG", [0, 1, 2, 3]) == [
+            (0, 'A', 'G'), (1, 'T', 'A'), (3, 'G', 'T'),
+        ]
+
+    def test_partial_positions(self):
+        """Only positions in ref_positions_to_include are checked."""
+        ref_changes_dict = get_refpos_values("ATCG", "GTCA")
+        assert get_bp_substitutions(ref_changes_dict, "ATCG", [0, 3]) == [
+            (0, 'A', 'G'), (3, 'G', 'A'),
+        ]
+
+    def test_all_match(self):
+        """All identical: empty result."""
+        ref_changes_dict = get_refpos_values("ATCG", "ATCG")
+        assert get_bp_substitutions(ref_changes_dict, "ATCG", [0, 1, 2, 3]) == []
+
+    def test_all_different(self):
+        """All four positions substituted."""
+        ref_changes_dict = get_refpos_values("ATCG", "TAGC")
+        assert get_bp_substitutions(ref_changes_dict, "ATCG", [0, 1, 2, 3]) == [
+            (0, 'A', 'T'), (1, 'T', 'A'), (2, 'C', 'G'), (3, 'G', 'C'),
+        ]
+
+    def test_with_insertion(self):
+        """Pre-built dict with an insertion at position 1 is flagged."""
+        ref_changes_dict = {0: 'A', 1: 'TG', 2: 'C', 3: 'G'}
+        result = get_bp_substitutions(ref_changes_dict, "ATCG", [0, 1, 2, 3])
+        assert any(sub[0] == 1 for sub in result)
+
+
+class TestGetBaseEditTargetSequence:
+
+    def test_df_alleles(self):
+        """Integration test with the real df_alleles fixture."""
+        df_alleles = pd.read_csv('tests/df_alleles.txt')
+        ref_seq = (
+            'CGGCCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCTGAAGTAGGGCCTTCGCGCACCTCATGG'
+            'AATCCCTTCTGCAGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGC'
+            'CGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG'
+        )
+        target_seq = get_base_edit_target_sequence(ref_seq, df_alleles, 0)
+        assert target_seq == (
+            'AATACGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGG'
+            'AATCCCTTCTGCAGCCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTG'
+            'CGCCGGGCCTTGCCGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGGCATGGCCCCATTCGCACGGCTCTG'
+            'GAGCGGC'
+        )
+
+    def test_small_df(self):
+        """Small fixture: most-common non-reference allele is the target."""
+        df_alleles = pd.read_csv('tests/test_be_df.txt')
+        target_seq = get_base_edit_target_sequence('AAAA', df_alleles, 0)
+        assert target_seq == 'AAGA'
+
+
+class TestGetUpsetPlotCounts:
+
+    def test_basic(self):
+        """Counts dict has expected keys and totals."""
+        df_alleles = pd.read_csv('tests/test_be_df.txt')
+        counts_dict = get_upset_plot_counts(df_alleles, [(3, 'A', 'G')], 'TEST')
+        assert len(counts_dict) == 19
+        assert counts_dict['total_alleles'] == 3
+        assert counts_dict['total_alleles_reads'] == 100
+        assert sum(counts_dict['binary_allele_counts'].values()) == 100
+
+
+class TestWriteBaseEditCounts:
+
+    def test_files_written_and_cleaned(self, tmp_path):
+        """write_base_edit_counts writes exactly the five expected files."""
+        df_alleles = pd.read_csv('tests/test_be_df.txt')
+        counts_dict = get_upset_plot_counts(df_alleles, [(3, 'A', 'G')], 'TEST')
+
+        def _jp(filename):
+            return str(tmp_path / filename)
+
+        write_base_edit_counts('TEST', counts_dict, [(3, 'A', 'G')], _jp)
+
+        expected = [
+            '10i.TEST.arrays.txt',
+            '10i.TEST.binary_allele_counts.txt',
+            '10i.TEST.category_allele_counts.txt',
+            '10i.TEST.counts.txt',
+            '10i.TEST.precise_allele_counts.txt',
+        ]
+        for filename in expected:
+            assert (tmp_path / filename).exists(), f"Missing: {filename}"

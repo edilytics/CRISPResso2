@@ -31,6 +31,9 @@ is being processed). Functions that operate per-sgRNA additionally require
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
 import os
 import re
 from collections import Counter, defaultdict
@@ -322,6 +325,7 @@ def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
     tuple
         ``(X, annot, y_labels, insertion_dict, per_element_annot_kws,
         is_reference)``
+
     """
     X = []
     annot = []
@@ -382,6 +386,7 @@ def prep_alleles_table_compare(df_alleles, sample_name_1, sample_name_2,
     -------
     tuple
         ``(X, annot, y_labels, insertion_dict, per_element_annot_kws)``
+
     """
     X = []
     annot = []
@@ -439,6 +444,7 @@ def prep_amino_acid_table_for_plot(df_alleles, reference_seq, MAX_N_ROWS,
     tuple
         ``(X, annot, y_labels, insertion_dict, silent_edit_dict,
         per_element_annot_kws, is_reference, reference_seq)``
+
     """
     X = []
     annot = []
@@ -1584,8 +1590,257 @@ def prep_class_piechart_and_barplot(class_counts_order, class_counts,
     return {'labels': labels, 'sizes': sizes, 'N_TOTAL': N_TOTAL}
 
 
+# =============================================================================
+# Base editing utility functions
+#
+# These are used by both CRISPRessoCORE (which imports them from here)
+# and by prep_base_edit_upset below.
+# =============================================================================
+
+
+def get_refpos_values(ref_aln_seq, read_aln_seq):
+    """Given a reference alignment return a dict mapping reference positions to read bases.
+
+    ``refpos_dict[ind]`` is the value of the read at the position
+    corresponding to the *ind*-th base in the reference.  Any additional
+    bases in the read (gaps in the ref) are assigned to the first position
+    of the ref (i.e. ``refpos_dict[0]``).  For gaps in the read, the value
+    is appended to the last non-gap reference position to the left.
+
+    Example::
+
+        ref_seq  = '--A-TGC-'
+        read_seq = 'GGAGTCGA'
+        get_refpos_values(ref_seq, read_seq)
+        # {0: 'GGAG', 1: 'T', 2: 'C', 3: 'GA'}
+    """
+    refpos_dict = defaultdict(str)
+
+    # First, if there are insertions in read, add those to the first position in ref
+    if ref_aln_seq[0] == '-':
+        aln_index = 0
+        read_start_bases = ""
+        while aln_index < len(ref_aln_seq) and ref_aln_seq[aln_index] == '-':
+            read_start_bases += read_aln_seq[aln_index]
+            aln_index += 1
+        refpos_dict[0] = read_start_bases
+        ref_aln_seq = ref_aln_seq[aln_index:]
+        read_aln_seq = read_aln_seq[aln_index:]
+
+    ref_pos = 0
+    last_nongap_ref_pos = 0
+    for ind in range(len(ref_aln_seq)):
+        ref_base = ref_aln_seq[ind]
+        read_base = read_aln_seq[ind]
+        if ref_base == '-':
+            refpos_dict[last_nongap_ref_pos] += read_base
+        else:
+            refpos_dict[ref_pos] += read_base
+            last_nongap_ref_pos = ref_pos
+            ref_pos += 1
+    return refpos_dict
+
+
+def get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include):
+    """Discover positions and bases that differ between reference and target (substitutions)."""
+    bp_substitutions_arr = []
+    for idx in ref_positions_to_include:
+        ref_base = ref_seq[idx]
+        if ref_changes_dict[idx] != ref_base:
+            bp_substitutions_arr.append((idx, ref_base, ref_changes_dict[idx]))
+    return bp_substitutions_arr
+
+
+def get_upset_plot_counts(df_alleles, bp_substitutions_arr, wt_ref_name):
+    """Count allele combinations for upset-style base editing plots."""
+    # set up counters
+    binary_allele_counts = defaultdict(int)  # e.g. T,T,X,T > 100 where each item is a string of the base at each position in bp_substitutions_arr, and 'X' is nontarget
+    category_allele_counts = defaultdict(int)  # e.g. T,T,R,T > 100 where each item is a string of the base at each position in bp_substitutions_arr, and 'T' is Target, 'R' is Reference, 'D' is Deletion, 'I' is insertion, and 'N' is anything else
+    precise_allele_counts = defaultdict(int)  # e.g. A,A,C,AA > 100 where each item is a string of the base at each position in bp_substitutions_arr
+
+    total_alleles = 0
+    total_alleles_reads = 0
+    total_alleles_on_ref = 0
+    total_alleles_reads_on_ref = 0
+
+    total_target_noindel_reads = 0
+    total_target_indel_reads = 0
+    total_reference_noindel_reads = 0
+    total_reference_indel_reads = 0
+    total_other_noindel_reads = 0
+    total_other_indel_reads = 0
+
+    target_base_counts = [0] * len(bp_substitutions_arr)
+    reference_base_counts = [0] * len(bp_substitutions_arr)
+    deletion_base_counts = [0] * len(bp_substitutions_arr)
+    insertion_base_counts = [0] * len(bp_substitutions_arr)
+    other_base_counts = [0] * len(bp_substitutions_arr)
+
+    # iterate all alleles in input allele table
+    for idx, allele in df_alleles.iterrows():
+        total_alleles += 1
+        total_alleles_reads += allele['#Reads']
+
+        if allele.Reference_Name != wt_ref_name:
+            continue
+        total_alleles_on_ref += 1
+        total_alleles_reads_on_ref += allele['#Reads']
+
+        has_indel_guide = False
+        if allele.n_deleted > 0:
+            has_indel_guide = True
+        if allele.n_inserted > 0:
+            has_indel_guide = True
+
+        has_indel = has_indel_guide
+
+        ref_aln = allele.Reference_Sequence
+        read_aln = allele.Aligned_Sequence
+        ref_base_position_lookup = get_refpos_values(ref_aln, read_aln)
+
+        binary_arr = []
+        cat_arr = []
+        val_arr = []
+        for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_substitutions_arr):
+            base_at_pos = ref_base_position_lookup[ref_ind]
+            this_binary = 'X'
+            this_category = 'N'
+            if base_at_pos == ref_base:
+                this_category = 'R'
+                reference_base_counts[ind] += allele['#Reads']
+            elif base_at_pos == mod_base:
+                this_category = 'T'
+                this_binary = 'T'
+                target_base_counts[ind] += allele['#Reads']
+            elif base_at_pos == '-':
+                this_category = 'D'
+                deletion_base_counts[ind] += allele['#Reads']
+            elif len(base_at_pos) != 1:
+                this_category = 'I'
+                insertion_base_counts[ind] += allele['#Reads']
+            else:
+                this_category = 'N'
+                other_base_counts[ind] += allele['#Reads']
+            binary_arr.append(this_binary)
+            cat_arr.append(this_category)
+            val_arr.append(base_at_pos)
+
+        if cat_arr.count('R') == len(cat_arr):
+            if not has_indel:
+                total_reference_noindel_reads += allele['#Reads']
+            else:
+                total_reference_indel_reads += allele['#Reads']
+        elif cat_arr.count('T') == len(cat_arr):
+            if not has_indel:
+                total_target_noindel_reads += allele['#Reads']
+            else:
+                total_target_indel_reads += allele['#Reads']
+        elif not has_indel:
+            total_other_noindel_reads += allele['#Reads']
+        else:
+            total_other_indel_reads += allele['#Reads']
+
+        binary_arr_str = "\t".join(binary_arr) + "\t" + str(has_indel)
+        cat_arr_str = "\t".join(cat_arr) + "\t" + str(has_indel)
+        val_arr_str = "\t".join(val_arr) + "\t" + str(has_indel)
+
+        binary_allele_counts[binary_arr_str] += allele['#Reads']
+        category_allele_counts[cat_arr_str] += allele['#Reads']
+        precise_allele_counts[val_arr_str] += allele['#Reads']
+
+    total_counts = [total_alleles_reads] * len(bp_substitutions_arr)
+
+    return {
+        "binary_allele_counts": binary_allele_counts,
+        "category_allele_counts": category_allele_counts,
+        "precise_allele_counts": precise_allele_counts,
+        "total_alleles": total_alleles,
+        "total_alleles_reads": total_alleles_reads,
+        "total_alleles_on_ref": total_alleles_on_ref,
+        "total_alleles_reads_on_ref": total_alleles_reads_on_ref,
+        "total_target_noindel_reads": total_target_noindel_reads,
+        "total_target_indel_reads": total_target_indel_reads,
+        "total_reference_noindel_reads": total_reference_noindel_reads,
+        "total_reference_indel_reads": total_reference_indel_reads,
+        "total_other_noindel_reads": total_other_noindel_reads,
+        "total_other_indel_reads": total_other_indel_reads,
+        "target_base_counts": target_base_counts,
+        "reference_base_counts": reference_base_counts,
+        "deletion_base_counts": deletion_base_counts,
+        "insertion_base_counts": insertion_base_counts,
+        "other_base_counts": other_base_counts,
+        "total_counts": total_counts,
+    }
+
+
+def get_base_edit_target_sequence(ref_seq, df_alleles, base_editor_target_ref_skip_allele_count):
+    """Find the target (edited) sequence from the allele table.
+
+    Scans *df_alleles* for the first modified allele whose unaligned
+    sequence differs from *ref_seq*, skipping the first
+    *base_editor_target_ref_skip_allele_count* such alleles.
+
+    Returns the target sequence string, or ``""`` if none is found.
+    """
+    target_seq = ""
+    seen_nonref_allele_count = 0
+    for idx, allele in df_alleles.iterrows():
+        if allele.Aligned_Sequence.replace("-", "") != ref_seq and allele.Read_Status == 'MODIFIED':
+            if seen_nonref_allele_count >= base_editor_target_ref_skip_allele_count:
+                target_seq = allele.Aligned_Sequence.replace("-", "")
+                break
+            else:
+                logger.debug('Skipping allele ' + str(idx) + ' with sequence ' + allele.Aligned_Sequence)
+            seen_nonref_allele_count += 1
+    if target_seq == "":
+        logger.warning('Target reference sequence not found in allele table (all reads were equal to the reference sequence)')
+
+    return target_seq
+
+
+def write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp):
+    """Write base editing count tables to disk.
+
+    Writes binary, category, precise allele counts and summary arrays
+    to TSV files under the path constructed by *_jp*.
+    """
+    prefix = '10i.' + ref_name
+
+    with open(_jp(prefix + '.binary_allele_counts.txt'), 'w') as fout:
+        sorted_binary_allele_counts = sorted(counts_dict['binary_allele_counts'].keys(), key=lambda x: counts_dict['binary_allele_counts'][x], reverse=True)
+        fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
+        for allele_str in sorted_binary_allele_counts:
+            fout.write(allele_str + '\t' + str(counts_dict['binary_allele_counts'][allele_str]) + '\n')
+
+    with open(_jp(prefix + '.category_allele_counts.txt'), 'w') as fout:
+        sorted_category_allele_counts = sorted(counts_dict['category_allele_counts'].keys(), key=lambda x: counts_dict['category_allele_counts'][x], reverse=True)
+        fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
+        for allele_str in sorted_category_allele_counts:
+            fout.write(allele_str + '\t' + str(counts_dict['category_allele_counts'][allele_str]) + '\n')
+
+    with open(_jp(prefix + '.precise_allele_counts.txt'), 'w') as fout:
+        sorted_precise_allele_counts = sorted(counts_dict['precise_allele_counts'].keys(), key=lambda x: counts_dict['precise_allele_counts'][x], reverse=True)
+        fout.write("\t".join([str(x) for x in bp_substitutions_arr]) + '\thas_indel\tcount\n')
+        for allele_str in sorted_precise_allele_counts:
+            fout.write(allele_str + '\t' + str(counts_dict['precise_allele_counts'][allele_str]) + '\n')
+
+    with open(_jp(prefix + '.arrays.txt'), 'w') as fout:
+        fout.write('Class\t' + "\t".join([str(x) for x in bp_substitutions_arr]) + '\n')
+        fout.write('total_counts\t' + "\t".join([str(x) for x in counts_dict['total_counts']]) + '\n')
+        fout.write('reference_counts\t' + "\t".join([str(x) for x in counts_dict['reference_base_counts']]) + '\n')
+        fout.write('target_counts\t' + "\t".join([str(x) for x in counts_dict['target_base_counts']]) + '\n')
+        fout.write('deletion_counts\t' + "\t".join([str(x) for x in counts_dict['deletion_base_counts']]) + '\n')
+        fout.write('insertion_counts\t' + "\t".join([str(x) for x in counts_dict['insertion_base_counts']]) + '\n')
+        fout.write('other_counts\t' + "\t".join([str(x) for x in counts_dict['other_base_counts']]) + '\n')
+
+    with open(_jp(prefix + '.counts.txt'), 'w') as fout:
+        target_name = 'Target'
+        fout.write("\t".join([ref_name, ref_name + "_indels", target_name, target_name + "_indels", "other", "other_indels"]) + '\n')
+        fout.write("\t".join([str(x) for x in [counts_dict['total_reference_noindel_reads'], counts_dict['total_reference_indel_reads'], counts_dict['total_target_noindel_reads'], counts_dict['total_target_indel_reads'], counts_dict['total_other_noindel_reads'], counts_dict['total_other_indel_reads']]]) + '\n')
+
+
 def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
-                         args):
+                         args, gap_incentive=None):
     """Prepare data for base edit upset plot (plot_10i).
 
     Finds the target sequence, aligns it to reference, identifies
@@ -1609,22 +1864,20 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
         base_editor_consider_changes_outside_qw,
         needleman_wunsch_gap_open, needleman_wunsch_gap_extend,
         needleman_wunsch_aln_matrix_loc, quantification_window_coordinates.
+    gap_incentive : np.ndarray or None
+        Per-position gap incentive array for alignment.  If ``None``,
+        zeros are used.
 
     Returns
     -------
     dict or None
-        Dict with 'bp_substitutions_arr' and 'binary_allele_counts',
-        or None if no target sequence found, quantification_window_coordinates
-        is set, or no substitutions detected.
+        Dict with ``'bp_substitutions_arr'`` and ``'counts_dict'``
+        (the full output of :func:`get_upset_plot_counts`),
+        or ``None`` if no target sequence found,
+        ``quantification_window_coordinates`` is set, or no
+        substitutions detected.
 
     """
-    from CRISPResso2.CRISPRessoCORE import (
-        get_base_edit_target_sequence,
-        get_bp_substitutions,
-        get_refpos_values,
-        get_upset_plot_counts,
-    )
-
     target_seq = get_base_edit_target_sequence(
         ref_seq, df_alleles,
         args.base_editor_target_ref_skip_allele_count,
@@ -1643,13 +1896,12 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
     if aln_matrix_loc == 'EDNAFULL':
         aln_matrix = CRISPResso2Align.make_matrix()
     else:
-        import os
         if not os.path.exists(aln_matrix_loc):
             return None
         aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
 
-    # gap_incentive comes from the ref data; use zeros as default
-    gap_incentive = np.zeros(len(ref_seq) + 1, dtype=np.int32)
+    if gap_incentive is None:
+        gap_incentive = np.zeros(len(ref_seq) + 1, dtype=np.int32)
 
     aln_target_seq, aln_ref_seq, _aln_score = CRISPResso2Align.global_align(
         target_seq,
@@ -1681,7 +1933,7 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
 
     return {
         'bp_substitutions_arr': bp_substitutions_arr,
-        'binary_allele_counts': counts_dict['binary_allele_counts'],
+        'counts_dict': counts_dict,
     }
 
 

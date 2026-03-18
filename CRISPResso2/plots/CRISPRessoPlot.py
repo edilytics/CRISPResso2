@@ -12,9 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib import patches
 from matplotlib import cm
 from matplotlib import gridspec
-from collections import defaultdict
 from copy import deepcopy
-import re
 from matplotlib import colors as colors_mpl
 import seaborn as sns
 from CRISPResso2.plots import upsetplot
@@ -2999,7 +2997,6 @@ def custom_heatmap(data, vmin=None, vmax=None, cmap=None, center=None, robust=Fa
     return ax
 
 
-
 def plot_amino_acid_heatmap(
         reference_seq_amino_acids,
         fig_filename_root,
@@ -3128,7 +3125,6 @@ def plot_amino_acid_heatmap(
     if SAVE_ALSO_PNG:
         fig.savefig(fig_filename_root + '.png', bbox_inches='tight', bbox_extra_artists=(lgd,))
     plt.close(fig)
-
 
 
 def plot_alleles_heatmap(

@@ -398,6 +398,7 @@ def main():
                 merged[quant_cols] = merged[quant_cols].fillna(0)
                 lfc_error = 0.1
                 merged['each_LFC'] = np.log2(((merged['%Reads_' + sample_1_name] + lfc_error) / (merged['%Reads_' + sample_2_name] + lfc_error)).astype(float)).replace([np.inf, np.nan], 0)
+                # Sort by read frequency descending, with sequence tiebreakers for deterministic output
                 merged = merged.sort_values(['%Reads_' + sample_1_name, 'Aligned_Sequence', 'Reference_Sequence'], ascending=[False, True, True])
                 merged = merged.reset_index(drop=True).set_index('Aligned_Sequence')
                 args.crispresso_output_folder_root = os.path.split(allele_file_1)[1].replace(".txt", "")
@@ -415,6 +416,7 @@ def main():
                 'The proportion and number of reads is shown for each sample on the right, with the values for ' + sample_1_name + ' followed by the values for ' + sample_2_name + '.'
 
                 plot_name = '3.' + args.crispresso_output_folder_root + '_top'
+                # Sort by LFC descending (enriched in sample_1 first), with sequence tiebreakers for deterministic output
                 CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[False, False, False]), sample_1_name, sample_2_name, _jp(plot_name),
                             MIN_FREQUENCY=args.min_frequency_alleles_around_cut_to_plot, MAX_N_ROWS=args.max_rows_alleles_around_cut_to_plot, SAVE_ALSO_PNG=save_png)
                 crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
@@ -423,6 +425,7 @@ def main():
                 crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Allele comparison table', os.path.basename(allele_comparison_file))]
 
                 plot_name = '3.' + args.crispresso_output_folder_root + '_bottom'
+                # Sort by LFC ascending (enriched in sample_2 first), with sequence tiebreakers for deterministic output
                 CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[True, False, False]), sample_1_name, sample_2_name, _jp(plot_name),
                             MIN_FREQUENCY=args.min_frequency_alleles_around_cut_to_plot, MAX_N_ROWS=args.max_rows_alleles_around_cut_to_plot, SAVE_ALSO_PNG=save_png)
                 crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
