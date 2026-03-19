@@ -1552,7 +1552,7 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
             closest = min(valid_positions, key=lambda p: abs(p - amino_acid_cut_point))
             cut_idx = ref_positions.index(closest)
         else:
-            cut_idx = 0
+            cut_idx = None
     left_idx = row['ref_positions'].index(plot_left_idx)
     seq_acids_and_codons = get_amino_acids_and_codons(row['Aligned_Sequence'][left_idx::].replace('-', ''))
     ref_acids_and_codons = get_amino_acids_and_codons(row['Reference_Sequence'][left_idx::].replace('-', ''))
