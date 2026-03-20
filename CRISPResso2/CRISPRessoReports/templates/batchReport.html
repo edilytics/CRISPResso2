@@ -14,11 +14,9 @@
 		<div id='jumbotron_content' >
 			{{ render_partial('shared/partials/pro_banner.html') }}
 
+          <h2 id="CRISPResso2_Batch_Output" class="cr-run-name cr-section-heading">{{report_name}}</h2>
           {% if run_names|length > 0 %}
             <div class='card text-center mb-2'>
-              <div class='card-header'>
-                <h5 id="CRISPResso2_Batch_Output">{{report_name}}</h5>
-              </div>
               <div class='card-body p-0'>
                 <div class="list-group list-group-flush scrollable-list">
               {% for run_name in run_names %}
