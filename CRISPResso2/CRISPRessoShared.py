@@ -1541,29 +1541,39 @@ def get_dataframe_around_cut_debug(df_alleles, cut_point, offset):
 
 
 def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point):
+    # amino_acid_cut_point is already an amino acid index (computed upstream as
+    # (best_cut_point - exon_start + 1) // 3, clamped to the valid range). It
+    # is used directly to set gap_incentive for the amino-acid-level alignment
+    # — no ref_positions lookup is needed because ref_positions stores
+    # nucleotide positions, not amino acid indices.
+
     try:
-        cut_idx = row['ref_positions'].index(amino_acid_cut_point)
+        left_idx = row['ref_positions'].index(plot_left_idx)
     except ValueError:
-        # amino_acid_cut_point not in ref_positions (e.g. large deletion removed that position)
-        # Find the closest available position
+        # plot_left_idx (exon start) was deleted in this read — find the
+        # first remaining reference position to the right so we don't
+        # accidentally include upstream sequence in the amino-acid window.
         ref_positions = row['ref_positions']
         valid_positions = [p for p in ref_positions if p >= 0]
-        if valid_positions:
-            closest = min(valid_positions, key=lambda p: abs(p - amino_acid_cut_point))
-            cut_idx = ref_positions.index(closest)
-        else:
-            cut_idx = 0
-    left_idx = row['ref_positions'].index(plot_left_idx)
+        right_candidates = [p for p in valid_positions if p >= plot_left_idx]
+        if right_candidates:
+            nearest_right = min(right_candidates)
+            left_idx = ref_positions.index(nearest_right)
+
     seq_acids_and_codons = get_amino_acids_and_codons(row['Aligned_Sequence'][left_idx::].replace('-', ''))
     ref_acids_and_codons = get_amino_acids_and_codons(row['Reference_Sequence'][left_idx::].replace('-', ''))
     aligned_seq = ''.join(tup[0] for tup in seq_acids_and_codons)
     reference_seq = ''.join(tup[0] for tup in ref_acids_and_codons)
 
     gap_incentive = np.zeros(len(reference_seq) + 1, dtype=int)
-    try:
-        gap_incentive[cut_idx] = 1
-    except IndexError:
-        pass
+    if 0 <= amino_acid_cut_point < len(gap_incentive):
+        gap_incentive[amino_acid_cut_point] = 1
+    else:
+        logging.warning(
+            'amino_acid_cut_point %d is out of range for gap_incentive '
+            '(length %d); skipping gap incentive.',
+            amino_acid_cut_point, len(gap_incentive),
+        )
     aligned_seq, reference_seq, score = CRISPResso2Align.global_align(
         aligned_seq,
         reference_seq,
