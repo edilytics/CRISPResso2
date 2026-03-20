@@ -7,9 +7,9 @@
 /* ----- Design Tokens ----- */
 :root {
   /* Instrument grays — cool-neutral with subtle blue undertone */
-  --cr-surface-ground:  #f5f7fa;  /* page canvas */
+  --cr-surface-ground:  #edf2f8;  /* page canvas — light blue */
   --cr-surface:         #ffffff;  /* card / elevated surface */
-  --cr-surface-inset:   #eef1f6;  /* inset panels, code blocks */
+  --cr-surface-inset:   #dfe4ec;  /* inset panels, code blocks, card headers */
   --cr-surface-hover:   #e8ecf2;  /* hover state for interactive surfaces */
 
   /* Ink hierarchy — four levels of text contrast */
@@ -48,7 +48,7 @@
   --cr-font-lg:    1.125rem;  /* 18px */
   --cr-font-xl:    1.25rem;   /* 20px */
   --cr-font-2xl:   1.5rem;    /* 24px */
-  --cr-font-title: 2.25rem;   /* 36px — slightly tighter than 40 */
+  --cr-font-title: 3.5rem;    /* 56px */
 
   /* Spacing — 4px base */
   --cr-space-xs: 0.25rem;   /* 4px */
@@ -97,18 +97,19 @@ a:hover {
 /* ----- Header ----- */
 .crispresso-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--cr-space-lg);
   padding: var(--cr-space-lg) 0;
 }
 .crispresso-header img {
-  width: 56px;
+  width: 72px;
   height: auto;
   flex-shrink: 0;
 }
 .crispresso-header-text {
   display: flex;
   flex-direction: column;
+  margin-top: 0.75rem;
 }
 .crispresso-header-text h1 {
   font-size: var(--cr-font-title);
@@ -284,7 +285,7 @@ a:hover {
 figcaption.labelpadding {
   display: block;
   font-size: var(--cr-font-sm);
-  color: var(--cr-ink-tertiary);
+  color: var(--cr-ink);
   padding: var(--cr-space-sm) var(--cr-space-md);
   line-height: 1.5;
 }

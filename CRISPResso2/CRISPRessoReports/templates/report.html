@@ -611,7 +611,6 @@
 
 {% block foot %}
 <script>
-{% if not C2PRO_INSTALLED %}
 function updateZoom(e) {
   /*prevent any other actions that may occur when moving over the image:*/
 //  e.preventDefault();
@@ -686,7 +685,7 @@ try {
 }
 
 	{% for amplicon_name in report_data.amplicons %}
-		{% if 'plot_2a' in report_data['figures']['locs'][amplicon_name] %}
+		{% if 'plot_2a' not in report_data['figures']['htmls'].get(amplicon_name, {}) and 'plot_2a' in report_data['figures']['locs'][amplicon_name] %}
 		view = document.getElementById('zoomview_nucs_{{amplicon_name}}');
 		img = document.getElementById('tozoom_nucs_{{amplicon_name}}');
 		lens = document.getElementById('zoomlens_nucs_{{amplicon_name}}')
@@ -707,7 +706,6 @@ try {
 
 		{% endif %}
 	{% endfor %}
-{% endif %}
 </script>
 
 
