@@ -1551,20 +1551,14 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
         left_idx = row['ref_positions'].index(plot_left_idx)
     except ValueError:
         # plot_left_idx (exon start) was deleted in this read — find the
-        # closest remaining reference position as a fallback.
+        # first remaining reference position to the right so we don't
+        # accidentally include upstream sequence in the amino-acid window.
         ref_positions = row['ref_positions']
         valid_positions = [p for p in ref_positions if p >= 0]
-        if valid_positions:
-            closest = min(valid_positions, key=lambda p: abs(p - plot_left_idx))
-            left_idx = ref_positions.index(closest)
-        else:
-            logging.warning(
-                'No valid reference positions found for amino acid row; '
-                'returning default row.'
-            )
-            return ('', '', row['Read_Status'] == 'UNMODIFIED',
-                    row['n_deleted'], row['n_inserted'], row['n_mutated'],
-                    row['#Reads'], row['%Reads'])
+        right_candidates = [p for p in valid_positions if p >= plot_left_idx]
+        if right_candidates:
+            nearest_right = min(right_candidates)
+            left_idx = ref_positions.index(nearest_right)
 
     seq_acids_and_codons = get_amino_acids_and_codons(row['Aligned_Sequence'][left_idx::].replace('-', ''))
     ref_acids_and_codons = get_amino_acids_and_codons(row['Reference_Sequence'][left_idx::].replace('-', ''))
