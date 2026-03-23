@@ -5453,7 +5453,7 @@ def main():
 
             if C2PRO_INSTALLED:
                 from CRISPRessoPro import hooks as pro_hooks
-                pro_hooks.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
+                pro_hooks.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger, plot_context)
             else:
                 CRISPRessoReport.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
 
