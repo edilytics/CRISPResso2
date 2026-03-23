@@ -201,6 +201,7 @@ class BatchPlotContext(PlotContext):
 
     amplicon_name: Optional[str] = None
     sgRNA_ind: Optional[int] = None
+    mod_type: Optional[str] = None
 
 
 # =============================================================================
