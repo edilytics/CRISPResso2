@@ -1158,7 +1158,7 @@ def guess_amplicons(fastq_r1, fastq_r2, number_of_reads_to_consider, fastp_comma
     split_interleaved_input: if true, split interleaved input into two files
     min_freq_to_consider: selected ampilcon must be frequent at least at this percentage in the population
     amplicon_similarity_cutoff: if the current amplicon has similarity of greater than this cutoff to any other existing amplicons, it won't be added
-
+    
     Returns:
     list of putative amplicons
 
