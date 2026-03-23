@@ -4761,14 +4761,7 @@ def main():
             ref_percent_complete_start, ref_percent_complete_end = 48, 88
             ref_percent_complete_step = (ref_percent_complete_end - ref_percent_complete_start) / float(len(ref_names))
             for ref_index, ref_name in enumerate(ref_names):
-                ref_seq = refs[ref_name]['sequence']
-                include_idxs_list = refs[ref_name]['include_idxs']
-                quantification_window_ref_seq = [list(ref_seq)[x] for x in include_idxs_list]
-                tot_aln_reads = counts_total[ref_name]
                 ref_plot_name = refs[ref_name]['ref_plot_name']
-                cut_points = refs[ref_name]['sgRNA_cut_points']
-                sgRNA_orig_sequences = refs[ref_name]['sgRNA_orig_sequences']
-                sgRNA_names = refs[ref_name]['sgRNA_names']
 
                 info('Processing plots for amplicon {0}...'.format(ref_name), {'percent_complete': ref_percent_complete_start + (ref_percent_complete_step * ref_index)})
 
@@ -4777,6 +4770,11 @@ def main():
 
                 # plot quilt for this amplicon  (if not crispresso1 mode)
                 if not args.crispresso1_mode:
+                    ref_seq = refs[ref_name]['sequence']
+                    include_idxs_list = refs[ref_name]['include_idxs']
+                    quantification_window_ref_seq = [ref_seq[x] for x in include_idxs_list]
+                    tot_aln_reads = counts_total[ref_name]
+
                     # nucleotide counts
                     df_nuc_freq = pd.DataFrame([base_count_vectors[ref_name + "_A"], base_count_vectors[ref_name + "_C"], base_count_vectors[ref_name + "_G"], base_count_vectors[ref_name + "_T"], base_count_vectors[ref_name + "_N"], base_count_vectors[ref_name + '_-']])
                     df_nuc_freq.index = ['A', 'C', 'G', 'T', 'N', '-']
@@ -4836,10 +4834,9 @@ def main():
                         crispresso2_info['results']['refs'][ref_name]['plot_2b_roots'] = []
                         crispresso2_info['results']['refs'][ref_name]['plot_2b_captions'] = []
                         crispresso2_info['results']['refs'][ref_name]['plot_2b_datas'] = []
-                        for i in range(len(cut_points)):
-                            cut_point = cut_points[i]
-                            sgRNA = sgRNA_orig_sequences[i]
-                            sgRNA_name = sgRNA_names[i]
+                        for i in range(len(refs[ref_name]['sgRNA_cut_points'])):
+                            sgRNA = refs[ref_name]['sgRNA_orig_sequences'][i]
+                            sgRNA_name = refs[ref_name]['sgRNA_names'][i]
 
                             sgRNA_label = "sgRNA_" + sgRNA  # for file names
                             sgRNA_legend = "sgRNA " + sgRNA  # for legends
@@ -5053,7 +5050,7 @@ def main():
 
                         # Use the last sgRNA's cut point (from the 2b loop above)
                         plot_context.ref_name = ref_name
-                        plot_context.sgRNA_ind = len(cut_points) - 1
+                        plot_context.sgRNA_ind = len(refs[ref_name]['sgRNA_cut_points']) - 1
                         base_edit_data = CRISPRessoPlotData.prep_base_edit_quilt(plot_context)
                         df_alleles_around_cut = base_edit_data['df_alleles_around_cut']
                         ref_seq_around_cut = base_edit_data['ref_seq_around_cut']
@@ -5103,8 +5100,8 @@ def main():
                 crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'] = []
 
                 for sgRNA_ind, sgRNA_seq in enumerate(sgRNA_sequences):
-                    sgRNA = sgRNA_orig_sequences[sgRNA_ind]
-                    sgRNA_name = sgRNA_names[sgRNA_ind]
+                    sgRNA = refs[ref_name]['sgRNA_orig_sequences'][sgRNA_ind]
+                    sgRNA_name = refs[ref_name]['sgRNA_names'][sgRNA_ind]
 
                     sgRNA_label = "sgRNA_" + sgRNA  # for file names
                     sgRNA_legend = "sgRNA " + sgRNA  # for legends
@@ -5219,7 +5216,7 @@ def main():
                                 'binary_allele_counts': counts_dict['binary_allele_counts'],
                                 'save_also_png': save_png,
                             }
-                            CRISPRessoPlot.plot_combination_upset(**plot_10i_input)
+                            plot(CRISPRessoPlot.plot_combination_upset, plot_10i_input)
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_roots'].append(os.path.basename(fig_root_10i))
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'].append(f"Figure 10i: Upset plot of Base Edits for {args.conversion_nuc_from} around cut site for {sgRNA_legend}. Each dot matrix at the bottom represents a specific combination of base edits (colored by target position), and the bar plot at the top shows the number of reads with each combination.")
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.' + sgRNA_label + '.binary_allele_counts.txt')])
