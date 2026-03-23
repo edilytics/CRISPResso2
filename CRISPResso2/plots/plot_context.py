@@ -302,6 +302,23 @@ class ComparePlotContext(PlotContext):
     amplicon_info_1: dict[str, dict]    # Per-amplicon quantification info, sample 1
     amplicon_info_2: dict[str, dict]    # Per-amplicon quantification info, sample 2
 
-    # === Scope field ===
+    # === Scope fields (set by CORE per amplicon iteration) ===
 
     amplicon_name: Optional[str] = None
+
+    # Per-amplicon loaded data
+    profile_1: Optional[np.ndarray] = None
+    profile_2: Optional[np.ndarray] = None
+    mod_freqs_1: Optional[dict] = None
+    mod_freqs_2: Optional[dict] = None
+    consensus_sequence: Optional[str] = None
+    quant_windows_1: Optional[np.ndarray] = None
+    quant_windows_2: Optional[np.ndarray] = None
+    cut_points: Optional[list] = None
+    sgRNA_intervals: Optional[list] = None
+
+    # Per-mod-type scope
+    mod_type: Optional[str] = None
+
+    # Allele comparison data (list of (df1, df2, allele_file_1, allele_file_2) tuples)
+    allele_pairs: Optional[list] = None

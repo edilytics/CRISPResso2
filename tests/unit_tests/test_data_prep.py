@@ -4,6 +4,8 @@ Each prep function takes a CorePlotContext as its only argument and returns
 the kwargs dict that the corresponding CRISPRessoPlot function expects.
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 from collections import Counter
@@ -2025,3 +2027,202 @@ class TestWriteBaseEditCounts:
         ]
         for filename in expected:
             assert (tmp_path / filename).exists(), f"Missing: {filename}"
+
+
+# =============================================================================
+# Compare prep functions
+# =============================================================================
+
+
+def _make_compare_ctx(tmp_path, **overrides):
+    """Build a minimal ComparePlotContext for testing."""
+    from CRISPResso2.plots.plot_context import ComparePlotContext
+    defaults = dict(
+        args=SimpleNamespace(
+            reported_qvalue_cutoff=0.05,
+            min_frequency_alleles_around_cut_to_plot=0.05,
+            max_rows_alleles_around_cut_to_plot=50,
+            offset_around_cut_to_plot=20,
+            crispresso_output_folder_1='/tmp/s1',
+            crispresso_output_folder_2='/tmp/s2',
+        ),
+        run_data={'results': {'general_plots': {}}},
+        output_directory=str(tmp_path),
+        save_png=False,
+        _jp=lambda f: os.path.join(str(tmp_path), f),
+        custom_config={},
+        amplicon_names=['Amp1'],
+        sample_1_name='WT',
+        sample_2_name='KO',
+        run_info_1={'running_info': {'report_filename': 'report.html'}, 'results': {'refs': {'Amp1': {'sgRNA_cut_points': [10], 'sgRNA_intervals': [(5, 15)], 'include_idxs': np.array([8, 9, 10, 11, 12])}}}},
+        run_info_2={'running_info': {'report_filename': 'report.html'}, 'results': {'refs': {'Amp1': {'sgRNA_cut_points': [10], 'sgRNA_intervals': [(5, 15)], 'include_idxs': np.array([8, 9, 10, 11, 12])}}}},
+        amplicon_info_1={'Amp1': {'Reads_aligned': '1000', 'Unmodified': '800', 'Modified': '200'}},
+        amplicon_info_2={'Amp1': {'Reads_aligned': '1000', 'Unmodified': '900', 'Modified': '100'}},
+        amplicon_name='Amp1',
+    )
+    defaults.update(overrides)
+    return ComparePlotContext(**defaults)
+
+
+class TestPrepCompareEditingBarchart:
+    """Tests for prep_compare_editing_barchart."""
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_editing_barchart
+        ctx = _make_compare_ctx(tmp_path)
+        result = prep_compare_editing_barchart(ctx)
+        assert 'n_total_1' in result
+        assert 'n_total_2' in result
+        assert 'sample_1_name' in result
+        assert 'plot_titles' in result
+        assert 'plot_path' in result
+
+    def test_reads_from_amplicon_info(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_editing_barchart
+        ctx = _make_compare_ctx(tmp_path)
+        result = prep_compare_editing_barchart(ctx)
+        assert result['n_total_1'] == 1000.0
+        assert result['n_modified_1'] == 200.0
+        assert result['n_unmodified_2'] == 900.0
+
+    def test_sample_names_passthrough(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_editing_barchart
+        ctx = _make_compare_ctx(tmp_path)
+        result = prep_compare_editing_barchart(ctx)
+        assert result['sample_1_name'] == 'WT'
+        assert result['sample_2_name'] == 'KO'
+
+
+class TestPrepCompareModificationPositions:
+    """Tests for prep_compare_modification_positions."""
+
+    def _make_ctx_with_mod_freqs(self, tmp_path):
+        ctx = _make_compare_ctx(tmp_path)
+        seq = 'ACGTACGTACGTACGTACGT'
+        ctx.mod_freqs_1 = {
+            'Insertions': [10] * len(seq),
+            'Deletions': [5] * len(seq),
+            'Substitutions': [3] * len(seq),
+            'All_modifications': [15] * len(seq),
+            'Total': [100] * len(seq),
+        }
+        ctx.mod_freqs_2 = {
+            'Insertions': [5] * len(seq),
+            'Deletions': [10] * len(seq),
+            'Substitutions': [2] * len(seq),
+            'All_modifications': [12] * len(seq),
+            'Total': [100] * len(seq),
+        }
+        ctx.consensus_sequence = seq
+        ctx.cut_points = [10]
+        ctx.sgRNA_intervals = [(5, 15)]
+        ctx.quant_windows_1 = np.array([8, 9, 10, 11, 12])
+        ctx.quant_windows_2 = np.array([8, 9, 10, 11, 12])
+        return ctx
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_modification_positions
+        ctx = self._make_ctx_with_mod_freqs(tmp_path)
+        ctx.mod_type = 'Insertions'
+        result = prep_compare_modification_positions(ctx)
+        assert 'plot_kwargs' in result
+        assert 'mod_df' in result
+        assert 'sig_count' in result
+        assert 'sig_count_quant_window' in result
+
+    def test_fisher_test_produces_pvalues(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_modification_positions
+        ctx = self._make_ctx_with_mod_freqs(tmp_path)
+        ctx.mod_type = 'Insertions'
+        result = prep_compare_modification_positions(ctx)
+        pvalues = result['plot_kwargs']['pvalues']
+        assert len(pvalues) == len(ctx.consensus_sequence)
+        # All positions have same counts so p-values should all be equal
+        assert all(p == pvalues[0] for p in pvalues)
+
+    def test_sig_count_is_int(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_modification_positions
+        ctx = self._make_ctx_with_mod_freqs(tmp_path)
+        ctx.mod_type = 'Insertions'
+        result = prep_compare_modification_positions(ctx)
+        assert isinstance(result['sig_count'], (int, np.integer))
+
+    def test_mod_df_has_correct_shape(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_modification_positions
+        ctx = self._make_ctx_with_mod_freqs(tmp_path)
+        ctx.mod_type = 'Deletions'
+        result = prep_compare_modification_positions(ctx)
+        # 7 rows: sample1_mod, sample1_total, sample2_mod, sample2_total, odds_ratios, pvalues, qval_bonferroni
+        assert result['mod_df'].shape[0] == 7
+        # columns: Reference + one per base
+        assert result['mod_df'].shape[1] == len(ctx.consensus_sequence) + 1
+
+
+class TestPrepCompareAlleleTable:
+    """Tests for prep_compare_allele_table."""
+
+    def _make_ctx_with_allele_pairs(self, tmp_path):
+        ctx = _make_compare_ctx(tmp_path)
+        ctx.consensus_sequence = 'ACGTACGTACGTACGTACGT'
+        ctx.sgRNA_intervals = [(5, 15)]
+        ctx.cut_points = [10]
+
+        df1 = pd.DataFrame({
+            'Aligned_Sequence': ['ACGT', 'ACGA'],
+            'Reference_Sequence': ['ACGT', 'ACGT'],
+            'Unedited': [True, False],
+            'n_deleted': [0, 0],
+            'n_inserted': [0, 0],
+            'n_mutated': [0, 1],
+            '#Reads': [80, 20],
+            '%Reads': [80.0, 20.0],
+        })
+        df2 = pd.DataFrame({
+            'Aligned_Sequence': ['ACGT', 'ACGC'],
+            'Reference_Sequence': ['ACGT', 'ACGT'],
+            'Unedited': [True, False],
+            'n_deleted': [0, 0],
+            'n_inserted': [0, 0],
+            'n_mutated': [0, 1],
+            '#Reads': [60, 40],
+            '%Reads': [60.0, 40.0],
+        })
+        ctx.allele_pairs = [('alleles_around_sgRNA.txt', 'alleles_around_sgRNA.txt', df1, df2)]
+        return ctx
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_allele_table
+        ctx = self._make_ctx_with_allele_pairs(tmp_path)
+        result = prep_compare_allele_table(ctx, 0)
+        assert 'merged_df' in result
+        assert 'plot_top_kwargs' in result
+        assert 'plot_bottom_kwargs' in result
+        assert 'is_base_edit' in result
+        assert 'file_root' in result
+
+    def test_merged_df_has_lfc(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_allele_table
+        ctx = self._make_ctx_with_allele_pairs(tmp_path)
+        result = prep_compare_allele_table(ctx, 0)
+        assert 'each_LFC' in result['merged_df'].columns
+
+    def test_top_bottom_sorted_differently(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_allele_table
+        ctx = self._make_ctx_with_allele_pairs(tmp_path)
+        result = prep_compare_allele_table(ctx, 0)
+        top_lfc = result['plot_top_kwargs']['df_alleles']['each_LFC'].iloc[0]
+        bottom_lfc = result['plot_bottom_kwargs']['df_alleles']['each_LFC'].iloc[0]
+        # Top should be enriched in sample_1 (higher LFC), bottom in sample_2 (lower LFC)
+        assert top_lfc >= bottom_lfc
+
+    def test_is_base_edit_detection(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_compare_allele_table
+        ctx = self._make_ctx_with_allele_pairs(tmp_path)
+        result = prep_compare_allele_table(ctx, 0)
+        assert result['is_base_edit'] is False
+
+        # Test with base_edit in filename
+        ctx.allele_pairs = [('base_edit_alleles.txt', 'base_edit_alleles.txt',
+                             ctx.allele_pairs[0][2], ctx.allele_pairs[0][3])]
+        result = prep_compare_allele_table(ctx, 0)
+        assert result['is_base_edit'] is True
