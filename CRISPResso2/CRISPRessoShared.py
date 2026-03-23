@@ -503,9 +503,7 @@ def get_silent_edits(ref_seq, ref_codons, seq, seq_codons):
     ref_codons = [('A', 'GCT'), ('G', 'GGT'), ('S', 'AGT')]
     seq_codons = [('A', 'GCT'), ('G', 'GGT'),  ('T', 'ACT'), ('S', 'AGC')]
 
-    Returns
-    -------
-    'AGTs'
+    returns: 'AGTs'
 
     Parameters
     ----------
@@ -969,8 +967,7 @@ def get_command_output(command):
                  bufsize=-1)  # bufsize system default
     while True:
         retcode = p.poll()
-        line = p.stdout.readline()
-        yield line
+        yield p.stdout.readline()
         if retcode is not None:
             break
 
@@ -1567,6 +1564,7 @@ def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_a
     tuple of (str, str, bool, int, int, int, int, float)
         (aligned_aa_seq, reference_aa_seq, is_unmodified, n_deleted,
          n_inserted, n_mutated, n_reads, pct_reads)
+
     """
     try:
         left_idx = row['ref_positions'].index(plot_left_idx)
