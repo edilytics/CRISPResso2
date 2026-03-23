@@ -2438,3 +2438,52 @@ def prep_scaffold_indel_lengths(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
     }
+
+
+# =============================================================================
+# Multi-mode summary plot prep functions (Pooled, WGS, Aggregate)
+# =============================================================================
+
+
+def prep_reads_total(ctx, prefix: str):
+    """Prepare kwargs for plot_reads_total (reads summary bar chart).
+
+    Used by Pooled, WGS, and Aggregate modes.
+
+    Parameters
+    ----------
+    ctx : PooledPlotContext | WGSPlotContext | AggregatePlotContext
+        Must have ``df_summary_quantification``, ``save_png``, ``_jp``,
+        and ``args.min_reads_to_use_region``.
+    prefix : str
+        Filename prefix, e.g. ``'CRISPRessoPooled'``, ``'CRISPRessoWGS'``,
+        ``'CRISPRessoAggregate'``.
+    """
+    return {
+        'df_summary_quantification': ctx.df_summary_quantification,
+        'fig_filename_root': ctx._jp(f'{prefix}_reads_summary'),
+        'save_png': ctx.save_png,
+        'cutoff': ctx.args.min_reads_to_use_region,
+    }
+
+
+def prep_unmod_mod_pcts(ctx, prefix: str):
+    """Prepare kwargs for plot_unmod_mod_pcts (modification summary bar chart).
+
+    Used by Pooled, WGS, and Aggregate modes.
+
+    Parameters
+    ----------
+    ctx : PooledPlotContext | WGSPlotContext | AggregatePlotContext
+        Must have ``df_summary_quantification``, ``save_png``, ``_jp``,
+        and ``args.min_reads_to_use_region``.
+    prefix : str
+        Filename prefix, e.g. ``'CRISPRessoPooled'``, ``'CRISPRessoWGS'``,
+        ``'CRISPRessoAggregate'``.
+    """
+    return {
+        'df_summary_quantification': ctx.df_summary_quantification,
+        'fig_filename_root': ctx._jp(f'{prefix}_modification_summary'),
+        'save_png': ctx.save_png,
+        'cutoff': ctx.args.min_reads_to_use_region,
+    }

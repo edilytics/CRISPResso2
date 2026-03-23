@@ -4,6 +4,8 @@ Each prep function takes a CorePlotContext as its only argument and returns
 the kwargs dict that the corresponding CRISPRessoPlot function expects.
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 from collections import Counter
@@ -2025,3 +2027,140 @@ class TestWriteBaseEditCounts:
         ]
         for filename in expected:
             assert (tmp_path / filename).exists(), f"Missing: {filename}"
+
+
+# =============================================================================
+# Multi-mode summary plot prep functions (Pooled, WGS, Aggregate)
+# =============================================================================
+
+
+class TestPrepReadsTotal:
+    """Tests for prep_reads_total."""
+
+    def _make_summary_ctx(self, tmp_path):
+        """Build a minimal context with df_summary_quantification."""
+        from CRISPResso2.plots.plot_context import PooledPlotContext
+        df = pd.DataFrame({
+            'Name': ['region1', 'region2'],
+            'Reads_total': [1000, 500],
+            'Reads_aligned': [900, 400],
+            'Unmodified': [800, 350],
+            'Modified': [100, 50],
+        })
+        return PooledPlotContext(
+            args=SimpleNamespace(min_reads_to_use_region=10),
+            run_data={},
+            output_directory=str(tmp_path),
+            save_png=True,
+            _jp=lambda f: os.path.join(str(tmp_path), f),
+            custom_config={},
+            df_summary_quantification=df,
+        )
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert 'df_summary_quantification' in result
+        assert 'fig_filename_root' in result
+        assert 'save_png' in result
+        assert 'cutoff' in result
+
+    def test_filename_uses_prefix(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert 'CRISPRessoPooled_reads_summary' in result['fig_filename_root']
+
+    def test_different_prefix(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoWGS')
+        assert 'CRISPRessoWGS_reads_summary' in result['fig_filename_root']
+
+    def test_cutoff_from_args(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert result['cutoff'] == 10
+
+    def test_save_png_passthrough(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert result['save_png'] is True
+
+    def test_dataframe_is_same_reference(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert result['df_summary_quantification'] is ctx.df_summary_quantification
+
+
+class TestPrepUnmodModPcts:
+    """Tests for prep_unmod_mod_pcts."""
+
+    def _make_summary_ctx(self, tmp_path):
+        """Build a minimal context with df_summary_quantification."""
+        from CRISPResso2.plots.plot_context import PooledPlotContext
+        df = pd.DataFrame({
+            'Name': ['region1', 'region2'],
+            'Reads_total': [1000, 500],
+            'Reads_aligned': [900, 400],
+            'Unmodified': [800, 350],
+            'Modified': [100, 50],
+        })
+        return PooledPlotContext(
+            args=SimpleNamespace(min_reads_to_use_region=10),
+            run_data={},
+            output_directory=str(tmp_path),
+            save_png=False,
+            _jp=lambda f: os.path.join(str(tmp_path), f),
+            custom_config={},
+            df_summary_quantification=df,
+        )
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_unmod_mod_pcts
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_unmod_mod_pcts(ctx, prefix='CRISPRessoPooled')
+        assert 'df_summary_quantification' in result
+        assert 'fig_filename_root' in result
+        assert 'save_png' in result
+        assert 'cutoff' in result
+
+    def test_filename_uses_prefix(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_unmod_mod_pcts
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_unmod_mod_pcts(ctx, prefix='CRISPRessoPooled')
+        assert 'CRISPRessoPooled_modification_summary' in result['fig_filename_root']
+
+    def test_save_png_passthrough(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_unmod_mod_pcts
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_unmod_mod_pcts(ctx, prefix='CRISPRessoPooled')
+        assert result['save_png'] is False
+
+    def test_works_with_wgs_context(self, tmp_path):
+        """Verify the function works with WGSPlotContext too."""
+        from CRISPResso2.plots.plot_context import WGSPlotContext
+        from CRISPResso2.plots.data_prep import prep_unmod_mod_pcts
+        df = pd.DataFrame({
+            'Name': ['region1'],
+            'Reads_total': [1000],
+            'Reads_aligned': [900],
+            'Unmodified': [800],
+            'Modified': [100],
+        })
+        ctx = WGSPlotContext(
+            args=SimpleNamespace(min_reads_to_use_region=50),
+            run_data={},
+            output_directory=str(tmp_path),
+            save_png=True,
+            _jp=lambda f: os.path.join(str(tmp_path), f),
+            custom_config={},
+            df_summary_quantification=df,
+        )
+        result = prep_unmod_mod_pcts(ctx, prefix='CRISPRessoWGS')
+        assert 'CRISPRessoWGS_modification_summary' in result['fig_filename_root']
+        assert result['cutoff'] == 50
