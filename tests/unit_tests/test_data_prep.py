@@ -4,6 +4,8 @@ Each prep function takes a CorePlotContext as its only argument and returns
 the kwargs dict that the corresponding CRISPRessoPlot function expects.
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 from collections import Counter
@@ -2025,3 +2027,313 @@ class TestWriteBaseEditCounts:
         ]
         for filename in expected:
             assert (tmp_path / filename).exists(), f"Missing: {filename}"
+
+
+# =============================================================================
+# Batch / Aggregate prep functions
+# =============================================================================
+
+
+def _make_batch_ctx(tmp_path, **overrides):
+    """Build a minimal BatchPlotContext for testing."""
+    from CRISPResso2.plots.plot_context import BatchPlotContext
+
+    seq = 'ACGTACGTAC'
+    seq_cols = list(seq)
+    n_rows_nuc = 4  # 2 batches × 2 nucleotides
+    n_rows_mod = 2  # 2 batches
+    n_rows_mod_freq = 6  # 2 batches × 3 mod types
+
+    nuc_data = {'Batch': ['s1', 's1', 's2', 's2'], 'Nucleotide': ['A', 'C', 'A', 'C']}
+    for i, base in enumerate(seq_cols):
+        nuc_data[i] = [0.25] * n_rows_nuc
+    nuc_pct_df = pd.DataFrame(nuc_data)
+    nuc_pct_df.columns = ['Batch', 'Nucleotide'] + seq_cols
+
+    mod_pct_data = {'Batch': ['s1', 's2'], 'Modification': ['Insertions', 'Insertions']}
+    for i, base in enumerate(seq_cols):
+        mod_pct_data[i] = [0.05] * n_rows_mod
+    mod_pct_df = pd.DataFrame(mod_pct_data)
+    mod_pct_df.columns = ['Batch', 'Modification'] + seq_cols
+
+    mod_freq_data = {'Batch': ['s1', 's1', 's1', 's2', 's2', 's2'],
+                     'Modification': ['Insertions', 'Deletions', 'Substitutions'] * 2}
+    for i, base in enumerate(seq_cols):
+        mod_freq_data[i] = [5] * n_rows_mod_freq
+    mod_freq_df = pd.DataFrame(mod_freq_data)
+    mod_freq_df.columns = ['Batch', 'Modification'] + seq_cols
+
+    defaults = dict(
+        args=SimpleNamespace(
+            conversion_nuc_from='C',
+            conversion_nuc_to='T',
+            base_editor_output=False,
+            use_matplotlib=True,
+        ),
+        run_data={'results': {'general_plots': {}}},
+        output_directory=str(tmp_path),
+        save_png=False,
+        _jp=lambda f: os.path.join(str(tmp_path), f),
+        custom_config={'colors': {}},
+        amplicon_names=['Amp1'],
+        nucleotide_frequency_summary_dfs={'Amp1': nuc_pct_df.copy()},
+        nucleotide_percentage_summary_dfs={'Amp1': nuc_pct_df},
+        modification_frequency_summary_dfs={'Amp1': mod_freq_df},
+        modification_percentage_summary_dfs={'Amp1': mod_pct_df},
+        consensus_guides={'Amp1': ['ACGT']},
+        consensus_include_idxs={'Amp1': np.array([3, 4, 5, 6])},
+        consensus_sgRNA_intervals={'Amp1': [(3, 7)]},
+        consensus_sgRNA_plot_idxs={'Amp1': [np.array([2, 3, 4, 5, 6, 7])]},
+        guides_all_same={'Amp1': True},
+        amplicon_name='Amp1',
+    )
+    defaults.update(overrides)
+    return BatchPlotContext(**defaults)
+
+
+class TestComputeSubSgRNAIntervals:
+    """Tests for _compute_sub_sgRNA_intervals."""
+
+    def test_basic_mapping(self):
+        from CRISPResso2.plots.data_prep import _compute_sub_sgRNA_intervals
+        sgRNA_plot_idxs = np.array([2, 3, 4, 5, 6, 7])
+        consensus_sgRNA_intervals = [(3, 7)]
+        include_idxs = np.array([3, 4, 5, 6])
+        sub_intervals, sub_include = _compute_sub_sgRNA_intervals(
+            sgRNA_plot_idxs, consensus_sgRNA_intervals, include_idxs,
+        )
+        assert len(sub_intervals) == 1
+        assert sub_intervals[0][0] >= 0
+        assert sub_include[0] == 3 - 2  # offset by plot_idxs[0]
+
+
+class TestPrepBatchNucQuiltAroundSgRNA:
+    """Tests for prep_batch_nuc_quilt_around_sgRNA."""
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_batch_nuc_quilt_around_sgRNA
+        ctx = _make_batch_ctx(tmp_path)
+        ctx.sgRNA_ind = 0
+        result = prep_batch_nuc_quilt_around_sgRNA(ctx)
+        assert 'nuc_pct_df' in result
+        assert 'mod_pct_df' in result
+        assert 'fig_filename_root' in result
+        assert 'sgRNA_intervals' in result
+
+    def test_slices_dataframe(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_batch_nuc_quilt_around_sgRNA
+        ctx = _make_batch_ctx(tmp_path)
+        ctx.sgRNA_ind = 0
+        result = prep_batch_nuc_quilt_around_sgRNA(ctx)
+        # sliced DataFrame should have fewer columns than original
+        orig_cols = ctx.nucleotide_percentage_summary_dfs['Amp1'].shape[1]
+        result_cols = result['nuc_pct_df'].shape[1]
+        assert result_cols <= orig_cols
+
+
+class TestPrepBatchNucQuilt:
+    """Tests for prep_batch_nuc_quilt."""
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_batch_nuc_quilt
+        ctx = _make_batch_ctx(tmp_path)
+        result = prep_batch_nuc_quilt(ctx)
+        assert 'nuc_pct_df' in result
+        assert 'fig_filename_root' in result
+
+    def test_includes_sgRNA_data_when_guides_same(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_batch_nuc_quilt
+        ctx = _make_batch_ctx(tmp_path)
+        result = prep_batch_nuc_quilt(ctx)
+        assert 'sgRNA_intervals' in result
+        assert 'sgRNA_sequences' in result
+
+    def test_no_sgRNA_when_guides_differ(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_batch_nuc_quilt
+        ctx = _make_batch_ctx(tmp_path, guides_all_same={'Amp1': False})
+        result = prep_batch_nuc_quilt(ctx)
+        assert 'sgRNA_intervals' not in result
+
+
+class TestPrepBatchConversionMap:
+    """Tests for prep_batch_conversion_map."""
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_batch_conversion_map
+        ctx = _make_batch_ctx(tmp_path)
+        result = prep_batch_conversion_map(ctx)
+        assert 'nuc_pct_df' in result
+        assert 'conversion_nuc_from' in result
+        assert 'conversion_nuc_to' in result
+
+
+class TestPrepBatchAlleleModificationHeatmap:
+    """Tests for prep_batch_allele_modification_heatmap."""
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_batch_allele_modification_heatmap
+        ctx = _make_batch_ctx(tmp_path)
+        ctx.mod_type = 'Insertions'
+        result = prep_batch_allele_modification_heatmap(ctx)
+        assert 'sample_values' in result
+        assert 'sample_sgRNA_intervals' in result
+        assert 'plot_path' in result
+        assert 'div_id' in result
+
+    def test_filters_by_mod_type(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_batch_allele_modification_heatmap
+        ctx = _make_batch_ctx(tmp_path)
+        ctx.mod_type = 'Insertions'
+        result = prep_batch_allele_modification_heatmap(ctx)
+        # Should only have rows for 'Insertions' (2 batches)
+        assert result['sample_values'].shape[0] == 2
+
+
+class TestPrepBatchAlleleModificationLine:
+    """Tests for prep_batch_allele_modification_line."""
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_batch_allele_modification_line
+        ctx = _make_batch_ctx(tmp_path)
+        ctx.mod_type = 'Deletions'
+        result = prep_batch_allele_modification_line(ctx)
+        assert 'sample_values' in result
+        assert 'plot_path' in result
+        assert 'div_id' in result
+
+
+# =============================================================================
+# Multi-mode summary plot prep functions (Pooled, WGS, Aggregate)
+# =============================================================================
+
+
+class TestPrepReadsTotal:
+    """Tests for prep_reads_total."""
+
+    def _make_summary_ctx(self, tmp_path):
+        """Build a minimal context with df_summary_quantification."""
+        from CRISPResso2.plots.plot_context import PooledPlotContext
+        df = pd.DataFrame({
+            'Name': ['region1', 'region2'],
+            'Reads_total': [1000, 500],
+            'Reads_aligned': [900, 400],
+            'Unmodified': [800, 350],
+            'Modified': [100, 50],
+        })
+        return PooledPlotContext(
+            args=SimpleNamespace(min_reads_to_use_region=10),
+            run_data={},
+            output_directory=str(tmp_path),
+            save_png=True,
+            _jp=lambda f: os.path.join(str(tmp_path), f),
+            custom_config={},
+            df_summary_quantification=df,
+        )
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert 'df_summary_quantification' in result
+        assert 'fig_filename_root' in result
+        assert 'save_png' in result
+        assert 'cutoff' in result
+
+    def test_filename_uses_prefix(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert 'CRISPRessoPooled_reads_summary' in result['fig_filename_root']
+
+    def test_different_prefix(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoWGS')
+        assert 'CRISPRessoWGS_reads_summary' in result['fig_filename_root']
+
+    def test_cutoff_from_args(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert result['cutoff'] == 10
+
+    def test_save_png_passthrough(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert result['save_png'] is True
+
+    def test_dataframe_is_same_reference(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert result['df_summary_quantification'] is ctx.df_summary_quantification
+
+
+class TestPrepUnmodModPcts:
+    """Tests for prep_unmod_mod_pcts."""
+
+    def _make_summary_ctx(self, tmp_path):
+        """Build a minimal context with df_summary_quantification."""
+        from CRISPResso2.plots.plot_context import PooledPlotContext
+        df = pd.DataFrame({
+            'Name': ['region1', 'region2'],
+            'Reads_total': [1000, 500],
+            'Reads_aligned': [900, 400],
+            'Unmodified': [800, 350],
+            'Modified': [100, 50],
+        })
+        return PooledPlotContext(
+            args=SimpleNamespace(min_reads_to_use_region=10),
+            run_data={},
+            output_directory=str(tmp_path),
+            save_png=False,
+            _jp=lambda f: os.path.join(str(tmp_path), f),
+            custom_config={},
+            df_summary_quantification=df,
+        )
+
+    def test_returns_expected_keys(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_unmod_mod_pcts
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_unmod_mod_pcts(ctx, prefix='CRISPRessoPooled')
+        assert 'df_summary_quantification' in result
+        assert 'fig_filename_root' in result
+        assert 'save_png' in result
+        assert 'cutoff' in result
+
+    def test_filename_uses_prefix(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_unmod_mod_pcts
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_unmod_mod_pcts(ctx, prefix='CRISPRessoPooled')
+        assert 'CRISPRessoPooled_modification_summary' in result['fig_filename_root']
+
+    def test_save_png_passthrough(self, tmp_path):
+        from CRISPResso2.plots.data_prep import prep_unmod_mod_pcts
+        ctx = self._make_summary_ctx(tmp_path)
+        result = prep_unmod_mod_pcts(ctx, prefix='CRISPRessoPooled')
+        assert result['save_png'] is False
+
+    def test_works_with_wgs_context(self, tmp_path):
+        """Verify the function works with WGSPlotContext too."""
+        from CRISPResso2.plots.plot_context import WGSPlotContext
+        from CRISPResso2.plots.data_prep import prep_unmod_mod_pcts
+        df = pd.DataFrame({
+            'Name': ['region1'],
+            'Reads_total': [1000],
+            'Reads_aligned': [900],
+            'Unmodified': [800],
+            'Modified': [100],
+        })
+        ctx = WGSPlotContext(
+            args=SimpleNamespace(min_reads_to_use_region=50),
+            run_data={},
+            output_directory=str(tmp_path),
+            save_png=True,
+            _jp=lambda f: os.path.join(str(tmp_path), f),
+            custom_config={},
+            df_summary_quantification=df,
+        )
+        result = prep_unmod_mod_pcts(ctx, prefix='CRISPRessoWGS')
+        assert 'CRISPRessoWGS_modification_summary' in result['fig_filename_root']
+        assert result['cutoff'] == 50

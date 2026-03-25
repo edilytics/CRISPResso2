@@ -1610,22 +1610,44 @@ def main():
         if args.suppress_report:
             save_png = False
 
-        if not args.suppress_plots:
-            plot_root = _jp("CRISPRessoPooled_reads_summary")
+        # --- Build PooledPlotContext ---
+        from CRISPResso2.plots.plot_context import PooledPlotContext
+        from CRISPResso2.plots.data_prep import prep_reads_total, prep_unmod_mod_pcts
 
+        plot_context = PooledPlotContext(
+            args=args,
+            run_data=crispresso2_info,
+            output_directory=OUTPUT_DIRECTORY,
+            save_png=save_png,
+            _jp=_jp,
+            custom_config={},
+            df_summary_quantification=df_summary_quantification,
+        )
+
+        C2PRO_INSTALLED = CRISPRessoShared.is_C2Pro_installed()
+        if C2PRO_INSTALLED:
+            try:
+                from CRISPRessoPro import hooks as pro_hooks
+                pro_hooks.on_pooled_plots_complete(plot_context, logger)
+            except Exception as e:
+                if args.halt_on_plot_fail:
+                    raise
+                logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
+        elif not args.suppress_plots:
+            reads_total_input = prep_reads_total(plot_context, prefix='CRISPRessoPooled')
             debug('Plotting reads summary', {'percent_complete': 90})
-            CRISPRessoPlot.plot_reads_total(df_summary_quantification=df_summary_quantification, fig_filename_root=plot_root, save_png=save_png, cutoff=args.min_reads_to_use_region)
-            plot_name = os.path.basename(plot_root)
+            CRISPRessoPlot.plot_reads_total(**reads_total_input)
+            plot_name = os.path.basename(reads_total_input['fig_filename_root'])
             crispresso2_info['results']['general_plots']['summary_plot_root'] = plot_name
             crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
             crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'CRISPRessoPooled Read Allocation Summary'
             crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Each bar shows the total number of reads allocated to each amplicon. The vertical line shows the cutoff for analysis, set using the --min_reads_to_use_region parameter.'
             crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('CRISPRessoPooled summary', os.path.basename(samples_quantification_summary_filename))]
 
-            plot_root = _jp("CRISPRessoPooled_modification_summary")
+            unmod_mod_input = prep_unmod_mod_pcts(plot_context, prefix='CRISPRessoPooled')
             debug('Plotting modification summary', {'percent_complete': 95})
-            CRISPRessoPlot.plot_unmod_mod_pcts(df_summary_quantification=df_summary_quantification, fig_filename_root=plot_root, save_png=save_png, cutoff=args.min_reads_to_use_region)
-            plot_name = os.path.basename(plot_root)
+            CRISPRessoPlot.plot_unmod_mod_pcts(**unmod_mod_input)
+            plot_name = os.path.basename(unmod_mod_input['fig_filename_root'])
             crispresso2_info['results']['general_plots']['summary_plot_root'] = plot_name
             crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
             crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'CRISPRessoPooled Modification Summary'
@@ -1695,7 +1717,11 @@ def main():
                 report_name = _jp("CRISPResso2Pooled_report.html")
             else:
                 report_name = OUTPUT_DIRECTORY + '.html'
-            CRISPRessoReport.make_pooled_report_from_folder(report_name, crispresso2_info, OUTPUT_DIRECTORY, _ROOT, logger)
+            if C2PRO_INSTALLED:
+                from CRISPRessoPro import hooks as pro_hooks
+                pro_hooks.make_pooled_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
+            else:
+                CRISPRessoReport.make_pooled_report_from_folder(report_name, crispresso2_info, OUTPUT_DIRECTORY, _ROOT, logger)
             crispresso2_info['running_info']['report_location'] = report_name
             crispresso2_info['running_info']['report_filename'] = os.path.basename(report_name)
 
