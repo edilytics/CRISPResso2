@@ -383,6 +383,49 @@ def write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp):
         fout.write("\t".join([str(x) for x in [counts_dict['total_reference_noindel_reads'], counts_dict['total_reference_indel_reads'], counts_dict['total_target_noindel_reads'], counts_dict['total_target_indel_reads'], counts_dict['total_other_noindel_reads'], counts_dict['total_other_indel_reads']]]) + '\n')
 
 
+def find_closest_sgRNA_cut_point(exon_start, exon_end, sgRNA_cut_points, sgRNA_plot_cut_points):
+    """Find the sgRNA with cut_point closest to the given exon interval.
+
+    If no sgRNA cut points are provided, defaults to the exon midpoint.
+
+    Parameters
+    ----------
+    exon_start : int
+        Start position of the exon interval.
+    exon_end : int
+        End position of the exon interval.
+    sgRNA_cut_points : list of int
+        List of sgRNA cut point positions.
+    sgRNA_plot_cut_points : list
+        List of sgRNA plot cut point values (corresponding to sgRNA_cut_points).
+
+    Returns
+    -------
+    tuple
+        (best_cut_point, best_plot_cut_point) where best_cut_point is the
+        closest sgRNA cut point (or exon midpoint if no guides), and
+        best_plot_cut_point is the corresponding plot cut point (or False if
+        no guides).
+
+    """
+    best_cut_point = (exon_start + exon_end) // 2  # default to exon midpoint if no guides
+    best_plot_cut_point = False
+    if len(sgRNA_cut_points) > 0:
+        best_sgRNA_idx = 0
+        best_distance = float('inf')
+        for sgRNA_idx, cp in enumerate(sgRNA_cut_points):
+            if exon_start <= cp <= exon_end:
+                distance = 0
+            else:
+                distance = min(abs(cp - exon_start), abs(cp - exon_end))
+            if distance < best_distance:
+                best_distance = distance
+                best_sgRNA_idx = sgRNA_idx
+        best_cut_point = sgRNA_cut_points[best_sgRNA_idx]
+        best_plot_cut_point = sgRNA_plot_cut_points[best_sgRNA_idx]
+    return best_cut_point, best_plot_cut_point
+
+
 def split_quant_window_coordinates(quant_window_coordinates):
     """Split the quantification window coordinates to be iterated over.
 
@@ -2873,6 +2916,20 @@ def main():
         if len(coding_seqs) > 0:
             crispresso2_info['running_info']['coding_seqs'] = coding_seqs
 
+        # Parse coding sequence names (parallel to guide_names parsing)
+        coding_seq_names = [str(i) for i in range(len(coding_seqs))]
+        if args.coding_seq_name:
+            coding_seq_name_arr = args.coding_seq_name.split(",")
+            if len(coding_seq_name_arr) > len(coding_seqs):
+                raise CRISPRessoShared.BadParameterException(
+                    "More coding sequence names were given than coding sequences. "
+                    "Coding sequences: %d Coding sequence names: %d" % (len(coding_seqs), len(coding_seq_name_arr)))
+            for idx, cs_name in enumerate(coding_seq_name_arr):
+                if cs_name.strip() != "":
+                    coding_seq_names[idx] = CRISPRessoShared.clean_filename(cs_name.strip())
+        if len(coding_seqs) > 0:
+            crispresso2_info['running_info']['coding_seq_names'] = coding_seq_names
+
         # SET REFERENCES TO COMPARE###
         ref_names = []  # ordered list of names
         refs = {}  # dict of ref_name > ref object
@@ -4681,14 +4738,13 @@ def main():
 
         for ref_name in ref_names:
             ref_plot_name = refs[ref_name]['ref_plot_name']
+            crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'] = []
 
             # n_this_category = counts_total[ref_name]
             # if n_this_category < 1:
             #    continue
 
             if not args.suppress_plots:
-                crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'] = []
-
                 ins_pct_vector_filename = _jp(ref_plot_name + 'Effect_vector_insertion.txt')
                 save_vector_to_file(insertion_pct_vectors[ref_name], ins_pct_vector_filename)
                 crispresso2_info['results']['refs'][ref_name]['insertion_pct_vector_filename'] = os.path.basename(ins_pct_vector_filename)
@@ -6022,7 +6078,7 @@ def main():
                         crispresso2_info['results']['refs'][ref_name]['plot_10g_roots'].append(os.path.basename(fig_filename_root))
                         crispresso2_info['results']['refs'][ref_name]['plot_10g_captions'].append("Figure 10g: Non-reference base counts. For target nucleotides in the plotting window, this plot shows the number of non-reference (non-" + args.conversion_nuc_from + ") bases. The number of each target base is annotated on the reference sequence at the bottom of the plot.")
                         crispresso2_info['results']['refs'][ref_name]['plot_10g_datas'].append([('Nucleotide frequencies at ' + args.conversion_nuc_from + 's', os.path.basename(quant_window_sel_nuc_freq_filename))])
-                        wt_ref_name = ref_name
+                    wt_ref_name = ref_name
                     ref_seq = refs[wt_ref_name]['sequence']
                     target_seq = get_base_edit_target_sequence(ref_seq, df_alleles, args.base_editor_target_ref_skip_allele_count)
 
@@ -6084,11 +6140,20 @@ def main():
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'].append(f"Figure 10i: Upset plot of Base Edits for {args.conversion_nuc_from} around cut site for {sgRNA_legend}. Each dot matrix at the bottom represents a specific combination of base edits (colored by target position), and the bar plot at the top shows the number of reads with each combination.")
                             crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.' + sgRNA_label + '.binary_allele_counts.txt')])
 
-            if refs[ref_name]['contains_coding_seq']:
+            if refs[ref_name]['contains_coding_seq'] and not args.suppress_plots:
                 for i, coding_seq in enumerate(coding_seqs):
-                    fig_filename_root = _jp('9a.' + ref_plot_name + 'amino_acid_table_around_' + coding_seq)
+                    coding_seq_label = coding_seq_names[i]
+                    fig_filename_root = _jp('9a.' + ref_plot_name + 'amino_acid_table_around_' + coding_seq_label)
                     coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
-                    amino_acid_cut_point = (cut_point - refs[ref_name]['exon_positions'][0] + 1) // 3
+
+                    # Find the sgRNA with cut_point closest to this coding sequence's exon interval
+                    exon_start, exon_end = refs[ref_name]['exon_intervals'][i]
+                    best_cut_point, best_plot_cut_point = find_closest_sgRNA_cut_point(
+                        exon_start, exon_end, sgRNA_cut_points, sgRNA_plot_cut_points,
+                    )
+
+                    amino_acid_cut_point = (best_cut_point - exon_start + 1) // 3
+                    amino_acid_cut_point = max(0, min(amino_acid_cut_point, len(coding_seq_amino_acids) - 1))
                     df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
                         df_alleles.loc[df_alleles['Reference_Name'] == ref_name],
                         refs[ref_name]['exon_intervals'][i][0],
@@ -6104,22 +6169,19 @@ def main():
                         'MIN_FREQUENCY': args.min_frequency_alleles_around_cut_to_plot,
                         'MAX_N_ROWS': args.max_rows_alleles_around_cut_to_plot,
                         'SAVE_ALSO_PNG': save_png,
-                        'plot_cut_point': plot_cut_point,
-                        'sgRNA_intervals': new_sgRNA_intervals,
-                        'sgRNA_names': sgRNA_names,
-                        'sgRNA_mismatches': sgRNA_mismatches,
+                        'plot_cut_point': best_plot_cut_point,
                         'annotate_wildtype_allele': args.annotate_wildtype_allele,
                         'cut_point': amino_acid_cut_point,
                     }
 
-                    amino_acid_filename = _jp(ref_plot_name + 'amino_acid_table_for_' + coding_seq + '.txt')
+                    amino_acid_filename = _jp(ref_plot_name + 'amino_acid_table_for_' + coding_seq_label + '.txt')
                     df_to_plot.to_csv(amino_acid_filename, sep='\t', header=True, index=True)
 
                     debug('Plotting amino acids for {0}'.format(ref_name))
                     plot(CRISPRessoPlot.plot_amino_acid_table, plot_9a_input)
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_roots'].append(os.path.basename(fig_filename_root))
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_captions'].append(
-                        "Figure 9a: Visualization of the distribution of identified amino acids based on the coding sequence (" + coding_seq + "). The vertical dashed line indicates the predicted cleavage site.")
+                        "Figure 9a: Visualization of the distribution of identified amino acids based on the coding sequence " + coding_seq_label + " (" + coding_seq + "). The vertical dashed line indicates the predicted cleavage site.")
                     crispresso2_info['results']['refs'][ref_name]['plot_9a_datas'].append([('Amino Acid table', os.path.basename(amino_acid_filename))])
 
             info('Done!')
