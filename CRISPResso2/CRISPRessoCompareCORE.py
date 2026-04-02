@@ -401,8 +401,8 @@ def main():
                 # Sort by read frequency descending, with sequence tiebreakers for deterministic output
                 merged = merged.sort_values(['%Reads_' + sample_1_name, 'Aligned_Sequence', 'Reference_Sequence'], ascending=[False, True, True])
                 merged = merged.reset_index(drop=True).set_index('Aligned_Sequence')
-                args.crispresso_output_folder_root = os.path.split(allele_file_1)[1].replace(".txt", "")
-                allele_comparison_file = _jp(args.crispresso_output_folder_root + '.txt')
+                folder_root = os.path.split(allele_file_1)[1].replace(".txt", "")
+                allele_comparison_file = _jp(folder_root + '.txt')
                 merged.to_csv(allele_comparison_file, sep="\t", index=None)
 
                 is_base_edit = 'base_edit' in allele_file_1
@@ -415,18 +415,16 @@ def main():
                 label_suffix = ' Nucleotides are indicated by unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines indicate deleted sequences. The vertical dashed line indicates the predicted cleavage site. ' + \
                 'The proportion and number of reads is shown for each sample on the right, with the values for ' + sample_1_name + ' followed by the values for ' + sample_2_name + '.'
 
-                plot_name = '3.' + args.crispresso_output_folder_root + '_top'
-                # Sort by LFC descending (enriched in sample_1 first), with sequence tiebreakers for deterministic output
-                CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[False, False, False]), sample_1_name, sample_2_name, _jp(plot_name),
+                plot_name = '3.' + folder_root + '_top'
+                CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[False, True, True]), sample_1_name, sample_2_name, _jp(plot_name),
                             MIN_FREQUENCY=args.min_frequency_alleles_around_cut_to_plot, MAX_N_ROWS=args.max_rows_alleles_around_cut_to_plot, SAVE_ALSO_PNG=save_png)
                 crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
                 crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = title_prefix + sample_1_name
                 crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = label_prefix + label_suffix + ' Alleles are sorted for enrichment in ' + sample_1_name + '.'
                 crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Allele comparison table', os.path.basename(allele_comparison_file))]
 
-                plot_name = '3.' + args.crispresso_output_folder_root + '_bottom'
-                # Sort by LFC ascending (enriched in sample_2 first), with sequence tiebreakers for deterministic output
-                CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[True, False, False]), sample_1_name, sample_2_name, _jp(plot_name),
+                plot_name = '3.' + folder_root + '_bottom'
+                CRISPRessoPlot.plot_alleles_table_compare(ref_seq_around_cut, merged.sort_values(['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'], ascending=[True, True, True]), sample_1_name, sample_2_name, _jp(plot_name),
                             MIN_FREQUENCY=args.min_frequency_alleles_around_cut_to_plot, MAX_N_ROWS=args.max_rows_alleles_around_cut_to_plot, SAVE_ALSO_PNG=save_png)
                 crispresso2_info['results']['general_plots']['summary_plot_names'].append(plot_name)
                 crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = title_prefix + sample_2_name
