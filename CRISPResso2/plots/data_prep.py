@@ -1898,7 +1898,7 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
         return None
 
     # Lazy import — CRISPResso2Align is a compiled C extension
-    import CRISPResso2Align
+    from CRISPResso2 import CRISPResso2Align
 
     # Align target to reference
     aln_matrix_loc = args.needleman_wunsch_aln_matrix_loc
