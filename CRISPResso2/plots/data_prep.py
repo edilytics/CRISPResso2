@@ -1141,9 +1141,10 @@ def prep_log_nuc_freqs(ctx: CorePlotContext):
 def prep_amino_acid_table(ctx: CorePlotContext):
     """Prepare amino acid table data for plot_9a and CSV export.
 
-    Requires ``ctx.ref_name``, ``ctx.sgRNA_ind``, and ``ctx.coding_seq_ind``.
+    Requires ``ctx.ref_name`` and ``ctx.coding_seq_ind``.
 
-    Converts a nucleotide coding sequence to amino acids, computes the
+    Converts a nucleotide coding sequence to amino acids, finds the closest
+    sgRNA cut point to the coding sequence's exon interval, computes the
     amino acid cut point, builds the amino acid allele DataFrame via
     ``CRISPRessoShared.get_amino_acid_dataframe``, and calls
     :func:`prep_amino_acid_table_for_plot` to produce a
@@ -1158,6 +1159,7 @@ def prep_amino_acid_table(ctx: CorePlotContext):
       ``None`` if no rows pass the frequency threshold
     """
     from CRISPResso2 import CRISPRessoShared
+    from CRISPResso2.CRISPRessoCORE import find_closest_sgRNA_cut_point
 
     ref_name = ctx.ref_name
     ref = _ref(ctx)
@@ -1165,16 +1167,25 @@ def prep_amino_acid_table(ctx: CorePlotContext):
 
     coding_seqs = ctx.run_data['running_info']['coding_seqs']
     coding_seq = coding_seqs[coding_seq_ind]
-    cut_point = ref['sgRNA_cut_points'][ctx.sgRNA_ind]
-    exon_positions_start = ref['exon_positions'][0]
+    coding_seq_names = ctx.run_data['running_info'].get('coding_seq_names', [str(i) for i in range(len(coding_seqs))])
+    coding_seq_label = coding_seq_names[coding_seq_ind]
+    sgRNA_cut_points = ref['sgRNA_cut_points']
+    sgRNA_plot_cut_points = ref['sgRNA_plot_cut_points']
     df_alleles_for_ref = ctx.df_alleles.loc[ctx.df_alleles['Reference_Name'] == ref_name]
     exon_interval_start = ref['exon_intervals'][coding_seq_ind][0]
+
+    # Find the sgRNA with cut_point closest to this coding sequence's exon interval
+    exon_start, exon_end = ref['exon_intervals'][coding_seq_ind]
+    best_cut_point, best_plot_cut_point = find_closest_sgRNA_cut_point(
+        exon_start, exon_end, sgRNA_cut_points, sgRNA_plot_cut_points,
+    )
 
     _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     blosum_path = os.path.join(_ROOT, "BLOSUM62")
 
     coding_seq_amino_acids = CRISPRessoShared.get_amino_acids_from_nucs(coding_seq)
-    amino_acid_cut_point = (cut_point - exon_positions_start + 1) // 3
+    amino_acid_cut_point = (best_cut_point - exon_start + 1) // 3
+    amino_acid_cut_point = max(0, min(amino_acid_cut_point, len(coding_seq_amino_acids) - 1))
     df_to_plot = CRISPRessoShared.get_amino_acid_dataframe(
         df_alleles_for_ref,
         exon_interval_start,
@@ -1207,7 +1218,7 @@ def prep_amino_acid_table(ctx: CorePlotContext):
 
         fig_filename_root = _make_fig_filename_root(
             ctx,
-            '9a.' + _ref_plot_name(ctx) + 'amino_acid_table_around_' + coding_seq,
+            '9a.' + _ref_plot_name(ctx) + 'amino_acid_table_around_' + coding_seq_label,
         )
 
         plot_input = {
@@ -1221,10 +1232,8 @@ def prep_amino_acid_table(ctx: CorePlotContext):
             'per_element_annot_kws': per_element_annot_kws,
             'custom_colors': ctx.custom_config.get('colors', {}),
             'SAVE_ALSO_PNG': ctx.save_png,
-            'plot_cut_point': ref['sgRNA_plot_cut_points'][ctx.sgRNA_ind],
-            'sgRNA_intervals': ref['sgRNA_intervals'],
-            'sgRNA_names': ref['sgRNA_names'],
-            'sgRNA_mismatches': ref['sgRNA_mismatches'],
+            'plot_cut_point': best_plot_cut_point,
+            'annotate_wildtype_allele': ctx.args.annotate_wildtype_allele,
             'amino_acid_cut_point': amino_acid_cut_point,
         }
 

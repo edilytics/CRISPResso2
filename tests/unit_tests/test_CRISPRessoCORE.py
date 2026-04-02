@@ -4,7 +4,12 @@ import pytest
 import pandas as pd
 from pytest_check import check
 
-from CRISPResso2 import CRISPRessoCORE, CRISPRessoShared, CRISPRessoCOREResources
+from inline_snapshot import snapshot
+
+from CRISPResso2 import CRISPResso2Align, CRISPRessoCORE, CRISPRessoShared, CRISPRessoCOREResources
+
+
+ALN_MATRIX = CRISPResso2Align.read_matrix("./CRISPResso2/EDNAFULL")
 
 def calc_score(seq, ref):
     score = 0
@@ -1630,6 +1635,447 @@ def test_irregular_sublist_generation():
         sublists.append(sublist)
     assert [len(sublist) for sublist in sublists] == [28,28,28,29]
     assert [s for sublist in sublists for s in sublist] == mock_variant_cache
+
+
+# Test upset plot data functions
+def test_get_base_edit_target_sequence():
+    df_alleles = pd.read_csv('tests/df_alleles.txt')
+    ref_seq = 'CGGCCGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCTGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCAGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGG'
+    base_editor_target_ref_skip_allele_count = 0
+
+    target_seq = CRISPRessoCORE.get_base_edit_target_sequence(
+        ref_seq,
+        df_alleles,
+        base_editor_target_ref_skip_allele_count
+    )
+
+    assert target_seq == 'AATACGGATGTTCCAATCAGTACGCAGAGAGTCGCCGTCTCCAAGGTGAAAGCGGAAGTAGGGCCTTCGCGCACCTCATGGAATCCCTTCTGCAGCCGCTTTTCCGAGCTTCTGGCGGTCTCAAGCACTACCTACGTCAGCACCTGGGACCCCGCCACCGTGCGCCGGGCCTTGCCGTGGGCGCGCTACCTGCGCCACATCCATCGGCGCTTTGGTCGGCATGGCCCCATTCGCACGGCTCTGGAGCGGC'
+
+
+def test_get_bp_subs_one_sub():
+    ref_seq = 'AAA'
+    aln_ref_seq = 'AAA'
+    aln_target_seq = 'CAA'
+    ref_positions_to_include = [0, 1, 2]
+    ref_changes_dict = CRISPRessoCORE.get_refpos_values(aln_ref_seq, aln_target_seq)
+    bp_substitutions_arr = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
+
+    assert len(bp_substitutions_arr) == 1
+    assert bp_substitutions_arr[0][0] == 0
+    assert bp_substitutions_arr[0][1] == 'A'
+    assert bp_substitutions_arr[0][2] == 'C'
+
+def test_get_bp_subs_two_subs():
+    ref_seq = 'AAA'
+    aln_ref_seq = 'AAA'
+    aln_target_seq = 'CCA'
+    ref_positions_to_include = [0, 1, 2]
+    ref_changes_dict = CRISPRessoCORE.get_refpos_values(aln_ref_seq, aln_target_seq)
+    bp_substitutions_arr = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
+
+    assert len(bp_substitutions_arr) == 2
+    assert bp_substitutions_arr[0] == (0, 'A', 'C')
+    assert bp_substitutions_arr[1] == (1, 'A', 'C')
+
+def test_get_bp_subs_insertions():
+
+    ref_seq = 'AAAAAA'
+    aln_ref_seq = 'AAA-AAA-----'
+    aln_target_seq = 'AAACAAACCCCC'
+    ref_positions_to_include = [0, 1, 2, 3, 4, 5]
+    ref_changes_dict = CRISPRessoCORE.get_refpos_values(aln_ref_seq, aln_target_seq)
+    bp_substitutions_arr = CRISPRessoCORE.get_bp_substitutions(ref_changes_dict, ref_seq, ref_positions_to_include)
+
+    assert len(bp_substitutions_arr) == 2
+    assert bp_substitutions_arr[0] == (2, 'A', 'AC')
+    assert bp_substitutions_arr[1] == (5, 'A', 'ACCCCC')
+
+
+def test_get_base_edit_target_sequence():
+
+    df_alleles = pd.read_csv('tests/test_be_df.txt')
+    ref_seq = 'AAAA'
+    base_editor_target_ref_skip_allele_count = 0
+
+    target_seq = CRISPRessoCORE.get_base_edit_target_sequence(
+        ref_seq,
+        df_alleles,
+        base_editor_target_ref_skip_allele_count
+    )
+
+    assert target_seq == 'AAGA'
+
+
+
+def test_get_upset_plot_counts():
+    df_alleles = pd.read_csv('tests/test_be_df.txt')
+    target_seq = 'AAGA'
+    bp_substitutions_arr = [(3, 'A', 'G')]
+
+    wt_ref_name = 'TEST'
+
+    counts_dict = CRISPRessoCORE.get_upset_plot_counts(
+        df_alleles,
+        bp_substitutions_arr,
+        wt_ref_name
+    )
+
+    assert len(counts_dict) == 19
+    assert counts_dict['total_alleles'] == 3
+    assert counts_dict['total_alleles_reads'] == 100
+    assert sum(counts_dict['binary_allele_counts'].values()) == 100
+
+
+
+def test_write_base_edit_counts():
+
+
+    OUTPUT_DIRECTORY = '.'
+    clean_file_prefix = ""
+    _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, clean_file_prefix + filename)
+    ref_name = 'TEST'
+    bp_substitutions_arr = [(3, 'A', 'G')]
+    counts_dict = CRISPRessoCORE.get_upset_plot_counts(
+        pd.read_csv('tests/test_be_df.txt'),
+        bp_substitutions_arr,
+        ref_name,
+    )
+
+    expected_files = [
+        '10i.TEST.arrays.txt',
+        '10i.TEST.binary_allele_counts.txt',
+        '10i.TEST.category_allele_counts.txt',
+        '10i.TEST.counts.txt',
+        '10i.TEST.precise_allele_counts.txt',
+    ]
+
+
+    CRISPRessoCORE.write_base_edit_counts(
+        ref_name,
+        counts_dict,
+        bp_substitutions_arr,
+        _jp
+    )
+
+    for filename in expected_files:
+        if os.path.exists(filename):
+            os.remove(filename)
+        else:
+            assert False
+
+
+def test_coding_seq_filename_uses_name_when_provided():
+    """When coding_seq_names is provided, those names are used in filenames."""
+    coding_seq_names = ['Exon1', 'Exon2']
+    ref_plot_name = 'Reference.'
+
+    for i, name in enumerate(coding_seq_names):
+        fig_filename = '9a.' + ref_plot_name + 'amino_acid_table_around_' + name + '.pdf'
+        table_filename = ref_plot_name + 'amino_acid_table_for_' + name + '.txt'
+        assert name in fig_filename
+        assert name in table_filename
+        # Filenames must be well under OS limits
+        assert len(fig_filename.encode('utf-8')) <= 255
+        assert len(table_filename.encode('utf-8')) <= 255
+
+
+def test_coding_seq_filename_uses_index_when_no_name():
+    """When coding_seq_names is not provided, 0-based index is used in filenames."""
+    coding_seq_names = ['0', '1', '2']
+    ref_plot_name = 'Reference.'
+
+    for i, label in enumerate(coding_seq_names):
+        fig_filename = '9a.' + ref_plot_name + 'amino_acid_table_around_' + label + '.pdf'
+        table_filename = ref_plot_name + 'amino_acid_table_for_' + label + '.txt'
+        assert label in fig_filename
+        assert label in table_filename
+        assert len(fig_filename.encode('utf-8')) <= 255
+        assert len(table_filename.encode('utf-8')) <= 255
+
+
+def test_coding_seq_filename_never_too_long():
+    """Whether using names or indices, filenames should never exceed OS limits.
+
+    This is a regression test for the original issue where coding sequences
+    >200bp were embedded verbatim in filenames, exceeding the 255-byte limit.
+    Now that coding sequences are never part of the filename, this should
+    always pass regardless of the coding sequence length.
+    """
+    # With a name
+    coding_seq_label = 'MyExon'
+    ref_plot_name = 'Reference.'
+    fig_filename = '9a.' + ref_plot_name + 'amino_acid_table_around_' + coding_seq_label + '.pdf'
+    table_filename = ref_plot_name + 'amino_acid_table_for_' + coding_seq_label + '.txt'
+    assert len(fig_filename.encode('utf-8')) <= 255
+    assert len(table_filename.encode('utf-8')) <= 255
+
+    # With an index fallback
+    coding_seq_label = '0'
+    fig_filename = '9a.' + ref_plot_name + 'amino_acid_table_around_' + coding_seq_label + '.pdf'
+    table_filename = ref_plot_name + 'amino_acid_table_for_' + coding_seq_label + '.txt'
+    assert len(fig_filename.encode('utf-8')) <= 255
+    assert len(table_filename.encode('utf-8')) <= 255
+
+
+# =============================================================================
+# Tests for coding_seq_names parsing logic
+# =============================================================================
+
+
+def _parse_coding_seq_names(coding_seqs, coding_seq_names_str):
+    """Replicate the coding_seq_names parsing logic from CRISPRessoCORE.
+
+    This helper mirrors the parsing block in CRISPRessoCORE.main() so we
+    can unit-test naming/indexing without running the full pipeline.
+    """
+    coding_seq_names = [str(i) for i in range(len(coding_seqs))]
+    if coding_seq_names_str:
+        coding_seq_name_arr = coding_seq_names_str.split(",")
+        if len(coding_seq_name_arr) > len(coding_seqs):
+            raise CRISPRessoShared.BadParameterException(
+                "More coding sequence names were given than coding sequences. "
+                "Coding sequences: %d Coding sequence names: %d" % (len(coding_seqs), len(coding_seq_name_arr)))
+        for idx, cs_name in enumerate(coding_seq_name_arr):
+            if cs_name.strip() != "":
+                coding_seq_names[idx] = CRISPRessoShared.clean_filename(cs_name.strip())
+    return coding_seq_names
+
+
+def test_coding_seq_names_matching_count():
+    """Names provided for every coding sequence are used as-is."""
+    coding_seqs = ['ATCGATCG', 'GCTAGCTA', 'TTTTAAAA']
+    result = _parse_coding_seq_names(coding_seqs, 'Exon1,Exon2,Exon3')
+    assert result == ['Exon1', 'Exon2', 'Exon3']
+
+
+def test_coding_seq_names_fewer_names_than_seqs():
+    """Unnamed coding sequences fall back to their 0-based index."""
+    coding_seqs = ['ATCGATCG', 'GCTAGCTA', 'TTTTAAAA']
+    result = _parse_coding_seq_names(coding_seqs, 'Exon1')
+    assert result == ['Exon1', '1', '2']
+
+
+def test_coding_seq_names_more_names_than_seqs_raises():
+    """More names than coding sequences should raise BadParameterException."""
+    coding_seqs = ['ATCGATCG']
+    with pytest.raises(CRISPRessoShared.BadParameterException):
+        _parse_coding_seq_names(coding_seqs, 'Exon1,Exon2')
+
+
+def test_coding_seq_names_empty_string_uses_indices():
+    """An empty coding_seq_names string defaults to index-based names."""
+    coding_seqs = ['ATCGATCG', 'GCTAGCTA']
+    result = _parse_coding_seq_names(coding_seqs, '')
+    assert result == ['0', '1']
+
+
+def test_coding_seq_names_none_uses_indices():
+    """None coding_seq_names defaults to index-based names."""
+    coding_seqs = ['ATCGATCG', 'GCTAGCTA']
+    result = _parse_coding_seq_names(coding_seqs, None)
+    assert result == ['0', '1']
+
+
+def test_coding_seq_names_no_coding_seqs():
+    """With no coding sequences, names list should be empty."""
+    result = _parse_coding_seq_names([], '')
+    assert result == []
+
+
+def test_coding_seq_names_partial_empty_names():
+    """Empty names in the comma-separated list fall back to index."""
+    coding_seqs = ['ATCGATCG', 'GCTAGCTA', 'TTTTAAAA']
+    result = _parse_coding_seq_names(coding_seqs, 'Exon1,,Exon3')
+    assert result == ['Exon1', '1', 'Exon3']
+
+
+def test_coding_seq_names_are_filename_safe():
+    """User-provided names with spaces/special chars are cleaned for filenames."""
+    coding_seqs = ['ATCGATCG']
+    result = _parse_coding_seq_names(coding_seqs, 'My Exon (1)')
+    name = result[0]
+    # clean_filename should make it safe for filenames
+    assert '/' not in name
+    assert ' ' not in name
+
+
+# =============================================================================
+# Tests for get_prime_editing_guides
+# =============================================================================
+#
+# Regression tests for PR #615: IndexError when a guide sequence regex match
+# extends to the very end of the reference sequence.  coords_r has length
+# len(from_sequence), so coords_r[match.end()] is out-of-bounds when
+# match.end() == len(from_sequence).  Three independent code paths are affected:
+#
+# 1. pegRNA spacer matching at end of ref0_seq                      (clone path)
+# 2. PE extension matching at end of prime_editing_edited_amp_seq   (clone path)
+# 3. Nicking guide matching at end of RC(ref0_seq)                  (clone path)
+#
+# Each test constructs sequences that place the relevant guide at the very end
+# of its reference, forcing the boundary condition.  On master these raise
+# ``IndexError: list index out of range``; on the fixed branch they succeed.
+# These tests will test the generation of the guide sequences by checking if the
+# function can complete. If there are indexing errors, the functions will error out
+# (trying to access indices beyond the bounds of the amplicon lookup coords (i.e. coords_r).
+#
+# In other words, the return values of these tests are not particularly interesting -
+# just the fact that the function returns. The 'pe_guide_names', 'pe_guide_qw_centers',
+# 'pe_guide_qw_sizes', and 'pe_guide_plot_cut_points' are trivially set so they are
+# not part of the test. the 'pe_orig_guide_seqs' reflects input to the function call
+# (so these results aren't being tested directly) and the 'pe_guides' contain the reverse
+# complement of the extension sequence and the fw sequence for the other two guides -
+# so these values are not being specifically evaluated.
+
+def test_spacer_at_end():
+    """Spacer at the end of ref0_seq should not raise IndexError."""
+    ref0_seq    = 'GCTGATCGTAGCTAGCTAGCTACGATCGATCGTAGCTAGT' 'GTCATCTTAGTCATTACCTG'
+    edited_amp  = 'GCTGATCGTAGCTAGCTAGCTACGAACGATCGTAGCTAGT' 'GTCATCTTAGTCATTACCTG'
+    #                                       ^ SNP pos 25 (T→A)
+    spacer      = 'GTCATCTTAGTCATTACCTG'  # last 20 bp of ref0
+    ext_dna     = edited_amp[10:30]       # extension in middle, no boundary issue
+
+    result = CRISPRessoCORE.get_prime_editing_guides(
+        this_amp_seq=edited_amp, ref0_seq=ref0_seq,
+        prime_editing_edited_amp_seq=edited_amp,
+        prime_editing_pegRNA_extension_seq=CRISPRessoShared.reverse_complement(ext_dna),
+        prime_editing_extension_seq_dna=ext_dna,
+        prime_editing_pegRNA_spacer_seq=spacer,
+        prime_editing_nicking_guide_seq='',
+        prime_editing_pegRNA_extension_quantification_window_size=5,
+        nicking_qw_center=-3, nicking_qw_size=1,
+        aln_matrix=ALN_MATRIX,
+        needleman_wunsch_gap_open=-20, needleman_wunsch_gap_extend=-2,
+        prime_editing_gap_open=-50, prime_editing_gap_extend=0,
+    )
+
+    # This tests gets the prime editing guides with reference to the prime edited
+    # reference (this_amp_seq=edited_amp (the prime-edited seq))
+    # Thus, there are no mismatches ([], [])
+
+    assert result == snapshot(
+        (
+            ["GCTAGCTAGCTACGAACGAT", "GTCATCTTAGTCATTACCTG"],  # pe_guides
+            ["ATCGTTCGTAGCTAGCTAGC", "GTCATCTTAGTCATTACCTG"],  # pe_orig_guide_seqs
+            [[], []],                                           # pe_guide_mismatches
+            ["PE Extension", "PE spacer sgRNA"],                # pe_guide_names
+            [0, -3],                                            # pe_guide_qw_centers
+            [5, 1],                                             # pe_guide_qw_sizes
+            [False, True],                                      # pe_guide_plot_cut_points
+        )
+    )
+
+
+def test_extension_at_end():
+    """Extension at the end of edited_amp_seq should not raise IndexError."""
+    edited_amp = 'GCTGATCGTAGCTAGCTAGCTACGATCGATCGTAGCTAGT' 'CGATCTAGCTAGCTAGCTAG'
+    ref0_seq   = 'GCTGATCGTAGCTAGCTAGCTACGATCGATCGTAGCTAGT' 'CGATCTAGCTAGCTAGCAAG'
+    #             extension region differs here:                              ^  T→A
+    ext_dna    = 'CGATCTAGCTAGCTAGCTAG'  # last 20 bp of edited_amp
+    spacer     = ref0_seq[15:35]         # from middle of ref0
+
+    result = CRISPRessoCORE.get_prime_editing_guides(
+        this_amp_seq=ref0_seq, ref0_seq=ref0_seq,
+        prime_editing_edited_amp_seq=edited_amp,
+        prime_editing_pegRNA_extension_seq=CRISPRessoShared.reverse_complement(ext_dna),
+        prime_editing_extension_seq_dna=ext_dna,
+        prime_editing_pegRNA_spacer_seq=spacer,
+        prime_editing_nicking_guide_seq='',
+        prime_editing_pegRNA_extension_quantification_window_size=5,
+        nicking_qw_center=-3, nicking_qw_size=1,
+        aln_matrix=ALN_MATRIX,
+        needleman_wunsch_gap_open=-20, needleman_wunsch_gap_extend=-2,
+        prime_editing_gap_open=-50, prime_editing_gap_extend=0,
+    )
+    # This test tests guide creation against the WT seq (this_amp_seq=ref0_seq)
+    # so there is a mismatch in the guide sequence created for the extension sequence. ([17], [])
+
+    assert result == snapshot(
+        (
+            ["CGATCTAGCTAGCTAGCAAG", "CTAGCTACGATCGATCGTAG"],  # pe_guides
+            ["CTAGCTAGCTAGCTAGATCG", "CTAGCTACGATCGATCGTAG"],  # pe_orig_guide_seqs
+            [[17], []],                                         # pe_guide_mismatches
+            ["PE Extension", "PE spacer sgRNA"],                # pe_guide_names
+            [0, -3],                                            # pe_guide_qw_centers
+            [5, 1],                                             # pe_guide_qw_sizes
+            [False, True],                                      # pe_guide_plot_cut_points
+        )
+    )
+
+
+def test_nicking_at_end():
+    """Nicking guide at the end of RC(ref0_seq) should not raise IndexError."""
+    ref0_seq    = 'GCTGATCGTAGCTAGCTAGCTACGATCGATCGTAGCTAGT' 'CGATCTAGCTAGCTAGCTAG'
+    edited_amp  = 'GCTGATCGTAGCTAGCTAGCTACGAACGATCGTAGCTAGT' 'CGATCTAGCTAGCTAGCTAG'
+    #                                       ^ SNP pos 25 (T→A)
+    spacer      = ref0_seq[20:40]  # 'TACGATCGATCGTAGCTAGT', from middle
+    ext_dna     = edited_amp[10:30]
+    nicking     = CRISPRessoShared.reverse_complement(ref0_seq[:20])  # matches end of RC(ref0)
+
+    result = CRISPRessoCORE.get_prime_editing_guides(
+        this_amp_seq=edited_amp, ref0_seq=ref0_seq,
+        prime_editing_edited_amp_seq=edited_amp,
+        prime_editing_pegRNA_extension_seq=CRISPRessoShared.reverse_complement(ext_dna),
+        prime_editing_extension_seq_dna=ext_dna,
+        prime_editing_pegRNA_spacer_seq=spacer,
+        prime_editing_nicking_guide_seq=nicking,
+        prime_editing_pegRNA_extension_quantification_window_size=5,
+        nicking_qw_center=-3, nicking_qw_size=1,
+        aln_matrix=ALN_MATRIX,
+        needleman_wunsch_gap_open=-20, needleman_wunsch_gap_extend=-2,
+        prime_editing_gap_open=-50, prime_editing_gap_extend=0,
+    )
+
+
+
+    assert result == snapshot(
+        (
+            ["GCTAGCTAGCTACGAACGAT", "TACGAACGATCGTAGCTAGT", "GCTAGCTAGCTACGATCAGC"],  # pe_guides
+            ["ATCGTTCGTAGCTAGCTAGC", "TACGATCGATCGTAGCTAGT", "GCTAGCTAGCTACGATCAGC"],  # pe_orig_guide_seqs
+            [[], [5], []],                                                               # pe_guide_mismatches
+            ["PE Extension", "PE spacer sgRNA", "PE nicking sgRNA"],                     # pe_guide_names
+            [0, -3, -3],                                                                 # pe_guide_qw_centers
+            [5, 1, 1],                                                                   # pe_guide_qw_sizes
+            [False, True, True],                                                         # pe_guide_plot_cut_points
+        )
+    )
+
+
+def test_all_guides_in_middle():
+    """All three guide types in the interior — no boundary condition hit."""
+    ref0_seq    = 'GCTGATCGTAGCTAGCTAGCTACGATCGATCGTAGCTAGT' 'GTCATCTTAGTCATTACCTG' 'AACGTAACGTAACGTAACGT'
+    edited_amp  = 'GCTGAGCGTAGCTAGCTAGCTACGATCGATCGTAGCTAGT' 'GTCATCTTAGTCATTACCTG' 'AACGTAACGTAACGTAACGT'
+    #                   ^ SNP at pos 5 (T→G)
+    spacer      = 'GTCATCTTAGTCATTACCTG'  # middle of ref0 (pos 40-60)
+    ext_dna     = edited_amp[20:40]       # middle of edited_amp
+    rc_ref0     = CRISPRessoShared.reverse_complement(ref0_seq)
+    nicking     = rc_ref0[30:50]          # middle of RC(ref0)
+
+    result = CRISPRessoCORE.get_prime_editing_guides(
+        this_amp_seq=edited_amp, ref0_seq=ref0_seq,
+        prime_editing_edited_amp_seq=edited_amp,
+        prime_editing_pegRNA_extension_seq=CRISPRessoShared.reverse_complement(ext_dna),
+        prime_editing_extension_seq_dna=ext_dna,
+        prime_editing_pegRNA_spacer_seq=spacer,
+        prime_editing_nicking_guide_seq=nicking,
+        prime_editing_pegRNA_extension_quantification_window_size=5,
+        nicking_qw_center=-3, nicking_qw_size=1,
+        aln_matrix=ALN_MATRIX,
+        needleman_wunsch_gap_open=-20, needleman_wunsch_gap_extend=-2,
+        prime_editing_gap_open=-50, prime_editing_gap_extend=0,
+    )
+
+    assert result == snapshot(
+        (
+            ["TACGATCGATCGTAGCTAGT", "GTCATCTTAGTCATTACCTG", "CTAAGATGACACTAGCTACG"],  # pe_guides
+            ["ACTAGCTACGATCGATCGTA", "GTCATCTTAGTCATTACCTG", "CTAAGATGACACTAGCTACG"],  # pe_orig_guide_seqs
+            [[], [], []],                                                                # pe_guide_mismatches
+            ["PE Extension", "PE spacer sgRNA", "PE nicking sgRNA"],                     # pe_guide_names
+            [0, -3, -3],                                                                 # pe_guide_qw_centers
+            [5, 1, 1],                                                                   # pe_guide_qw_sizes
+            [False, True, True],                                                         # pe_guide_plot_cut_points
+        )
+    )
 
 
 if __name__ == "__main__":
