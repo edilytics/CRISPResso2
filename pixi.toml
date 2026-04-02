@@ -33,6 +33,7 @@ pillow = "*"
 
 [feature.test.pypi-dependencies]
 ydiff = "*"
+inline-snapshot = "*"
 
 [feature.pro.dependencies]
 python-kaleido = "<=0.2.1"

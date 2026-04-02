@@ -969,8 +969,7 @@ def get_command_output(command):
                  bufsize=-1)  # bufsize system default
     while True:
         retcode = p.poll()
-        line = p.stdout.readline()
-        yield line
+        yield p.stdout.readline()
         if retcode is not None:
             break
 
@@ -1541,38 +1540,55 @@ def get_dataframe_around_cut_debug(df_alleles, cut_point, offset):
 
 
 def get_amino_acid_row(row, plot_left_idx, sequence_length, matrix_path, amino_acid_cut_point):
-    try:
-        cut_idx = row['ref_positions'].index(amino_acid_cut_point)
-    except ValueError:
-        # amino_acid_cut_point not in ref_positions (e.g. large deletion removed that position)
-        # Find the closest available position
-        ref_positions = row['ref_positions']
-        valid_positions = [p for p in ref_positions if p >= 0]
-        if valid_positions:
-            closest = min(valid_positions, key=lambda p: abs(p - amino_acid_cut_point))
-            cut_idx = ref_positions.index(closest)
-        else:
-            cut_idx = 0
+    """Translate a single allele row into amino-acid-level aligned sequences.
+
+    Locates the exon start in the read's alignment, translates read and
+    reference to amino acids, re-aligns them with a gap incentive at the
+    cut site, and marks silent edits (same AA, different codon) as lowercase.
+
+    Parameters
+    ----------
+    row : pd.Series
+        Row from the alleles DataFrame with columns: 'ref_positions',
+        'Aligned_Sequence', 'Reference_Sequence', 'Read_Status',
+        'n_deleted', 'n_inserted', 'n_mutated', '#Reads', '%Reads'.
+    plot_left_idx : int
+        Reference-coordinate index of the exon start boundary.
+    sequence_length : int
+        Max amino acid characters to return (truncation length).
+    matrix_path : str
+        Path to the substitution scoring matrix for AA alignment.
+    amino_acid_cut_point : int
+        AA-level position where a gap incentive is applied during alignment.
+
+    Returns
+    -------
+    tuple of (str, str, bool, int, int, int, int, float)
+        (aligned_aa_seq, reference_aa_seq, is_unmodified, n_deleted,
+         n_inserted, n_mutated, n_reads, pct_reads)
+
+    """
     left_idx = row['ref_positions'].index(plot_left_idx)
+
     seq_acids_and_codons = get_amino_acids_and_codons(row['Aligned_Sequence'][left_idx::].replace('-', ''))
     ref_acids_and_codons = get_amino_acids_and_codons(row['Reference_Sequence'][left_idx::].replace('-', ''))
     aligned_seq = ''.join(tup[0] for tup in seq_acids_and_codons)
     reference_seq = ''.join(tup[0] for tup in ref_acids_and_codons)
 
     gap_incentive = np.zeros(len(reference_seq) + 1, dtype=int)
-    try:
-        gap_incentive[cut_idx] = 1
-    except IndexError:
-        pass
+    if 0 <= amino_acid_cut_point < len(gap_incentive):
+        gap_incentive[amino_acid_cut_point] = 1
+    else:
+        logging.warning(
+            'amino_acid_cut_point %d is out of range for gap_incentive '
+            '(length %d); skipping gap incentive.',
+            amino_acid_cut_point, len(gap_incentive),
+        )
     aligned_seq, reference_seq, score = CRISPResso2Align.global_align(
         aligned_seq,
         reference_seq,
         matrix=CRISPResso2Align.read_matrix(matrix_path),
         gap_incentive=gap_incentive,
-    )
-
-    aa_ref_positions = CRISPRessoCOREResources.find_indels_substitutions(
-        aligned_seq, reference_seq, range(len(reference_seq))
     )
 
     aligned_seq = get_silent_edits(
@@ -2005,7 +2021,11 @@ def get_sgRNA_mismatch_vals(seq1, seq2, start_loc, end_loc, coords_l, coords_r, 
     this_mismatches = []
     seen_inds = {}  # detect deletions in other string
     last_mismatch_val = rev_coords_l[coords_l[start_loc]]  # detect deletions in this string
-    for i in range(coords_l[start_loc], coords_r[end_loc]):
+    if end_loc >= len(coords_r):
+        end_loop = len(seq1)  # if the match extends to the end of from_sequence, iterate to the end of seq1
+    else:
+        end_loop = coords_r[end_loc]
+    for i in range(coords_l[start_loc], end_loop):
         if seq1[i] != seq2[rev_coords_l[i]] or seq1[i] == "-":
             this_mismatches.append(i - coords_l[start_loc])
         this_last_mismatch_val = rev_coords_l[i]
