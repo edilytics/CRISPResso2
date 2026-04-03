@@ -5509,18 +5509,19 @@ def main():
                             debug('Read ' + str(counts_dict['total_alleles']) + ' alleles with ' + str(counts_dict['total_alleles_reads']) + ' reads')
                             debug('Got ' + str(counts_dict['total_alleles_on_ref']) + ' alleles on reference "' + wt_ref_name + '" with ' + str(counts_dict['total_alleles_reads_on_ref']) + ' reads')
 
-                            fig_root_10i = _jp(f'10i.Base_editing_{wt_ref_name}_upset_plot.by_amplicon_combination.no_indels_{sgRNA_label}')
-                            plot_10i_input = {
-                                'fig_root': fig_root_10i,
-                                'ref_name': ref_name,
-                                'bp_substitutions_arr': bp_substitutions_arr,
-                                'binary_allele_counts': counts_dict['binary_allele_counts'],
-                                'save_also_png': save_png,
-                            }
-                            plot(CRISPRessoPlot.plot_combination_upset, plot_10i_input)
-                            crispresso2_info['results']['refs'][ref_name]['plot_10i_roots'].append(os.path.basename(fig_root_10i))
-                            crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'].append(f"Figure 10i: Upset plot of Base Edits for {args.conversion_nuc_from} around cut site for {sgRNA_legend}. Each dot matrix at the bottom represents a specific combination of base edits (colored by target position), and the bar plot at the top shows the number of reads with each combination.")
-                            crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.' + sgRNA_label + '.binary_allele_counts.txt')])
+                            if len(bp_substitutions_arr) > 0:
+                                fig_root_10i = _jp(f'10i.Base_editing_{wt_ref_name}_upset_plot.by_amplicon_combination.no_indels_{sgRNA_label}')
+                                plot_10i_input = {
+                                    'fig_root': fig_root_10i,
+                                    'ref_name': ref_name,
+                                    'bp_substitutions_arr': bp_substitutions_arr,
+                                    'binary_allele_counts': counts_dict['binary_allele_counts'],
+                                    'save_also_png': save_png,
+                                }
+                                plot(CRISPRessoPlot.plot_combination_upset, plot_10i_input)
+                                crispresso2_info['results']['refs'][ref_name]['plot_10i_roots'].append(os.path.basename(fig_root_10i))
+                                crispresso2_info['results']['refs'][ref_name]['plot_10i_captions'].append(f"Figure 10i: Upset plot of Base Edits for {args.conversion_nuc_from} around cut site for {sgRNA_legend}. Each dot matrix at the bottom represents a specific combination of base edits (colored by target position), and the bar plot at the top shows the number of reads with each combination.")
+                                crispresso2_info['results']['refs'][ref_name]['plot_10i_datas'].append([('Binary Allele Counts', '10i.' + ref_name + '.' + sgRNA_label + '.binary_allele_counts.txt')])
 
                 if refs[ref_name]['contains_coding_seq'] and not args.suppress_plots:
                     for i, coding_seq in enumerate(coding_seqs):

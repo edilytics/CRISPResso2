@@ -1882,9 +1882,8 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
     dict or None
         Dict with ``'bp_substitutions_arr'`` and ``'counts_dict'``
         (the full output of :func:`get_upset_plot_counts`),
-        or ``None`` if no target sequence found,
-        ``quantification_window_coordinates`` is set, or no
-        substitutions detected.
+        or ``None`` if no target sequence found or
+        ``quantification_window_coordinates`` is set.
 
     """
     target_seq = get_base_edit_target_sequence(
@@ -1932,9 +1931,6 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
     bp_substitutions_arr = get_bp_substitutions(
         ref_changes_dict, ref_seq, ref_positions_to_include,
     )
-
-    if len(bp_substitutions_arr) == 0:
-        return None
 
     counts_dict = get_upset_plot_counts(
         df_alleles, bp_substitutions_arr, ref_name,
