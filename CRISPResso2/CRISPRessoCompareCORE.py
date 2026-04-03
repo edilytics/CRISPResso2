@@ -398,6 +398,7 @@ def main():
                 merged[quant_cols] = merged[quant_cols].fillna(0)
                 lfc_error = 0.1
                 merged['each_LFC'] = np.log2(((merged['%Reads_' + sample_1_name] + lfc_error) / (merged['%Reads_' + sample_2_name] + lfc_error)).astype(float)).replace([np.inf, np.nan], 0)
+                # Sort by read frequency descending, with sequence tiebreakers for deterministic output
                 merged = merged.sort_values(['%Reads_' + sample_1_name, 'Aligned_Sequence', 'Reference_Sequence'], ascending=[False, True, True])
                 merged = merged.reset_index(drop=True).set_index('Aligned_Sequence')
                 folder_root = os.path.split(allele_file_1)[1].replace(".txt", "")
