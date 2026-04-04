@@ -48,6 +48,20 @@ from CRISPResso2.plots.plot_context import CorePlotContext
 # =============================================================================
 
 
+def _get_run_info(ctx, key, default=''):
+    """Safely get a value from ctx.run_data['running_info']."""
+    return ctx.run_data.get('running_info', {}).get(key, default)
+
+
+def _get_ref_info(ctx, ref_name, key, default=''):
+    """Safely get a value from ctx.run_data['results']['refs'][ref_name]."""
+    return (ctx.run_data
+            .get('results', {})
+            .get('refs', {})
+            .get(ref_name, {})
+            .get(key, default))
+
+
 def _to_numeric_ignore_columns(df, ignore_columns):
     """Convert DataFrame columns to numeric, ignoring specified columns."""
     for col in df.columns:
@@ -532,6 +546,7 @@ def prep_indel_size_distribution(ctx: CorePlotContext):
         ctx, '3a.' + _ref_plot_name(ctx) + 'Indel_size_distribution',
     )
 
+    indel_hist_filename = _get_ref_info(ctx, ref_name, 'indel_histogram_filename', '')
     return {
         'hdensity': hdensity,
         'hlengths': hlengths,
@@ -546,6 +561,11 @@ def prep_indel_size_distribution(ctx: CorePlotContext):
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
         'clipped_string': clipped_string,
+        'caption': (
+            "Figure 3a: Frequency distribution of alleles with indels (blue) "
+            "and without indels (red)." + clipped_string
+        ),
+        'data_files': [('Indel histogram', os.path.basename(indel_hist_filename))] if indel_hist_filename else [],
     }
 
 
@@ -598,6 +618,17 @@ def prep_frequency_deletions_insertions(ctx: CorePlotContext):
         '3b.' + _ref_plot_name(ctx) + 'Insertion_deletion_substitutions_size_hist',
     )
 
+    ins_hist_fn = _get_ref_info(ctx, ref_name, 'insertion_histogram_filename', '')
+    del_hist_fn = _get_ref_info(ctx, ref_name, 'deletion_histogram_filename', '')
+    sub_hist_fn = _get_ref_info(ctx, ref_name, 'substitution_histogram_filename', '')
+    data_files = []
+    if ins_hist_fn:
+        data_files.append(('Insertions frequency', os.path.basename(ins_hist_fn)))
+    if del_hist_fn:
+        data_files.append(('Deletions Frequency', os.path.basename(del_hist_fn)))
+    if sub_hist_fn:
+        data_files.append(('Substitutions Frequency', os.path.basename(sub_hist_fn)))
+
     return {
         'ref': ref,
         'counts_total': counts_total,
@@ -614,6 +645,17 @@ def prep_frequency_deletions_insertions(ctx: CorePlotContext):
         'custom_colors': ctx.custom_config.get('colors', {}),
         'ref_name': ref_name,
         'clipped_string': clipped_string,
+        'caption': (
+            "Figure 3b: Left panel, frequency distribution of sequence modifications that "
+            "increase read length with respect to the reference amplicon, classified as "
+            "insertions (positive indel size). Middle panel, frequency distribution of "
+            "sequence modifications that reduce read length with respect to the reference "
+            "amplicon, classified as deletions (negative indel size). Right panel, frequency "
+            "distribution of sequence modifications that do not alter read length with respect "
+            "to the reference amplicon, which are classified as substitutions (number of "
+            "substituted positions shown)." + clipped_string
+        ),
+        'data_files': data_files,
     }
 
 
@@ -665,6 +707,8 @@ def prep_amplicon_modifications(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
+        'caption': "Figure 4a: Combined frequency of any modification across the amplicon. Modifications outside of the quantification window are also shown.",
+        'data_files': [],
     }
 
 
@@ -707,6 +751,8 @@ def prep_modification_frequency(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
+        'caption': "Figure 4b: Frequency of insertions, deletions, and substitutions across the entire amplicon, including modifications outside of the quantification window.",
+        'data_files': [('Modification frequency', os.path.basename(_get_ref_info(ctx, ref_name, 'mod_count_filename', '')))] if _get_ref_info(ctx, ref_name, 'mod_count_filename', '') else [],
     }
 
 
@@ -731,11 +777,14 @@ def prep_dsODN_piechart(ctx: CorePlotContext):
         100 * n_contain / float(N_TOTAL),
         100 * n_not_contain / float(N_TOTAL),
     ]
+    allele_frequency_table_filename = _get_run_info(ctx, 'allele_frequency_table_filename', '')
     return {
         'sizes': sizes,
         'labels': labels,
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
+        'caption': "Figure 1d: Frequency of detection of dsODN " + str(getattr(ctx.args, 'dsODN', '')),
+        'data_files': [('Allele table', os.path.basename(allele_frequency_table_filename))] if allele_frequency_table_filename else [],
     }
 
 
@@ -782,6 +831,7 @@ def prep_nucleotide_quilt(ctx: CorePlotContext):
         ctx, '2a.' + _ref_plot_name(ctx) + 'Nucleotide_percentage_quilt',
     )
 
+    nuc_freq_filename = _get_ref_info(ctx, ref_name, 'nuc_freq_filename', '')
     return {
         'nuc_pct_df': nuc_df_for_plot,
         'mod_pct_df': mod_df_for_plot,
@@ -793,6 +843,14 @@ def prep_nucleotide_quilt(ctx: CorePlotContext):
         'sgRNA_sequences': ref['sgRNA_sequences'],
         'quantification_window_idxs': ref['include_idxs'],
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': (
+            "Figure 2a: Nucleotide distribution across amplicon. At each base in the reference "
+            "amplicon, the percentage of each base as observed in sequencing reads is shown "
+            "(A = green; C = orange; G = yellow; T = purple). Black bars show the percentage of "
+            "reads for which that base was deleted. Brown bars between bases show the percentage "
+            "of reads having an insertion at that position."
+        ),
+        'data_files': [('Nucleotide frequency table', os.path.basename(nuc_freq_filename))] if nuc_freq_filename else [],
     }
 
 
@@ -836,6 +894,8 @@ def prep_nucleotide_quilt_around_sgRNA(ctx: CorePlotContext):
         '2b.' + _ref_plot_name(ctx) + 'Nucleotide_percentage_quilt_around_' + _sgRNA_label(ctx),
     )
 
+    sgRNA_legend = _sgRNA_label(ctx)
+    quant_window_nuc_freq_filename = _get_ref_info(ctx, ref_name, 'quant_window_nuc_freq_filename', '')
     return {
         'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
         'mod_pct_df': mod_df_for_plot.iloc[:, sel_cols],
@@ -847,6 +907,8 @@ def prep_nucleotide_quilt_around_sgRNA(ctx: CorePlotContext):
         'sgRNA_sequences': ref['sgRNA_sequences'],
         'quantification_window_idxs': new_include_idx,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': 'Figure 2b: Nucleotide distribution around the ' + sgRNA_legend + '.',
+        'data_files': [('Nucleotide frequency in quantification window', os.path.basename(quant_window_nuc_freq_filename))] if quant_window_nuc_freq_filename else [],
     }
 
 
@@ -908,6 +970,14 @@ def prep_hdr_nucleotide_quilt(ctx: CorePlotContext):
         'sgRNA_sequences': ctx.refs[ref0]['sgRNA_sequences'],
         'quantification_window_idxs': [],  # windows may differ between amplicons
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': (
+            "Figure 4g: Nucleotide distribution across all amplicons. At each base in the "
+            "reference amplicon, the percentage of each base as observed in sequencing reads "
+            "is shown (A = green; C = orange; G = yellow; T = purple). Black bars show the "
+            "percentage of reads for which that base was deleted. Brown bars between bases "
+            "show the percentage of reads having an insertion at that position."
+        ),
+        'data_files': [],
     }
 
 
@@ -925,6 +995,14 @@ def prep_pe_nucleotide_quilt(ctx: CorePlotContext):
     result['fig_filename_root'] = _make_fig_filename_root(
         ctx, '11a.Prime_editing_nucleotide_percentage_quilt',
     )
+    result['caption'] = (
+        "Figure 11a: Nucleotide distribution across all amplicons. At each base in the "
+        "reference amplicon, the percentage of each base as observed in sequencing reads "
+        "is shown (A = green; C = orange; G = yellow; T = purple). Black bars show the "
+        "percentage of reads for which that base was deleted. Brown bars between bases "
+        "show the percentage of reads having an insertion at that position."
+    )
+    result['data_files'] = []
     return result
 
 
@@ -986,6 +1064,8 @@ def prep_pe_nucleotide_quilt_around_sgRNA(ctx: CorePlotContext):
         'sgRNA_sequences': pe_data['sgRNA_sequences'],
         'quantification_window_idxs': new_include_idx,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': 'Figure 11b: Nucleotide distribution around the ' + label + '.',
+        'data_files': [],
     }
 
 
@@ -1083,6 +1163,16 @@ def prep_global_modifications_reference(ctx: CorePlotContext):
         'save_also_png': ctx.save_png,
         'plot_title': plot_title,
         'fig_filename_root': fig_filename_root,
+        'caption': (
+            ("Figure 4e: Positions of modifications in all reads when aligned to the reference "
+             "sequence (" + ref0 + "). Insertions: red, deletions: purple, substitutions: green. "
+             "All modifications (including those outside the quantification window) are shown.")
+            if ref_name == ref0 else
+            ("Figure 4f: Positions of modifications in HDR reads with respect to the reference "
+             "sequence (" + ref0 + "). All modifications (including those outside the "
+             "quantification window) are shown.")
+        ),
+        'data_files': [],
     }
 
 
@@ -1135,6 +1225,11 @@ def prep_log_nuc_freqs(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'quantification_window_idxs': plot_quant_window_idxs,
+        'caption': (
+            "Figure 10d: Log2 nucleotide frequencies for each position in the plotting window "
+            "around the " + sgRNA_leg + ". The quantification window is outlined by the dotted box."
+        ),
+        'data_files': [],
     }
 
 
@@ -1242,6 +1337,8 @@ def prep_amino_acid_table(ctx: CorePlotContext):
         'amino_acid_cut_point': amino_acid_cut_point,
         'df_to_plot': df_to_plot,
         'plot_input': plot_input,
+        'caption': "Figure 9a: Visualization of the amino acid level mutations around the cleavage site.",
+        'data_files': [],
     }
 
 
@@ -1427,6 +1524,7 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
             'annotate_wildtype_allele': ctx.args.annotate_wildtype_allele,
         }
 
+    sgRNA_legend = _sgRNA_legend(ctx)
     return {
         'df_alleles_around_cut': df_alleles_around_cut,
         'ref_seq_around_cut': ref_seq_around_cut,
@@ -1434,6 +1532,15 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
         'new_cut_point': new_cut_point,
         'window_truncated': window_truncated,
         'plot_input': plot_input,
+        'caption': (
+            "Figure 9: Visualization of the distribution of identified alleles around the "
+            "cleavage site for the " + sgRNA_legend + ". Nucleotides are indicated by unique "
+            "colors (A = green; C = red; G = yellow; T = purple). Substitutions are shown in "
+            "bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines "
+            "indicate deleted sequences. The vertical dashed line indicates the predicted "
+            "cleavage site."
+        ),
+        'data_files': [],
     }
 
 
@@ -1543,10 +1650,20 @@ def prep_base_edit_quilt(ctx: CorePlotContext):
             'x_labels': x_labels,
         }
 
+    conversion_nuc_from = ctx.args.conversion_nuc_from
     return {
         'df_alleles_around_cut': df_alleles_around_cut,
         'ref_seq_around_cut': ref_seq_around_cut,
         'plot_input': plot_input,
+        'caption': (
+            "Figure 10h: Quilt of target nucleotide: " + conversion_nuc_from
+            + " across entire amplicon. The x-axis shows the corresponding position of the "
+            "nucleotide in the reference amplicon (1-indexed). Nucleotides are indicated by "
+            "unique colors (A = green; C = red; G = yellow; T = purple). Substitutions are "
+            "shown in bold font. Red rectangles highlight inserted sequences. Horizontal "
+            "dashed lines indicate deleted sequences."
+        ),
+        'data_files': [],
     }
 
 
@@ -1849,7 +1966,7 @@ def write_base_edit_counts(ref_name, counts_dict, bp_substitutions_arr, _jp):
 
 
 def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
-                         args, gap_incentive=None):
+                         args, gap_incentive=None, sgRNA_legend=''):
     """Prepare data for base edit upset plot (plot_10i).
 
     Finds the target sequence, aligns it to reference, identifies
@@ -1936,9 +2053,20 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
         df_alleles, bp_substitutions_arr, ref_name,
     )
 
+    conversion_nuc_from = getattr(args, 'conversion_nuc_from', 'C')
+    caption = (
+        f"Figure 10i: Upset plot of Base Edits for {conversion_nuc_from} "
+        f"around cut site for {sgRNA_legend}. Each dot matrix at the bottom "
+        f"represents a specific combination of base edits (colored by target "
+        f"position), and the bar plot at the top shows the number of reads "
+        f"with each combination."
+    ) if sgRNA_legend else ''
+
     return {
         'bp_substitutions_arr': bp_substitutions_arr,
         'counts_dict': counts_dict,
+        'caption': caption,
+        'data_files': [],
     }
 
 
@@ -1998,19 +2126,50 @@ def prep_read_barplot(ctx: CorePlotContext):
     """Prepare kwargs for plot_read_barplot (plot_1a)."""
     aln_stats = ctx.run_data['running_info']['alignment_stats']
     fig_filename_root = _make_fig_filename_root(ctx, '1a.Read_barplot')
+    mapping_stats_filename = _get_run_info(ctx, 'mapping_stats_filename', '')
     return {
         'N_READS_INPUT': aln_stats['N_READS_INPUT'],
         'N_READS_AFTER_PREPROCESSING': aln_stats['N_READS_AFTER_PREPROCESSING'],
         'N_TOTAL': ctx.N_TOTAL,
         'fig_filename_root': fig_filename_root,
         'save_png': ctx.save_png,
+        'caption': "Figure 1a: The number of reads in input fastqs, after preprocessing, and after alignment to amplicons.",
+        'data_files': [('Mapping statistics', os.path.basename(mapping_stats_filename))] if mapping_stats_filename else [],
     }
 
 
 def prep_class_piechart_and_barplot_plot(ctx: CorePlotContext):
-    """Prepare kwargs for plot_class_piechart_and_barplot (plot_1b/1c)."""
+    """Prepare kwargs for plot_class_piechart_and_barplot (plot_1b/1c).
+
+    Returns captions for both plots: ``piechart_caption`` and ``barplot_caption``.
+    The piechart caption has an HDR-specific variant when ``expected_hdr_amplicon_seq`` is set.
+    """
     piechart_plot_root = _make_fig_filename_root(ctx, '1b.Alignment_pie_chart')
     barplot_plot_root = _make_fig_filename_root(ctx, '1c.Alignment_barplot')
+    quant_of_editing_freq_filename = _get_run_info(ctx, 'quant_of_editing_freq_filename', '')
+
+    piechart_caption = (
+        "Figure 1b: Alignment and editing frequency of reads as determined by the "
+        "percentage and number of sequence reads showing unmodified and modified alleles."
+    )
+    if ctx.args.expected_hdr_amplicon_seq != "":
+        piechart_caption = (
+            "Figure 1b: Alignment and editing frequency of reads as determined by the "
+            "percentage and number of sequence reads showing unmodified and modified alleles. "
+            "NHEJ reads align more closely to the unmodified reference sequence, but have mutations "
+            "present in the specified quantification window. HDR reads align to the HDR reference "
+            "sequence and have no mutations in the specified quantification window. Imperfect HDR "
+            "reads have mutations in the specified window. AMBIGUOUS reads align equally well to "
+            "the unmodified and HDR reference sequences."
+        )
+
+    barplot_caption = (
+        "Figure 1c: Alignment and editing frequency of reads as determined by the "
+        "percentage and number of sequence reads showing unmodified and modified alleles."
+    )
+
+    data_files = [('Quantification of editing', os.path.basename(quant_of_editing_freq_filename))] if quant_of_editing_freq_filename else []
+
     return {
         'class_counts_order': ctx.class_counts_order,
         'class_counts': ctx.class_counts,
@@ -2021,18 +2180,30 @@ def prep_class_piechart_and_barplot_plot(ctx: CorePlotContext):
         'barplot_plot_root': barplot_plot_root,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_png': ctx.save_png,
+        'piechart_caption': piechart_caption,
+        'barplot_caption': barplot_caption,
+        'piechart_data_files': data_files,
+        'barplot_data_files': data_files,
     }
 
 
 def prep_alleles_homology_histogram(ctx: CorePlotContext):
     """Prepare kwargs for plot_alleles_homology_histogram (plot_1e)."""
     fig_filename_root = _make_fig_filename_root(ctx, '1e.Allele_homology_histogram')
+    alleles_homology_scores_filename = _get_run_info(ctx, 'alleles_homology_scores_filename', '')
     return {
         'fig_root': fig_filename_root,
         'homology_scores': ctx.homology_scores,
         'counts': ctx.homology_counts,
         'min_homology': ctx.args.default_min_aln_score,
         'save_also_png': ctx.save_png,
+        'caption': (
+            "Figure 1e: Distribution of read alignment homology scores, showing the "
+            "best-scoring alignment of each sequencing read to the provided amplicons. "
+            "The dashed line indicates the minimum alignment score threshold used to "
+            "discard low-quality alignments."
+        ),
+        'data_files': [('Alleles Homology Scores', os.path.basename(alleles_homology_scores_filename))] if alleles_homology_scores_filename else [],
     }
 
 
@@ -2069,6 +2240,8 @@ def prep_quantification_window_locations(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
+        'caption': "Figure 4c: Frequency of insertions, deletions, and substitutions across the entire amplicon, considering only modifications that overlap with the quantification window.",
+        'data_files': [],
     }
 
 
@@ -2103,6 +2276,8 @@ def prep_position_dependent_indels(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
+        'caption': "Figure 4d: Position dependent insertion size(left) and deletion size (right), including only modifications that overlap with the quantification window.",
+        'data_files': [],
     }
 
 
@@ -2132,6 +2307,8 @@ def prep_frameshift_analysis(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': "Figure 5: Frameshift analysis of coding sequence reads affected by modifications (unmodified reads are excluded from this analysis).",
+        'data_files': [],
     }
 
 
@@ -2148,6 +2325,7 @@ def prep_frameshift_frequency(ctx: CorePlotContext):
         '6.' + _ref_plot_name(ctx) + 'Frameshift_in-frame_mutation_profiles',
     )
 
+    hists_inframe_count = ctx.hists_inframe[ref_name][0]
     return {
         'hists_frameshift': ctx.hists_frameshift[ref_name],
         'hists_inframe': ctx.hists_inframe[ref_name],
@@ -2158,6 +2336,13 @@ def prep_frameshift_frequency(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
+        'caption': (
+            "Figure 6: Frameshift and in-frame mutagenesis profiles indicating position "
+            "affected by modification. The y axis shows the number of reads and percentage "
+            "of all reads in that category (frameshifted (top) or in-frame (bottom)). "
+            "%d reads with no length modifications are not shown." % hists_inframe_count
+        ),
+        'data_files': [],
     }
 
 
@@ -2191,6 +2376,8 @@ def prep_non_coding_mutations(ctx: CorePlotContext):
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
+        'caption': "Figure 7: Reads with insertions, deletions, and substitutions mapped to reference amplicon position exclusively in noncoding region/s (that is, without mutations affecting coding sequences). The predicted cleavage site is indicated by a vertical dashed line. Only sequence positions directly adjacent to insertions or directly affected by deletions or substitutions are plotted.",
+        'data_files': [],
     }
 
 
@@ -2213,6 +2400,8 @@ def prep_potential_splice_sites(ctx: CorePlotContext):
         'save_also_png': ctx.save_png,
         'ref_name': ref_name,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': "Figure 8: Predicted impact on splice sites. Potential splice sites modified refers to reads in which the either of the two intronic positions adjacent to exon junctions are disrupted.",
+        'data_files': [],
     }
 
 
@@ -2244,6 +2433,8 @@ def prep_subs_across_ref(ctx: CorePlotContext):
         'quantification_window_idxs': ref['include_idxs'],
         'custom_colors': ctx.custom_config.get('colors', {}),
         'ref_name': ref_name,
+        'caption': "Figure 10a: Substitution frequencies across the amplicon.",
+        'data_files': [],
     }
 
 
@@ -2268,6 +2459,8 @@ def prep_sub_freq_barplot(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': "Figure 10b: Substitution frequencies across the amplicon.",
+        'data_files': [],
     }
 
 
@@ -2292,6 +2485,8 @@ def prep_sub_freq_barplot_quant_window(ctx: CorePlotContext):
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': "Figure 10c: Substitution frequencies in the quantification window",
+        'data_files': [],
     }
 
 
@@ -2344,7 +2539,15 @@ def prep_conversion_at_sel_nucs_plot(ctx: CorePlotContext):
 
     Builds nucleotide percentage DataFrame sliced to the sgRNA plot window.
     """
-    return _prep_conversion_at_sel_nucs_common(ctx, '10e')
+    result = _prep_conversion_at_sel_nucs_common(ctx, '10e')
+    sgRNA_legend = _sgRNA_legend(ctx)
+    result['caption'] = (
+        "Figure 10e: Proportion of each base at each nucleotide targeted by base editors "
+        "in the plotting window around the " + sgRNA_legend + ". The number of each target "
+        "base is annotated on the reference sequence at the bottom of the plot."
+    )
+    result['data_files'] = []
+    return result
 
 
 def prep_conversion_at_sel_nucs_not_include_ref(ctx: CorePlotContext):
@@ -2352,7 +2555,17 @@ def prep_conversion_at_sel_nucs_not_include_ref(ctx: CorePlotContext):
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
     """
-    return _prep_conversion_at_sel_nucs_common(ctx, '10f', variant='no_ref_')
+    result = _prep_conversion_at_sel_nucs_common(ctx, '10f', variant='no_ref_')
+    sgRNA_legend = _sgRNA_legend(ctx)
+    result['caption'] = (
+        "Figure 10f: Non-reference base proportions. For target nucleotides in the plotting "
+        "window, this plot shows the proportion of non-reference (non-"
+        + ctx.args.conversion_nuc_from + ") bases as a percentage of all non-reference "
+        "sequences. The number of each target base is annotated on the reference sequence "
+        "at the bottom of the plot."
+    )
+    result['data_files'] = []
+    return result
 
 
 def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: CorePlotContext):
@@ -2360,7 +2573,16 @@ def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: CorePlotContext):
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
     """
-    return _prep_conversion_at_sel_nucs_common(ctx, '10g', variant='no_ref_scaled_')
+    result = _prep_conversion_at_sel_nucs_common(ctx, '10g', variant='no_ref_scaled_')
+    sgRNA_legend = _sgRNA_legend(ctx)
+    result['caption'] = (
+        "Figure 10g: Non-reference base counts. For target nucleotides in the plotting "
+        "window, this plot shows the number of non-reference (non-"
+        + ctx.args.conversion_nuc_from + ") bases. The number of each target base is "
+        "annotated on the reference sequence at the bottom of the plot."
+    )
+    result['data_files'] = []
+    return result
 
 
 def prep_global_frameshift_analysis(ctx: CorePlotContext, global_data: dict | None = None):
@@ -2384,6 +2606,8 @@ def prep_global_frameshift_analysis(ctx: CorePlotContext, global_data: dict | No
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': "Figure 5a: Frameshift analysis of coding sequence reads affected by modifications for all reads. Unmodified reference reads are excluded from this plot, and all HDR reads are included in this plot.",
+        'data_files': [],
     }
 
 
@@ -2401,11 +2625,19 @@ def prep_global_frameshift_in_frame_mutations(ctx: CorePlotContext, global_data:
         ctx, '6a.Global_frameshift_in-frame_mutation_profiles',
     )
 
+    global_hists_inframe_count = global_data['global_hists_inframe'][0]
     return {
         'global_hists_frameshift': global_data['global_hists_frameshift'],
         'global_hists_inframe': global_data['global_hists_inframe'],
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
+        'caption': (
+            "Figure 6a: Frameshift and in-frame mutagenesis profiles for all reads indicating "
+            "position affected by modification. The y axis shows the number of reads and "
+            "percentage of all reads in that category (frameshifted (top) or in-frame (bottom)). "
+            "%d reads with no length modifications are not shown." % global_hists_inframe_count
+        ),
+        'data_files': [],
     }
 
 
@@ -2429,6 +2661,8 @@ def prep_impact_on_splice_sites(ctx: CorePlotContext, global_data: dict | None =
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'caption': "Figure 8a: Predicted impact on splice sites for all reads. Potential splice sites modified refers to reads in which the either of the two intronic positions adjacent to exon junctions are disrupted.",
+        'data_files': [],
     }
 
 
@@ -2438,8 +2672,17 @@ def prep_scaffold_indel_lengths(ctx: CorePlotContext):
         ctx, '11c.Prime_editing_scaffold_insertion_sizes',
     )
 
+    scaffold_insertion_sizes_filename = _get_run_info(ctx, 'scaffold_insertion_sizes_filename', '')
     return {
         'df_scaffold_insertion_sizes': ctx.df_scaffold_insertion_sizes,
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
+        'caption': (
+            "Figure 11c: Scaffold insertion lengths and deletion lengths in reads that contain "
+            "a scaffold insertion. 'Length matching scaffold' shows the number of basepairs "
+            "immediately after the pegRNA extension sequence that exactly match the scaffold RNA "
+            "sequence. 'Insertion length' shows the length of the insertion immediately after "
+            "the pegRNA extension sequence (including bases that do not match the scaffold sequence)."
+        ),
+        'data_files': [('Scaffold insertion alleles with insertion sizes', os.path.basename(scaffold_insertion_sizes_filename))] if scaffold_insertion_sizes_filename else [],
     }
