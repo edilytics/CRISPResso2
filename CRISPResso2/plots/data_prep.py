@@ -116,6 +116,19 @@ def _make_fig_filename_root(ctx: CorePlotContext, filename: str) -> str:
     return filename
 
 
+def _data_file_basename(ctx, filename: str) -> str:
+    """Return the basename of a data file, including any file_prefix.
+
+    When a ``file_prefix`` is set (e.g. batch runs), ``_jp`` prepends
+    the slugified prefix to the filename.  This helper uses ``_jp`` to
+    reconstruct the correct on-disk basename so that data-file links in
+    the HTML report resolve correctly.
+    """
+    if ctx._jp is not None:
+        return os.path.basename(ctx._jp(filename))
+    return filename
+
+
 def _ref(ctx: CorePlotContext) -> dict:
     """Shortcut for the current reference's data dict."""
     return ctx.refs[ctx.ref_name]
@@ -894,7 +907,7 @@ def prep_nucleotide_quilt_around_sgRNA(ctx: CorePlotContext):
         '2b.' + _ref_plot_name(ctx) + 'Nucleotide_percentage_quilt_around_' + _sgRNA_label(ctx),
     )
 
-    sgRNA_legend = _sgRNA_label(ctx)
+    sgRNA_legend = _sgRNA_legend(ctx)
     quant_window_nuc_freq_filename = _get_ref_info(ctx, ref_name, 'quant_window_nuc_freq_filename', '')
     return {
         'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
@@ -1049,9 +1062,22 @@ def prep_pe_nucleotide_quilt_around_sgRNA(ctx: CorePlotContext):
         label = sgRNA_name
     label = CRISPRessoShared.slugify(label)
 
+    # Human-readable legend for caption (with spaces, not slugified)
+    legend = "sgRNA " + sgRNA
+    if sgRNA_name != "":
+        legend = sgRNA_name + " (" + sgRNA + ")"
+
     fig_filename_root = _make_fig_filename_root(
         ctx, '11b.Nucleotide_percentage_quilt_around_' + label,
     )
+
+    # Build data_files from quant_window_nuc_freq_filename for each PE ref
+    pe_ref_names = [r for r in ctx.ref_names if ctx.counts_total[r] > 0]
+    pe_data_files = []
+    for rn in pe_ref_names:
+        qw_nuc_fn = _get_ref_info(ctx, rn, 'quant_window_nuc_freq_filename', '')
+        if qw_nuc_fn:
+            pe_data_files.append(('Nucleotide frequency in quantification window for ' + rn, os.path.basename(qw_nuc_fn)))
 
     return {
         'nuc_pct_df': nuc_df_for_plot.iloc[:, sel_cols],
@@ -1064,8 +1090,8 @@ def prep_pe_nucleotide_quilt_around_sgRNA(ctx: CorePlotContext):
         'sgRNA_sequences': pe_data['sgRNA_sequences'],
         'quantification_window_idxs': new_include_idx,
         'custom_colors': ctx.custom_config.get('colors', {}),
-        'caption': 'Figure 11b: Nucleotide distribution around the ' + label + '.',
-        'data_files': [],
+        'caption': 'Figure 11b: Nucleotide distribution around the ' + legend + '.',
+        'data_files': pe_data_files,
     }
 
 
@@ -1337,7 +1363,11 @@ def prep_amino_acid_table(ctx: CorePlotContext):
         'amino_acid_cut_point': amino_acid_cut_point,
         'df_to_plot': df_to_plot,
         'plot_input': plot_input,
-        'caption': "Figure 9a: Visualization of the amino acid level mutations around the cleavage site.",
+        'caption': (
+            "Figure 9a: Visualization of the distribution of identified amino acids "
+            "based on the coding sequence " + coding_seq_label + " (" + coding_seq + "). "
+            "The vertical dashed line indicates the predicted cleavage site."
+        ),
         'data_files': [],
     }
 
@@ -1540,7 +1570,7 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
             "indicate deleted sequences. The vertical dashed line indicates the predicted "
             "cleavage site."
         ),
-        'data_files': [],
+        'data_files': [('Allele frequency table', _data_file_basename(ctx, _ref_plot_name(ctx) + 'Alleles_frequency_table_around_' + _sgRNA_label(ctx) + '.txt'))],
     }
 
 
@@ -2190,7 +2220,6 @@ def prep_class_piechart_and_barplot_plot(ctx: CorePlotContext):
 def prep_alleles_homology_histogram(ctx: CorePlotContext):
     """Prepare kwargs for plot_alleles_homology_histogram (plot_1e)."""
     fig_filename_root = _make_fig_filename_root(ctx, '1e.Allele_homology_histogram')
-    alleles_homology_scores_filename = _get_run_info(ctx, 'alleles_homology_scores_filename', '')
     return {
         'fig_root': fig_filename_root,
         'homology_scores': ctx.homology_scores,
@@ -2203,7 +2232,7 @@ def prep_alleles_homology_histogram(ctx: CorePlotContext):
             "The dashed line indicates the minimum alignment score threshold used to "
             "discard low-quality alignments."
         ),
-        'data_files': [('Alleles Homology Scores', os.path.basename(alleles_homology_scores_filename))] if alleles_homology_scores_filename else [],
+        'data_files': [('Alleles Homology Scores', _data_file_basename(ctx, 'Alleles_homology_scores.txt'))],
     }
 
 
@@ -2241,7 +2270,7 @@ def prep_quantification_window_locations(ctx: CorePlotContext):
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
         'caption': "Figure 4c: Frequency of insertions, deletions, and substitutions across the entire amplicon, considering only modifications that overlap with the quantification window.",
-        'data_files': [],
+        'data_files': [('Modification frequency in quantification window', os.path.basename(_get_ref_info(ctx, ref_name, 'quant_window_mod_count_filename', '')))] if _get_ref_info(ctx, ref_name, 'quant_window_mod_count_filename', '') else [],
     }
 
 
@@ -2460,7 +2489,7 @@ def prep_sub_freq_barplot(ctx: CorePlotContext):
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'caption': "Figure 10b: Substitution frequencies across the amplicon.",
-        'data_files': [],
+        'data_files': [('Nucleotide frequencies', os.path.basename(_get_ref_info(ctx, ref_name, 'nuc_freq_filename', '')))] if _get_ref_info(ctx, ref_name, 'nuc_freq_filename', '') else [],
     }
 
 
@@ -2486,7 +2515,7 @@ def prep_sub_freq_barplot_quant_window(ctx: CorePlotContext):
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'caption': "Figure 10c: Substitution frequencies in the quantification window",
-        'data_files': [],
+        'data_files': [('Nucleotide frequencies in quantification window', os.path.basename(_get_ref_info(ctx, ref_name, 'quant_window_sub_freq_filename', '')))] if _get_ref_info(ctx, ref_name, 'quant_window_sub_freq_filename', '') else [],
     }
 
 
@@ -2532,6 +2561,12 @@ def _prep_conversion_at_sel_nucs_common(ctx: CorePlotContext, plot_number: str, 
     }
 
 
+def _sel_nuc_freq_data_files(ctx: CorePlotContext):
+    """Build data_files for plots 10e/10f/10g (selected nucleotide frequency table)."""
+    sel_nuc_freq_basename = _data_file_basename(ctx, _ref_plot_name(ctx) + 'Selected_nucleotide_frequency_table_around_' + _sgRNA_label(ctx) + '.txt')
+    return [('Nucleotide frequencies at ' + ctx.args.conversion_nuc_from + 's', sel_nuc_freq_basename)]
+
+
 def prep_conversion_at_sel_nucs_plot(ctx: CorePlotContext):
     """Prepare kwargs for plot_conversion_at_sel_nucs (plot_10e).
 
@@ -2546,7 +2581,7 @@ def prep_conversion_at_sel_nucs_plot(ctx: CorePlotContext):
         "in the plotting window around the " + sgRNA_legend + ". The number of each target "
         "base is annotated on the reference sequence at the bottom of the plot."
     )
-    result['data_files'] = []
+    result['data_files'] = _sel_nuc_freq_data_files(ctx)
     return result
 
 
@@ -2564,7 +2599,7 @@ def prep_conversion_at_sel_nucs_not_include_ref(ctx: CorePlotContext):
         "sequences. The number of each target base is annotated on the reference sequence "
         "at the bottom of the plot."
     )
-    result['data_files'] = []
+    result['data_files'] = _sel_nuc_freq_data_files(ctx)
     return result
 
 
@@ -2581,7 +2616,7 @@ def prep_conversion_at_sel_nucs_not_include_ref_scaled(ctx: CorePlotContext):
         + ctx.args.conversion_nuc_from + ") bases. The number of each target base is "
         "annotated on the reference sequence at the bottom of the plot."
     )
-    result['data_files'] = []
+    result['data_files'] = _sel_nuc_freq_data_files(ctx)
     return result
 
 
