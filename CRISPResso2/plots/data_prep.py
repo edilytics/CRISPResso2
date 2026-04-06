@@ -2837,12 +2837,16 @@ def prep_batch_nuc_quilt(ctx):
         amplicon_plot_name = ""
     fig_filename_root = ctx._jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt')
 
+    # Detect group column name from DataFrame (Batch='Batch', Aggregate='Folder')
+    group_column = ctx.nucleotide_percentage_summary_dfs[amp].columns[0]
+
     result = {
         'nuc_pct_df': ctx.nucleotide_percentage_summary_dfs[amp],
         'mod_pct_df': ctx.modification_percentage_summary_dfs[amp],
         'fig_filename_root': fig_filename_root,
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'group_column': group_column,
     }
     if ctx.guides_all_same[amp] and ctx.consensus_guides[amp]:
         result['sgRNA_intervals'] = ctx.consensus_sgRNA_intervals[amp]
@@ -3015,4 +3019,53 @@ def prep_batch_allele_modification_line(ctx):
         'div_id': div_id,
         'amplicon_name': amp,
         'plot_name': plot_name,
+    }
+
+
+# =============================================================================
+# Multi-mode summary plot prep functions (Pooled, WGS, Aggregate)
+# =============================================================================
+
+
+def prep_reads_total(ctx, prefix: str):
+    """Prepare kwargs for plot_reads_total (reads summary bar chart).
+
+    Used by Pooled, WGS, and Aggregate modes.
+
+    Parameters
+    ----------
+    ctx : PooledPlotContext | WGSPlotContext | AggregatePlotContext
+        Must have ``df_summary_quantification``, ``save_png``, ``_jp``,
+        and ``args.min_reads_to_use_region``.
+    prefix : str
+        Filename prefix, e.g. ``'CRISPRessoPooled'``, ``'CRISPRessoWGS'``,
+        ``'CRISPRessoAggregate'``.
+    """
+    return {
+        'df_summary_quantification': ctx.df_summary_quantification,
+        'fig_filename_root': ctx._jp(f'{prefix}_reads_summary'),
+        'save_png': ctx.save_png,
+        'cutoff': ctx.args.min_reads_to_use_region,
+    }
+
+
+def prep_unmod_mod_pcts(ctx, prefix: str):
+    """Prepare kwargs for plot_unmod_mod_pcts (modification summary bar chart).
+
+    Used by Pooled, WGS, and Aggregate modes.
+
+    Parameters
+    ----------
+    ctx : PooledPlotContext | WGSPlotContext | AggregatePlotContext
+        Must have ``df_summary_quantification``, ``save_png``, ``_jp``,
+        and ``args.min_reads_to_use_region``.
+    prefix : str
+        Filename prefix, e.g. ``'CRISPRessoPooled'``, ``'CRISPRessoWGS'``,
+        ``'CRISPRessoAggregate'``.
+    """
+    return {
+        'df_summary_quantification': ctx.df_summary_quantification,
+        'fig_filename_root': ctx._jp(f'{prefix}_modification_summary'),
+        'save_png': ctx.save_png,
+        'cutoff': ctx.args.min_reads_to_use_region,
     }
