@@ -3069,3 +3069,263 @@ def prep_unmod_mod_pcts(ctx, prefix: str):
         'save_png': ctx.save_png,
         'cutoff': ctx.args.min_reads_to_use_region,
     }
+
+
+# =============================================================================
+# Compare prep functions
+# =============================================================================
+
+
+def prep_compare_editing_barchart(ctx):
+    """Prepare kwargs for plot_quantification_comparison_barchart.
+
+    Parameters
+    ----------
+    ctx : ComparePlotContext
+        Must have ``amplicon_name``, ``amplicon_info_1/2``,
+        ``sample_1_name``, ``sample_2_name`` set.
+
+    Returns
+    -------
+    dict
+        kwargs for ``CRISPRessoPlot.plot_quantification_comparison_barchart``.
+    """
+    amp = ctx.amplicon_name
+    n_refs = len(ctx.amplicon_names)
+
+    n_total_1 = float(ctx.amplicon_info_1[amp]['Reads_aligned'])
+    n_unmodified_1 = float(ctx.amplicon_info_1[amp]['Unmodified'])
+    n_modified_1 = float(ctx.amplicon_info_1[amp]['Modified'])
+
+    n_total_2 = float(ctx.amplicon_info_2[amp]['Reads_aligned'])
+    n_unmodified_2 = float(ctx.amplicon_info_2[amp]['Unmodified'])
+    n_modified_2 = float(ctx.amplicon_info_2[amp]['Modified'])
+
+    amplicon_plot_name = amp + "."
+    if n_refs == 1 and amp == "Reference":
+        amplicon_plot_name = ""
+
+    plot_titles = {
+        'vs': plot_title_with_ref_name(
+            '%s VS %s' % (ctx.sample_1_name, ctx.sample_2_name), amp, n_refs,
+        ),
+        'diff': plot_title_with_ref_name(
+            '%s - %s' % (ctx.sample_1_name, ctx.sample_2_name), amp, n_refs,
+        ),
+    }
+
+    return {
+        'n_total_1': n_total_1,
+        'n_unmodified_1': n_unmodified_1,
+        'n_modified_1': n_modified_1,
+        'n_total_2': n_total_2,
+        'n_unmodified_2': n_unmodified_2,
+        'n_modified_2': n_modified_2,
+        'sample_1_name': ctx.sample_1_name,
+        'sample_2_name': ctx.sample_2_name,
+        'plot_titles': plot_titles,
+        'plot_path': ctx._jp('1.' + amplicon_plot_name + 'Editing_comparison'),
+        'save_also_png': ctx.save_png,
+    }
+
+
+def prep_compare_modification_positions(ctx):
+    """Compute Fisher tests and prepare kwargs for plot_quantification_positions.
+
+    Parameters
+    ----------
+    ctx : ComparePlotContext
+        Must have ``amplicon_name``, ``mod_freqs_1/2``, ``mod_type``,
+        ``consensus_sequence``, ``cut_points``, ``sgRNA_intervals``,
+        ``quant_windows_1/2``, ``sample_1_name/2_name`` set.
+
+    Returns
+    -------
+    dict with keys:
+        ``plot_kwargs`` : dict for ``CRISPRessoPlot.plot_quantification_positions``
+        ``mod_df`` : pd.DataFrame for CSV export
+        ``sig_count`` : int — significant positions (Bonferroni)
+        ``sig_count_quant_window`` : int or np.nan
+    """
+    from scipy import stats
+
+    amp = ctx.amplicon_name
+    mod = ctx.mod_type
+    n_refs = len(ctx.amplicon_names)
+
+    mod_counts_1 = np.array(ctx.mod_freqs_1[mod], dtype=float)
+    tot_counts_1 = np.array(ctx.mod_freqs_1['Total'], dtype=float)
+    unmod_counts_1 = tot_counts_1 - mod_counts_1
+
+    mod_counts_2 = np.array(ctx.mod_freqs_2[mod], dtype=float)
+    tot_counts_2 = np.array(ctx.mod_freqs_2['Total'], dtype=float)
+    unmod_counts_2 = tot_counts_2 - mod_counts_2
+
+    fisher_results = [
+        stats.fisher_exact([[z[0], z[1]], [z[2], z[3]]]) if max(z) > 0 else [np.nan, 1.0]
+        for z in zip(mod_counts_1, unmod_counts_1, mod_counts_2, unmod_counts_2)
+    ]
+    oddsratios, pvalues = [a for a, b in fisher_results], [b for a, b in fisher_results]
+
+    # Build mod_df for CSV export
+    rows = [
+        [ctx.sample_1_name + '_' + mod] + list(mod_counts_1),
+        [ctx.sample_1_name + '_total'] + list(tot_counts_1),
+        [ctx.sample_2_name + '_' + mod] + list(mod_counts_2),
+        [ctx.sample_2_name + '_total'] + list(tot_counts_2),
+        ['odds_ratios'] + list(oddsratios),
+        ['pvalues'] + list(pvalues),
+    ]
+
+    m, pvals = len(pvalues), np.asarray(pvalues)
+    qval_bonferroni = pvals * float(m)
+    qval_bonferroni[np.where(qval_bonferroni > 1)] = 1
+    rows.append(['qval_bonferroni'] + list(qval_bonferroni))
+
+    colnames = ['Reference'] + list(ctx.consensus_sequence)
+    mod_df = pd.DataFrame(rows, columns=colnames)
+
+    # Significance counts
+    sig_count = len(np.where(qval_bonferroni <= ctx.args.reported_qvalue_cutoff)[0])
+
+    sig_count_quant_window = np.nan
+    quant_windows_are_equal = np.array_equal(ctx.quant_windows_1, ctx.quant_windows_2)
+    if quant_windows_are_equal:
+        qvals_in_quant = np.take(qval_bonferroni, ctx.quant_windows_1)
+        sig_count_quant_window = len(np.where(qvals_in_quant <= ctx.args.reported_qvalue_cutoff)[0])
+
+    amplicon_plot_name = amp + "."
+    if n_refs == 1 and amp == "Reference":
+        amplicon_plot_name = ""
+
+    mod_name = mod
+    if mod == "All_modifications":
+        mod_name = "Combined modifications (insertions, deletions and substitutions)"
+
+    plot_title = plot_title_with_ref_name(
+        '%s: %s - %s' % (mod, ctx.sample_1_name, ctx.sample_2_name), amp, n_refs,
+    )
+
+    plot_kwargs = {
+        'mod_counts_1': mod_counts_1,
+        'tot_counts_1': tot_counts_1,
+        'mod_counts_2': mod_counts_2,
+        'tot_counts_2': tot_counts_2,
+        'len_amplicon': len(ctx.consensus_sequence),
+        'pvalues': pvalues,
+        'consensus_sequence_len': len(ctx.consensus_sequence),
+        'cut_points': ctx.cut_points,
+        'sgRNA_intervals': ctx.sgRNA_intervals,
+        'plot_title': plot_title,
+        'plot_path': ctx._jp('2.' + amplicon_plot_name + mod + '_quantification'),
+        'save_also_png': ctx.save_png,
+    }
+
+    return {
+        'plot_kwargs': plot_kwargs,
+        'mod_df': mod_df,
+        'mod_name': mod_name,
+        'sig_count': sig_count,
+        'sig_count_quant_window': sig_count_quant_window,
+        'amplicon_plot_name': amplicon_plot_name,
+    }
+
+
+def prep_compare_allele_table(ctx, pair_index):
+    """Merge allele tables and prepare kwargs for plot_alleles_table_compare.
+
+    Parameters
+    ----------
+    ctx : ComparePlotContext
+        Must have ``allele_pairs``, ``sample_1_name/2_name``,
+        ``consensus_sequence``, ``sgRNA_intervals``, ``cut_points``,
+        and ``args`` set.
+    pair_index : int
+        Index into ``ctx.allele_pairs``.
+
+    Returns
+    -------
+    dict with keys:
+        ``merged_df`` : pd.DataFrame for CSV export
+        ``ref_seq_around_cut`` : str
+        ``plot_top_kwargs`` : dict for plot_alleles_table_compare (LFC desc)
+        ``plot_bottom_kwargs`` : dict for plot_alleles_table_compare (LFC asc)
+        ``is_base_edit`` : bool
+        ``file_root`` : str — allele file root for filenames
+    """
+    allele_file_1, allele_file_2, df1, df2 = ctx.allele_pairs[pair_index]
+
+    # Find unmodified reference for comparison
+    ref_seq_around_cut = ""
+    if len(df1.loc[df1['Reference_Sequence'].str.contains('-') == False]) > 0:
+        ref_seq_around_cut = df1.loc[df1['Reference_Sequence'].str.contains('-') == False]['Reference_Sequence'].iloc[0]
+    elif len(df2.loc[df2['Reference_Sequence'].str.contains('-') == False]) > 0:
+        ref_seq_around_cut = df2.loc[df2['Reference_Sequence'].str.contains('-') == False]['Reference_Sequence'].iloc[0]
+    else:
+        seq_len = df2[df2['Unedited'] == True]['Reference_Sequence'].iloc[0]
+        for sgRNA_interval, cut_point in zip(ctx.sgRNA_intervals, ctx.cut_points):
+            sgRNA_seq = ctx.consensus_sequence[sgRNA_interval[0]:sgRNA_interval[1]]
+            if sgRNA_seq in allele_file_1:
+                ref_seq_around_cut = ctx.consensus_sequence[
+                    max(0, cut_point - ctx.args.offset_around_cut_to_plot + 1):
+                    min(seq_len, cut_point + ctx.args.offset_around_cut_to_plot + 1)
+                ]
+                break
+
+    # Merge
+    merged = pd.merge(
+        df1, df2,
+        on=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated'],
+        suffixes=('_' + ctx.sample_1_name, '_' + ctx.sample_2_name),
+        how='outer',
+    )
+    quant_cols = [
+        '#Reads_' + ctx.sample_1_name, '%Reads_' + ctx.sample_1_name,
+        '#Reads_' + ctx.sample_2_name, '%Reads_' + ctx.sample_2_name,
+    ]
+    merged[quant_cols] = merged[quant_cols].fillna(0)
+    lfc_error = 0.1
+    merged['each_LFC'] = np.log2(
+        ((merged['%Reads_' + ctx.sample_1_name] + lfc_error) /
+         (merged['%Reads_' + ctx.sample_2_name] + lfc_error)).astype(float)
+    ).replace([np.inf, np.nan], 0)
+    merged = merged.sort_values(
+        ['%Reads_' + ctx.sample_1_name, 'Aligned_Sequence', 'Reference_Sequence'],
+        ascending=[False, True, True],
+    )
+    merged = merged.reset_index(drop=True).set_index('Aligned_Sequence')
+
+    file_root = os.path.split(allele_file_1)[1].replace(".txt", "")
+    is_base_edit = 'base_edit' in allele_file_1
+
+    common_kwargs = {
+        'reference_seq': ref_seq_around_cut,
+        'sample_name_1': ctx.sample_1_name,
+        'sample_name_2': ctx.sample_2_name,
+        'MIN_FREQUENCY': ctx.args.min_frequency_alleles_around_cut_to_plot,
+        'MAX_N_ROWS': ctx.args.max_rows_alleles_around_cut_to_plot,
+        'SAVE_ALSO_PNG': ctx.save_png,
+    }
+
+    plot_top_kwargs = dict(common_kwargs)
+    plot_top_kwargs['df_alleles'] = merged.sort_values(
+        ['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'],
+        ascending=[False, False, False],
+    )
+    plot_top_kwargs['fig_filename_root'] = ctx._jp('3.' + file_root + '_top')
+
+    plot_bottom_kwargs = dict(common_kwargs)
+    plot_bottom_kwargs['df_alleles'] = merged.sort_values(
+        ['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'],
+        ascending=[True, False, False],
+    )
+    plot_bottom_kwargs['fig_filename_root'] = ctx._jp('3.' + file_root + '_bottom')
+
+    return {
+        'merged_df': merged,
+        'ref_seq_around_cut': ref_seq_around_cut,
+        'plot_top_kwargs': plot_top_kwargs,
+        'plot_bottom_kwargs': plot_bottom_kwargs,
+        'is_base_edit': is_base_edit,
+        'file_root': file_root,
+    }
