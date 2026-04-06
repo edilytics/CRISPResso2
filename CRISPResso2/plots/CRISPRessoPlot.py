@@ -4427,7 +4427,7 @@ def plot_quantification_positions(
     plt.close(fig)
 
 
-def plot_combination_upset(fig_root, ref_name, bp_substitutions_arr, binary_allele_counts, save_also_png=False):
+def plot_combination_upset(fig_root, ref_name, bp_substitutions_arr, binary_allele_counts, save_also_png=False, **kwargs):
     header_arr = []
     for ind, (ref_ind, ref_base, mod_base) in enumerate(bp_substitutions_arr):
         header_arr.append(str(ref_ind) + ':' + ref_base + '->' + mod_base)
@@ -4460,7 +4460,7 @@ def plot_combination_upset(fig_root, ref_name, bp_substitutions_arr, binary_alle
     plt.close()
 
 
-def plot_alleles_homology_histogram(fig_root, homology_scores, counts, min_homology, bin_size=5, save_also_png=False):
+def plot_alleles_homology_histogram(fig_root, homology_scores, counts, min_homology, bin_size=5, save_also_png=False, **kwargs):
     """Plot histogram of homology scores for all reads."""
     fig, ax = plt.subplots(figsize=(12, 8))
     bins = np.arange(0, 105, bin_size)
