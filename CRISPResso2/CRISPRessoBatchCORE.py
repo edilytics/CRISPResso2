@@ -705,7 +705,7 @@ def main():
                                 if len(consensus_guides) == 1:
                                     crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = ''
                                 crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = args.conversion_nuc_from + '->' + args.conversion_nuc_to + ' conversion rates around the guide ' + sgRNA + ' for the amplicon ' + amplicon_name
-                                crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies around sgRNA', os.path.basename(nuc_freq_filename)), ('Nucleotide percentages around sgRNA', os.path.basename(nuc_freq_filename))]
+                                crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies around sgRNA', os.path.basename(sub_nucleotide_frequency_summary_filename)), ('Nucleotide percentages around sgRNA', os.path.basename(sub_nucleotide_percentage_summary_filename))]
 
                     # Whole-region quilt (when guides_all_same)
                     if should_plot_large_plots(all_nuc_pct_dfs[amplicon_name].shape[0], False, args.use_matplotlib):

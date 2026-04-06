@@ -721,7 +721,7 @@ def prep_amplicon_modifications(ctx: CorePlotContext):
         'custom_colors': ctx.custom_config.get('colors', {}),
         'save_also_png': ctx.save_png,
         'caption': "Figure 4a: Combined frequency of any modification across the amplicon. Modifications outside of the quantification window are also shown.",
-        'data_files': [],
+        'data_files': [('Combined modification frequency', os.path.basename(_get_ref_info(ctx, ref_name, 'combined_pct_vector_filename', '')))] if _get_ref_info(ctx, ref_name, 'combined_pct_vector_filename', '') else [],
     }
 
 
@@ -1255,7 +1255,7 @@ def prep_log_nuc_freqs(ctx: CorePlotContext):
             "Figure 10d: Log2 nucleotide frequencies for each position in the plotting window "
             "around the " + sgRNA_leg + ". The quantification window is outlined by the dotted box."
         ),
-        'data_files': [],
+        'data_files': [('Nucleotide frequencies in quantification window', os.path.basename(_get_ref_info(ctx, ref_name, 'quant_window_nuc_freq_filename', '')))] if _get_ref_info(ctx, ref_name, 'quant_window_nuc_freq_filename', '') else [],
     }
 
 
@@ -2337,7 +2337,7 @@ def prep_frameshift_analysis(ctx: CorePlotContext):
         'save_also_png': ctx.save_png,
         'custom_colors': ctx.custom_config.get('colors', {}),
         'caption': "Figure 5: Frameshift analysis of coding sequence reads affected by modifications (unmodified reads are excluded from this analysis).",
-        'data_files': [],
+        'data_files': [('Frameshift analysis', os.path.basename(_get_ref_info(ctx, ref_name, 'frameshift_analysis_filename', '')))] if _get_ref_info(ctx, ref_name, 'frameshift_analysis_filename', '') else [],
     }
 
 
@@ -2811,6 +2811,9 @@ def prep_batch_nuc_quilt_around_sgRNA(ctx):
         amplicon_plot_name = ""
     fig_filename_root = ctx._jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt_around_sgRNA_' + sgRNA)
 
+    # Detect group column name from DataFrame (Batch='Batch', Aggregate='Folder')
+    group_column = ctx.nucleotide_percentage_summary_dfs[amp].columns[0]
+
     return {
         'nuc_pct_df': nuc_pct_df,
         'mod_pct_df': mod_pct_df,
@@ -2820,6 +2823,7 @@ def prep_batch_nuc_quilt_around_sgRNA(ctx):
         'sgRNA_sequences': sub_consensus_guides,
         'quantification_window_idxs': sub_include_idxs,
         'custom_colors': ctx.custom_config.get('colors', {}),
+        'group_column': group_column,
     }
 
 

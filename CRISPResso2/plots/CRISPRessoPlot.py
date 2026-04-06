@@ -80,7 +80,7 @@ def get_nuc_color(nuc, alpha):
 
 
 def get_color_lookup(nucs, alpha, custom_colors=None):
-    if custom_colors is None:
+    if not custom_colors:
         colorLookup = {}
         for nuc in nucs:
             colorLookup[nuc] = get_nuc_color(nuc, alpha)
