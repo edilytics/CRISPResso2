@@ -1722,7 +1722,7 @@ def main():
                 report_name = OUTPUT_DIRECTORY + '.html'
             if C2PRO_INSTALLED:
                 from CRISPRessoPro import hooks as pro_hooks
-                pro_hooks.make_pooled_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
+                pro_hooks.make_pooled_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger, plot_context)
             else:
                 CRISPRessoReport.make_pooled_report_from_folder(report_name, crispresso2_info, OUTPUT_DIRECTORY, _ROOT, logger)
             crispresso2_info['running_info']['report_location'] = report_name
