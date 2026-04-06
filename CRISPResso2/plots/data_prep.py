@@ -2721,3 +2721,298 @@ def prep_scaffold_indel_lengths(ctx: CorePlotContext):
         ),
         'data_files': [('Scaffold insertion alleles with insertion sizes', os.path.basename(scaffold_insertion_sizes_filename))] if scaffold_insertion_sizes_filename else [],
     }
+
+
+# =============================================================================
+# Batch / Aggregate prep functions
+# =============================================================================
+
+
+def _compute_sub_sgRNA_intervals(sgRNA_plot_idxs, consensus_sgRNA_intervals, include_idxs):
+    """Map full-amplicon sgRNA intervals to sub-indexed coordinates.
+
+    When plotting around a single sgRNA, the DataFrame columns are a subset
+    of the full amplicon. This function computes where the sgRNA intervals
+    fall in the sub-indexed coordinate system.
+
+    Returns (sub_sgRNA_intervals, sub_include_idxs).
+    """
+    sub_sgRNA_intervals = []
+    for sgRNA_interval in consensus_sgRNA_intervals:
+        newstart = None
+        newend = None
+        for idx, i in enumerate(sgRNA_plot_idxs):
+            if i <= sgRNA_interval[0]:
+                newstart = idx
+            if newend is None and i >= sgRNA_interval[1]:
+                newend = idx
+        # if guide doesn't overlap with plot idxs
+        if newend == 0 or newstart == len(sgRNA_plot_idxs):
+            continue
+        # correct partial overlaps
+        elif newstart is None and newend is None:
+            newstart = 0
+            newend = len(include_idxs) - 1
+        elif newstart is None:
+            newstart = 0
+        elif newend is None:
+            newend = len(include_idxs) - 1
+        sub_sgRNA_intervals.append((newstart, newend))
+    # Scale include_idxs to sub-indexed coordinates
+    sub_include_idxs = include_idxs - sgRNA_plot_idxs[0]
+    return sub_sgRNA_intervals, sub_include_idxs
+
+
+def prep_batch_nuc_quilt_around_sgRNA(ctx):
+    """Prepare kwargs for plot_nucleotide_quilt around one sgRNA (Batch/Aggregate).
+
+    Parameters
+    ----------
+    ctx : BatchPlotContext | AggregatePlotContext
+        Must have ``amplicon_name`` and ``sgRNA_ind`` scope fields set.
+
+    Returns
+    -------
+    dict
+        kwargs for ``CRISPRessoPlot.plot_nucleotide_quilt``, plus
+        ``sub_consensus_guides`` for metadata use.
+    """
+    amp = ctx.amplicon_name
+    sgRNA_ind = ctx.sgRNA_ind
+    sgRNA_plot_idxs = ctx.consensus_sgRNA_plot_idxs[amp][sgRNA_ind]
+    include_idxs = ctx.consensus_include_idxs[amp]
+
+    # Slice DataFrames to sgRNA columns
+    plot_idxs_flat = [0, 1]  # Batch, Nucleotide/Modification columns
+    plot_idxs_flat.extend([plot_idx + 2 for plot_idx in sgRNA_plot_idxs])
+
+    nuc_pct_df = ctx.nucleotide_percentage_summary_dfs[amp].iloc[:, plot_idxs_flat]
+    nuc_pct_df = pd.concat([nuc_pct_df.iloc[:, 0:2], nuc_pct_df.iloc[:, 2:].apply(pd.to_numeric)], axis=1)
+
+    mod_pct_df = ctx.modification_percentage_summary_dfs[amp].iloc[:, plot_idxs_flat]
+    mod_pct_df = pd.concat([mod_pct_df.iloc[:, 0:2], mod_pct_df.iloc[:, 2:].apply(pd.to_numeric)], axis=1)
+
+    # Compute sub-indexed sgRNA intervals
+    sub_sgRNA_intervals, sub_include_idxs = _compute_sub_sgRNA_intervals(
+        sgRNA_plot_idxs, ctx.consensus_sgRNA_intervals[amp], include_idxs,
+    )
+
+    # Collect sub_consensus_guides for metadata
+    sub_consensus_guides = []
+    for sgRNA_index, sgRNA_interval in enumerate(ctx.consensus_sgRNA_intervals[amp]):
+        for idx_val, i in enumerate(sgRNA_plot_idxs):
+            if i >= sgRNA_interval[0]:
+                sub_consensus_guides.append(ctx.consensus_guides[amp][sgRNA_index])
+                break
+
+    sgRNA = ctx.consensus_guides[amp][sgRNA_ind]
+    amplicon_plot_name = amp + "."
+    if len(ctx.amplicon_names) == 1 and amp == "Reference":
+        amplicon_plot_name = ""
+    fig_filename_root = ctx._jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt_around_sgRNA_' + sgRNA)
+
+    return {
+        'nuc_pct_df': nuc_pct_df,
+        'mod_pct_df': mod_pct_df,
+        'fig_filename_root': fig_filename_root,
+        'save_also_png': ctx.save_png,
+        'sgRNA_intervals': sub_sgRNA_intervals,
+        'sgRNA_sequences': sub_consensus_guides,
+        'quantification_window_idxs': sub_include_idxs,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
+def prep_batch_nuc_quilt(ctx):
+    """Prepare kwargs for plot_nucleotide_quilt for full region (Batch/Aggregate).
+
+    Parameters
+    ----------
+    ctx : BatchPlotContext | AggregatePlotContext
+        Must have ``amplicon_name`` scope field set.
+    """
+    amp = ctx.amplicon_name
+    amplicon_plot_name = amp + "."
+    if len(ctx.amplicon_names) == 1 and amp == "Reference":
+        amplicon_plot_name = ""
+    fig_filename_root = ctx._jp(amplicon_plot_name.replace('.', '') + 'Nucleotide_percentage_quilt')
+
+    result = {
+        'nuc_pct_df': ctx.nucleotide_percentage_summary_dfs[amp],
+        'mod_pct_df': ctx.modification_percentage_summary_dfs[amp],
+        'fig_filename_root': fig_filename_root,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+    if ctx.guides_all_same[amp] and ctx.consensus_guides[amp]:
+        result['sgRNA_intervals'] = ctx.consensus_sgRNA_intervals[amp]
+        result['sgRNA_sequences'] = ctx.consensus_guides[amp]
+        result['quantification_window_idxs'] = ctx.consensus_include_idxs[amp]
+    return result
+
+
+def prep_batch_conversion_map_around_sgRNA(ctx):
+    """Prepare kwargs for plot_conversion_map around one sgRNA (Batch only).
+
+    Parameters
+    ----------
+    ctx : BatchPlotContext
+        Must have ``amplicon_name`` and ``sgRNA_ind`` scope fields set.
+    """
+    amp = ctx.amplicon_name
+    sgRNA_ind = ctx.sgRNA_ind
+    sgRNA_plot_idxs = ctx.consensus_sgRNA_plot_idxs[amp][sgRNA_ind]
+    include_idxs = ctx.consensus_include_idxs[amp]
+
+    plot_idxs_flat = [0, 1]
+    plot_idxs_flat.extend([plot_idx + 2 for plot_idx in sgRNA_plot_idxs])
+
+    nuc_pct_df = ctx.nucleotide_percentage_summary_dfs[amp].iloc[:, plot_idxs_flat]
+    nuc_pct_df = pd.concat([nuc_pct_df.iloc[:, 0:2], nuc_pct_df.iloc[:, 2:].apply(pd.to_numeric)], axis=1)
+
+    sub_sgRNA_intervals, sub_include_idxs = _compute_sub_sgRNA_intervals(
+        sgRNA_plot_idxs, ctx.consensus_sgRNA_intervals[amp], include_idxs,
+    )
+
+    sgRNA = ctx.consensus_guides[amp][sgRNA_ind]
+    amplicon_plot_name = amp + "."
+    if len(ctx.amplicon_names) == 1 and amp == "Reference":
+        amplicon_plot_name = ""
+    fig_filename_root = ctx._jp(amplicon_plot_name + 'Nucleotide_conversion_map_around_sgRNA_' + sgRNA)
+
+    return {
+        'nuc_pct_df': nuc_pct_df,
+        'fig_filename_root': fig_filename_root,
+        'conversion_nuc_from': ctx.args.conversion_nuc_from,
+        'conversion_nuc_to': ctx.args.conversion_nuc_to,
+        'save_also_png': ctx.save_png,
+        'sgRNA_intervals': sub_sgRNA_intervals,
+        'quantification_window_idxs': sub_include_idxs,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+
+
+def prep_batch_conversion_map(ctx):
+    """Prepare kwargs for plot_conversion_map for full region (Batch only).
+
+    Parameters
+    ----------
+    ctx : BatchPlotContext
+        Must have ``amplicon_name`` scope field set.
+    """
+    amp = ctx.amplicon_name
+    amplicon_plot_name = amp + "."
+    if len(ctx.amplicon_names) == 1 and amp == "Reference":
+        amplicon_plot_name = ""
+    fig_filename_root = ctx._jp(amplicon_plot_name + 'Nucleotide_conversion_map')
+
+    result = {
+        'nuc_pct_df': ctx.nucleotide_percentage_summary_dfs[amp],
+        'fig_filename_root': fig_filename_root,
+        'conversion_nuc_from': ctx.args.conversion_nuc_from,
+        'conversion_nuc_to': ctx.args.conversion_nuc_to,
+        'save_also_png': ctx.save_png,
+        'custom_colors': ctx.custom_config.get('colors', {}),
+    }
+    if ctx.guides_all_same[amp] and ctx.consensus_guides[amp]:
+        result['sgRNA_intervals'] = ctx.consensus_sgRNA_intervals[amp]
+        result['quantification_window_idxs'] = ctx.consensus_include_idxs[amp]
+    return result
+
+
+def prep_batch_allele_modification_heatmap(ctx):
+    """Prepare kwargs for plot_allele_modification_heatmap (Batch/Aggregate).
+
+    Parameters
+    ----------
+    ctx : BatchPlotContext | AggregatePlotContext
+        Must have ``amplicon_name`` and ``mod_type`` scope fields set.
+    """
+    amp = ctx.amplicon_name
+    mod_type = ctx.mod_type
+    mod_freq_df = ctx.modification_frequency_summary_dfs[amp]
+
+    modification_df = mod_freq_df[mod_freq_df['Modification'] == mod_type].copy()
+    modification_df.index = [
+        '{0} ({1})'.format(batch, batch_index)
+        for batch_index, batch in enumerate(modification_df['Batch'], 1)
+    ]
+    modification_df = modification_df.drop(['Modification', 'Batch'], axis=1)
+    modification_df.columns = [
+        '{0} ({1})'.format(column, position)
+        for position, column in enumerate(modification_df.columns, 1)
+    ]
+
+    if ctx.guides_all_same[amp]:
+        sgRNA_intervals = [ctx.consensus_sgRNA_intervals[amp]] * modification_df.shape[0]
+    else:
+        sgRNA_intervals = [ctx.consensus_sgRNA_intervals[amp]]
+
+    amplicon_plot_name = amp + "."
+    if len(ctx.amplicon_names) == 1 and amp == "Reference":
+        amplicon_plot_name = ""
+
+    plot_name = 'CRISPRessoBatch_percentage_of_{0}_across_alleles_{1}_heatmap'.format(
+        mod_type.lower(), amp,
+    )
+    plot_path = '{0}.html'.format(ctx._jp(plot_name))
+    div_id = '{0}-allele-modification-heatmap-{1}'.format(amp.lower(), mod_type.lower())
+
+    return {
+        'sample_values': modification_df,
+        'sample_sgRNA_intervals': sgRNA_intervals,
+        'plot_path': plot_path,
+        'title': mod_type,
+        'div_id': div_id,
+        'amplicon_name': amp,
+        'plot_name': plot_name,
+    }
+
+
+def prep_batch_allele_modification_line(ctx):
+    """Prepare kwargs for plot_allele_modification_line (Batch/Aggregate).
+
+    Parameters
+    ----------
+    ctx : BatchPlotContext | AggregatePlotContext
+        Must have ``amplicon_name`` and ``mod_type`` scope fields set.
+    """
+    amp = ctx.amplicon_name
+    mod_type = ctx.mod_type
+    mod_freq_df = ctx.modification_frequency_summary_dfs[amp]
+
+    modification_df = mod_freq_df[mod_freq_df['Modification'] == mod_type].copy()
+    modification_df.index = [
+        '{0} ({1})'.format(batch, batch_index)
+        for batch_index, batch in enumerate(modification_df['Batch'], 1)
+    ]
+    modification_df = modification_df.drop(['Modification', 'Batch'], axis=1)
+    modification_df.columns = [
+        '{0} ({1})'.format(column, position)
+        for position, column in enumerate(modification_df.columns, 1)
+    ]
+
+    if ctx.guides_all_same[amp]:
+        sgRNA_intervals = [ctx.consensus_sgRNA_intervals[amp]] * modification_df.shape[0]
+    else:
+        sgRNA_intervals = [ctx.consensus_sgRNA_intervals[amp]]
+
+    amplicon_plot_name = amp + "."
+    if len(ctx.amplicon_names) == 1 and amp == "Reference":
+        amplicon_plot_name = ""
+
+    plot_name = 'CRISPRessoBatch_percentage_of_{0}_across_alleles_{1}_line'.format(
+        mod_type.lower(), amp,
+    )
+    plot_path = '{0}.html'.format(ctx._jp(plot_name))
+    div_id = '{0}-allele-modification-line-{1}'.format(amp.lower(), mod_type.lower())
+
+    return {
+        'sample_values': modification_df,
+        'sample_sgRNA_intervals': sgRNA_intervals,
+        'plot_path': plot_path,
+        'title': mod_type,
+        'div_id': div_id,
+        'amplicon_name': amp,
+        'plot_name': plot_name,
+    }
