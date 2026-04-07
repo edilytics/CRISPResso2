@@ -197,6 +197,14 @@ class BatchPlotContext(PlotContext):
     consensus_sgRNA_plot_idxs: dict[str, list[np.ndarray]]
     guides_all_same: dict[str, bool]
 
+    # Per-amplicon summary file paths (amplicon_name -> {kind: filename})
+    # Populated by CRISPRessoBatchCORE; used by built-in plot runner.
+    all_summary_filenames: dict[str, dict[str, str]] = field(default_factory=dict)
+
+    # Quantification-window summary filenames (populated when base_editor_output).
+    sub_nucleotide_frequency_summary_filename: str = ''
+    sub_nucleotide_percentage_summary_filename: str = ''
+
     # === Scope fields ===
 
     amplicon_name: Optional[str] = None
@@ -240,6 +248,15 @@ class AggregatePlotContext(PlotContext):
 
     # Per-amplicon sample count (for pagination)
     sample_count: dict[str, int]
+
+    # Per-amplicon summary file paths (amplicon_name -> {kind: filename}).
+    # Populated by CRISPRessoAggregateCORE; used by the shared
+    # ``run_builtin_batch_plots`` runner.
+    all_summary_filenames: dict[str, dict[str, str]] = field(default_factory=dict)
+
+    # Quantification-window summary filenames (populated when base_editor_output).
+    sub_nucleotide_frequency_summary_filename: str = ''
+    sub_nucleotide_percentage_summary_filename: str = ''
 
     # === Scope fields ===
 

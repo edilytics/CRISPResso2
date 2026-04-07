@@ -6,8 +6,6 @@ Software pipeline for the analysis of genome editing outcomes from deep sequenci
 
 import os
 from copy import deepcopy
-from concurrent.futures import ProcessPoolExecutor, wait
-from functools import partial
 import sys
 import re
 import traceback
@@ -619,12 +617,6 @@ def main():
         # Pass 2: Context construction + plotting
         # =====================================================================
         from CRISPResso2.plots.plot_context import BatchPlotContext
-        from CRISPResso2.plots.data_prep import (
-            prep_batch_nuc_quilt_around_sgRNA,
-            prep_batch_nuc_quilt,
-            prep_batch_conversion_map_around_sgRNA,
-            prep_batch_conversion_map,
-        )
 
         batch_plot_context = BatchPlotContext(
             args=args,
@@ -643,7 +635,17 @@ def main():
             consensus_sgRNA_intervals=all_consensus_sgRNA_intervals,
             consensus_sgRNA_plot_idxs=all_consensus_sgRNA_plot_idxs,
             guides_all_same=all_guides_all_same,
+            all_summary_filenames=all_summary_filenames,
+            sub_nucleotide_frequency_summary_filename=locals().get(
+                'sub_nucleotide_frequency_summary_filename', ''
+            ),
+            sub_nucleotide_percentage_summary_filename=locals().get(
+                'sub_nucleotide_percentage_summary_filename', ''
+            ),
         )
+        # Stash n_processes_for_batch on args so the shared runner can
+        # read it without a separate positional argument.
+        args.n_processes_for_batch = n_processes_for_batch
 
         if C2PRO_INSTALLED:
             try:
@@ -654,106 +656,10 @@ def main():
                     raise
                 logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
         elif not args.suppress_plots and not args.suppress_batch_summary_plots:
-            if n_processes_for_batch > 1:
-                process_pool = ProcessPoolExecutor(n_processes_for_batch)
-                process_futures = {}
-            else:
-                process_pool = None
-                process_futures = None
-
-            plot = partial(
-                CRISPRessoMultiProcessing.run_plot,
-                num_processes=n_processes_for_batch,
-                process_futures=process_futures,
-                process_pool=process_pool,
-                halt_on_plot_fail=args.halt_on_plot_fail,
+            from CRISPResso2.plots.builtin_runners import run_builtin_batch_plots
+            run_builtin_batch_plots(
+                batch_plot_context, crispresso2_info, CRISPRessoPlot, logger,
             )
-
-            window_nuc_pct_quilt_plot_names = []
-            nuc_pct_quilt_plot_names = []
-            window_nuc_conv_plot_names = []
-            nuc_conv_plot_names = []
-
-            for amplicon_name in batch_amplicon_names:
-                batch_plot_context.amplicon_name = amplicon_name
-                nuc_freq_filename = all_summary_filenames[amplicon_name]['nucleotide_frequency']
-                mod_freq_filename = all_summary_filenames[amplicon_name]['modification_frequency']
-                guides_all_same = all_guides_all_same[amplicon_name]
-                consensus_guides = all_consensus_guides[amplicon_name]
-
-                if guides_all_same and consensus_guides:
-                    for sgRNA_ind, sgRNA in enumerate(consensus_guides):
-                        batch_plot_context.sgRNA_ind = sgRNA_ind
-
-                        if should_plot_large_plots(all_nuc_pct_dfs[amplicon_name].shape[0], False, args.use_matplotlib):
-                            quilt_input = prep_batch_nuc_quilt_around_sgRNA(batch_plot_context)
-                            debug('Plotting nucleotide percentage quilt for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
-                            plot(CRISPRessoPlot.plot_nucleotide_quilt, quilt_input)
-                            plot_name = os.path.basename(quilt_input['fig_filename_root'])
-                            window_nuc_pct_quilt_plot_names.append(plot_name)
-                            crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'sgRNA: ' + sgRNA + ' Amplicon: ' + amplicon_name
-                            crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base around the guide ' + sgRNA + ' for the amplicon ' + amplicon_name
-                            crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nuc_freq_filename)), ('Modification frequencies', os.path.basename(mod_freq_filename))]
-
-                            if args.base_editor_output:
-                                conv_input = prep_batch_conversion_map_around_sgRNA(batch_plot_context)
-                                debug('Plotting nucleotide conversion map for amplicon {0}, sgRNA {1}'.format(amplicon_name, sgRNA))
-                                plot(CRISPRessoPlot.plot_conversion_map, conv_input)
-                                plot_name = os.path.basename(conv_input['fig_filename_root'])
-                                window_nuc_conv_plot_names.append(plot_name)
-                                crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'sgRNA: ' + sgRNA + ' Amplicon: ' + amplicon_name
-                                if len(consensus_guides) == 1:
-                                    crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = ''
-                                crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = args.conversion_nuc_from + '->' + args.conversion_nuc_to + ' conversion rates around the guide ' + sgRNA + ' for the amplicon ' + amplicon_name
-                                crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies around sgRNA', os.path.basename(sub_nucleotide_frequency_summary_filename)), ('Nucleotide percentages around sgRNA', os.path.basename(sub_nucleotide_percentage_summary_filename))]
-
-                    # Whole-region quilt (when guides_all_same)
-                    if should_plot_large_plots(all_nuc_pct_dfs[amplicon_name].shape[0], False, args.use_matplotlib):
-                        quilt_input = prep_batch_nuc_quilt(batch_plot_context)
-                        debug('Plotting nucleotide quilt for {0}'.format(amplicon_name))
-                        plot(CRISPRessoPlot.plot_nucleotide_quilt, quilt_input)
-                        plot_name = os.path.basename(quilt_input['fig_filename_root'])
-                        nuc_pct_quilt_plot_names.append(plot_name)
-                        crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = 'Amplicon: ' + amplicon_name
-                        if len(amplicon_names) == 1:
-                            crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = ''
-                        crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base for the amplicon ' + amplicon_name
-                        crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nuc_freq_filename)), ('Modification frequencies', os.path.basename(mod_freq_filename))]
-
-                        if args.base_editor_output:
-                            conv_input = prep_batch_conversion_map(batch_plot_context)
-                            debug('Plotting nucleotide conversion map for {0}'.format(amplicon_name))
-                            plot(CRISPRessoPlot.plot_conversion_map, conv_input)
-                            plot_name = os.path.basename(conv_input['fig_filename_root'])
-                            nuc_conv_plot_names.append(plot_name)
-                            crispresso2_info['results']['general_plots']['summary_plot_titles'][plot_name] = ''
-                            crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = args.conversion_nuc_from + '->' + args.conversion_nuc_to + ' conversion rates for the amplicon ' + amplicon_name
-                            crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nuc_freq_filename)), ('Modification frequencies', os.path.basename(mod_freq_filename))]
-
-                else:
-                    # Guides not all same — whole-region quilt only, no sgRNA data on plot
-                    if should_plot_large_plots(all_nuc_pct_dfs[amplicon_name].shape[0], False, args.use_matplotlib):
-                        quilt_input = prep_batch_nuc_quilt(batch_plot_context)
-                        debug('Plotting nucleotide quilt for {0}'.format(amplicon_name))
-                        plot(CRISPRessoPlot.plot_nucleotide_quilt, quilt_input)
-                        plot_name = os.path.basename(quilt_input['fig_filename_root'])
-                        nuc_pct_quilt_plot_names.append(plot_name)
-                        crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = 'Composition of each base for the amplicon ' + amplicon_name
-                        crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nuc_freq_filename)), ('Modification frequencies', os.path.basename(mod_freq_filename))]
-
-                        if args.base_editor_output:
-                            conv_input = prep_batch_conversion_map(batch_plot_context)
-                            debug('Plotting BE nucleotide conversion map for {0}'.format(amplicon_name))
-                            plot(CRISPRessoPlot.plot_conversion_map, conv_input)
-                            plot_name = os.path.basename(conv_input['fig_filename_root'])
-                            nuc_conv_plot_names.append(plot_name)
-                            crispresso2_info['results']['general_plots']['summary_plot_labels'][plot_name] = args.conversion_nuc_from + '->' + args.conversion_nuc_to + ' conversion rates for the amplicon ' + amplicon_name
-                            crispresso2_info['results']['general_plots']['summary_plot_datas'][plot_name] = [('Nucleotide frequencies', os.path.basename(nuc_freq_filename)), ('Modification frequencies', os.path.basename(mod_freq_filename))]
-
-            crispresso2_info['results']['general_plots']['window_nuc_pct_quilt_plot_names'] = window_nuc_pct_quilt_plot_names
-            crispresso2_info['results']['general_plots']['nuc_pct_quilt_plot_names'] = nuc_pct_quilt_plot_names
-            crispresso2_info['results']['general_plots']['window_nuc_conv_plot_names'] = window_nuc_conv_plot_names
-            crispresso2_info['results']['general_plots']['nuc_conv_plot_names'] = nuc_conv_plot_names
 
         # summarize amplicon modifications
         with open(_jp('CRISPRessoBatch_quantification_of_editing_frequency.txt'), 'w') as outfile:
@@ -812,19 +718,8 @@ def main():
                     for line in infile:
                         outfile.write(batch_name + "\t" + line)
 
-        if not C2PRO_INSTALLED and not args.suppress_plots and not args.suppress_batch_summary_plots and n_processes_for_batch > 1:
-            wait(process_futures)
-            if args.debug:
-                debug('CRISPResso batch results:')
-                for future in process_futures:
-                    debug('future: ' + str(future))
-            for future in process_futures:
-                try:
-                    future.result()
-                except Exception as e:
-                    logger.warning('Error in plot pool: %s' % e)
-                    logger.debug(traceback.format_exc())
-            process_pool.shutdown()
+        # (Built-in plot multiprocessing teardown is handled inside
+        # ``run_builtin_batch_plots``; nothing to do here.)
 
         if not args.suppress_report:
             if (args.place_report_in_output_folder):

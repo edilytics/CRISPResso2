@@ -2776,6 +2776,7 @@ def prep_batch_nuc_quilt_around_sgRNA(ctx):
     dict
         kwargs for ``CRISPRessoPlot.plot_nucleotide_quilt``, plus
         ``sub_consensus_guides`` for metadata use.
+
     """
     amp = ctx.amplicon_name
     sgRNA_ind = ctx.sgRNA_ind
@@ -2834,6 +2835,7 @@ def prep_batch_nuc_quilt(ctx):
     ----------
     ctx : BatchPlotContext | AggregatePlotContext
         Must have ``amplicon_name`` scope field set.
+
     """
     amp = ctx.amplicon_name
     amplicon_plot_name = amp + "."
@@ -2866,6 +2868,7 @@ def prep_batch_conversion_map_around_sgRNA(ctx):
     ----------
     ctx : BatchPlotContext
         Must have ``amplicon_name`` and ``sgRNA_ind`` scope fields set.
+
     """
     amp = ctx.amplicon_name
     sgRNA_ind = ctx.sgRNA_ind
@@ -2907,6 +2910,7 @@ def prep_batch_conversion_map(ctx):
     ----------
     ctx : BatchPlotContext
         Must have ``amplicon_name`` scope field set.
+
     """
     amp = ctx.amplicon_name
     amplicon_plot_name = amp + "."
@@ -2935,6 +2939,7 @@ def prep_batch_allele_modification_heatmap(ctx):
     ----------
     ctx : BatchPlotContext | AggregatePlotContext
         Must have ``amplicon_name`` and ``mod_type`` scope fields set.
+
     """
     amp = ctx.amplicon_name
     mod_type = ctx.mod_type
@@ -2984,6 +2989,7 @@ def prep_batch_allele_modification_line(ctx):
     ----------
     ctx : BatchPlotContext | AggregatePlotContext
         Must have ``amplicon_name`` and ``mod_type`` scope fields set.
+
     """
     amp = ctx.amplicon_name
     mod_type = ctx.mod_type
@@ -3031,7 +3037,24 @@ def prep_batch_allele_modification_line(ctx):
 # =============================================================================
 
 
-def prep_reads_total(ctx, prefix: str):
+def _resolve_min_reads_cutoff(ctx):
+    """Return the minimum-reads cutoff for the given mode's args namespace.
+
+    Pooled and WGS use ``min_reads_to_use_region``; Aggregate uses
+    ``min_reads_for_inclusion``. Returns whichever attribute exists.
+    """
+    args = ctx.args
+    if hasattr(args, 'min_reads_to_use_region'):
+        return args.min_reads_to_use_region
+    if hasattr(args, 'min_reads_for_inclusion'):
+        return args.min_reads_for_inclusion
+    raise AttributeError(
+        "args namespace lacks both 'min_reads_to_use_region' and "
+        "'min_reads_for_inclusion'"
+    )
+
+
+def prep_reads_total(ctx, prefix: str, name: str | None = None):
     """Prepare kwargs for plot_reads_total (reads summary bar chart).
 
     Used by Pooled, WGS, and Aggregate modes.
@@ -3040,20 +3063,26 @@ def prep_reads_total(ctx, prefix: str):
     ----------
     ctx : PooledPlotContext | WGSPlotContext | AggregatePlotContext
         Must have ``df_summary_quantification``, ``save_png``, ``_jp``,
-        and ``args.min_reads_to_use_region``.
+        and the appropriate min-reads arg for its mode.
     prefix : str
         Filename prefix, e.g. ``'CRISPRessoPooled'``, ``'CRISPRessoWGS'``,
         ``'CRISPRessoAggregate'``.
+    name : str, optional
+        Override for the bare filename root (no directory). When provided,
+        the generated path is ``ctx._jp(name)``; otherwise the path defaults
+        to ``ctx._jp(f'{prefix}_reads_summary')``.
+
     """
+    bare = name if name is not None else f'{prefix}_reads_summary'
     return {
         'df_summary_quantification': ctx.df_summary_quantification,
-        'fig_filename_root': ctx._jp(f'{prefix}_reads_summary'),
+        'fig_filename_root': ctx._jp(bare),
         'save_png': ctx.save_png,
-        'cutoff': ctx.args.min_reads_to_use_region,
+        'cutoff': _resolve_min_reads_cutoff(ctx),
     }
 
 
-def prep_unmod_mod_pcts(ctx, prefix: str):
+def prep_unmod_mod_pcts(ctx, prefix: str, name: str | None = None):
     """Prepare kwargs for plot_unmod_mod_pcts (modification summary bar chart).
 
     Used by Pooled, WGS, and Aggregate modes.
@@ -3062,16 +3091,22 @@ def prep_unmod_mod_pcts(ctx, prefix: str):
     ----------
     ctx : PooledPlotContext | WGSPlotContext | AggregatePlotContext
         Must have ``df_summary_quantification``, ``save_png``, ``_jp``,
-        and ``args.min_reads_to_use_region``.
+        and the appropriate min-reads arg for its mode.
     prefix : str
         Filename prefix, e.g. ``'CRISPRessoPooled'``, ``'CRISPRessoWGS'``,
         ``'CRISPRessoAggregate'``.
+    name : str, optional
+        Override for the bare filename root (no directory). When provided,
+        the generated path is ``ctx._jp(name)``; otherwise the path defaults
+        to ``ctx._jp(f'{prefix}_modification_summary')``.
+
     """
+    bare = name if name is not None else f'{prefix}_modification_summary'
     return {
         'df_summary_quantification': ctx.df_summary_quantification,
-        'fig_filename_root': ctx._jp(f'{prefix}_modification_summary'),
+        'fig_filename_root': ctx._jp(bare),
         'save_png': ctx.save_png,
-        'cutoff': ctx.args.min_reads_to_use_region,
+        'cutoff': _resolve_min_reads_cutoff(ctx),
     }
 
 
@@ -3093,6 +3128,7 @@ def prep_compare_editing_barchart(ctx):
     -------
     dict
         kwargs for ``CRISPRessoPlot.plot_quantification_comparison_barchart``.
+
     """
     amp = ctx.amplicon_name
     n_refs = len(ctx.amplicon_names)
@@ -3150,6 +3186,7 @@ def prep_compare_modification_positions(ctx):
         ``mod_df`` : pd.DataFrame for CSV export
         ``sig_count`` : int — significant positions (Bonferroni)
         ``sig_count_quant_window`` : int or np.nan
+
     """
     from scipy import stats
 
@@ -3256,6 +3293,7 @@ def prep_compare_allele_table(ctx, pair_index):
         ``plot_bottom_kwargs`` : dict for plot_alleles_table_compare (LFC asc)
         ``is_base_edit`` : bool
         ``file_root`` : str — allele file root for filenames
+
     """
     allele_file_1, allele_file_2, df1, df2 = ctx.allele_pairs[pair_index]
 
@@ -3333,3 +3371,478 @@ def prep_compare_allele_table(ctx, pair_index):
         'is_base_edit': is_base_edit,
         'file_root': file_root,
     }
+
+
+# =============================================================================
+# Shared data-file exports (used by both CORE and Pro hooks)
+# =============================================================================
+
+
+def write_core_amplicon_data_files(ctx: CorePlotContext, crispresso2_info: dict):
+    """Write CORE's per-amplicon CSV data files.
+
+    Replicates the CSV exports that ``CRISPRessoCORE.main``'s ``elif not
+    args.suppress_plots:`` branch performs at the top of its per-reference
+    plotting loop.  Both CORE (non-Pro path) and Pro's ``on_plots_complete``
+    hook call this so that the same data files are produced regardless of
+    which plotting backend handles the figures.
+
+    Writes, for each reference with ``counts_total[ref_name] > 0``:
+
+    - ``{ref_plot_name}Nucleotide_frequency_table.txt``
+    - ``{ref_plot_name}Nucleotide_percentage_table.txt``
+    - ``{ref_plot_name}Quantification_window_nucleotide_frequency_table.txt``
+    - ``{ref_plot_name}Quantification_window_nucleotide_percentage_table.txt``
+
+    And, when ``args.base_editor_output`` is set:
+
+    - ``{ref_plot_name}Substitution_frequency_table.txt``
+    - ``{ref_plot_name}Quantification_window_substitution_frequency_table.txt``
+
+    Each file's basename is recorded under the standard key in
+    ``crispresso2_info['results']['refs'][ref_name]``.
+
+    Skipped entirely when ``args.crispresso1_mode`` is True (mirrors CORE).
+
+    Parameters
+    ----------
+    ctx : CorePlotContext
+        Context exposing ``ref_names``, ``refs``, ``counts_total``,
+        ``all_base_count_vectors``, ``all_substitution_base_vectors``,
+        ``substitution_base_vectors``, and ``_jp``.
+    crispresso2_info : dict
+        Run info dict whose ``results.refs[ref_name]`` entries are updated
+        with the written filenames (matching CORE's key names).
+
+    """
+    if getattr(ctx.args, 'crispresso1_mode', False):
+        return
+
+    for ref_name in ctx.ref_names:
+        if ctx.counts_total[ref_name] < 1:
+            continue
+
+        ref = ctx.refs[ref_name]
+        # Gracefully skip refs that lack the fields we need.  This happens
+        # in minimal test fixtures; production refs always have these.
+        if not all(k in ref for k in ('ref_plot_name', 'sequence', 'include_idxs')):
+            continue
+        # Skip if the per-amplicon count vectors aren't available.
+        if (ref_name + '_A') not in ctx.all_base_count_vectors:
+            continue
+
+        ref_plot_name = ref['ref_plot_name']
+        ref_seq = ref['sequence']
+        include_idxs_list = ref['include_idxs']
+        quantification_window_ref_seq = [ref_seq[x] for x in include_idxs_list]
+        tot_aln_reads = ctx.counts_total[ref_name]
+        info_ref = crispresso2_info['results']['refs'][ref_name]
+
+        # Derive quantification-window counts from the full-amplicon vectors.
+        window_rows = [
+            [
+                ctx.all_base_count_vectors[ref_name + '_' + nuc][x]
+                for x in include_idxs_list
+            ]
+            for nuc in ['A', 'C', 'G', 'T', 'N', '-']
+        ]
+        df_nuc_freq = pd.DataFrame(
+            window_rows,
+            index=['A', 'C', 'G', 'T', 'N', '-'],
+            columns=quantification_window_ref_seq,
+        )
+        quant_window_nuc_freq_filename = ctx._jp(
+            ref_plot_name + 'Quantification_window_nucleotide_frequency_table.txt'
+        )
+        df_nuc_freq.to_csv(quant_window_nuc_freq_filename, sep='\t', header=True, index=True)
+        info_ref['quant_window_nuc_freq_filename'] = os.path.basename(quant_window_nuc_freq_filename)
+
+        df_nuc_pct = df_nuc_freq.divide(tot_aln_reads)
+        quant_window_nuc_pct_filename = ctx._jp(
+            ref_plot_name + 'Quantification_window_nucleotide_percentage_table.txt'
+        )
+        df_nuc_pct.to_csv(quant_window_nuc_pct_filename, sep='\t', header=True, index=True)
+        info_ref['quant_window_nuc_pct_filename'] = os.path.basename(quant_window_nuc_pct_filename)
+
+        df_nuc_freq_all = pd.DataFrame(
+            [
+                ctx.all_base_count_vectors[ref_name + '_' + nuc]
+                for nuc in ['A', 'C', 'G', 'T', 'N', '-']
+            ],
+            index=['A', 'C', 'G', 'T', 'N', '-'],
+            columns=list(ref_seq),
+        )
+        nuc_freq_filename = ctx._jp(ref_plot_name + 'Nucleotide_frequency_table.txt')
+        df_nuc_freq_all.to_csv(nuc_freq_filename, sep='\t', header=True, index=True)
+        info_ref['nuc_freq_filename'] = os.path.basename(nuc_freq_filename)
+
+        df_nuc_pct_all = df_nuc_freq_all.divide(tot_aln_reads)
+        nuc_pct_filename = ctx._jp(ref_plot_name + 'Nucleotide_percentage_table.txt')
+        df_nuc_pct_all.to_csv(nuc_pct_filename, sep='\t', header=True, index=True)
+        info_ref['nuc_pct_filename'] = os.path.basename(nuc_pct_filename)
+
+        if getattr(ctx.args, 'base_editor_output', False):
+            alph = ['A', 'C', 'G', 'T', 'N']
+            df_sub_freq = pd.DataFrame(
+                [list(ctx.substitution_base_vectors[ref_name + '_' + a]) for a in alph],
+                index=alph,
+                columns=quantification_window_ref_seq,
+            )
+            quant_window_sub_freq_filename = ctx._jp(
+                ref_plot_name + 'Quantification_window_substitution_frequency_table.txt'
+            )
+            df_sub_freq.to_csv(quant_window_sub_freq_filename, sep='\t', header=True, index=True)
+            info_ref['quant_window_sub_freq_filename'] = os.path.basename(quant_window_sub_freq_filename)
+
+            df_sub_freq_all = pd.DataFrame(
+                [list(ctx.all_substitution_base_vectors[ref_name + '_' + a]) for a in alph],
+                index=alph,
+                columns=list(ref_seq),
+            )
+            sub_freq_table_filename = ctx._jp(
+                ref_plot_name + 'Substitution_frequency_table.txt'
+            )
+            df_sub_freq_all.to_csv(sub_freq_table_filename, sep='\t', header=True, index=True)
+            info_ref['sub_freq_table_filename'] = os.path.basename(sub_freq_table_filename)
+
+
+def write_core_per_sgRNA_data_files(ctx: CorePlotContext, crispresso2_info: dict):
+    """Write CORE's per-sgRNA CSV data files.
+
+    Mirrors the per-sgRNA CSV exports from ``CRISPRessoCORE.main``'s ``elif
+    not args.suppress_plots:`` branch.  Called by Pro's ``on_plots_complete``
+    so Pro mode produces the same on-disk data files as the non-Pro path.
+
+    For each reference amplicon with reads, iterates ``sgRNA_sequences`` and
+    writes:
+
+    - ``{ref_plot_name}Alleles_frequency_table_around_{sgRNA_label}.txt`` (plot 9)
+
+    When base-editor output is requested and not crispresso1 mode:
+
+    - ``{ref_plot_name}Selected_nucleotide_percentage_table_around_{sgRNA_label}.txt`` (plot 10e/f/g)
+    - ``{ref_plot_name}Selected_nucleotide_frequency_table_around_{sgRNA_label}.txt`` (plot 10e/f/g)
+    - ``10i.{ref_name}.{sgRNA_label}.{binary_allele_counts,category_allele_counts,precise_allele_counts,arrays,counts}.txt`` (plot 10i)
+
+    Writes per-amplicon base-edit alleles-around-cut table (plot 10h) when
+    base-editor output is requested.
+
+    Requires ``ctx.df_alleles`` to be populated.  Mutates
+    ``ctx.ref_name`` and ``ctx.sgRNA_ind`` during iteration but restores
+    them to ``None`` on return.
+    """
+    from CRISPResso2 import CRISPRessoShared
+
+    saved_ref_name = ctx.ref_name
+    saved_sgRNA_ind = ctx.sgRNA_ind
+    is_base_editor = getattr(ctx.args, 'base_editor_output', False)
+    is_crispresso1 = getattr(ctx.args, 'crispresso1_mode', False)
+
+    try:
+        for ref_name in ctx.ref_names:
+            if ctx.counts_total[ref_name] < 1:
+                continue
+
+            ref = ctx.refs[ref_name]
+            # Gracefully skip refs that lack the fields we need.
+            if 'ref_plot_name' not in ref or 'sgRNA_sequences' not in ref:
+                continue
+            if ctx.df_alleles is None:
+                continue
+
+            ref_plot_name = ref['ref_plot_name']
+            info_ref = crispresso2_info['results']['refs'][ref_name]
+            info_ref.setdefault('allele_frequency_files', [])
+            ctx.ref_name = ref_name
+
+            # Plot 10h (base-edit quilt, per amplicon, uses last sgRNA)
+            if is_base_editor and not is_crispresso1 and len(ref.get('sgRNA_cut_points', [])) > 0:
+                ctx.sgRNA_ind = len(ref['sgRNA_cut_points']) - 1
+                base_edit_data = prep_base_edit_quilt(ctx)
+                base_edit_allele_filename = ctx._jp(
+                    ref_plot_name + 'base_edit_'
+                    + ctx.args.conversion_nuc_from + 's_quilt.txt'
+                )
+                base_edit_data['df_alleles_around_cut'].to_csv(
+                    base_edit_allele_filename, sep='\t', header=True,
+                )
+                info_ref['allele_frequency_files'].append(
+                    os.path.basename(base_edit_allele_filename)
+                )
+
+            # Per sgRNA writes
+            sgRNA_sequences = ref['sgRNA_sequences']
+            for sgRNA_ind, _sgRNA_seq in enumerate(sgRNA_sequences):
+                sgRNA = ref['sgRNA_orig_sequences'][sgRNA_ind]
+                sgRNA_name = ref['sgRNA_names'][sgRNA_ind]
+                sgRNA_label = "sgRNA_" + sgRNA
+                if sgRNA_name:
+                    sgRNA_label = sgRNA_name
+                sgRNA_label = CRISPRessoShared.slugify(sgRNA_label)
+                ctx.sgRNA_ind = sgRNA_ind
+
+                # Plot 9: alleles around cut
+                alleles_data = prep_alleles_around_cut(ctx)
+                allele_filename = ctx._jp(
+                    ref_plot_name + 'Alleles_frequency_table_around_'
+                    + sgRNA_label + '.txt'
+                )
+                alleles_data['df_alleles_around_cut'].to_csv(
+                    allele_filename, sep='\t', header=True,
+                )
+                info_ref['allele_frequency_files'].append(
+                    os.path.basename(allele_filename)
+                )
+
+                # Plot 10e/f/g: selected nucleotide frequency/percentage
+                if is_base_editor and not is_crispresso1:
+                    sel_nuc_data = prep_conversion_at_sel_nucs(ctx)
+                    just_sel_nuc_pcts = sel_nuc_data['just_sel_nuc_pcts']
+                    just_sel_nuc_freqs = sel_nuc_data['just_sel_nuc_freqs']
+                    quant_window_sel_nuc_pct_filename = ctx._jp(
+                        ref_plot_name + 'Selected_nucleotide_percentage_table_around_'
+                        + sgRNA_label + '.txt'
+                    )
+                    just_sel_nuc_pcts.to_csv(
+                        quant_window_sel_nuc_pct_filename, sep='\t', header=True, index=True,
+                    )
+                    quant_window_sel_nuc_freq_filename = ctx._jp(
+                        ref_plot_name + 'Selected_nucleotide_frequency_table_around_'
+                        + sgRNA_label + '.txt'
+                    )
+                    just_sel_nuc_freqs.to_csv(
+                        quant_window_sel_nuc_freq_filename, sep='\t', header=True, index=True,
+                    )
+
+                    # Plot 10i: base-edit upset counts
+                    upset_data = prep_base_edit_upset(
+                        ref['sequence'],
+                        ctx.df_alleles,
+                        ref_name,
+                        ref['sgRNA_intervals'][sgRNA_ind],
+                        ctx.args,
+                        gap_incentive=ref['gap_incentive'],
+                        sgRNA_legend=sgRNA_label,
+                    )
+                    if upset_data is not None:
+                        write_base_edit_counts(
+                            ref_name + '.' + sgRNA_label,
+                            upset_data['counts_dict'],
+                            upset_data['bp_substitutions_arr'],
+                            ctx._jp,
+                        )
+    finally:
+        ctx.ref_name = saved_ref_name
+        ctx.sgRNA_ind = saved_sgRNA_ind
+
+
+def write_core_coding_data_files(ctx: CorePlotContext, crispresso2_info: dict):
+    """Write CORE's per-coding-sequence CSV data files (amino acid tables).
+
+    Mirrors the per-coding-sequence CSV exports from CORE's ``elif`` branch.
+    Called by Pro's ``on_plots_complete`` so Pro mode produces the same
+    on-disk data files as the non-Pro path.
+
+    For each reference amplicon that ``contains_coding_seq``, iterates
+    ``running_info['coding_seqs']`` and writes
+    ``{ref_plot_name}amino_acid_table_for_{coding_seq_label}.txt``.
+
+    Mutates ``ctx.ref_name`` and ``ctx.coding_seq_ind`` during iteration
+    but restores them on return.
+    """
+    saved_ref_name = ctx.ref_name
+    saved_coding_seq_ind = ctx.coding_seq_ind
+    coding_seqs = crispresso2_info['running_info'].get('coding_seqs', [])
+    coding_seq_names = crispresso2_info['running_info'].get('coding_seq_names', [])
+    if not coding_seqs:
+        return
+
+    try:
+        for ref_name in ctx.ref_names:
+            if ctx.counts_total[ref_name] < 1:
+                continue
+            ref = ctx.refs[ref_name]
+            if not ref.get('contains_coding_seq', False):
+                continue
+            if 'ref_plot_name' not in ref:
+                continue
+
+            ref_plot_name = ref['ref_plot_name']
+            ctx.ref_name = ref_name
+
+            for i, _coding_seq in enumerate(coding_seqs):
+                coding_seq_label = (
+                    coding_seq_names[i]
+                    if i < len(coding_seq_names)
+                    else str(i)
+                )
+                ctx.coding_seq_ind = i
+                amino_acid_data = prep_amino_acid_table(ctx)
+                df_to_plot = amino_acid_data['df_to_plot']
+                amino_acid_filename = ctx._jp(
+                    ref_plot_name + 'amino_acid_table_for_'
+                    + coding_seq_label + '.txt'
+                )
+                df_to_plot.to_csv(
+                    amino_acid_filename, sep='\t', header=True, index=True,
+                )
+    finally:
+        ctx.ref_name = saved_ref_name
+        ctx.coding_seq_ind = saved_coding_seq_ind
+
+
+def write_core_hdr_data_files(ctx: CorePlotContext, crispresso2_info: dict):
+    """Write HDR cross-amplicon nucleotide/modification summary tables.
+
+    Mirrors plot_4g's CSV exports from CORE's elif branch.  Only writes when
+    ``args.expected_hdr_amplicon_seq`` is non-empty.  Writes:
+
+    - ``{ref_plot_name}Reads_from_all_amplicons_nucleotide_percent_table.txt``
+    - ``{ref_plot_name}Reads_from_all_amplicons_modification_percent_table.txt``
+    """
+    if not getattr(ctx.args, 'expected_hdr_amplicon_seq', ''):
+        return
+
+    ref_names_for_hdr = [r for r in ctx.ref_names if ctx.counts_total[r] > 0]
+    if not ref_names_for_hdr:
+        return
+    if 'ref_plot_name' not in ctx.refs[ref_names_for_hdr[0]]:
+        return
+
+    saved_ref_name = ctx.ref_name
+    ctx.ref_name = ctx.ref_names[0]
+    try:
+        plot_4g_input = prep_hdr_nucleotide_quilt(ctx)
+    finally:
+        ctx.ref_name = saved_ref_name
+
+    hdr_nuc_pct_df = plot_4g_input['nuc_pct_df']
+    hdr_mod_pct_df = plot_4g_input['mod_pct_df']
+    ref_plot_name = ctx.refs[ref_names_for_hdr[0]]['ref_plot_name']
+
+    mod_freq_filename = ctx._jp(
+        ref_plot_name + 'Reads_from_all_amplicons_modification_percent_table.txt'
+    )
+    hdr_mod_pct_df.rename(columns={'Batch': 'Amplicon'}).to_csv(
+        mod_freq_filename, sep='\t', header=True, index=False,
+    )
+    nuc_freq_filename = ctx._jp(
+        ref_plot_name + 'Reads_from_all_amplicons_nucleotide_percent_table.txt'
+    )
+    hdr_nuc_pct_df.rename(columns={'Batch': 'Amplicon'}).to_csv(
+        nuc_freq_filename, sep='\t', header=True, index=False,
+    )
+
+
+def write_core_prime_editing_data_files(ctx: CorePlotContext, crispresso2_info: dict):
+    """Write prime editing scaffold insertion sizes table.
+
+    Mirrors the plot_11c CSV export from CORE's elif branch.  Only writes
+    when both ``args.prime_editing_pegRNA_extension_seq`` and
+    ``args.prime_editing_pegRNA_scaffold_seq`` are set.
+
+    Computes the DataFrame on the fly by iterating
+    ``ctx.df_alleles`` restricted to ``Reference_Name == 'Scaffold-incorporated'``
+    and measuring the match length of the observed scaffold against the
+    expected (reverse-complemented) sequence.  Also stores the computed
+    DataFrame on ``ctx.df_scaffold_insertion_sizes`` so subsequent plot
+    preparation can reuse it.
+    """
+    from CRISPResso2 import CRISPRessoShared
+    from CRISPResso2.CRISPRessoCORE import get_pe_scaffold_search
+
+    args = ctx.args
+    if not getattr(args, 'prime_editing_pegRNA_extension_seq', ''):
+        return
+    if not getattr(args, 'prime_editing_pegRNA_scaffold_seq', ''):
+        return
+
+    refs = ctx.refs
+    if 'Prime-edited' not in refs:
+        return
+
+    scaffold_dna_seq = CRISPRessoShared.reverse_complement(
+        args.prime_editing_pegRNA_scaffold_seq.upper().replace('U', 'T')
+    )
+    pe_seq = refs['Prime-edited']['sequence']
+    pe_scaffold_dna_info = get_pe_scaffold_search(
+        pe_seq,
+        args.prime_editing_pegRNA_extension_seq,
+        args.prime_editing_pegRNA_scaffold_seq,
+        args.prime_editing_pegRNA_scaffold_min_match_length,
+    )
+
+    df_alleles_scaffold = ctx.df_alleles.loc[
+        ctx.df_alleles['Reference_Name'] == 'Scaffold-incorporated'
+    ]
+
+    def get_scaffold_len(row, scaffold_start_loc, scaffold_seq):
+        pe_read_possible_scaffold_loc = row['ref_positions'].index(scaffold_start_loc - 1) + 1
+        i = 0
+        num_match_scaffold = 0
+        num_gaps = 0
+        matches_scaffold_to_this_point = True
+        has_gaps_to_this_point = True
+        aln_seq_to_test = row['Aligned_Sequence'][pe_read_possible_scaffold_loc:].replace("-", "")
+        while (
+            i < len(scaffold_seq)
+            and i < len(aln_seq_to_test)
+            and (matches_scaffold_to_this_point or has_gaps_to_this_point)
+        ):
+            if matches_scaffold_to_this_point and aln_seq_to_test[i] == scaffold_seq[i]:
+                num_match_scaffold += 1
+            else:
+                matches_scaffold_to_this_point = False
+
+            if (
+                has_gaps_to_this_point
+                and row['Reference_Sequence'][pe_read_possible_scaffold_loc + i] == '-'
+            ):
+                num_gaps += 1
+            else:
+                has_gaps_to_this_point = False
+            i += 1
+        return (
+            row['Aligned_Sequence'],
+            row['Reference_Sequence'],
+            num_match_scaffold,
+            num_gaps,
+            row['#Reads'],
+            row['%Reads'],
+        )
+
+    df_scaffold_insertion_sizes = pd.DataFrame(
+        list(
+            df_alleles_scaffold.apply(
+                lambda row: get_scaffold_len(row, pe_scaffold_dna_info[0], scaffold_dna_seq),
+                axis=1,
+            ).values
+        ),
+        columns=[
+            'Aligned_Sequence', 'Reference_Sequence',
+            'Num_match_scaffold', 'Num_gaps', '#Reads', '%Reads',
+        ],
+    )
+
+    filename = ctx._jp('Scaffold_insertion_sizes.txt')
+    df_scaffold_insertion_sizes.to_csv(filename, sep='\t', header=True, index=False)
+    crispresso2_info['Scaffold_insertion_sizes_filename'] = filename
+    # Stash so downstream plot code can reuse.
+    ctx.df_scaffold_insertion_sizes = df_scaffold_insertion_sizes
+
+
+def write_all_core_data_files(ctx: CorePlotContext, crispresso2_info: dict):
+    """Write all CORE CSV data files that the non-Pro elif branch writes.
+
+    Convenience wrapper that runs :func:`write_core_amplicon_data_files`,
+    :func:`write_core_hdr_data_files`, :func:`write_core_per_sgRNA_data_files`,
+    :func:`write_core_coding_data_files`, and
+    :func:`write_core_prime_editing_data_files` in the correct order
+    (amplicon writes first so HDR/per-sgRNA writes can reference the
+    metadata they populate).
+    """
+    write_core_amplicon_data_files(ctx, crispresso2_info)
+    write_core_hdr_data_files(ctx, crispresso2_info)
+    write_core_per_sgRNA_data_files(ctx, crispresso2_info)
+    write_core_coding_data_files(ctx, crispresso2_info)
+    write_core_prime_editing_data_files(ctx, crispresso2_info)
