@@ -46,6 +46,7 @@ pytest-check = "*"
 
 [feature.pro.pypi-dependencies]
 kaleido = "*"
+orjson = "*"
 ydiff = "*"
 inline-snapshot = "*"
 

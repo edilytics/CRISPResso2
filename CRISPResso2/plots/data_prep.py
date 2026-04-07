@@ -3349,17 +3349,21 @@ def prep_compare_allele_table(ctx, pair_index):
         'SAVE_ALSO_PNG': ctx.save_png,
     }
 
+    # Tiebreaker sort: Aligned_Sequence/Reference_Sequence ascending.
+    # Keep in sync with the original CRISPRessoCompareCORE implementation
+    # so the alleles selected (MAX_N_ROWS) and their order match the
+    # expected PDF text streams in the integration tests.
     plot_top_kwargs = dict(common_kwargs)
     plot_top_kwargs['df_alleles'] = merged.sort_values(
         ['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'],
-        ascending=[False, False, False],
+        ascending=[False, True, True],
     )
     plot_top_kwargs['fig_filename_root'] = ctx._jp('3.' + file_root + '_top')
 
     plot_bottom_kwargs = dict(common_kwargs)
     plot_bottom_kwargs['df_alleles'] = merged.sort_values(
         ['each_LFC', 'Aligned_Sequence', 'Reference_Sequence'],
-        ascending=[True, False, False],
+        ascending=[True, True, True],
     )
     plot_bottom_kwargs['fig_filename_root'] = ctx._jp('3.' + file_root + '_bottom')
 
