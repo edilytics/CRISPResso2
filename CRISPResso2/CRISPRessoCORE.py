@@ -2778,10 +2778,7 @@ def main():
         if (args.needleman_wunsch_gap_extend > 0):
             raise CRISPRessoShared.BadParameterException("Needleman Wunsch gap extend penalty must be <= 0")
 
-        if args.use_matplotlib or not C2PRO_INSTALLED:
-            from CRISPResso2.plots import CRISPRessoPlot
-        else:
-            from CRISPRessoPro import plot as CRISPRessoPlot
+        from CRISPResso2.plots import CRISPRessoPlot
         CRISPRessoPlot.setMatplotlibDefaults()
 
         # create output directory

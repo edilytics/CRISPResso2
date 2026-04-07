@@ -753,6 +753,11 @@ ___________________________________
                     report_filename = _jp("CRISPResso2Aggregate_report.html")
                 if C2PRO_INSTALLED:
                     from CRISPRessoPro import hooks as pro_hooks
+                    # Store aggregate data so Pro hook can access it
+                    crispresso2_info['running_info']['name'] = args.name
+                    crispresso2_info['results']['crispresso2_folders'] = crispresso2_folders
+                    crispresso2_info['results']['crispresso2_folder_htmls'] = crispresso2_folder_htmls
+                    crispresso2_info['results']['general_plots']['quilt_plots_to_show'] = quilt_plots_to_show
                     pro_hooks.make_aggregate_report(crispresso2_info, report_filename, OUTPUT_DIRECTORY, _ROOT, logger, agg_plot_context)
                 else:
                     CRISPRessoReport.make_aggregate_report(

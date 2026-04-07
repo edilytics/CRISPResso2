@@ -66,7 +66,7 @@ def _to_numeric_ignore_columns(df, ignore_columns):
     """Convert DataFrame columns to numeric, ignoring specified columns."""
     for col in df.columns:
         if col not in ignore_columns:
-            df[col] = df[col].apply(pd.to_numeric, errors='raise')
+            df[col] = df[col].apply(pd.to_numeric, errors='coerce')
     return df
 
 
@@ -2056,7 +2056,7 @@ def prep_base_edit_upset(ref_seq, df_alleles, ref_name, sgRNA_interval,
         aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
 
     if gap_incentive is None:
-        gap_incentive = np.zeros(len(ref_seq) + 1, dtype=np.int32)
+        gap_incentive = np.zeros(len(ref_seq) + 1, dtype=int)
 
     aln_target_seq, aln_ref_seq, _aln_score = CRISPResso2Align.global_align(
         target_seq,
