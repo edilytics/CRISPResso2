@@ -551,7 +551,12 @@ ___________________________________
                     'sub_nucleotide_percentage_summary_filename', ''
                 ),
             )
-            # Stash n_processes for the shared plot runner.
+            # Stash n_processes_for_batch on args so Pro's plot_runners
+            # (via on_aggregate_plots_complete) can read it.  CORE's
+            # elif branch below uses the outer `plot` partial defined
+            # at the top of main() — the same pool that handles the
+            # rest of the run — so all futures are awaited together
+            # by the single shutdown at the end of main().
             args.n_processes_for_batch = getattr(args, 'n_processes', 1)
 
             if C2PRO_INSTALLED:
@@ -567,27 +572,9 @@ ___________________________________
                 # CRISPRessoPro.plots.plot_runners.run_builtin_aggregate_plots
                 # — the two copies are maintained independently to honor the
                 # Pro/Core boundary (see design_docs/MULTI_MODE_PLOT_PLUGIN.md).
-                n_processes = getattr(args, 'n_processes_for_batch', 1)
-                try:
-                    n_processes = int(n_processes)
-                except (TypeError, ValueError):
-                    n_processes = 1
-
-                if n_processes > 1:
-                    process_pool = ProcessPoolExecutor(n_processes)
-                    process_futures = {}
-                else:
-                    process_pool = None
-                    process_futures = None
-
-                plot = partial(
-                    run_plot,
-                    num_processes=n_processes,
-                    process_futures=process_futures,
-                    process_pool=process_pool,
-                    halt_on_plot_fail=getattr(args, 'halt_on_plot_fail', False),
-                )
-
+                #
+                # We deliberately reuse the outer `plot` partial defined at
+                # the top of main() rather than creating a second pool.
                 general_plots = crispresso2_info['results']['general_plots']
                 general_plots.setdefault('summary_plot_names', [])
                 general_plots.setdefault('summary_plot_titles', {})
@@ -682,15 +669,10 @@ ___________________________________
                 general_plots['window_nuc_conv_plot_names'] = window_nuc_conv_plot_names
                 general_plots['nuc_conv_plot_names'] = nuc_conv_plot_names
 
-                if process_pool is not None:
-                    wait(process_futures)
-                    for future in process_futures:
-                        try:
-                            future.result()
-                        except Exception as e:
-                            warn(f'Error in plot pool: {e}')
-                            debug(traceback.format_exc())
-                    process_pool.shutdown()
+                # Note: pool teardown happens at the end of main() —
+                # we share the outer `plot` partial / process_pool, so
+                # the queued futures from this branch are awaited
+                # together with the rest of the run.
 
             quantification_summary = []
             # summarize amplicon modifications

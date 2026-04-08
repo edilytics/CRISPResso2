@@ -650,8 +650,10 @@ def main():
                 'sub_nucleotide_percentage_summary_filename', ''
             ),
         )
-        # Stash n_processes_for_batch on args so the shared runner can
-        # read it without a separate positional argument.
+        # Stash n_processes_for_batch on args so Pro's plot_runners
+        # (via the on_batch_plots_complete hook) can read it.  CORE's
+        # elif branch below uses the local n_processes_for_batch
+        # directly.
         args.n_processes_for_batch = n_processes_for_batch
 
         if C2PRO_INSTALLED:
@@ -667,11 +669,7 @@ def main():
             # CRISPRessoPro.plots.plot_runners.run_builtin_batch_plots —
             # the two copies are maintained independently to honor the
             # Pro/Core boundary (see design_docs/MULTI_MODE_PLOT_PLUGIN.md).
-            n_processes = getattr(args, 'n_processes_for_batch', 1)
-            try:
-                n_processes = int(n_processes)
-            except (TypeError, ValueError):
-                n_processes = 1
+            n_processes = int(n_processes_for_batch)
 
             if n_processes > 1:
                 process_pool = ProcessPoolExecutor(n_processes)
@@ -685,7 +683,7 @@ def main():
                 num_processes=n_processes,
                 process_futures=process_futures,
                 process_pool=process_pool,
-                halt_on_plot_fail=getattr(args, 'halt_on_plot_fail', False),
+                halt_on_plot_fail=args.halt_on_plot_fail,
             )
 
             general_plots = crispresso2_info['results']['general_plots']
