@@ -287,10 +287,9 @@ def main():
         '''
         info(CRISPRessoShared.get_crispresso_header(description, pooled_string))
 
-        if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
-            from CRISPResso2.plots import CRISPRessoPlot
-        else:
-            from CRISPRessoPro import plot as CRISPRessoPlot
+        # CORE always uses matplotlib; when Pro is installed the hooks
+        # below skip this path entirely and Pro owns plotting decisions.
+        from CRISPResso2.plots import CRISPRessoPlot
 
         crispresso_options = CRISPRessoShared.get_core_crispresso_options()
         options_to_ignore = {'fastq_r1', 'fastq_r2', 'amplicon_seq', 'amplicon_name', 'output_folder', 'name',

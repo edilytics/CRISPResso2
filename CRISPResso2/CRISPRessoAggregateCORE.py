@@ -67,10 +67,11 @@ def main():
 
         args = parser.parse_args()
 
-        if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
-            from CRISPResso2.plots import CRISPRessoPlot
-        else:
-            from CRISPRessoPro import plot as CRISPRessoPlot
+        # CORE always uses matplotlib; when Pro is installed the hook
+        # below skips the per-amplicon path entirely and Pro owns
+        # plotting decisions.  The unconditional summary-plot block
+        # later in main() also always uses this matplotlib module.
+        from CRISPResso2.plots import CRISPRessoPlot
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
@@ -515,6 +516,8 @@ ___________________________________
             # =================================================================
             from CRISPResso2.plots.plot_context import AggregatePlotContext
             from CRISPResso2.plots.data_prep import (
+                prep_batch_nuc_quilt,
+                prep_batch_nuc_quilt_around_sgRNA,
                 prep_reads_total,
                 prep_unmod_mod_pcts,
             )
@@ -560,10 +563,134 @@ ___________________________________
                         raise
                     logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
             elif not args.suppress_plots:
-                from CRISPResso2.plots.builtin_runners import run_builtin_aggregate_plots
-                run_builtin_aggregate_plots(
-                    agg_plot_context, crispresso2_info, CRISPRessoPlot, logger,
+                # Inline CORE plot iteration.  Pro's equivalent lives in
+                # CRISPRessoPro.plots.plot_runners.run_builtin_aggregate_plots
+                # — the two copies are maintained independently to honor the
+                # Pro/Core boundary (see design_docs/MULTI_MODE_PLOT_PLUGIN.md).
+                n_processes = getattr(args, 'n_processes_for_batch', 1)
+                try:
+                    n_processes = int(n_processes)
+                except (TypeError, ValueError):
+                    n_processes = 1
+
+                if n_processes > 1:
+                    process_pool = ProcessPoolExecutor(n_processes)
+                    process_futures = {}
+                else:
+                    process_pool = None
+                    process_futures = None
+
+                plot = partial(
+                    run_plot,
+                    num_processes=n_processes,
+                    process_futures=process_futures,
+                    process_pool=process_pool,
+                    halt_on_plot_fail=getattr(args, 'halt_on_plot_fail', False),
                 )
+
+                general_plots = crispresso2_info['results']['general_plots']
+                general_plots.setdefault('summary_plot_names', [])
+                general_plots.setdefault('summary_plot_titles', {})
+                general_plots.setdefault('summary_plot_labels', {})
+                general_plots.setdefault('summary_plot_datas', {})
+
+                window_nuc_pct_quilt_plot_names = []
+                nuc_pct_quilt_plot_names = []
+                window_nuc_conv_plot_names = []
+                nuc_conv_plot_names = []
+
+                for amplicon_name in agg_plot_context.amplicon_names:
+                    agg_plot_context.amplicon_name = amplicon_name
+                    nuc_freq_filename = agg_plot_context.all_summary_filenames[amplicon_name]['nucleotide_frequency']
+                    mod_freq_filename = agg_plot_context.all_summary_filenames[amplicon_name]['modification_frequency']
+                    guides_all_same = agg_plot_context.guides_all_same[amplicon_name]
+                    consensus_guides = agg_plot_context.consensus_guides[amplicon_name]
+                    this_number_samples = agg_plot_context.sample_count[amplicon_name]
+
+                    # Per-sgRNA quilts (when guides_all_same and small enough for matplotlib)
+                    if guides_all_same and consensus_guides:
+                        for sgRNA_ind, sgRNA in enumerate(consensus_guides):
+                            agg_plot_context.sgRNA_ind = sgRNA_ind
+                            if this_number_samples < args.max_samples_per_summary_plot:
+                                quilt_input = prep_batch_nuc_quilt_around_sgRNA(agg_plot_context)
+                                debug(f'Plotting nucleotide percentage quilt for amplicon {amplicon_name}, sgRNA {sgRNA}')
+                                plot(CRISPRessoPlot.plot_nucleotide_quilt, quilt_input)
+                                plot_name = os.path.basename(quilt_input['fig_filename_root'])
+                                window_nuc_pct_quilt_plot_names.append(plot_name)
+                                title = f'sgRNA: {sgRNA} Amplicon: {amplicon_name}'
+                                if len(consensus_guides) == 1:
+                                    title = ''
+                                general_plots['summary_plot_titles'][plot_name] = title
+                                general_plots['summary_plot_labels'][plot_name] = (
+                                    f'Composition of each base around the guide {sgRNA} for the amplicon {amplicon_name}'
+                                )
+                                general_plots['summary_plot_datas'][plot_name] = [
+                                    (f'{amplicon_name} nucleotide frequencies', os.path.basename(nuc_freq_filename)),
+                                    (f'{amplicon_name} modification frequencies', os.path.basename(mod_freq_filename)),
+                                ]
+
+                    # Whole-region quilt with pagination
+                    quilt_input = prep_batch_nuc_quilt(agg_plot_context)
+                    nuc_pct_df = quilt_input['nuc_pct_df']
+                    mod_pct_df = quilt_input['mod_pct_df']
+                    if this_number_samples <= 0:
+                        continue
+                    nrow_per_sample_nucs = nuc_pct_df.shape[0] / this_number_samples
+                    nrow_per_sample_mods = mod_pct_df.shape[0] / this_number_samples
+
+                    this_plot_suffix = ''
+                    this_plot_suffix_int = 1
+                    for sample_start_ind in range(
+                        0, this_number_samples, args.max_samples_per_summary_plot,
+                    ):
+                        sample_end_ind = min(
+                            sample_start_ind + args.max_samples_per_summary_plot,
+                            this_number_samples,
+                        )
+                        this_nuc_start_ind = int(sample_start_ind * nrow_per_sample_nucs)
+                        this_nuc_end_ind = int((sample_end_ind + 1) * nrow_per_sample_nucs - 1)
+                        this_mod_start_ind = int(sample_start_ind * nrow_per_sample_mods)
+                        this_mod_end_ind = int((sample_end_ind + 1) * nrow_per_sample_mods - 1)
+
+                        page_input = dict(quilt_input)
+                        page_input['nuc_pct_df'] = nuc_pct_df.iloc[this_nuc_start_ind:this_nuc_end_ind, :]
+                        page_input['mod_pct_df'] = mod_pct_df.iloc[this_mod_start_ind:this_mod_end_ind, :]
+                        page_input['fig_filename_root'] = quilt_input['fig_filename_root'] + this_plot_suffix
+
+                        debug(f'Plotting nucleotide quilt for {amplicon_name}{this_plot_suffix}')
+                        plot(CRISPRessoPlot.plot_nucleotide_quilt, page_input)
+
+                        plot_name = os.path.basename(page_input['fig_filename_root'])
+                        nuc_pct_quilt_plot_names.append(plot_name)
+                        title = f'Amplicon: {amplicon_name}{this_plot_suffix}'
+                        if len(agg_plot_context.amplicon_names) == 1:
+                            title = ''
+                        general_plots['summary_plot_titles'][plot_name] = title
+                        general_plots['summary_plot_labels'][plot_name] = (
+                            f'Composition of each base for the amplicon {amplicon_name}'
+                        )
+                        general_plots['summary_plot_datas'][plot_name] = [
+                            (f'{amplicon_name} nucleotide frequencies', os.path.basename(nuc_freq_filename)),
+                            (f'{amplicon_name} modification frequencies', os.path.basename(mod_freq_filename)),
+                        ]
+
+                        this_plot_suffix_int += 1
+                        this_plot_suffix = f'_{this_plot_suffix_int}'
+
+                general_plots['window_nuc_pct_quilt_plot_names'] = window_nuc_pct_quilt_plot_names
+                general_plots['nuc_pct_quilt_plot_names'] = nuc_pct_quilt_plot_names
+                general_plots['window_nuc_conv_plot_names'] = window_nuc_conv_plot_names
+                general_plots['nuc_conv_plot_names'] = nuc_conv_plot_names
+
+                if process_pool is not None:
+                    wait(process_futures)
+                    for future in process_futures:
+                        try:
+                            future.result()
+                        except Exception as e:
+                            warn(f'Error in plot pool: {e}')
+                            debug(traceback.format_exc())
+                    process_pool.shutdown()
 
             quantification_summary = []
             # summarize amplicon modifications
@@ -639,10 +766,18 @@ ___________________________________
             # Update context with the now-available df_summary_quantification
             agg_plot_context.df_summary_quantification = df_summary_quantification
 
-            # Summary bar plots run in both Pro and non-Pro paths: CORE
-            # emits matplotlib PDFs unconditionally here; future Pro hook
-            # work can replace this with interactive HTML versions.
-            if not args.suppress_plots:
+            # Summary bar plots: Pro owns HTML generation via its own hook;
+            # CORE's elif emits matplotlib PDFs inline.  The two paths are
+            # parallel and mutually exclusive per the Pro/Core boundary.
+            if C2PRO_INSTALLED:
+                try:
+                    from CRISPRessoPro import hooks as pro_hooks
+                    pro_hooks.on_aggregate_summary_ready(agg_plot_context, logger)
+                except Exception as e:
+                    if args.halt_on_plot_fail:
+                        raise
+                    logger.warning(f"CRISPRessoPro summary hook failed: {e}")
+            elif not args.suppress_plots:
                 debug('Plotting reads summary...', {'percent_complete': 94})
                 reads_total_input = prep_reads_total(agg_plot_context, prefix='CRISPRessoAggregate')
                 plot(CRISPRessoPlot.plot_reads_total, reads_total_input)
