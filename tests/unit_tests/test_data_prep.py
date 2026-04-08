@@ -2263,11 +2263,117 @@ class TestPrepReadsTotal:
         result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
         assert result['save_png'] is True
 
-    def test_dataframe_is_same_reference(self, tmp_path):
+    def test_dataframe_is_a_copy(self, tmp_path):
+        """The returned df must be a copy so sanitization doesn't
+        mutate ``ctx.df_summary_quantification``."""
         from CRISPResso2.plots.data_prep import prep_reads_total
         ctx = self._make_summary_ctx(tmp_path)
         result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
-        assert result['df_summary_quantification'] is ctx.df_summary_quantification
+        assert result['df_summary_quantification'] is not ctx.df_summary_quantification
+
+
+class TestSanitizeSummaryNames:
+    """Tests for the Name column sanitization in prep_reads_total /
+    prep_unmod_mod_pcts."""
+
+    def _make_summary_ctx(self, tmp_path, df):
+        from CRISPResso2.plots.plot_context import PooledPlotContext
+        return PooledPlotContext(
+            args=SimpleNamespace(min_reads_to_use_region=10),
+            run_data={},
+            output_directory=str(tmp_path),
+            save_png=True,
+            _jp=lambda f: os.path.join(str(tmp_path), f),
+            custom_config={},
+            df_summary_quantification=df,
+        )
+
+    def test_ascii_names_unchanged(self, tmp_path):
+        """ASCII-only names should pass through slugify unchanged
+        (or nearly so — slugify is a no-op for clean ASCII)."""
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        df = pd.DataFrame({
+            'Name': ['HEK3', 'sample1'],
+            'Reads_total': [100, 200],
+        })
+        ctx = self._make_summary_ctx(tmp_path, df)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert list(result['df_summary_quantification']['Name']) == ['HEK3', 'sample1']
+
+    def test_emoji_stripped(self, tmp_path):
+        """Emoji must be stripped — this is the core reason the
+        sanitization exists."""
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        df = pd.DataFrame({
+            'Name': ['FAN /+-C%_:@#%a😀sdf    -'],
+            'Reads_total': [100],
+        })
+        ctx = self._make_summary_ctx(tmp_path, df)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        sanitized = list(result['df_summary_quantification']['Name'])[0]
+        assert '😀' not in sanitized
+        assert sanitized == 'FAN_+-C%_@#%asdf_-'
+
+    def test_source_dataframe_not_mutated(self, tmp_path):
+        """``ctx.df_summary_quantification`` must be unchanged by
+        the prep call — sanitization only affects the returned copy.
+        CSVs / crispresso2_info / log lines still see raw names."""
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        original = 'FAN /+-C%_:@#%a😀sdf    -'
+        df = pd.DataFrame({'Name': [original], 'Reads_total': [100]})
+        ctx = self._make_summary_ctx(tmp_path, df)
+        prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert list(ctx.df_summary_quantification['Name']) == [original]
+
+    def test_non_string_entries_coerced(self, tmp_path):
+        """Integer / None / NaN entries in Name are coerced via
+        str() before slugify — must not crash."""
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        df = pd.DataFrame({
+            'Name': [1, 'HEK3', None, np.nan],
+            'Reads_total': [100, 200, 300, 400],
+        })
+        ctx = self._make_summary_ctx(tmp_path, df)
+        # Must not raise
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        sanitized = list(result['df_summary_quantification']['Name'])
+        assert sanitized[0] == '1'
+        assert sanitized[1] == 'HEK3'
+        # None and NaN become the string 'None' / 'nan' via str() coercion.
+        # The exact text doesn't matter; the point is no crash.
+        assert len(sanitized) == 4
+
+    def test_missing_name_column_ok(self, tmp_path):
+        """If the df has no 'Name' column (unusual), sanitization
+        is a no-op — must not crash."""
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        df = pd.DataFrame({'Reads_total': [100]})
+        ctx = self._make_summary_ctx(tmp_path, df)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        # Copy should still be returned; just without a Name column.
+        assert 'Name' not in result['df_summary_quantification'].columns
+
+    def test_empty_dataframe(self, tmp_path):
+        """Empty DataFrame with a Name column — sanitization is a
+        no-op, returns empty df."""
+        from CRISPResso2.plots.data_prep import prep_reads_total
+        df = pd.DataFrame({'Name': [], 'Reads_total': []})
+        ctx = self._make_summary_ctx(tmp_path, df)
+        result = prep_reads_total(ctx, prefix='CRISPRessoPooled')
+        assert len(result['df_summary_quantification']) == 0
+
+    def test_applies_to_prep_unmod_mod_pcts_too(self, tmp_path):
+        """The sanitization must also apply via prep_unmod_mod_pcts,
+        not just prep_reads_total."""
+        from CRISPResso2.plots.data_prep import prep_unmod_mod_pcts
+        df = pd.DataFrame({
+            'Name': ['clean', 'emoji😀here'],
+            'Reads_total': [100, 200],
+        })
+        ctx = self._make_summary_ctx(tmp_path, df)
+        result = prep_unmod_mod_pcts(ctx, prefix='CRISPRessoPooled')
+        sanitized = list(result['df_summary_quantification']['Name'])
+        assert '😀' not in sanitized[1]
 
 
 class TestPrepUnmodModPcts:

@@ -3054,6 +3054,33 @@ def _resolve_min_reads_cutoff(ctx):
     )
 
 
+def _sanitize_summary_names(df):
+    r"""Return a copy of ``df`` with the ``Name`` column passed through
+    ``CRISPRessoShared.slugify``.
+
+    This is a display-label normalization: it strips emoji and other
+    non-ASCII characters from user-supplied sample names before they
+    are embedded in plot labels.  Without it, plotly's JSON encoder
+    produces environment-dependent output (``\uXXXX`` escapes with
+    stdlib json vs raw UTF-8 with orjson), which causes integration
+    tests to flap between local and CI.
+
+    The source DataFrame on the context is NOT mutated.  CSVs, log
+    messages, and ``crispresso2_info`` keys continue to hold the raw
+    user-supplied name; only the plot kwargs see the sanitized form.
+
+    Non-string entries in the ``Name`` column are coerced via ``str()``
+    before slugify.  If the column is absent, the copy is returned
+    unchanged.
+    """
+    from CRISPResso2 import CRISPRessoShared
+
+    out = df.copy()
+    if 'Name' in out.columns:
+        out['Name'] = out['Name'].apply(lambda n: CRISPRessoShared.slugify(str(n)))
+    return out
+
+
 def prep_reads_total(ctx, prefix: str, name: str | None = None):
     """Prepare kwargs for plot_reads_total (reads summary bar chart).
 
@@ -3075,7 +3102,7 @@ def prep_reads_total(ctx, prefix: str, name: str | None = None):
     """
     bare = name if name is not None else f'{prefix}_reads_summary'
     return {
-        'df_summary_quantification': ctx.df_summary_quantification,
+        'df_summary_quantification': _sanitize_summary_names(ctx.df_summary_quantification),
         'fig_filename_root': ctx._jp(bare),
         'save_png': ctx.save_png,
         'cutoff': _resolve_min_reads_cutoff(ctx),
@@ -3103,7 +3130,7 @@ def prep_unmod_mod_pcts(ctx, prefix: str, name: str | None = None):
     """
     bare = name if name is not None else f'{prefix}_modification_summary'
     return {
-        'df_summary_quantification': ctx.df_summary_quantification,
+        'df_summary_quantification': _sanitize_summary_names(ctx.df_summary_quantification),
         'fig_filename_root': ctx._jp(bare),
         'save_png': ctx.save_png,
         'cutoff': _resolve_min_reads_cutoff(ctx),

@@ -45,8 +45,9 @@ pytest-cov = "*"
 pytest-check = "*"
 
 [feature.pro.pypi-dependencies]
-kaleido = "*"
-orjson = "*"
+# Pin kaleido 0.2.1: newer kaleido (1.x) requires plotly >= 6.1.1
+# while we're still on plotly 5.18.0.
+kaleido = "==0.2.1"
 ydiff = "*"
 inline-snapshot = "*"
 
