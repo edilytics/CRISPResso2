@@ -33,6 +33,11 @@ jobs:
             filter: "wgs or asym"
           - name: "VCF"
             filter: "vcf"
+        include:
+          - pro: true
+            group:
+              name: "Pro-only"
+              filter: "pro_only"
 
     name: "${{ matrix.group.name }} (Pro: ${{ matrix.pro }})"
 
@@ -69,6 +74,22 @@ jobs:
           fi
           sudo fc-cache -f
 
+      - name: Install MS core fonts
+        run: |
+          if [ -d ".pixi/msttcorefonts" ]; then
+            echo "Using cached fonts"
+            sudo mkdir -p /usr/share/fonts/truetype/msttcorefonts
+            sudo cp .pixi/msttcorefonts/* /usr/share/fonts/truetype/msttcorefonts/
+          else
+            echo "Installing fonts from scratch"
+            echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | sudo debconf-set-selections
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ttf-mscorefonts-installer
+            mkdir -p .pixi/msttcorefonts
+            cp /usr/share/fonts/truetype/msttcorefonts/*.ttf .pixi/msttcorefonts/
+          fi
+          sudo fc-cache -f
+
       - name: Install environment
         run: pixi install -e test
 
@@ -85,12 +106,14 @@ jobs:
         with:
           repository: edilytics/CRISPResso2_tests
           path: CRISPResso2_tests
+          ref: cole/plot-plugin
 
       - name: Checkout CRISPRessoPro
         if: matrix.pro
         uses: actions/checkout@v4
         with:
           repository: edilytics/CRISPRessoPro
+          ref: cole/plot-plugin
           token: ${{ secrets.CRISPRESSOPRO_PAT }}
           path: CRISPRessoPro
 
@@ -101,4 +124,4 @@ jobs:
       - name: Run Tests
         run: |
           pixi run -e test -- pytest CRISPResso2_tests/test_cli.py \
-            -m "${{ matrix.group.filter }}" -v ${{ matrix.pro && '--pro' || '' }} ${{ !matrix.pro && '--diff-plots' || '' }} --test --print
+            -m "${{ matrix.group.filter }}" -v ${{ !matrix.pro && '--diff-plots' || '' }} --test --print
