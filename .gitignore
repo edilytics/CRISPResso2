@@ -6,3 +6,10 @@ __pycache__
 CRISPResso2.egg-info
 dist
 tests/CRISPResso*
+.coverage
+
+# Pixi
+.pixi/
+pixi.lock
+
+.pi

@@ -1,5 +1,25 @@
-{% if 'guardrails_htmls' in report_data['run_data']['results'] and report_data['run_data']['results']['guardrails_htmls']|length > 0 %}
-	{% for message in report_data['run_data']['results']['guardrails_htmls'] %}
-		{{message | safe}}
-	{% endfor %}
+{% set failed = report_data['run_data']['results'].get('guardrails_failed_htmls', []) %}
+{% set passed = report_data['run_data']['results'].get('guardrails_passed_htmls', []) %}
+{% if failed|length > 0 or passed|length > 0 %}
+<details class="guardrail-outer">
+	<summary class="guardrail-banner {% if failed|length > 0 %}guardrail-banner-fail{% else %}guardrail-banner-pass{% endif %}">{% if failed|length > 0 %}Guardrails — {{ failed|length }} out of {{ failed|length + passed|length }} failed{% else %}All {{ passed|length }} guardrails passed{% endif %} <i class="fas fa-chevron-down guardrail-toggle guardrail-banner-chevron"></i></summary>
+	<div class="guardrail-body">
+	{% if failed|length > 0 %}
+	<details open class="guardrail-section guardrail-section-fail">
+		<summary class="guardrail-summary"><i class="fas fa-chevron-down guardrail-toggle guardrail-chevron"></i>Failed Guardrails ({{ failed|length }})</summary>
+		{% for message in failed %}
+			{{ message | safe }}
+		{% endfor %}
+	</details>
+	{% endif %}
+	{% if passed|length > 0 %}
+	<details class="guardrail-section guardrail-section-pass">
+		<summary class="guardrail-summary"><i class="fas fa-chevron-down guardrail-toggle guardrail-chevron"></i>Passed Guardrails ({{ passed|length }})</summary>
+		{% for message in passed %}
+			{{ message | safe }}
+		{% endfor %}
+	</details>
+	{% endif %}
+	</div>
+</details>
 {% endif %}
