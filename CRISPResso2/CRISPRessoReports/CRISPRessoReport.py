@@ -69,8 +69,7 @@ def render_template(template_name, jinja2_env, **data):
 
 
 def make_report_from_folder(crispresso_report_file, crispresso_folder, _root, logger, use_matplotlib=False):
-    """
-    Makes an html report for a crispresso run
+    """Makes an html report for a crispresso run
 
     Parameters
     ----------
@@ -191,8 +190,7 @@ def assemble_figs(run_data, crispresso_folder):
 
 
 def make_report(run_data, crispresso_report_file, crispresso_folder, _root, logger, use_matplotlib=False):
-    """
-    Writes an HMTL report for a CRISPResso run
+    """Writes an HMTL report for a CRISPResso run
     """
     data = assemble_figs(run_data, crispresso_folder)
 
