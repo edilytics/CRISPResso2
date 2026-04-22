@@ -9,7 +9,6 @@ import errno
 import gzip
 import importlib.metadata
 import importlib.util
-import importlib.metadata
 from pathlib import Path
 
 import io
