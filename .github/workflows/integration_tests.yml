@@ -95,6 +95,7 @@ jobs:
           repository: edilytics/CRISPRessoPro
           token: ${{ secrets.CRISPRESSOPRO_PAT }}
           path: CRISPRessoPro
+          ref: cole/fix-plot-id-slugs
 
       - name: Install CRISPRessoPro
         if: matrix.pro
