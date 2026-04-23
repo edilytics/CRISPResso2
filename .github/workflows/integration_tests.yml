@@ -84,7 +84,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: edilytics/CRISPResso2_tests
-          ref: 'sam/fix_regex_bug'
           # ref: '<BRANCH-NAME>' # update to specific branch
           path: CRISPResso2_tests
 
@@ -95,7 +94,6 @@ jobs:
           repository: edilytics/CRISPRessoPro
           token: ${{ secrets.CRISPRESSOPRO_PAT }}
           path: CRISPRessoPro
-          ref: cole/fix-plot-id-slugs
 
       - name: Install CRISPRessoPro
         if: matrix.pro
