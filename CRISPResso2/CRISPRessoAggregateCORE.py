@@ -64,8 +64,13 @@ def main():
         # CRISPRessoPro params
         parser.add_argument('--use_matplotlib', action='store_true',
                         help='Use matplotlib for plotting instead of plotly/d3 when CRISPRessoPro is installed')
+        if C2PRO_INSTALLED:
+            parser.add_argument('--config_json', type=str, default='None',
+                                help='Raw JSON string for Pro config (mutually exclusive with --config_file).')
 
         args = parser.parse_args()
+        # Validate Pro-only config inputs early (inline JSON for Aggregate).
+        CRISPRessoShared.check_custom_config(args)
 
         # CORE always uses matplotlib; when Pro is installed the hook
         # below skips the per-amplicon path entirely and Pro owns

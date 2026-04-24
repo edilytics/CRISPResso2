@@ -2227,18 +2227,27 @@ def is_C2Pro_installed():
 
 
 def check_custom_config(args):
-    """Check if the config_file argument was provided. If so load the configurations from the file, otherwise load default configurations.
+    """Load and validate custom configuration from a file path or inline JSON.
+
+    This remains a CRISPRessoPro-gated feature. If Pro is not installed,
+    defaults are returned even when config inputs are provided.
 
     Parameters
     ----------
-    args : dict
-        All arguments passed into the crispresso run.
+    args : argparse.Namespace or None
+        CLI arguments for the run.
 
     Returns
     -------
-    config : dict
-        A dict with a 'colors' key that contains hex color values for different report items as well as a 'guardrails' key that contains the guardrail values.
+    dict
+        A config dict with ``colors`` and ``guardrails`` keys.
 
+    Raises
+    ------
+    BadParameterException
+        If explicit config input is invalid (mutually-exclusive sources,
+        missing file, malformed JSON, invalid schema, or invalid guardrail
+        value types).
     """
     config = {
         "colors": {
@@ -2251,7 +2260,7 @@ def check_custom_config(args):
             'G': '#FFFF99',
             'N': '#C8C8C8',
             '-': '#1E1E1E',
-            'amino_acid_scheme': 'unique'
+            'amino_acid_scheme': 'unique',
         },
         "guardrails": {
             'min_total_reads': 10000,
@@ -2263,50 +2272,139 @@ def check_custom_config(args):
             'max_rate_of_subs': 0.3,
             'guide_len': 19,
             'amplicon_len': 50,
-            'amplicon_to_read_length': 1.5
-        }
+            'amplicon_to_read_length': 1.5,
+        },
     }
 
-    if args is None or not hasattr(args, 'config_file'):
+    if args is None:
+        return config
+
+    has_config_file = hasattr(args, 'config_file')
+    has_config_json = hasattr(args, 'config_json')
+    if not has_config_file and not has_config_json:
         return config
 
     logger = logging.getLogger(getmodule(stack()[1][0]).__name__)
+
+    # Config customization is Pro-only by policy.
     if not is_C2Pro_installed():
         return config
 
-    if args.config_file:
+    def _is_set(value):
+        if value is None:
+            return False
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped != '' and stripped.lower() != 'none'
+        return True
+
+    config_file = getattr(args, 'config_file', None)
+    config_json = getattr(args, 'config_json', None)
+
+    use_file = _is_set(config_file)
+    use_inline_json = _is_set(config_json)
+
+    if use_file and use_inline_json:
+        raise BadParameterException(
+            "The options --config_file and --config_json are mutually exclusive. "
+            "Please provide exactly one config source.",
+        )
+
+    if not use_file and not use_inline_json:
+        return config
+
+    if use_file:
+        if not isinstance(config_file, str) or config_file.strip() == '':
+            raise BadParameterException("--config_file must be a non-empty file path string.")
+        config_file = config_file.strip()
+        if not os.path.isfile(config_file):
+            raise BadParameterException(
+                "Cannot read config file '%s': file does not exist or is not a regular file."
+                % config_file,
+            )
         try:
-            with open(args.config_file, "r") as json_file:
+            with open(config_file, "r") as json_file:
                 custom_config = json.load(json_file)
+        except json.JSONDecodeError as e:
+            raise BadParameterException(
+                "Cannot parse config file '%s': %s (line %s, column %s)."
+                % (config_file, e.msg, e.lineno, e.colno),
+            )
+        except OSError as e:
+            raise BadParameterException("Cannot read config file '%s': %s" % (config_file, str(e)))
+    else:
+        if not isinstance(config_json, str) or config_json.strip() == '':
+            raise BadParameterException("--config_json must be a non-empty JSON string.")
+        config_json = config_json.strip()
+        try:
+            custom_config = json.loads(config_json)
+        except json.JSONDecodeError as e:
+            raise BadParameterException(
+                "Cannot parse inline config JSON (--config_json): %s (line %s, column %s)."
+                % (e.msg, e.lineno, e.colno),
+            )
 
-            if 'guardrails' in custom_config.keys():
-                for key in config['guardrails']:
-                    if key not in custom_config['guardrails']:
-                        logger.warn(f"Value for {key} not provided, defaulting.")
-                        custom_config['guardrails'][key] = config['guardrails'][key]
-                for key in custom_config['guardrails']:
-                    if key not in config['guardrails']:
-                        logger.warn(f"Key {key} is not a recognized guardrail parameter, skipping.")
-            else:
-                logger.warn("Json file does not contain the guardrails key. Defaulting all values.")
-                custom_config['guardrails'] = config['guardrails']
+    if not isinstance(custom_config, dict):
+        raise BadParameterException(
+            "Custom config must be a JSON object with optional 'colors' and 'guardrails' keys.",
+        )
 
-            if 'colors' in custom_config.keys():
-                for key in config['colors']:
-                    if key not in custom_config['colors']:
-                        logger.warn(f"Value for {key} not provided, defaulting")
-                        custom_config['colors'][key] = config['colors'][key]
-            else:
-                logger.warn("Json file does not contain the colors key. Defaulting all values.")
-                custom_config['colors'] = config['colors']
+    if 'guardrails' in custom_config:
+        if not isinstance(custom_config['guardrails'], dict):
+            raise BadParameterException("Config key 'guardrails' must be a JSON object.")
+        for key in config['guardrails']:
+            if key not in custom_config['guardrails']:
+                logger.warning(f"Value for {key} not provided, defaulting.")
+                custom_config['guardrails'][key] = config['guardrails'][key]
+        for key in custom_config['guardrails']:
+            if key not in config['guardrails']:
+                logger.warning(f"Key {key} is not a recognized guardrail parameter, skipping.")
+    else:
+        logger.warning("Config does not contain the guardrails key. Defaulting all values.")
+        custom_config['guardrails'] = dict(config['guardrails'])
 
-            return custom_config
-        except Exception:
-            if args.config_file:
-                logger.warn("Cannot read config file '%s', defaulting config parameters." % args.config_file)
-            else:
-                logger.debug("No config file provided, defaulting config parameters.")
-    return config
+    if 'colors' in custom_config:
+        if not isinstance(custom_config['colors'], dict):
+            raise BadParameterException("Config key 'colors' must be a JSON object.")
+        for key in config['colors']:
+            if key not in custom_config['colors']:
+                logger.warning(f"Value for {key} not provided, defaulting")
+                custom_config['colors'][key] = config['colors'][key]
+    else:
+        logger.warning("Config does not contain the colors key. Defaulting all values.")
+        custom_config['colors'] = dict(config['colors'])
+
+    guardrail_types = {
+        'min_total_reads': 'int',
+        'aligned_cutoff': 'float',
+        'alternate_alignment': 'float',
+        'min_ratio_of_mods_in_to_out': 'float',
+        'modifications_at_ends': 'float',
+        'outside_window_max_sub_rate': 'float',
+        'max_rate_of_subs': 'float',
+        'guide_len': 'int',
+        'amplicon_len': 'int',
+        'amplicon_to_read_length': 'float',
+    }
+
+    for key, expected_type in guardrail_types.items():
+        value = custom_config['guardrails'][key]
+
+        if expected_type == 'int':
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise BadParameterException(
+                    "Guardrail '%s' must be an integer, got %s."
+                    % (key, type(value).__name__),
+                )
+        elif expected_type == 'float':
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise BadParameterException(
+                    "Guardrail '%s' must be a number, got %s."
+                    % (key, type(value).__name__),
+                )
+            custom_config['guardrails'][key] = float(value)
+
+    return custom_config
 
 
 def safety_check(crispresso2_info, aln_stats, guardrails):

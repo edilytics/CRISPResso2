@@ -276,6 +276,8 @@ def main():
         args = parser.parse_args()
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
+        # Validate Pro-only config inputs early (file or inline JSON).
+        CRISPRessoShared.check_custom_config(args)
 
         description = ['~~~CRISPRessoPooled~~~', '-Analysis of CRISPR/Cas9 outcomes from POOLED deep sequencing data-']
         pooled_string = r'''

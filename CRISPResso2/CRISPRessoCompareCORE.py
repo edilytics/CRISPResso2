@@ -104,6 +104,8 @@ def main():
         args = parser.parse_args()
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
+        # Validate Pro-only inline config input early.
+        CRISPRessoShared.check_custom_config(args)
 
         description = ['~~~CRISPRessoCompare~~~', '-Comparison of two CRISPResso analyses-']
         compare_header = r'''

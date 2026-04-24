@@ -309,6 +309,8 @@ def main():
         args = parser.parse_args()
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
+        # Validate Pro-only config inputs early (file or inline JSON).
+        CRISPRessoShared.check_custom_config(args)
 
         description = ['~~~CRISPRessoWGS~~~', '-Analysis of CRISPR/Cas9 outcomes from WGS data-']
         wgs_string = r'''
