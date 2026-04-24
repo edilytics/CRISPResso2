@@ -36,20 +36,16 @@ pillow = "*"
 ydiff = "*"
 inline-snapshot = "*"
 
+[feature.pro.dependencies]
+python-kaleido = "<=0.2.1"
+
 [feature.lint.dependencies]
 ruff = "=0.14.13"
-
-[feature.pro.dependencies]
-pytest = "*"
-pytest-cov = "*"
-pytest-check = "*"
 
 [feature.pro.pypi-dependencies]
 # Pin kaleido 0.2.1: newer kaleido (1.x) requires plotly >= 6.1.1
 # while we're still on plotly 5.18.0.
 kaleido = "==0.2.1"
-ydiff = "*"
-inline-snapshot = "*"
 
 [environments]
 default = { features = [], solve-group = "default" }
@@ -67,6 +63,20 @@ test = { cmd = "pytest tests --cov CRISPResso2", depends-on = ["install"] }
 [feature.test.tasks.integration]
 cmd = "make $ARGS"
 cwd = "../CRISPResso2_tests"
+depends-on = ["install"]
+
+[feature.pro.tasks.integration]
+cmd = "pytest test_cli.py"
+cwd = "../CRISPResso2_tests"
+depends-on = ["install", "install-pro"]
+
+[feature.pro.tasks]
+install = "pip install -e . && pip install -e ../CRISPRessoPro"
+
+[feature.pro.tasks.pro-unit-test]
+cmd = "pytest tests --cov CRISPRessoPro"
+cwd = "../CRISPRessoPro"
+depends-on = ["install"]
 
 [feature.pro.tasks]
 install = "pip install -e . && pip install -e ../CRISPRessoPro"

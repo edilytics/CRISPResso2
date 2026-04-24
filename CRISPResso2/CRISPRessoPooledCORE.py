@@ -186,7 +186,7 @@ def get_n_aligned_bam_region(bam_filename, chr_name, chr_start, chr_end, samtool
 
 
 def find_overlapping_genes(row, df_genes):
-    df_genes_overlapping = df_genes.loc[(df_genes.chrom == row.chr_id) &
+    df_genes_overlapping = df_genes.loc[(df_genes.chrom.astype(str) == str(row.chr_id)) &
                                      (df_genes.txStart <= row.bpend) &
                                      (row.bpstart <= df_genes.txEnd)]
     genes_overlapping = []
@@ -1223,7 +1223,7 @@ def main():
                                 chr_output_filenames.append(chr_output_filename)
                                 curr_pos = curr_end
                                 curr_end = curr_pos + chr_step_size
-                            if curr_end < chr_len:
+                            if curr_pos < chr_len:
                                 chr_output_filename = _jp('MAPPED_REGIONS/%s_%s_%s.info' % (chr_str, curr_pos, chr_len))
                                 sub_chr_command = chr_cmd.replace("__REGION__", ":%d-%d " % (curr_pos, chr_len)).replace("__DEMUX_CHR_LOGFILENAME__", chr_output_filename)
                                 chr_commands.append(sub_chr_command)
@@ -1257,7 +1257,7 @@ def main():
                 sum_aligned_reads = df_all_demux["number of reads"].sum()
                 # write the sorted file
                 df_all_demux.to_csv(REPORT_ALL_DEPTH, sep="\t", index=False, na_rep="NA")
-                df_all_demux['loc'] = df_all_demux['chr_id'] + ' ' + df_all_demux['start'].apply(str) + ' ' + df_all_demux['end'].apply(str)
+                df_all_demux['loc'] = df_all_demux['chr_id'].apply(str) + ' ' + df_all_demux['start'].apply(str) + ' ' + df_all_demux['end'].apply(str)
                 df_all_demux.set_index(['loc'], inplace=True)
 
                 if sum_aligned_reads == 0:
@@ -1301,7 +1301,7 @@ def main():
                     info('Processing amplicon: %s' % idx)
 
                     # check if we have reads
-                    demux_key = row['chr_id'] + ' ' + str(row['bpstart']) + ' ' + str(row['bpend'])
+                    demux_key = str(row['chr_id']) + ' ' + str(row['bpstart']) + ' ' + str(row['bpend'])
                     if demux_key in df_all_demux.index:
                         demux_row = df_all_demux.loc[demux_key]
                         N_READS = demux_row['number of reads']
