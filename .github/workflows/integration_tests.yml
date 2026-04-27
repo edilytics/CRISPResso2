@@ -72,6 +72,21 @@ jobs:
       - name: Select Pixi environment
         run: echo "PIXI_ENV=${{ matrix.pro && 'test-pro' || 'test' }}" >> $GITHUB_ENV
 
+      - name: Checkout CRISPResso2_tests
+        uses: actions/checkout@v4
+        with:
+          repository: edilytics/CRISPResso2_tests
+          # ref: '<BRANCH-NAME>' # update to specific branch
+          path: CRISPResso2_tests
+
+      - name: Checkout CRISPRessoPro
+        if: matrix.pro
+        uses: actions/checkout@v4
+        with:
+          repository: edilytics/CRISPRessoPro
+          token: ${{ secrets.CRISPRESSOPRO_PAT }}
+          path: CRISPRessoPro
+
       - name: Install environment
         run: pixi install -e $PIXI_ENV
 
@@ -87,21 +102,6 @@ jobs:
         run: |
           pixi run -e $PIXI_ENV -- fc-cache -f
           pixi run -e $PIXI_ENV -- python -c "import matplotlib; import shutil; shutil.rmtree(matplotlib.get_cachedir(), ignore_errors=True); print('Cleared', matplotlib.get_cachedir())"
-
-      - name: Checkout CRISPResso2_tests
-        uses: actions/checkout@v4
-        with:
-          repository: edilytics/CRISPResso2_tests
-          # ref: '<BRANCH-NAME>' # update to specific branch
-          path: CRISPResso2_tests
-
-      - name: Checkout CRISPRessoPro
-        if: matrix.pro
-        uses: actions/checkout@v4
-        with:
-          repository: edilytics/CRISPRessoPro
-          token: ${{ secrets.CRISPRESSOPRO_PAT }}
-          path: CRISPRessoPro
 
       - name: Run Tests
         run: |
