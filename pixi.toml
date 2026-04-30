@@ -10,7 +10,7 @@ python = ">=3.10,<3.13"
 numpy = "*"
 cython = "*"
 scipy = "*"
-matplotlib = "*"
+matplotlib-base = "*"
 seaborn = "*"
 pandas = "<3.0"
 jinja2 = "*"
@@ -20,10 +20,6 @@ samtools = "*"
 plotly = "==5.18.0"
 setuptools = "*"
 pip = "*"
-
-[target.linux-64.dependencies]
-gcc_linux-64 = "*"
-gxx_linux-64 = "*"
 
 [feature.test.dependencies]
 pytest = "*"
