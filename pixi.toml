@@ -17,7 +17,6 @@ jinja2 = "*"
 fastp = "*"
 bowtie2 = "*"
 samtools = "*"
-plotly = "==5.18.0"
 setuptools = "*"
 pip = "*"
 
@@ -33,6 +32,7 @@ ydiff = "*"
 inline-snapshot = "*"
 
 [feature.pro.dependencies]
+plotly = "==5.18.0"
 python-kaleido = "<=0.2.1"
 
 [feature.lint.dependencies]
