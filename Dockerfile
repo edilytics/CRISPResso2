@@ -18,7 +18,7 @@ RUN pixi install
 COPY . .
 RUN pixi run -e default install
 
-# --- Runtime stage: slim image with just the environment ---
+# --- Runtime stage: slim image with runtime environment only ---
 FROM ubuntu:24.04
 
 LABEL org.opencontainers.image.authors="support@edilytics.com"
@@ -34,19 +34,24 @@ RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula sele
   && rm -rf /usr/share/doc/* \
   && rm -rf /usr/share/zoneinfo
 
-# Copy pixi binary from build stage
-COPY --from=build /usr/local/bin/pixi /usr/local/bin/pixi
+# Keep env path identical to build stage to avoid shebang/entrypoint path issues.
+COPY --from=build /CRISPResso2/.pixi/envs/default /CRISPResso2/.pixi/envs/default
 
-# Copy the project (includes .pixi/ environment) from build stage
-COPY --from=build /CRISPResso2 /CRISPResso2
+# Copy only minimal app files required at runtime.
+COPY --from=build /CRISPResso2/CRISPResso2 /CRISPResso2/CRISPResso2
+COPY --from=build /CRISPResso2/CRISPResso2.egg-info /CRISPResso2/CRISPResso2.egg-info
+COPY --from=build /CRISPResso2/CRISPResso2_router.py /CRISPResso2/CRISPResso2_router.py
+COPY --from=build /CRISPResso2/LICENSE.txt /CRISPResso2/LICENSE.txt
 
 WORKDIR /CRISPResso2
 
-# Verify
-RUN pixi run -e default -- CRISPResso -h \
-  && pixi run -e default -- CRISPRessoBatch -h \
-  && pixi run -e default -- CRISPRessoPooled -h \
-  && pixi run -e default -- CRISPRessoWGS -h \
-  && pixi run -e default -- CRISPRessoCompare -h
+ENV PATH="/CRISPResso2/.pixi/envs/default/bin:${PATH}"
 
-ENTRYPOINT ["pixi", "run", "-e", "default", "--", "python", "/CRISPResso2/CRISPResso2_router.py"]
+# Verify
+RUN CRISPResso -h \
+  && CRISPRessoBatch -h \
+  && CRISPRessoPooled -h \
+  && CRISPRessoWGS -h \
+  && CRISPRessoCompare -h
+
+ENTRYPOINT ["python", "/CRISPResso2/CRISPResso2_router.py"]
