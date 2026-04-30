@@ -66,10 +66,6 @@ cwd = "../CRISPResso2_tests"
 depends-on = ["install"]
 
 [feature.pro.tasks]
-# Install both CRISPResso2 and CRISPRessoPro when the `pro` feature is enabled.
-install = "pip install -e . && pip install -e ../CRISPRessoPro"
-
-# Backwards-compatible alias used by docs/CI.
 install-pro = "pip install -e . && pip install -e ../CRISPRessoPro"
 
 [feature.pro.tasks.pro-unit-test]
