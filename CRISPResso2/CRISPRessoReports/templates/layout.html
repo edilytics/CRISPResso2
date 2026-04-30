@@ -31,14 +31,43 @@
     Remove this if you use the .htaccess -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
 
-    <!-- Replace favicon.ico & apple-touch-icon.png in the root of your domain and delete these references -->
+    {% set favicon_version = '20260430' %}
     {% if is_web %}
-    <link rel="icon" href="/static/imgs/CRISPResso_justcup.svg" type="image/svg+xml">
+    {% set favicon_base = '/static/favicons' %}
+    <link rel="icon" type="image/svg+xml" href="{{favicon_base}}/favicon.svg?v={{favicon_version}}">
+    <link rel="icon" type="image/png" sizes="48x48" href="{{favicon_base}}/favicon-48x48.png?v={{favicon_version}}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{favicon_base}}/favicon-32x32.png?v={{favicon_version}}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{favicon_base}}/favicon-16x16.png?v={{favicon_version}}">
+    <link rel="shortcut icon" href="{{favicon_base}}/favicon.ico?v={{favicon_version}}" type="image/x-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{favicon_base}}/apple-touch-icon.png?v={{favicon_version}}">
+    <link rel="manifest" href="{{favicon_base}}/site.webmanifest?v={{favicon_version}}">
     <link rel="stylesheet" href="/static/css/main.css">
     <script src="/static/js/htmx-1.9.1.min.js"></script>
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     {% else %}
-    <link rel="shortcut icon" href="http://crispresso.com/static/favicon.ico" />
+    {% set favicon_base = 'https://crispresso.com/static/favicons' %}
+    <link rel="icon" type="image/svg+xml" href="{{favicon_base}}/favicon.svg?v={{favicon_version}}">
+    <link rel="icon" type="image/png" sizes="48x48" href="{{favicon_base}}/favicon-48x48.png?v={{favicon_version}}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{favicon_base}}/favicon-32x32.png?v={{favicon_version}}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{favicon_base}}/favicon-16x16.png?v={{favicon_version}}">
+    <link rel="shortcut icon" href="{{favicon_base}}/favicon.ico?v={{favicon_version}}" type="image/x-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{favicon_base}}/apple-touch-icon.png?v={{favicon_version}}">
+    <link rel="manifest" href="{{favicon_base}}/site.webmanifest?v={{favicon_version}}">
+    <script>
+      (function () {
+        var remoteIcon = '{{favicon_base}}/favicon-32x32.png?v={{favicon_version}}';
+        var fallbackIcon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAADkElEQVRYhe1WTWwbVRD+ZnbtqEApVUtCEq9TqgY7sQSlByQgpeLQAiq7qSMsEDcQCJAoggtIXCg98SMkOHDiUASKEI3kFLtQgRBCAnFrVECpd9O4JLbjRKKgxk2bxN59wyFNMCmNs/He4Lvte/O+73uzo3kD/I//OigIkoiVGyChwTq2sWImflcQ3A2E7YcNy/65LTneWr8ePTi20+h3ioZlv9CIg5v0sA2QXTpJuH6x8OUd5yHyE4D3E6nR8HXOAgD0ZtRLmfgggMF/2xOi8yQSvujyZgB/XI8jkBpYje2WvXkTYYKERgqZ2P61YpvKwGpETafPZW1Sd6/MIRQ64Kq5XJD8a+OIsGHZEjHtt/wc852BHYd+uwUAPJl/CMJXxcSlM/YTCvQya/qPfvh814Bh5aYEEGJ9H7zFe5b0Q6rm8Xczp7p/98vnOwNE+n4CUDjRnQeQ93v+Gr71BEUsJw2o9lJlZi++f9BtVrQeDTMQNZ0+gSSJ6fGgxYF1dEJFaqnNKkwFLQ6s4xfcmhq9adOinleQcRE4zLihKUFCunAifvwaA13JsR7x3Ag8PU+6PFIT+baciTsA0JYcbw271ceYOSEezzUhzqTJnzXmT6fS3aUVA4ZpHwXhdQAViBwHUa8AvWi50SgNGfNGv/2UCD5i0u4sfNF9dsPXB2BYuW8Ajt/c4u4aHUpUl2qAZECAi8XKdCsYwyLyAQHbePHyntutX9sg+FAjertZcQDwhJ8UyNbZeXoHWC5CD8cAbDG23DYLhSQT9QnBY9fLuwgNAShPzpbfaFYcAMrZ2AUCPUusHe4yz+35uwYGzrajhvYatAKTOiaEkyyUJaI3WeG9iWzMDsLAMqJW7ggJFVf6wGS6dxrA9NVPc9mUqvFuYdoJIDgDKdGk6tyroK6s2Qcm073TRDSiRD6LHvxla1D6XVX7KAR7dVc+adiIwjV+CYTLooU/DkJ8h+nEleBVj3F44qvEzLrego7+3H2a0A8i9GgpGzu1YfWUaNEF54wiqZQyPfcDPp/jiJnbp4hmlhuUHyRSo+FL1dADypNc6WRspa37moqJ2GKR0x2ms92vgUsL2rsK3rCE1EL9ui8DxUr5NYAuMMnnfs51WOfuVoQXyeNnpoZ7/jEh+56IOg+N7SalTjPkaXi1TKN4l1s0jTFCCnYhGzuwen9DY3mnZT/PwCsAOhsGE4SArz2W51bfHgD+AswtY73DLjEGAAAAAElFTkSuQmCC';
+        var probe = new Image();
+        probe.onerror = function () {
+          var fallback = document.createElement('link');
+          fallback.rel = 'icon';
+          fallback.type = 'image/png';
+          fallback.sizes = '32x32';
+          fallback.href = fallbackIcon;
+          document.head.appendChild(fallback);
+        };
+        probe.src = remoteIcon;
+      })();
+    </script>
     {% endif %}
 
     <!-- Optional JavaScript -->
