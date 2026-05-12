@@ -272,6 +272,16 @@ def main():
                     raise DifferentAmpliconLengthException(
                         'Different amplicon lengths for the two amplicons.'
                     )
+                merged = pd.merge(df1, df2, on=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated'], suffixes=('_' + sample_1_name, '_' + sample_2_name), how='outer')
+                quant_cols = ['#Reads_' + sample_1_name, '%Reads_' + sample_1_name, '#Reads_' + sample_2_name, '%Reads_' + sample_2_name]
+                merged[quant_cols] = merged[quant_cols].fillna(0)
+                lfc_error = 0.1
+                merged['each_LFC'] = np.log2(((merged['%Reads_' + sample_1_name] + lfc_error) / (merged['%Reads_' + sample_2_name] + lfc_error)).astype(float)).replace([np.inf, np.nan], 0)
+                merged = merged.sort_values(['%Reads_' + sample_1_name, 'Aligned_Sequence', 'Reference_Sequence'], ascending=[False, True, True])
+                merged = merged.reset_index(drop=True).set_index('Aligned_Sequence')
+                folder_root = os.path.split(allele_file_1)[1].replace(".txt", "")
+                allele_comparison_file = _jp(folder_root + '.txt')
+                merged.to_csv(allele_comparison_file, sep="\t")
 
                 plot_context.cut_points = (
                     run_info_1['results']['refs'][amplicon_name]['sgRNA_cut_points']
