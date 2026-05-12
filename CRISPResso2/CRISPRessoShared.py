@@ -2248,6 +2248,7 @@ def check_custom_config(args):
         If explicit config input is invalid (mutually-exclusive sources,
         missing file, malformed JSON, invalid schema, or invalid guardrail
         value types).
+
     """
     config = {
         "colors": {
