@@ -384,7 +384,7 @@ def main():
 
                     allele_comparison_file = _jp(allele_data['file_root'] + '.txt')
                     allele_data['merged_df'].to_csv(
-                        allele_comparison_file, sep='\t', index=None,
+                        allele_comparison_file, sep='\t',
                     )
 
                     is_base_edit = allele_data['is_base_edit']
