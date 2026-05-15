@@ -339,7 +339,7 @@ def main():
                     positions_data = prep_compare_modification_positions(plot_context)
 
                     mod_filename = _jp(f'{amplicon_plot_name}{mod}_quantification.txt')
-                    positions_data['mod_df'].to_csv(mod_filename, sep='\t', index=None)
+                    positions_data['mod_df'].to_csv(mod_filename, sep='\t')
 
                     CRISPRessoPlot.plot_quantification_positions(**positions_data['plot_kwargs'])
                     plot_name = os.path.basename(positions_data['plot_kwargs']['plot_path'])
