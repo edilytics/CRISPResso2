@@ -33,6 +33,11 @@ jobs:
             filter: "wgs or asym"
           - name: "VCF"
             filter: "vcf"
+        include:
+          - pro: true
+            group:
+              name: "Pro-only"
+              filter: "pro_only"
 
     name: "${{ matrix.group.name }} (Pro: ${{ matrix.pro }})"
 
@@ -82,12 +87,14 @@ jobs:
           repository: edilytics/CRISPResso2_tests
           # ref: '<BRANCH-NAME>' # update to specific branch
           path: CRISPResso2_tests
+          ref: cole/plot-plugin
 
       - name: Checkout CRISPRessoPro
         if: matrix.pro
         uses: actions/checkout@v4
         with:
           repository: edilytics/CRISPRessoPro
+          ref: cole/plot-plugin
           token: ${{ secrets.CRISPRESSOPRO_PAT }}
           path: CRISPRessoPro
 
