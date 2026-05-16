@@ -5353,7 +5353,7 @@ def main():
 
                         # write alleles table to file
                         base_edit_allele_filename = _jp(ref_plot_name + 'base_edit_' + args.conversion_nuc_from + 's_quilt.txt')
-                        df_alleles_around_cut.to_csv(base_edit_allele_filename, sep='\t', header=True)
+                        df_alleles_around_cut.to_csv(base_edit_allele_filename, sep='\t', header=True, index=True, index_label=df_alleles_around_cut.index.name)
                         crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'].append(os.path.basename(base_edit_allele_filename))
 
                         plot_10h_input = base_edit_data.get('plot_input')
@@ -5418,7 +5418,7 @@ def main():
 
                     # write alleles table to file
                     allele_filename = _jp(ref_plot_name + 'Alleles_frequency_table_around_' + sgRNA_label + '.txt')
-                    df_alleles_around_cut.to_csv(allele_filename, sep='\t', header=True)
+                    df_alleles_around_cut.to_csv(allele_filename, sep='\t', header=True, index=True, index_label=df_alleles_around_cut.index.name)
                     crispresso2_info['results']['refs'][ref_name]['allele_frequency_files'].append(os.path.basename(allele_filename))
 
                     plot_9_input = alleles_data.get('plot_input')
@@ -5441,7 +5441,7 @@ def main():
     #                    crispresso2_info['quant_window_sel_nuc_pct_filename'] = os.path.basename(quant_window_sel_nuc_pct_filename)
 
                         quant_window_sel_nuc_freq_filename = _jp(ref_plot_name + 'Selected_nucleotide_frequency_table_around_' + sgRNA_label + '.txt')
-                        just_sel_nuc_freqs.to_csv(quant_window_sel_nuc_freq_filename, sep='\t', header=True, index=True)
+                        just_sel_nuc_freqs.to_csv(quant_window_sel_nuc_freq_filename, sep='\t', header=True, index=True, index_label=just_sel_nuc_freqs.index.name)
     #                   not storing the name because it is unique to this sgRNA
     #                    crispresso2_info['quant_window_sel_nuc_freq_filename'] = os.path.basename(quant_window_sel_nuc_freq_filename)
 

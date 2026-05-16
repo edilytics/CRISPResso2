@@ -3595,7 +3595,11 @@ def write_core_per_sgRNA_data_files(ctx: CorePlotContext, crispresso2_info: dict
                     + ctx.args.conversion_nuc_from + 's_quilt.txt'
                 )
                 base_edit_data['df_alleles_around_cut'].to_csv(
-                    base_edit_allele_filename, sep='\t', header=True,
+                    base_edit_allele_filename,
+                    sep='\t',
+                    header=True,
+                    index=True,
+                    index_label=base_edit_data['df_alleles_around_cut'].index.name
                 )
                 info_ref['allele_frequency_files'].append(
                     os.path.basename(base_edit_allele_filename)
@@ -3619,7 +3623,7 @@ def write_core_per_sgRNA_data_files(ctx: CorePlotContext, crispresso2_info: dict
                     + sgRNA_label + '.txt'
                 )
                 alleles_data['df_alleles_around_cut'].to_csv(
-                    allele_filename, sep='\t', header=True,
+                    allele_filename, sep='\t', header=True, index=True, index_label=alleles_data['df_alleles_around_cut'].index.name
                 )
                 info_ref['allele_frequency_files'].append(
                     os.path.basename(allele_filename)
