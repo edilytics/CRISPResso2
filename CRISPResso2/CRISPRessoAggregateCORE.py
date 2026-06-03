@@ -499,7 +499,7 @@ ___________________________________
                                     if newend == 0 or newstart == len(sgRNA_plot_idxs):
                                         continue
                                     # otherwise, correct partial overlaps
-                                    elif newstart == None and newend == None:
+                                    elif newstart is None and newend is None:
                                         newstart = 0
                                         newend = len(include_idxs) - 1
                                     elif newstart == None:
