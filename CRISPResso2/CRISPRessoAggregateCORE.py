@@ -502,7 +502,7 @@ ___________________________________
                                     elif newstart is None and newend is None:
                                         newstart = 0
                                         newend = len(include_idxs) - 1
-                                    elif newstart == None:
+                                    elif newstart is None:
                                         newstart = 0
                                     elif newend == None:
                                         newend = len(include_idxs) - 1
