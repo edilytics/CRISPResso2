@@ -504,7 +504,7 @@ ___________________________________
                                         newend = len(include_idxs) - 1
                                     elif newstart is None:
                                         newstart = 0
-                                    elif newend == None:
+                                    elif newend is None:
                                         newend = len(include_idxs) - 1
                                     # and add it to the list
                                     sub_sgRNA_intervals.append((newstart, newend))
