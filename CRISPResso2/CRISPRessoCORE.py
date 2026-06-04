@@ -4999,7 +4999,9 @@ def main():
                 if args.halt_on_plot_fail:
                     raise
                 logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
-        elif not args.suppress_plots:
+        elif args.suppress_plots:
+            CRISPRessoPlotData.write_all_core_data_files(plot_context, crispresso2_info)
+        else:
             if n_processes > 1:
                 process_pool = ProcessPoolExecutor(n_processes)
                 process_futures = {}
