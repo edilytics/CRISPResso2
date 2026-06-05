@@ -2201,28 +2201,23 @@ def format_cl_text(text, max_chars=None, spaces_to_tab=4):
 
 
 def zip_results(results_folder):
-    path_values = os.path.split(results_folder)
-    output_folder = path_values[0]
-    folder_id = path_values[1]
+    output_folder, folder_id = os.path.split(results_folder)
+    zip_name = folder_id + ".zip"
     if output_folder == "":
         cmd_to_zip = 'zip -m -r {0} {1}'.format(
-            folder_id + ".zip", folder_id
+            shlex.quote(zip_name), shlex.quote(folder_id)
         )
     else:
-        cmd_to_zip = 'cd {0} && zip -m -r {1} {2} .'.format(
-            output_folder, folder_id + ".zip", folder_id
+        cmd_to_zip = 'cd {0} && zip -m -r {1} {2}'.format(
+            shlex.quote(output_folder), shlex.quote(zip_name), shlex.quote(folder_id)
         )
     sb.call(cmd_to_zip, shell=True)
 
 
 def is_C2Pro_installed():
     try:
-        spec = importlib.util.find_spec("CRISPRessoPro")
-        if spec is None:
-            return False
-        else:
-            return True
-    except:
+        return importlib.util.find_spec("CRISPRessoPro") is not None
+    except Exception:
         return False
 
 
