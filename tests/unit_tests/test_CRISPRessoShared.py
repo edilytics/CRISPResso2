@@ -276,6 +276,33 @@ def test_get_quant_window_ranges_from_include_idxs_multiple_gaps():
 
 
 # =============================================================================
+# Tests for get_amplicon_info_for_guides function
+# =============================================================================
+
+
+def test_get_amplicon_info_for_guides_plot_idxs_include_right_edge():
+    """A guide near the right edge should plot through the terminal base."""
+    ref_seq = "AAAAACCCCCGACGTTTTTT"
+    result = CRISPRessoShared.get_amplicon_info_for_guides(
+        ref_seq=ref_seq,
+        guides=["GACGT"],
+        guide_mismatches=[[]],
+        guide_names=[""],
+        quantification_window_centers=[0],
+        quantification_window_sizes=[1],
+        quantification_window_coordinates=None,
+        exclude_bp_from_left=0,
+        exclude_bp_from_right=0,
+        plot_window_size=10,
+        guide_plot_cut_points=[True],
+    )
+
+    sgRNA_plot_idxs = list(result[4][0])
+    assert sgRNA_plot_idxs[-1] == len(ref_seq) - 1
+    assert "".join(ref_seq[i] for i in sgRNA_plot_idxs) == "GACGTTTTTT"
+
+
+# =============================================================================
 # Tests for get_silent_edits function
 # =============================================================================
 

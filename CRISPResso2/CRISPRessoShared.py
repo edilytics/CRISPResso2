@@ -1849,7 +1849,7 @@ def get_amplicon_info_for_guides(ref_seq, guides, guide_mismatches, guide_names,
                 logging.warning('Offset around cut would be greater than reference sequence length. Window will be truncated.')
                 window_around_cut = ref_seq_length - cut_p - 1
             st = max(0, cut_p - window_around_cut + 1)
-            en = min(ref_seq_length - 1, cut_p + window_around_cut + 1)
+            en = min(ref_seq_length, cut_p + window_around_cut + 1)
             this_sgRNA_plot_idxs.append(sorted(list(range(st, en))))
     else:
         this_sgRNA_plot_idxs.append(range(ref_seq_length))

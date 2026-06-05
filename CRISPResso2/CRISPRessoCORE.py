@@ -3469,7 +3469,7 @@ def main():
                         ref_seq_length = len(refs[ref_name]['sequence'])
                         window_around_cut = max(1, args.plot_window_size)
                         st = max(0, sgRNA_cut_point_this - window_around_cut + 1)
-                        en = min(ref_seq_length - 1, sgRNA_cut_point_this + window_around_cut + 1)
+                        en = min(ref_seq_length, sgRNA_cut_point_this + window_around_cut + 1)
                         this_sgRNA_plot_idxs.append(sorted(list(range(st, en))))
 
                     old_this_sgRNA_plot_idxs = []
