@@ -1629,15 +1629,8 @@ def main():
         )
 
         C2PRO_INSTALLED = CRISPRessoShared.is_C2Pro_installed()
-        if C2PRO_INSTALLED:
-            try:
-                from CRISPRessoPro import hooks as pro_hooks
-                pro_hooks.on_pooled_plots_complete(plot_context, logger)
-            except Exception as e:
-                if args.halt_on_plot_fail:
-                    raise
-                logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
-        elif not args.suppress_plots:
+        pro_plots_ran = C2PRO_INSTALLED and CRISPRessoShared.run_C2Pro_hook('on_pooled_plots_complete', plot_context, logger)
+        if not pro_plots_ran and not args.suppress_plots:
             reads_total_input = prep_reads_total(plot_context, prefix='CRISPRessoPooled')
             debug('Plotting reads summary', {'percent_complete': 90})
             CRISPRessoPlot.plot_reads_total(**reads_total_input)
@@ -1721,9 +1714,9 @@ def main():
                 report_name = _jp("CRISPResso2Pooled_report.html")
             else:
                 report_name = OUTPUT_DIRECTORY + '.html'
-            if C2PRO_INSTALLED:
-                from CRISPRessoPro import hooks as pro_hooks
-                pro_hooks.make_pooled_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger, plot_context)
+            pro_report = CRISPRessoShared.get_C2Pro_hook('make_pooled_report') if C2PRO_INSTALLED else None
+            if pro_report:
+                pro_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger, plot_context)
             else:
                 CRISPRessoReport.make_pooled_report_from_folder(report_name, crispresso2_info, OUTPUT_DIRECTORY, _ROOT, logger)
             crispresso2_info['running_info']['report_location'] = report_name

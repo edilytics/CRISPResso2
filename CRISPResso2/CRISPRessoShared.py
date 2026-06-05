@@ -2226,6 +2226,56 @@ def is_C2Pro_installed():
         return False
 
 
+def get_C2Pro_version():
+    """Return the installed CRISPRessoPro version, or ``None``.
+
+    Keep direct CRISPRessoPro imports behind this helper so CORE modules
+    depend on one small integration boundary instead of importing Pro in
+    multiple places.
+    """
+    try:
+        import CRISPRessoPro
+        return CRISPRessoPro.__version__
+    except Exception:
+        return None
+
+
+def get_C2Pro_hooks():
+    """Return ``CRISPRessoPro.hooks`` when available, else ``None``."""
+    try:
+        from CRISPRessoPro import hooks
+        return hooks
+    except Exception:
+        return None
+
+
+def get_C2Pro_hook(hook_name):
+    hooks = get_C2Pro_hooks()
+    if hooks is None:
+        return None
+    return getattr(hooks, hook_name, None)
+
+
+def run_C2Pro_hook(hook_name, plot_context, logger):
+    """Run an optional CRISPRessoPro plot hook.
+
+    Plot hooks are best-effort unless ``--halt_on_plot_fail`` is set.
+    Report generation intentionally does not use this helper so report
+    failures still behave like normal report failures.
+    """
+    hook = get_C2Pro_hook(hook_name)
+    if hook is None:
+        return False
+
+    try:
+        hook(plot_context, logger)
+    except Exception as e:
+        if getattr(plot_context.args, 'halt_on_plot_fail', False):
+            raise
+        logger.warning(f"CRISPRessoPro {hook_name} hook failed: {e}")
+    return True
+
+
 def check_custom_config(args):
     """Load and validate custom configuration from a file path or inline JSON.
 

@@ -211,19 +211,9 @@ def main():
         )
 
         C2PRO_INSTALLED = CRISPRessoShared.is_C2Pro_installed()
-        if C2PRO_INSTALLED:
-            try:
-                from CRISPRessoPro import hooks as pro_hooks
-                pro_hooks.on_compare_plots_complete(plot_context, logger)
-            except Exception as e:
-                if args.halt_on_plot_fail:
-                    raise
-                logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
-        else:
-            # Inline CORE plot iteration.  Pro's equivalent lives in
-            # CRISPRessoPro.plots.plot_runners.run_builtin_compare_plots —
-            # the two copies are maintained independently to honor the
-            # Pro/Core boundary (see design_docs/MULTI_MODE_PLOT_PLUGIN.md).
+        pro_plots_ran = C2PRO_INSTALLED and CRISPRessoShared.run_C2Pro_hook('on_compare_plots_complete', plot_context, logger)
+        if not pro_plots_ran:
+            # Built-in matplotlib plot iteration for the non-Pro path.
             general_plots = crispresso2_info['results']['general_plots']
             general_plots.setdefault('summary_plot_names', [])
             general_plots.setdefault('summary_plot_titles', {})
@@ -439,7 +429,7 @@ def main():
         # directly (sig_counts / sig_counts_quant_window) in the
         # else-branch above; reuse them when available, otherwise
         # fall back to the Pro-published keys.
-        if C2PRO_INSTALLED:
+        if pro_plots_ran:
             sig_counts = crispresso2_info.get('_sig_counts', {})
             sig_counts_quant_window = crispresso2_info.get('_sig_counts_quant_window', {})
 
@@ -465,9 +455,9 @@ def main():
                 report_name = _jp("CRISPResso2Compare_report.html")
             else:
                 report_name = OUTPUT_DIRECTORY + '.html'
-            if C2PRO_INSTALLED:
-                from CRISPRessoPro import hooks as pro_hooks
-                pro_hooks.make_compare_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger, plot_context)
+            pro_report = CRISPRessoShared.get_C2Pro_hook('make_compare_report') if C2PRO_INSTALLED else None
+            if pro_report:
+                pro_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger, plot_context)
             else:
                 CRISPRessoReport.make_compare_report_from_folder(report_name, crispresso2_info, OUTPUT_DIRECTORY, _ROOT, logger)
             crispresso2_info['running_info']['report_location'] = report_name

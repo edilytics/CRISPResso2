@@ -19,10 +19,7 @@ from CRISPResso2 import CRISPRessoShared
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 from CRISPResso2.CRISPRessoMultiProcessing import get_max_processes, run_plot
 
-if CRISPRessoShared.is_C2Pro_installed():
-    C2PRO_INSTALLED = True
-else:
-    C2PRO_INSTALLED = False
+C2PRO_INSTALLED = CRISPRessoShared.is_C2Pro_installed()
 
 import logging
 
@@ -564,22 +561,10 @@ ___________________________________
             # by the single shutdown at the end of main().
             args.n_processes_for_batch = getattr(args, 'n_processes', 1)
 
-            if C2PRO_INSTALLED:
-                try:
-                    from CRISPRessoPro import hooks as pro_hooks
-                    pro_hooks.on_aggregate_plots_complete(agg_plot_context, logger)
-                except Exception as e:
-                    if args.halt_on_plot_fail:
-                        raise
-                    logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
-            elif not args.suppress_plots:
-                # Inline CORE plot iteration.  Pro's equivalent lives in
-                # CRISPRessoPro.plots.plot_runners.run_builtin_aggregate_plots
-                # — the two copies are maintained independently to honor the
-                # Pro/Core boundary (see design_docs/MULTI_MODE_PLOT_PLUGIN.md).
-                #
-                # We deliberately reuse the outer `plot` partial defined at
-                # the top of main() rather than creating a second pool.
+            pro_plots_ran = C2PRO_INSTALLED and CRISPRessoShared.run_C2Pro_hook('on_aggregate_plots_complete', agg_plot_context, logger)
+            if not pro_plots_ran and not args.suppress_plots:
+                # Built-in matplotlib plot iteration for the non-Pro path.
+                # Reuse the outer `plot` partial rather than creating a second pool.
                 general_plots = crispresso2_info['results']['general_plots']
                 general_plots.setdefault('summary_plot_names', [])
                 general_plots.setdefault('summary_plot_titles', {})
@@ -753,18 +738,10 @@ ___________________________________
             # Update context with the now-available df_summary_quantification
             agg_plot_context.df_summary_quantification = df_summary_quantification
 
-            # Summary bar plots: Pro owns HTML generation via its own hook;
-            # CORE's elif emits matplotlib PDFs inline.  The two paths are
-            # parallel and mutually exclusive per the Pro/Core boundary.
-            if C2PRO_INSTALLED:
-                try:
-                    from CRISPRessoPro import hooks as pro_hooks
-                    pro_hooks.on_aggregate_summary_ready(agg_plot_context, logger)
-                except Exception as e:
-                    if args.halt_on_plot_fail:
-                        raise
-                    logger.warning(f"CRISPRessoPro summary hook failed: {e}")
-            elif not args.suppress_plots:
+            # Summary bar plots: Pro handles its optional HTML hook; otherwise
+            # CORE emits the built-in matplotlib PDFs inline.
+            pro_summary_ran = C2PRO_INSTALLED and CRISPRessoShared.run_C2Pro_hook('on_aggregate_summary_ready', agg_plot_context, logger)
+            if not pro_summary_ran and not args.suppress_plots:
                 debug('Plotting reads summary...', {'percent_complete': 94})
                 reads_total_input = prep_reads_total(agg_plot_context, prefix='CRISPRessoAggregate')
                 plot(CRISPRessoPlot.plot_reads_total, reads_total_input)
@@ -810,14 +787,14 @@ ___________________________________
                 report_filename = OUTPUT_DIRECTORY + '.html'
                 if (args.place_report_in_output_folder):
                     report_filename = _jp("CRISPResso2Aggregate_report.html")
-                if C2PRO_INSTALLED:
-                    from CRISPRessoPro import hooks as pro_hooks
+                pro_report = CRISPRessoShared.get_C2Pro_hook('make_aggregate_report') if C2PRO_INSTALLED else None
+                if pro_report:
                     # Store aggregate data so Pro hook can access it
                     crispresso2_info['running_info']['name'] = args.name
                     crispresso2_info['results']['crispresso2_folders'] = crispresso2_folders
                     crispresso2_info['results']['crispresso2_folder_htmls'] = crispresso2_folder_htmls
                     crispresso2_info['results']['general_plots']['quilt_plots_to_show'] = quilt_plots_to_show
-                    pro_hooks.make_aggregate_report(crispresso2_info, report_filename, OUTPUT_DIRECTORY, _ROOT, logger, agg_plot_context)
+                    pro_report(crispresso2_info, report_filename, OUTPUT_DIRECTORY, _ROOT, logger, agg_plot_context)
                 else:
                     CRISPRessoReport.make_aggregate_report(
                         crispresso2_info,

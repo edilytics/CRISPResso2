@@ -26,11 +26,8 @@ from CRISPResso2 import CRISPRessoCOREResources, CRISPRessoShared
 from CRISPResso2.writers import vcf
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
-if CRISPRessoShared.is_C2Pro_installed():
-    from CRISPRessoPro import __version__ as CRISPRessoProVersion
-    C2PRO_INSTALLED = True
-else:
-    C2PRO_INSTALLED = False
+CRISPRessoProVersion = CRISPRessoShared.get_C2Pro_version()
+C2PRO_INSTALLED = CRISPRessoProVersion is not None
 
 from CRISPResso2 import CRISPResso2Align, CRISPRessoMultiProcessing
 from CRISPResso2.plots import data_prep as CRISPRessoPlotData
@@ -4991,17 +4988,10 @@ def main():
         #   Similarly, ``hooks.make_report`` below replaces the built-in
         #   ``CRISPRessoReport.make_report`` for HTML report generation.
         #
-        if C2PRO_INSTALLED:
-            try:
-                from CRISPRessoPro import hooks as pro_hooks
-                pro_hooks.on_plots_complete(plot_context, logger)
-            except Exception as e:
-                if args.halt_on_plot_fail:
-                    raise
-                logger.warning(f"CRISPRessoPro plugin hook failed: {e}")
-        elif args.suppress_plots:
+        pro_plots_ran = C2PRO_INSTALLED and CRISPRessoShared.run_C2Pro_hook('on_plots_complete', plot_context, logger)
+        if not pro_plots_ran and args.suppress_plots:
             CRISPRessoPlotData.write_all_core_data_files(plot_context, crispresso2_info)
-        else:
+        elif not pro_plots_ran:
             if n_processes > 1:
                 process_pool = ProcessPoolExecutor(n_processes)
                 process_futures = {}
@@ -5748,9 +5738,9 @@ def main():
             else:
                 report_name = OUTPUT_DIRECTORY + '.html'
 
-            if C2PRO_INSTALLED:
-                from CRISPRessoPro import hooks as pro_hooks
-                pro_hooks.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger, plot_context)
+            pro_report = CRISPRessoShared.get_C2Pro_hook('make_report') if C2PRO_INSTALLED else None
+            if pro_report:
+                pro_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger, plot_context)
             else:
                 CRISPRessoReport.make_report(crispresso2_info, report_name, OUTPUT_DIRECTORY, _ROOT, logger)
 
