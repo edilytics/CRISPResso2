@@ -69,10 +69,6 @@ def main():
         # Validate Pro-only config inputs early (inline JSON for Aggregate).
         CRISPRessoShared.check_custom_config(args)
 
-        # CORE always uses matplotlib; when Pro is installed the hook
-        # below skips the per-amplicon path entirely and Pro owns
-        # plotting decisions.  The unconditional summary-plot block
-        # later in main() also always uses this matplotlib module.
         from CRISPResso2.plots import CRISPRessoPlot
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
