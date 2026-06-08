@@ -3799,6 +3799,41 @@ def write_core_hdr_data_files(ctx: CorePlotContext, crispresso2_info: dict):
     )
 
 
+def get_pe_scaffold_search(prime_edited_ref_sequence, prime_editing_pegRNA_extension_seq, prime_editing_pegRNA_scaffold_seq, prime_editing_pegRNA_scaffold_min_match_length):
+    """For prime editing, determines the scaffold string to search for (the shortest substring of args.prime_editing_pegRNA_scaffold_seq not in the prime-edited reference sequence)
+    params:
+     prime_edited_ref_sequence: reference sequence of the prime-edited sequence
+     prime_editing_extension_seq: RNA sequence of extension sequence
+     prime_editing_pegRNA_scaffold_seq: sequence of the scaffold sequence
+     prime_editing_pegRNA_scaffold_min_match_length: minimum number of bases required to match between scaffold and read to count as scaffold-incorporated
+    returns:
+     tuple of(
+         index of location in ref to find scaffold seq if it exists
+         shortest dna sequence to identify scaffold sequence
+     )
+    """
+    info('Processing pegRNA scaffold sequence...')
+    # first, define the sequence we are looking for (extension plus the first base(s) of the scaffold)
+    scaffold_dna = CRISPRessoShared.reverse_complement(prime_editing_pegRNA_scaffold_seq.upper().replace('U', 'T'))
+
+    extension_seq_dna_top_strand = prime_editing_pegRNA_extension_seq.upper().replace('U', 'T')
+    prime_editing_extension_seq_dna = CRISPRessoShared.reverse_complement(extension_seq_dna_top_strand)
+
+    scaffold_start_loc = prime_edited_ref_sequence.index(prime_editing_extension_seq_dna) + len(prime_editing_extension_seq_dna)
+
+    # next find min length scaffold that when combined with min extension sequence is not in edited sequence
+    len_scaffold_to_use = prime_editing_pegRNA_scaffold_min_match_length  # length of the scaffold sequence to be added to the extension sequence, start at 1bp
+    scaffold_dna_search = prime_editing_extension_seq_dna + scaffold_dna[0:len_scaffold_to_use]
+    while scaffold_dna_search in prime_edited_ref_sequence:
+        if len_scaffold_to_use > len(scaffold_dna):
+            raise CRISPRessoShared.BadParameterException('The DNA scaffold provided is found in the unedited reference sequence. Please provide a longer scaffold sequence.')
+        len_scaffold_to_use += 1
+        scaffold_dna_search = prime_editing_extension_seq_dna + scaffold_dna[0:len_scaffold_to_use]
+
+    info('Searching for scaffold-templated reads with the sequence: \'' + str(scaffold_dna[0:len_scaffold_to_use]) + '\' starting at position ' + str(scaffold_start_loc) + ' in reads that align to the prime-edited sequence')
+    return (scaffold_start_loc, scaffold_dna[0:len_scaffold_to_use])
+
+
 def write_core_prime_editing_data_files(ctx: CorePlotContext, crispresso2_info: dict):
     """Write prime editing scaffold insertion sizes table.
 
@@ -3813,8 +3848,6 @@ def write_core_prime_editing_data_files(ctx: CorePlotContext, crispresso2_info: 
     DataFrame on ``ctx.df_scaffold_insertion_sizes`` so subsequent plot
     preparation can reuse it.
     """
-    from CRISPResso2.CRISPRessoCORE import get_pe_scaffold_search
-
     args = ctx.args
     if not getattr(args, 'prime_editing_pegRNA_extension_seq', ''):
         return

@@ -461,41 +461,6 @@ def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinat
     return list(filter(lambda x: x >= 0, include_idxs))
 
 
-def get_pe_scaffold_search(prime_edited_ref_sequence, prime_editing_pegRNA_extension_seq, prime_editing_pegRNA_scaffold_seq, prime_editing_pegRNA_scaffold_min_match_length):
-    """For prime editing, determines the scaffold string to search for (the shortest substring of args.prime_editing_pegRNA_scaffold_seq not in the prime-edited reference sequence)
-    params:
-     prime_edited_ref_sequence: reference sequence of the prime-edited sequence
-     prime_editing_extension_seq: RNA sequence of extension sequence
-     prime_editing_pegRNA_scaffold_seq: sequence of the scaffold sequence
-     prime_editing_pegRNA_scaffold_min_match_length: minimum number of bases required to match between scaffold and read to count as scaffold-incorporated
-    returns:
-     tuple of(
-         index of location in ref to find scaffold seq if it exists
-         shortest dna sequence to identify scaffold sequence
-     )
-    """
-    info('Processing pegRNA scaffold sequence...')
-    # first, define the sequence we are looking for (extension plus the first base(s) of the scaffold)
-    scaffold_dna = CRISPRessoShared.reverse_complement(prime_editing_pegRNA_scaffold_seq.upper().replace('U', 'T'))
-
-    extension_seq_dna_top_strand = prime_editing_pegRNA_extension_seq.upper().replace('U', 'T')
-    prime_editing_extension_seq_dna = CRISPRessoShared.reverse_complement(extension_seq_dna_top_strand)
-
-    scaffold_start_loc = prime_edited_ref_sequence.index(prime_editing_extension_seq_dna) + len(prime_editing_extension_seq_dna)
-
-    # next find min length scaffold that when combined with min extension sequence is not in edited sequence
-    len_scaffold_to_use = prime_editing_pegRNA_scaffold_min_match_length  # length of the scaffold sequence to be added to the extension sequence, start at 1bp
-    scaffold_dna_search = prime_editing_extension_seq_dna + scaffold_dna[0:len_scaffold_to_use]
-    while scaffold_dna_search in prime_edited_ref_sequence:
-        if len_scaffold_to_use > len(scaffold_dna):
-            raise CRISPRessoShared.BadParameterException('The DNA scaffold provided is found in the unedited reference sequence. Please provide a longer scaffold sequence.')
-        len_scaffold_to_use += 1
-        scaffold_dna_search = prime_editing_extension_seq_dna + scaffold_dna[0:len_scaffold_to_use]
-
-    info('Searching for scaffold-templated reads with the sequence: \'' + str(scaffold_dna[0:len_scaffold_to_use]) + '\' starting at position ' + str(scaffold_start_loc) + ' in reads that align to the prime-edited sequence')
-    return (scaffold_start_loc, scaffold_dna[0:len_scaffold_to_use])
-
-
 def get_prime_editing_guides(this_amp_seq, ref0_seq, prime_editing_edited_amp_seq, prime_editing_pegRNA_extension_seq, prime_editing_extension_seq_dna, prime_editing_pegRNA_spacer_seq, prime_editing_nicking_guide_seq,
                              prime_editing_pegRNA_extension_quantification_window_size, nicking_qw_center, nicking_qw_size, aln_matrix, needleman_wunsch_gap_open, needleman_wunsch_gap_extend, prime_editing_gap_open, prime_editing_gap_extend):
     """Gets prime editing guide sequences for this amplicon
@@ -1315,7 +1280,7 @@ def process_paired_fastq(fastq1_filename, fastq2_filename, variantCache, ref_nam
 
     pe_scaffold_dna_info = (0, None)  # scaffold start loc, scaffold seq to search
     if args.prime_editing_pegRNA_scaffold_seq != "":
-        pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
+        pe_scaffold_dna_info = CRISPRessoPlotData.get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
     n_processes = 1
     if args.n_processes == "max":
@@ -1848,7 +1813,7 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
     aln_matrix = CRISPResso2Align.read_matrix(aln_matrix_loc)
     pe_scaffold_dna_info = (0, None)  # scaffold start loc, scaffold seq to search
     if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
-        pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
+        pe_scaffold_dna_info = CRISPRessoPlotData.get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
     not_aligned_variants = {}
 
@@ -2055,7 +2020,7 @@ def process_bam(bam_filename, bam_chr_loc, output_bam, variantCache, ref_names, 
 
     pe_scaffold_dna_info = (0, None)  # scaffold start loc, scaffold sequence
     if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
-        pe_scaffold_dna_info = get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
+        pe_scaffold_dna_info = CRISPRessoPlotData.get_pe_scaffold_search(refs['Prime-edited']['sequence'], args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
     output_sam = output_bam + ".sam"
     with open(output_sam, "w") as sam_out:
@@ -5534,7 +5499,7 @@ def main():
                     # first, define the sequence we are looking for (extension plus the first base(s) of the scaffold)
                     scaffold_dna_seq = CRISPRessoShared.reverse_complement(args.prime_editing_pegRNA_scaffold_seq.upper().replace('U', 'T'))
                     pe_seq = refs['Prime-edited']['sequence']
-                    pe_scaffold_dna_info = get_pe_scaffold_search(pe_seq, args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
+                    pe_scaffold_dna_info = CRISPRessoPlotData.get_pe_scaffold_search(pe_seq, args.prime_editing_pegRNA_extension_seq, args.prime_editing_pegRNA_scaffold_seq, args.prime_editing_pegRNA_scaffold_min_match_length)
 
                     df_alleles_scaffold = df_alleles.loc[df_alleles['Reference_Name'] == 'Scaffold-incorporated']
 
