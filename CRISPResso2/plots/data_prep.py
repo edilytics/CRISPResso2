@@ -3812,7 +3812,7 @@ def get_pe_scaffold_search(prime_edited_ref_sequence, prime_editing_pegRNA_exten
          shortest dna sequence to identify scaffold sequence
      )
     """
-    info('Processing pegRNA scaffold sequence...')
+    logger.info('Processing pegRNA scaffold sequence...')
     # first, define the sequence we are looking for (extension plus the first base(s) of the scaffold)
     scaffold_dna = CRISPRessoShared.reverse_complement(prime_editing_pegRNA_scaffold_seq.upper().replace('U', 'T'))
 
@@ -3830,7 +3830,7 @@ def get_pe_scaffold_search(prime_edited_ref_sequence, prime_editing_pegRNA_exten
         len_scaffold_to_use += 1
         scaffold_dna_search = prime_editing_extension_seq_dna + scaffold_dna[0:len_scaffold_to_use]
 
-    info('Searching for scaffold-templated reads with the sequence: \'' + str(scaffold_dna[0:len_scaffold_to_use]) + '\' starting at position ' + str(scaffold_start_loc) + ' in reads that align to the prime-edited sequence')
+    logger.info('Searching for scaffold-templated reads with the sequence: \'' + str(scaffold_dna[0:len_scaffold_to_use]) + '\' starting at position ' + str(scaffold_start_loc) + ' in reads that align to the prime-edited sequence')
     return (scaffold_start_loc, scaffold_dna[0:len_scaffold_to_use])
 
 
