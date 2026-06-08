@@ -140,8 +140,6 @@ def main():
 
         _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
 
-        # CORE always uses matplotlib; when Pro is installed the hook
-        # below skips this path entirely and Pro owns plotting decisions.
         from CRISPResso2.plots import CRISPRessoPlot
         CRISPRessoPlot.setMatplotlibDefaults()
 
