@@ -1257,6 +1257,49 @@ def prep_log_nuc_freqs(ctx: CorePlotContext):
     }
 
 
+def find_closest_sgRNA_cut_point(exon_start, exon_end, sgRNA_cut_points, sgRNA_plot_cut_points):
+    """Find the sgRNA with cut_point closest to the given exon interval.
+
+    If no sgRNA cut points are provided, defaults to the exon midpoint.
+
+    Parameters
+    ----------
+    exon_start : int
+        Start position of the exon interval.
+    exon_end : int
+        End position of the exon interval.
+    sgRNA_cut_points : list of int
+        List of sgRNA cut point positions.
+    sgRNA_plot_cut_points : list
+        List of sgRNA plot cut point values (corresponding to sgRNA_cut_points).
+
+    Returns
+    -------
+    tuple
+        (best_cut_point, best_plot_cut_point) where best_cut_point is the
+        closest sgRNA cut point (or exon midpoint if no guides), and
+        best_plot_cut_point is the corresponding plot cut point (or False if
+        no guides).
+
+    """
+    best_cut_point = (exon_start + exon_end) // 2  # default to exon midpoint if no guides
+    best_plot_cut_point = False
+    if len(sgRNA_cut_points) > 0:
+        best_sgRNA_idx = 0
+        best_distance = float('inf')
+        for sgRNA_idx, cp in enumerate(sgRNA_cut_points):
+            if exon_start <= cp <= exon_end:
+                distance = 0
+            else:
+                distance = min(abs(cp - exon_start), abs(cp - exon_end))
+            if distance < best_distance:
+                best_distance = distance
+                best_sgRNA_idx = sgRNA_idx
+        best_cut_point = sgRNA_cut_points[best_sgRNA_idx]
+        best_plot_cut_point = sgRNA_plot_cut_points[best_sgRNA_idx]
+    return best_cut_point, best_plot_cut_point
+
+
 def prep_amino_acid_table(ctx: CorePlotContext):
     """Prepare amino acid table data for plot_9a and CSV export.
 
@@ -1277,8 +1320,6 @@ def prep_amino_acid_table(ctx: CorePlotContext):
     - ``plot_input``: dict of kwargs for ``plot_amino_acid_heatmap``, or
       ``None`` if no rows pass the frequency threshold
     """
-    from CRISPResso2.CRISPRessoCORE import find_closest_sgRNA_cut_point
-
     ref_name = ctx.ref_name
     ref = _ref(ctx)
     coding_seq_ind = ctx.coding_seq_ind
