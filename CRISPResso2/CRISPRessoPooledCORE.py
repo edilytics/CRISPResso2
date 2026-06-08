@@ -289,8 +289,6 @@ def main():
         '''
         info(CRISPRessoShared.get_crispresso_header(description, pooled_string))
 
-        # CORE always uses matplotlib; when Pro is installed the hooks
-        # below skip this path entirely and Pro owns plotting decisions.
         from CRISPResso2.plots import CRISPRessoPlot
 
         crispresso_options = CRISPRessoShared.get_core_crispresso_options()
