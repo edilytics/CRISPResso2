@@ -5101,11 +5101,6 @@ def main():
                     # (4) another graph with the frequency that each nucleotide within the amplicon was modified in any way (perhaps would consider insertion as modification of the flanking nucleotides);
                     # Indels location Plots
 
-                    n_this_category_modified = 0
-                    modifiedName = ref_name + "_MODIFIED"
-                    if modifiedName in class_counts:
-                        n_this_category_modified = class_counts[modifiedName]
-
                     plot_4a_input = CRISPRessoPlotData.prep_amplicon_modifications(plot_context)
                     fig_filename_root = plot_4a_input['fig_filename_root']
                     y_max = plot_4a_input['y_max']
