@@ -40,6 +40,7 @@ from collections import Counter, defaultdict
 import numpy as np
 import pandas as pd
 
+from CRISPResso2 import CRISPRessoShared
 from CRISPResso2.plots.plot_context import CorePlotContext
 
 
@@ -141,8 +142,6 @@ def _ref_plot_name(ctx: CorePlotContext) -> str:
 
 def _sgRNA_label(ctx: CorePlotContext) -> str:
     """Compute the file-name label for the current sgRNA."""
-    from CRISPResso2 import CRISPRessoShared
-
     ref = _ref(ctx)
     sgRNA = ref['sgRNA_orig_sequences'][ctx.sgRNA_ind]
     sgRNA_name = ref['sgRNA_names'][ctx.sgRNA_ind]
@@ -1056,7 +1055,6 @@ def prep_pe_nucleotide_quilt_around_sgRNA(ctx: CorePlotContext):
     # Build sgRNA label from first reference
     sgRNA = ref0['sgRNA_orig_sequences'][sgRNA_ind]
     sgRNA_name = ref0['sgRNA_names'][sgRNA_ind]
-    from CRISPResso2 import CRISPRessoShared
     label = "sgRNA_" + sgRNA
     if sgRNA_name != "":
         label = sgRNA_name
@@ -1279,7 +1277,6 @@ def prep_amino_acid_table(ctx: CorePlotContext):
     - ``plot_input``: dict of kwargs for ``plot_amino_acid_heatmap``, or
       ``None`` if no rows pass the frequency threshold
     """
-    from CRISPResso2 import CRISPRessoShared
     from CRISPResso2.CRISPRessoCORE import find_closest_sgRNA_cut_point
 
     ref_name = ctx.ref_name
@@ -1472,8 +1469,6 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
     - ``plot_input``: dict of kwargs for ``plot_alleles_table_prepped``, or
       ``None`` if no rows pass the frequency threshold
     """
-    from CRISPResso2 import CRISPRessoShared
-
     ref_name = ctx.ref_name
     ref = _ref(ctx)
     sgRNA_ind = ctx.sgRNA_ind
@@ -1604,8 +1599,6 @@ def prep_base_edit_quilt(ctx: CorePlotContext):
     - ``plot_input``: dict of kwargs for ``plot_alleles_table_prepped``, or
       ``None`` if no rows pass the frequency threshold
     """
-    from CRISPResso2 import CRISPRessoShared
-
     ref_name = ctx.ref_name
     ref = _ref(ctx)
 
@@ -3073,8 +3066,6 @@ def _sanitize_summary_names(df):
     before slugify.  If the column is absent, the copy is returned
     unchanged.
     """
-    from CRISPResso2 import CRISPRessoShared
-
     out = df.copy()
     if 'Name' in out.columns:
         out['Name'] = out['Name'].apply(lambda n: CRISPRessoShared.slugify(str(n)))
@@ -3562,8 +3553,6 @@ def write_core_per_sgRNA_data_files(ctx: CorePlotContext, crispresso2_info: dict
     ``ctx.ref_name`` and ``ctx.sgRNA_ind`` during iteration but restores
     them to ``None`` on return.
     """
-    from CRISPResso2 import CRISPRessoShared
-
     saved_ref_name = ctx.ref_name
     saved_sgRNA_ind = ctx.sgRNA_ind
     is_base_editor = getattr(ctx.args, 'base_editor_output', False)
@@ -3783,7 +3772,6 @@ def write_core_prime_editing_data_files(ctx: CorePlotContext, crispresso2_info: 
     DataFrame on ``ctx.df_scaffold_insertion_sizes`` so subsequent plot
     preparation can reuse it.
     """
-    from CRISPResso2 import CRISPRessoShared
     from CRISPResso2.CRISPRessoCORE import get_pe_scaffold_search
 
     args = ctx.args
