@@ -39,6 +39,7 @@ from CRISPResso2.plots.data_prep import (
     prep_pe_nucleotide_quilt,
     prep_pe_nucleotide_quilt_around_sgRNA,
     write_base_edit_counts,
+    write_core_amplicon_data_files,
     _to_numeric_ignore_columns,
 )
 from CRISPResso2.plots.plot_context import CorePlotContext
@@ -2027,6 +2028,75 @@ class TestWriteBaseEditCounts:
         ]
         for filename in expected:
             assert (tmp_path / filename).exists(), f"Missing: {filename}"
+
+
+class TestWriteCoreAmpliconDataFiles:
+
+    def test_writes_expected_files_and_metadata(self, tmp_path):
+        """Per-amplicon CORE exports are written and recorded in run metadata."""
+        ref_name = 'amp1'
+        ref_plot_name = 'Amp1_'
+        ctx = _make_ctx(
+            args=SimpleNamespace(
+                plot_histogram_outliers=False,
+                plot_window_size=20,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=True,
+                conversion_nuc_from='C',
+                expected_hdr_amplicon_seq='',
+                base_editor_output=True,
+                coding_seq='',
+                crispresso1_mode=False,
+            ),
+            output_directory=str(tmp_path),
+            _jp=lambda f: os.path.join(str(tmp_path), f),
+            refs={ref_name: _ref_dict(sequence='ACGT', ref_plot_name=ref_plot_name, include_idxs=[1, 3])},
+            ref_names=[ref_name],
+            counts_total={ref_name: 10},
+            all_base_count_vectors={
+                ref_name + '_A': np.array([1, 2, 3, 4]),
+                ref_name + '_C': np.array([5, 6, 7, 8]),
+                ref_name + '_G': np.array([9, 10, 11, 12]),
+                ref_name + '_T': np.array([13, 14, 15, 16]),
+                ref_name + '_N': np.array([17, 18, 19, 20]),
+                ref_name + '_-': np.array([21, 22, 23, 24]),
+            },
+            substitution_base_vectors={
+                ref_name + '_A': np.array([31, 32]),
+                ref_name + '_C': np.array([33, 34]),
+                ref_name + '_G': np.array([35, 36]),
+                ref_name + '_T': np.array([37, 38]),
+                ref_name + '_N': np.array([39, 40]),
+            },
+            all_substitution_base_vectors={
+                ref_name + '_A': np.array([41, 42, 43, 44]),
+                ref_name + '_C': np.array([45, 46, 47, 48]),
+                ref_name + '_G': np.array([49, 50, 51, 52]),
+                ref_name + '_T': np.array([53, 54, 55, 56]),
+                ref_name + '_N': np.array([57, 58, 59, 60]),
+            },
+        )
+        crispresso2_info = {'results': {'refs': {ref_name: {}}}}
+
+        write_core_amplicon_data_files(ctx, crispresso2_info)
+
+        expected = {
+            'quant_window_nuc_freq_filename': ref_plot_name + 'Quantification_window_nucleotide_frequency_table.txt',
+            'quant_window_nuc_pct_filename': ref_plot_name + 'Quantification_window_nucleotide_percentage_table.txt',
+            'nuc_freq_filename': ref_plot_name + 'Nucleotide_frequency_table.txt',
+            'nuc_pct_filename': ref_plot_name + 'Nucleotide_percentage_table.txt',
+            'quant_window_sub_freq_filename': ref_plot_name + 'Quantification_window_substitution_frequency_table.txt',
+            'sub_freq_table_filename': ref_plot_name + 'Substitution_frequency_table.txt',
+        }
+        info_ref = crispresso2_info['results']['refs'][ref_name]
+        for key, filename in expected.items():
+            assert info_ref[key] == filename
+            assert (tmp_path / filename).exists(), f"Missing: {filename}"
+
+        quant_window_nuc = pd.read_csv(tmp_path / expected['quant_window_nuc_freq_filename'], sep='\t', index_col=0)
+        assert list(quant_window_nuc.columns) == ['C', 'T']
+        assert quant_window_nuc.loc['A'].tolist() == [2, 4]
+        assert quant_window_nuc.loc['-'].tolist() == [22, 24]
 
 
 # =============================================================================

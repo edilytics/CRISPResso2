@@ -3820,8 +3820,7 @@ def main():
         deletion_count_vectors = {}
         substitution_count_vectors = {}
         indelsub_count_vectors = {}
-        substitution_base_vectors = {}  # these two are taken as a subset of all_substitution_base_vectors afterward to save time
-        base_count_vectors = {}  # calculated after as well
+        substitution_base_vectors = {}  # taken as a subset of all_substitution_base_vectors afterward to save time
 
         insertion_count_vectors_noncoding = {}  # insertions that are in the noncoding region
         deletion_count_vectors_noncoding = {}
@@ -4188,13 +4187,6 @@ def main():
             substitution_base_vectors[ref_name + "_G"] = [all_substitution_base_vectors[ref_name + "_G"][x] for x in this_include_idx]
             substitution_base_vectors[ref_name + "_T"] = [all_substitution_base_vectors[ref_name + "_T"][x] for x in this_include_idx]
             substitution_base_vectors[ref_name + "_N"] = [all_substitution_base_vectors[ref_name + "_N"][x] for x in this_include_idx]
-
-            base_count_vectors[ref_name + "_A"] = [all_base_count_vectors[ref_name + "_A"][x] for x in this_include_idx]
-            base_count_vectors[ref_name + "_C"] = [all_base_count_vectors[ref_name + "_C"][x] for x in this_include_idx]
-            base_count_vectors[ref_name + "_G"] = [all_base_count_vectors[ref_name + "_G"][x] for x in this_include_idx]
-            base_count_vectors[ref_name + "_T"] = [all_base_count_vectors[ref_name + "_T"][x] for x in this_include_idx]
-            base_count_vectors[ref_name + "_N"] = [all_base_count_vectors[ref_name + "_N"][x] for x in this_include_idx]
-            base_count_vectors[ref_name + "_-"] = [all_base_count_vectors[ref_name + "_-"][x] for x in this_include_idx]
 
             all_indelsub_count_vectors[ref_name] = all_insertion_count_vectors[ref_name] + all_deletion_count_vectors[ref_name] + all_substitution_count_vectors[ref_name]
             indelsub_count_vectors[ref_name] = insertion_count_vectors[ref_name] + deletion_count_vectors[ref_name] + substitution_count_vectors[ref_name]
@@ -4968,6 +4960,7 @@ def main():
             crispresso2_info['results']['general_plots']['plot_1e_root'] = os.path.basename(plot_1e_input['fig_root'])
             crispresso2_info['results']['general_plots']['plot_1e_caption'] = plot_1e_input.get('caption', '')
             crispresso2_info['results']['general_plots']['plot_1e_data'] = plot_1e_input.get('data_files', [])
+            CRISPRessoPlotData.write_core_amplicon_data_files(plot_context, crispresso2_info)
             ref_percent_complete_start, ref_percent_complete_end = 48, 88
             ref_percent_complete_step = (ref_percent_complete_end - ref_percent_complete_start) / float(len(ref_names))
             for ref_index, ref_name in enumerate(ref_names):
@@ -4980,57 +4973,6 @@ def main():
 
                 # plot quilt for this amplicon  (if not crispresso1 mode)
                 if not args.crispresso1_mode:
-                    ref_seq = refs[ref_name]['sequence']
-                    include_idxs_list = refs[ref_name]['include_idxs']
-                    quantification_window_ref_seq = [ref_seq[x] for x in include_idxs_list]
-                    tot_aln_reads = counts_total[ref_name]
-
-                    # nucleotide counts
-                    df_nuc_freq = pd.DataFrame([base_count_vectors[ref_name + "_A"], base_count_vectors[ref_name + "_C"], base_count_vectors[ref_name + "_G"], base_count_vectors[ref_name + "_T"], base_count_vectors[ref_name + "_N"], base_count_vectors[ref_name + '_-']])
-                    df_nuc_freq.index = ['A', 'C', 'G', 'T', 'N', '-']
-                    df_nuc_freq.columns = quantification_window_ref_seq
-                    # print table showing nuc frequencies (sum to total alleles) (in quantification window)
-                    quant_window_nuc_freq_filename = _jp(ref_plot_name + 'Quantification_window_nucleotide_frequency_table.txt')
-                    df_nuc_freq.to_csv(quant_window_nuc_freq_filename, sep='\t', header=True, index=True)
-                    crispresso2_info['results']['refs'][ref_name]['quant_window_nuc_freq_filename'] = os.path.basename(quant_window_nuc_freq_filename)
-
-                    df_nuc_pct = df_nuc_freq.divide(tot_aln_reads)
-                    quant_window_nuc_pct_filename = _jp(ref_plot_name + 'Quantification_window_nucleotide_percentage_table.txt')
-                    df_nuc_pct.to_csv(quant_window_nuc_pct_filename, sep='\t', header=True, index=True)
-                    crispresso2_info['results']['refs'][ref_name]['quant_window_nuc_pct_filename'] = os.path.basename(quant_window_nuc_pct_filename)
-
-                    df_nuc_freq_all = pd.DataFrame([all_base_count_vectors[ref_name + "_A"], all_base_count_vectors[ref_name + "_C"], all_base_count_vectors[ref_name + "_G"], all_base_count_vectors[ref_name + "_T"], all_base_count_vectors[ref_name + "_N"], all_base_count_vectors[ref_name + '_-']])
-                    df_nuc_freq_all.index = ['A', 'C', 'G', 'T', 'N', '-']
-                    df_nuc_freq_all.columns = list(ref_seq)
-                    # print table showing nuc frequencies (sum to total alleles) (in entire region)
-                    nuc_freq_filename = _jp(ref_plot_name + 'Nucleotide_frequency_table.txt')
-                    df_nuc_freq_all.to_csv(nuc_freq_filename, sep='\t', header=True, index=True)
-                    crispresso2_info['results']['refs'][ref_name]['nuc_freq_filename'] = os.path.basename(nuc_freq_filename)
-
-                    df_nuc_pct_all = df_nuc_freq_all.divide(tot_aln_reads)
-                    nuc_pct_filename = _jp(ref_plot_name + 'Nucleotide_percentage_table.txt')
-                    df_nuc_pct_all.to_csv(nuc_pct_filename, sep='\t', header=True, index=True)
-                    crispresso2_info['results']['refs'][ref_name]['nuc_pct_filename'] = os.path.basename(nuc_pct_filename)
-
-                    if args.base_editor_output:
-                        # substitution frequencies — build DataFrames for CSV export
-                        alph = ['A', 'C', 'G', 'T', 'N']
-                        df_sub_freq = pd.DataFrame(
-                            [list(substitution_base_vectors[ref_name + "_" + a]) for a in alph],
-                            index=alph, columns=quantification_window_ref_seq,
-                        )
-                        quant_window_sub_freq_filename = _jp(ref_plot_name + 'Quantification_window_substitution_frequency_table.txt')
-                        df_sub_freq.to_csv(quant_window_sub_freq_filename, sep='\t', header=True, index=True)
-                        crispresso2_info['results']['refs'][ref_name]['quant_window_sub_freq_filename'] = os.path.basename(quant_window_sub_freq_filename)
-
-                        df_sub_freq_all = pd.DataFrame(
-                            [list(all_substitution_base_vectors[ref_name + "_" + a]) for a in alph],
-                            index=alph, columns=list(ref_seq),
-                        )
-                        sub_freq_table_filename = _jp(ref_plot_name + 'Substitution_frequency_table.txt')
-                        df_sub_freq_all.to_csv(sub_freq_table_filename, sep='\t', header=True, index=True)
-                        crispresso2_info['results']['refs'][ref_name]['sub_freq_table_filename'] = os.path.basename(sub_freq_table_filename)
-
                     if not args.suppress_plots:
                         plot_context.ref_name = ref_name
                         plot_2a_input = CRISPRessoPlotData.prep_nucleotide_quilt(plot_context)
