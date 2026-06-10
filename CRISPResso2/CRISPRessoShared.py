@@ -2285,7 +2285,9 @@ def check_custom_config(args):
     Returns
     -------
     dict
-        A config dict with ``colors`` and ``guardrails`` keys.
+        A config dict with default ``colors`` and ``guardrails`` keys,
+        plus any additional Pro-only keys such as ``figures`` from the
+        user config.
 
     Raises
     ------
@@ -2392,7 +2394,7 @@ def check_custom_config(args):
 
     if not isinstance(custom_config, dict):
         raise BadParameterException(
-            "Custom config must be a JSON object with optional 'colors' and 'guardrails' keys.",
+            "Custom config must be a JSON object with optional 'colors', 'guardrails', and 'figures' keys.",
         )
 
     if 'guardrails' in custom_config:

@@ -52,7 +52,7 @@ class PlotContext:
     output_directory: str               # Output path
     save_png: bool                      # Whether to save PNG alongside HTML/SVG
     _jp: Callable[[str], str]           # Joins filename with output directory
-    custom_config: dict                 # Color/style configuration
+    custom_config: dict                 # Color/style/report configuration
 
 
 # =============================================================================
