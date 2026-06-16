@@ -4047,7 +4047,7 @@ def main():
                     'all_substitution_positions': variant_payload['all_substitution_positions'],
                     'substitution_positions': variant_payload['substitution_positions'],
                     'substitution_values': variant_payload['substitution_values']
-    			}
+                }
             else:
                 allele_row = {'#Reads': variant_count,
                        'Aligned_Sequence': variant_payload['aln_seq'],
