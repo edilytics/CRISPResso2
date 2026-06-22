@@ -4060,7 +4060,7 @@ def main():
                        'Aligned_Reference_Names': aln_ref_names_str,
                        'Aligned_Reference_Scores': aln_ref_scores_str,
                        'ref_positions': variant_payload['ref_positions']
-                    }
+                }
             return allele_row
 
         # end get_allele_row() definition
