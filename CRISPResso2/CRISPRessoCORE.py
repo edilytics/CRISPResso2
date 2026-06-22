@@ -122,10 +122,10 @@ check_fastp = lambda: check_program('fastp', download_url='http://opengene.org/f
 
 
 def get_avg_read_length_fastq(fastq_filename):
-     cmd = ('z' if fastq_filename.endswith('.gz') else '') + ('cat < \"%s\"' % fastq_filename) +\
-                  r''' | awk 'BN {n=0;s=0;} NR%4 == 2 {s+=length($0);n++;} END { printf("%d\n",s/n)}' '''
-     p = sb.Popen(cmd, shell=True, stdout=sb.PIPE)
-     return int(p.communicate()[0].strip())
+    cmd = ('z' if fastq_filename.endswith('.gz') else '') + ('cat < \"%s\"' % fastq_filename) +\
+                r''' | awk 'BN {n=0;s=0;} NR%4 == 2 {s+=length($0);n++;} END { printf("%d\n",s/n)}' '''
+    p = sb.Popen(cmd, shell=True, stdout=sb.PIPE)
+    return int(p.communicate()[0].strip())
 
 
 def get_n_reads_bam(bam_filename, bam_chr_loc=""):
