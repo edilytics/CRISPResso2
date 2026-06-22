@@ -3919,7 +3919,8 @@ def main():
                 row to put into allele table
             """
             if args.write_detailed_allele_table or args.vcf_output:
-                allele_row = {'#Reads': variant_count,
+                allele_row = {
+                    '#Reads': variant_count,
                     'Aligned_Sequence': variant_payload['aln_seq'],
                     'Reference_Sequence': variant_payload['aln_ref'],
                     'n_inserted': variant_payload['insertion_n'],
@@ -3944,17 +3945,18 @@ def main():
                     'substitution_values': variant_payload['substitution_values']
                 }
             else:
-                allele_row = {'#Reads': variant_count,
-                       'Aligned_Sequence': variant_payload['aln_seq'],
-                       'Reference_Sequence': variant_payload['aln_ref'],
-                       'n_inserted': variant_payload['insertion_n'],
-                       'n_deleted': variant_payload['deletion_n'],
-                       'n_mutated': variant_payload['substitution_n'],
-                       'Reference_Name': reference_name,
-                       'Read_Status': variant_payload['classification'],
-                       'Aligned_Reference_Names': aln_ref_names_str,
-                       'Aligned_Reference_Scores': aln_ref_scores_str,
-                       'ref_positions': variant_payload['ref_positions']
+                allele_row = {
+                    '#Reads': variant_count,
+                    'Aligned_Sequence': variant_payload['aln_seq'],
+                    'Reference_Sequence': variant_payload['aln_ref'],
+                    'n_inserted': variant_payload['insertion_n'],
+                    'n_deleted': variant_payload['deletion_n'],
+                    'n_mutated': variant_payload['substitution_n'],
+                    'Reference_Name': reference_name,
+                    'Read_Status': variant_payload['classification'],
+                    'Aligned_Reference_Names': aln_ref_names_str,
+                    'Aligned_Reference_Scores': aln_ref_scores_str,
+                    'ref_positions': variant_payload['ref_positions']
                 }
             return allele_row
 
