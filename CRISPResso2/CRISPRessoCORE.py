@@ -4148,8 +4148,8 @@ def main():
                     substituted_n_dicts[ref_name][variant_payload['substitution_n']] += variant_count
                     substitution_count_vectors[ref_name][variant_payload['substitution_positions']] += variant_count
                     if variant_payload['substitution_n'] > 0:
-                         counts_substitution[ref_name] += variant_count
-                         this_has_substitutions = True
+                        counts_substitution[ref_name] += variant_count
+                        this_has_substitutions = True
 
                     nucs = ['A', 'T', 'C', 'G', 'N']
                     for nuc in nucs:
