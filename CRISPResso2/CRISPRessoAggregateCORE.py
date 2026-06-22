@@ -100,7 +100,7 @@ ___________________________________
         logger.addHandler(CRISPRessoShared.StatusHandler(os.path.join(OUTPUT_DIRECTORY, 'CRISPRessoAggregate_status.json')))
 
         with open(log_filename, 'w+') as outfile:
-              outfile.write('[Command used]:\n%s\n\n[Execution log]:\n' % ' '.join(sys.argv))
+            outfile.write('[Command used]:\n%s\n\n[Execution log]:\n' % ' '.join(sys.argv))
 
         crispresso2Aggregate_info_file = os.path.join(
             OUTPUT_DIRECTORY, 'CRISPResso2Aggregate_info.json',
@@ -133,7 +133,7 @@ ___________________________________
             halt_on_plot_fail=args.halt_on_plot_fail,
         )
 
-        # glob returns paths including the original prefix
+    # glob returns paths including the original prefix
         all_files = []
         for prefix in args.prefix:
             all_files.extend(glob.glob(prefix + '*' + args.suffix))
