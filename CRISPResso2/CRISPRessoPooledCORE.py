@@ -962,7 +962,7 @@ def main():
                     filename_amplicon_seqs_fasta, filename_aligned_amplicons_sam_log, filename_aligned_amplicons_sam)
                 bowtie_status = sb.call(aligner_command, shell=True)
                 if bowtie_status:
-                        raise CRISPRessoShared.AlignmentException('Bowtie2 failed to align amplicons to the genome, please check the output file.')
+                    raise CRISPRessoShared.AlignmentException('Bowtie2 failed to align amplicons to the genome, please check the output file.')
 
                 additional_columns = []
                 with open(filename_aligned_amplicons_sam) as aln:
