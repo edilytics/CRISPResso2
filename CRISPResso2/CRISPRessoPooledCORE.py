@@ -39,11 +39,11 @@ def get_data(path):
 
 
 def check_library(library_name):
-        try:
-            return __import__(library_name)
-        except:
-            error('You need to install %s module to use CRISPRessoPooled!' % library_name)
-            sys.exit(1)
+    try:
+        return __import__(library_name)
+    except:
+        error('You need to install %s module to use CRISPRessoPooled!' % library_name)
+        sys.exit(1)
 
 
 # the dependencies are bowtie2 and samtools
