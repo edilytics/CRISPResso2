@@ -133,7 +133,7 @@ def main():
         OUTPUT_DIRECTORY = os.path.abspath(output_folder_name)
 
         if args.batch_output_folder:
-                 OUTPUT_DIRECTORY = os.path.join(os.path.abspath(args.batch_output_folder), output_folder_name)
+            OUTPUT_DIRECTORY = os.path.join(os.path.abspath(args.batch_output_folder), output_folder_name)
 
         _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
 
