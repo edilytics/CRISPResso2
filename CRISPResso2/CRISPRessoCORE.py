@@ -4126,8 +4126,8 @@ def main():
                     insertion_count_vectors[ref_name][variant_payload['insertion_positions']] += variant_count
                     this_effective_len = this_effective_len + variant_payload['insertion_n']
                     if variant_payload['insertion_n'] > 0:
-                         counts_insertion[ref_name] += variant_count
-                         this_has_insertions = True
+                        counts_insertion[ref_name] += variant_count
+                        this_has_insertions = True
 
                 this_has_deletions = False
                 all_deletion_count_vectors[ref_name][variant_payload['all_deletion_positions']] += variant_count
