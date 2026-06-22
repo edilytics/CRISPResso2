@@ -1511,77 +1511,77 @@ def main():
         empty_line_els = [np.nan] * (header_el_count - 1)
         n_reads_index = header_els.index('Reads_total') - 1
         for idx, row in df_final_data.iterrows():
+            amplicon_name = idx
+            if RUNNING_MODE == 'ONLY_AMPLICONS' or RUNNING_MODE == 'AMPLICONS_AND_GENOME':
                 amplicon_name = idx
-                if RUNNING_MODE == 'ONLY_AMPLICONS' or RUNNING_MODE == 'AMPLICONS_AND_GENOME':
-                    amplicon_name = idx
-                else:
-                    amplicon_name = 'REGION_%s_%d_%d' % (row.chr_id, row.bpstart, row.bpend)
+            else:
+                amplicon_name = 'REGION_%s_%d_%d' % (row.chr_id, row.bpstart, row.bpend)
 
-                folder_name = 'CRISPResso_on_%s' % row.run_name  # row.run_name may be different than idx because it has been slugified
+            folder_name = 'CRISPResso_on_%s' % row.run_name  # row.run_name may be different than idx because it has been slugified
 
-                all_region_names.append(row.run_name)
-                all_region_display_names[row.run_name] = amplicon_name
-                all_region_read_counts[row.run_name] = row.n_reads
+            all_region_names.append(row.run_name)
+            all_region_display_names[row.run_name] = amplicon_name
+            all_region_read_counts[row.run_name] = row.n_reads
 
-                run_data = None
-                try:
-                    run_data = CRISPRessoShared.load_crispresso_info(_jp(folder_name))
-                except:
-                    warn('Skipping the folder %s: not enough reads, incomplete, or empty folder.' % folder_name)
-                    debug('Folder cannot be read at ' + _jp(folder_name) + ' with error: %s' % traceback.format_exc())
+            run_data = None
+            try:
+                run_data = CRISPRessoShared.load_crispresso_info(_jp(folder_name))
+            except:
+                warn('Skipping the folder %s: not enough reads, incomplete, or empty folder.' % folder_name)
+                debug('Folder cannot be read at ' + _jp(folder_name) + ' with error: %s' % traceback.format_exc())
 
-                    this_els = empty_line_els[:]
-                    this_els[n_reads_index] = row.n_reads
-                    to_add = [amplicon_name]
-                    to_add.extend(this_els)
-                    quantification_summary.append(to_add)
-                else:
-                    n_tot = row.n_reads
-                    n_aligned = 0
-                    n_unmod = 0
-                    n_mod = 0
-                    n_discarded = 0
+                this_els = empty_line_els[:]
+                this_els[n_reads_index] = row.n_reads
+                to_add = [amplicon_name]
+                to_add.extend(this_els)
+                quantification_summary.append(to_add)
+            else:
+                n_tot = row.n_reads
+                n_aligned = 0
+                n_unmod = 0
+                n_mod = 0
+                n_discarded = 0
 
-                    n_insertion = 0
-                    n_deletion = 0
-                    n_substitution = 0
-                    n_only_insertion = 0
-                    n_only_deletion = 0
-                    n_only_substitution = 0
-                    n_insertion_and_deletion = 0
-                    n_insertion_and_substitution = 0
-                    n_deletion_and_substitution = 0
-                    n_insertion_and_deletion_and_substitution = 0
+                n_insertion = 0
+                n_deletion = 0
+                n_substitution = 0
+                n_only_insertion = 0
+                n_only_deletion = 0
+                n_only_substitution = 0
+                n_insertion_and_deletion = 0
+                n_insertion_and_substitution = 0
+                n_deletion_and_substitution = 0
+                n_insertion_and_deletion_and_substitution = 0
 
-                    for ref_name in run_data['results']['ref_names']:  # multiple alleles could be provided
-                        n_aligned += run_data['results']['alignment_stats']['counts_total'][ref_name]
-                        n_unmod += run_data['results']['alignment_stats']['counts_unmodified'][ref_name]
-                        n_mod += run_data['results']['alignment_stats']['counts_modified'][ref_name]
-                        n_discarded += run_data['results']['alignment_stats']['counts_discarded'][ref_name]
+                for ref_name in run_data['results']['ref_names']:  # multiple alleles could be provided
+                    n_aligned += run_data['results']['alignment_stats']['counts_total'][ref_name]
+                    n_unmod += run_data['results']['alignment_stats']['counts_unmodified'][ref_name]
+                    n_mod += run_data['results']['alignment_stats']['counts_modified'][ref_name]
+                    n_discarded += run_data['results']['alignment_stats']['counts_discarded'][ref_name]
 
-                        n_insertion += run_data['results']['alignment_stats']['counts_insertion'][ref_name]
-                        n_deletion += run_data['results']['alignment_stats']['counts_deletion'][ref_name]
-                        n_substitution += run_data['results']['alignment_stats']['counts_substitution'][ref_name]
-                        n_only_insertion += run_data['results']['alignment_stats']['counts_only_insertion'][ref_name]
-                        n_only_deletion += run_data['results']['alignment_stats']['counts_only_deletion'][ref_name]
-                        n_only_substitution += run_data['results']['alignment_stats']['counts_only_substitution'][ref_name]
-                        n_insertion_and_deletion += run_data['results']['alignment_stats']['counts_insertion_and_deletion'][ref_name]
-                        n_insertion_and_substitution += run_data['results']['alignment_stats']['counts_insertion_and_substitution'][ref_name]
-                        n_deletion_and_substitution += run_data['results']['alignment_stats']['counts_deletion_and_substitution'][ref_name]
-                        n_insertion_and_deletion_and_substitution += run_data['results']['alignment_stats']['counts_insertion_and_deletion_and_substitution'][ref_name]
+                    n_insertion += run_data['results']['alignment_stats']['counts_insertion'][ref_name]
+                    n_deletion += run_data['results']['alignment_stats']['counts_deletion'][ref_name]
+                    n_substitution += run_data['results']['alignment_stats']['counts_substitution'][ref_name]
+                    n_only_insertion += run_data['results']['alignment_stats']['counts_only_insertion'][ref_name]
+                    n_only_deletion += run_data['results']['alignment_stats']['counts_only_deletion'][ref_name]
+                    n_only_substitution += run_data['results']['alignment_stats']['counts_only_substitution'][ref_name]
+                    n_insertion_and_deletion += run_data['results']['alignment_stats']['counts_insertion_and_deletion'][ref_name]
+                    n_insertion_and_substitution += run_data['results']['alignment_stats']['counts_insertion_and_substitution'][ref_name]
+                    n_deletion_and_substitution += run_data['results']['alignment_stats']['counts_deletion_and_substitution'][ref_name]
+                    n_insertion_and_deletion_and_substitution += run_data['results']['alignment_stats']['counts_insertion_and_deletion_and_substitution'][ref_name]
 
-                    unmod_pct = np.nan
-                    mod_pct = np.nan
-                    if n_aligned > 0:
-                        unmod_pct = 100 * n_unmod / float(n_aligned)
-                        mod_pct = 100 * n_mod / float(n_aligned)
+                unmod_pct = np.nan
+                mod_pct = np.nan
+                if n_aligned > 0:
+                    unmod_pct = 100 * n_unmod / float(n_aligned)
+                    mod_pct = 100 * n_mod / float(n_aligned)
 
-                    vals = [amplicon_name]
-                    vals.extend([round(unmod_pct, 8), round(mod_pct, 8), n_tot, n_aligned, n_unmod, n_mod, n_discarded, n_insertion, n_deletion, n_substitution, n_only_insertion, n_only_deletion, n_only_substitution, n_insertion_and_deletion, n_insertion_and_substitution, n_deletion_and_substitution, n_insertion_and_deletion_and_substitution])
-                    quantification_summary.append(vals)
+                vals = [amplicon_name]
+                vals.extend([round(unmod_pct, 8), round(mod_pct, 8), n_tot, n_aligned, n_unmod, n_mod, n_discarded, n_insertion, n_deletion, n_substitution, n_only_insertion, n_only_deletion, n_only_substitution, n_insertion_and_deletion, n_insertion_and_substitution, n_deletion_and_substitution, n_insertion_and_deletion_and_substitution])
+                quantification_summary.append(vals)
 
-                    good_region_names.append(row.run_name)
-                    good_region_folders[row.run_name] = folder_name
+                good_region_names.append(row.run_name)
+                good_region_folders[row.run_name] = folder_name
 
         samples_quantification_summary_filename = _jp('SAMPLES_QUANTIFICATION_SUMMARY.txt')
 
