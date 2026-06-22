@@ -1685,13 +1685,13 @@ def main():
 
              for file_to_remove in files_to_remove:
                  try:
-                         if os.path.islink(file_to_remove):
-                             # print 'LINK',file_to_remove
-                             os.unlink(file_to_remove)
-                         else:
-                             os.remove(file_to_remove)
+                    if os.path.islink(file_to_remove):
+                        # print 'LINK',file_to_remove
+                        os.unlink(file_to_remove)
+                    else:
+                        os.remove(file_to_remove)
                  except:
-                         warn('Skipping:%s' % file_to_remove)
+                    warn('Skipping:%s' % file_to_remove)
 
         if not args.suppress_report and not args.suppress_plots:
             if (args.place_report_in_output_folder):
