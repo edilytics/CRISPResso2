@@ -4815,7 +4815,7 @@ def main():
 
                 splice_sites_analysis_filename = _jp(ref_plot_name + 'Splice_sites_analysis.txt')
                 with open(splice_sites_analysis_filename, 'w+') as outfile:
-                        outfile.write('Splice sites analysis:\n\tUnmodified:%d reads\n\tPotential splice sites modified:%d reads\n' % (counts_total[ref_name] - SPLICING_SITES_MODIFIED, SPLICING_SITES_MODIFIED))
+                    outfile.write('Splice sites analysis:\n\tUnmodified:%d reads\n\tPotential splice sites modified:%d reads\n' % (counts_total[ref_name] - SPLICING_SITES_MODIFIED, SPLICING_SITES_MODIFIED))
                 crispresso2_info['results']['refs'][ref_name]['splice_sites_analysis_filename'] = os.path.basename(splice_sites_analysis_filename)
                 crispresso2_info['results']['refs'][ref_name]['splice_sites_analysis_filename_caption'] = "A text file describing the number of splicing sites that are unmodified and modified. This file report is produced when the amplicon contains a coding sequence."
 
