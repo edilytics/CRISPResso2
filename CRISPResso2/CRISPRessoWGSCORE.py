@@ -41,11 +41,11 @@ def get_data(path):
 
 
 def check_library(library_name):
-        try:
-                return __import__(library_name)
-        except:
-                error('You need to install %s module to use CRISPRessoWGS!' % library_name)
-                sys.exit(1)
+    try:
+        return __import__(library_name)
+    except:
+        error('You need to install %s module to use CRISPRessoWGS!' % library_name)
+        sys.exit(1)
 
 
 def find_wrong_nt(sequence):
