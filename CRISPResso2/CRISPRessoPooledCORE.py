@@ -1671,26 +1671,26 @@ def main():
 
         # cleaning up
         if not args.keep_intermediate:
-             info('Removing Intermediate files...')
+            info('Removing Intermediate files...')
 
-             if RUNNING_MODE == 'ONLY_GENOME' or RUNNING_MODE == 'AMPLICONS_AND_GENOME':
-                 if args.aligned_pooled_bam is None:
-                     files_to_remove += [bam_filename_genome]
-                     files_to_remove += [bam_filename_genome + ".bai"]
+            if RUNNING_MODE == 'ONLY_GENOME' or RUNNING_MODE == 'AMPLICONS_AND_GENOME':
+                if args.aligned_pooled_bam is None:
+                    files_to_remove += [bam_filename_genome]
+                    files_to_remove += [bam_filename_genome + ".bai"]
 
-             if RUNNING_MODE == 'ONLY_AMPLICONS':
+            if RUNNING_MODE == 'ONLY_AMPLICONS':
                 files_to_remove += [bam_filename_amplicons, amplicon_fa_filename]
                 for bowtie2_file in glob.glob(_jp('CUSTOM_BOWTIE2_INDEX.*')):
                     files_to_remove.append(bowtie2_file)
 
-             for file_to_remove in files_to_remove:
-                 try:
+            for file_to_remove in files_to_remove:
+                try:
                     if os.path.islink(file_to_remove):
                         # print 'LINK',file_to_remove
                         os.unlink(file_to_remove)
                     else:
                         os.remove(file_to_remove)
-                 except:
+                except:
                     warn('Skipping:%s' % file_to_remove)
 
         if not args.suppress_report and not args.suppress_plots:
