@@ -209,9 +209,9 @@ np = check_library('numpy')
 
 
 def get_n_reads_fastq(fastq_filename):
-     p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '') + "cat < %s | wc -l" % fastq_filename, shell=True, stdout=sb.PIPE)
-     n_reads = int(float(p.communicate()[0]) / 4.0)
-     return n_reads
+    p = sb.Popen(('z' if fastq_filename.endswith('.gz') else '') + "cat < %s | wc -l" % fastq_filename, shell=True, stdout=sb.PIPE)
+    n_reads = int(float(p.communicate()[0]) / 4.0)
+    return n_reads
 
 
 def extract_reads(row, samtools_exclude_flags):
