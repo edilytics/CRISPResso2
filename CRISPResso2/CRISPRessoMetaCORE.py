@@ -61,11 +61,11 @@ def propagate_options(cmd, options, params, paramInd):
 
 
 def check_library(library_name):
-        try:
-                return __import__(library_name)
-        except:
-                error('You need to install %s module to use CRISPRessoMeta!' % library_name)
-                sys.exit(1)
+    try:
+        return __import__(library_name)
+    except:
+        error('You need to install %s module to use CRISPRessoMeta!' % library_name)
+        sys.exit(1)
 
 
 pd = check_library('pandas')
