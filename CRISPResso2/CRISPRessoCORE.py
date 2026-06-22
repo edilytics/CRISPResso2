@@ -4136,8 +4136,8 @@ def main():
                     deletion_count_vectors[ref_name][variant_payload['deletion_positions']] += variant_count
                     this_effective_len = this_effective_len - variant_payload['deletion_n']
                     if variant_payload['deletion_n'] > 0:
-                         counts_deletion[ref_name] += variant_count
-                         this_has_deletions = True
+                        counts_deletion[ref_name] += variant_count
+                        this_has_deletions = True
 
                 effective_len_dicts[ref_name][this_effective_len] += variant_count
 
