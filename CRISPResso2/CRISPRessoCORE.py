@@ -1904,8 +1904,8 @@ def process_fastq(fastq_filename, variantCache, ref_names, refs, args, files_to_
     with fastq_input_opener(fastq_filename) as fastq_handle:
 
         # Reading through the fastq file and enriching variantCache as a dictionary with the following:
-            # Key: the unique DNA sequence from the fastq file
-            # Value: an integer that represents how many times we've seen this specific read
+        # Key: the unique DNA sequence from the fastq file
+        # Value: an integer that represents how many times we've seen this specific read
         num_reads = 0
         fastq_id = fastq_handle.readline()
         while (fastq_id):
