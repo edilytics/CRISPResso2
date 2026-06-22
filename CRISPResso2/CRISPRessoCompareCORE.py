@@ -23,11 +23,11 @@ info = logger.info
 
 
 def check_library(library_name):
-        try:
-                return __import__(library_name)
-        except:
-                error('You need to install %s module to use CRISPRessoCompare!' % library_name)
-                sys.exit(1)
+    try:
+        return __import__(library_name)
+    except:
+        error('You need to install %s module to use CRISPRessoCompare!' % library_name)
+        sys.exit(1)
 
 
 def parse_profile(profile_file):
