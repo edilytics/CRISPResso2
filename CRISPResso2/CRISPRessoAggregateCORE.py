@@ -90,10 +90,10 @@ ___________________________________
         _jp = lambda filename: os.path.join(OUTPUT_DIRECTORY, filename)  # handy function to put a file in the output directory
 
         try:
-             info('Creating Folder %s' % OUTPUT_DIRECTORY)
-             os.makedirs(OUTPUT_DIRECTORY)
+            info('Creating Folder %s' % OUTPUT_DIRECTORY)
+            os.makedirs(OUTPUT_DIRECTORY)
         except:
-             warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
+            warn('Folder %s already exists.' % OUTPUT_DIRECTORY)
 
         log_filename = _jp('CRISPRessoAggregate_RUNNING_LOG.txt')
         logger.addHandler(logging.FileHandler(log_filename))
