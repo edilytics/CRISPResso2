@@ -1,0 +1,33 @@
+name: Semgrep
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    # Pinned OSS image; no SEMGREP_APP_TOKEN, no account, fully free.
+    container:
+      image: semgrep/semgrep:1.166.0
+    steps:
+      - uses: actions/checkout@v4
+
+      # --metrics=off + pinned packs => code never leaves the runner (private-repo safe).
+      # --error fails the job on any ERROR-severity finding; suppress accepted ones with # nosemgrep.
+      - name: Semgrep scan
+        run: |
+          semgrep scan \
+            --config=p/python \
+            --config=p/flask \
+            --config=p/javascript \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --config=p/dockerfile \
+            --severity=ERROR \
+            --metrics=off \
+            --error
