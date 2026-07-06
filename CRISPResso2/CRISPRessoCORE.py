@@ -2619,9 +2619,17 @@ def main():
 
         CRISPRessoShared.set_console_log_level(logger, args.verbosity, args.debug)
 
+        # Validate the storage backend flag and fail fast if the parquet backend is
+        # selected but its dependencies (polars/pyarrow) are not importable. No
+        # behavior changes here yet — the pandas path remains the default oracle.
+        storage_backend = CRISPRessoShared.assert_storage_backend_importable(args.storage_backend)
+        args.storage_backend = storage_backend
+
         description = ['~~~CRISPResso 2~~~', '-Analysis of genome editing outcomes from deep sequencing data-']
         header = CRISPRessoShared.get_crispresso_header(description=description, header_str=None)
         info(header)
+
+        info('Storage backend: %s' % args.storage_backend, {'percent_complete': 0})
 
         OUTPUT_DIRECTORY = 'CRISPResso_on_{0}'.format(normalize_name(args.name, args.fastq_r1, args.fastq_r2, args.bam_input))
 
@@ -2705,6 +2713,7 @@ def main():
         crispresso2_info = {'running_info': {}, 'results': {'alignment_stats': {}, 'general_plots': {}}}  # keep track of all information for this run to be pickled and saved at the end of the run
         crispresso2_info['running_info']['version'] = CRISPRessoShared.__version__
         crispresso2_info['running_info']['args'] = deepcopy(args)
+        crispresso2_info['running_info']['storage_backend'] = args.storage_backend
 
         crispresso2_info['running_info']['log_filename'] = os.path.basename(log_filename)
 

@@ -580,7 +580,7 @@ def test_sgRNA_mismatch_pe_extension_at_end():
 
     match.end() == len(amplicon), which triggered IndexError before the fix.
     """
-    amplicon        = 'GCATGCATGCATCGTACG'
+    amplicon = 'GCATGCATGCATCGTACG'
     edited_amplicon = 'GCATGCATGCATCGTACG'
     extension = 'CGTACG'
 
@@ -601,7 +601,7 @@ def test_sgRNA_mismatch_pe_extension_at_end():
 
 def test_sgRNA_mismatch_pe_extension_at_end_with_edit():
     """PE extension at end of amplicon where amplicons differ at last base."""
-    amplicon   = 'GCATGCATGCATCGTACT'  # last base T
+    amplicon = 'GCATGCATGCATCGTACT'  # last base T
     edited_amp = 'GCATGCATGCATCGTACG'  # last base G
     extension = 'CGTACG'
 
@@ -652,7 +652,7 @@ def test_sgRNA_mismatch_pe_regression_20bp():
     seq1 = 'AAAAATTTTTCCCCCGGGGG'
     seq2 = 'AAAAATTTTTCCCCCGGGGG'
 
-    match = re.search('GGGGG', seq2)
+    match = re.search(r'GGGGG', seq2)
     assert match.end() == 20
 
     coords_l, coords_r, rev_coords_l, rev_coords_r = _get_mismatch_coords(seq1, seq2)
@@ -1872,9 +1872,9 @@ def test_cigar_lookup_exists():
     """Test CIGAR_LOOKUP dictionary exists."""
     assert hasattr(CRISPRessoShared, 'CIGAR_LOOKUP')
     # Check some key lookups
-    assert CRISPRessoShared.CIGAR_LOOKUP[('A', 'A')] == 'M'
-    assert CRISPRessoShared.CIGAR_LOOKUP[('A', '-')] == 'I'
-    assert CRISPRessoShared.CIGAR_LOOKUP[('-', 'A')] == 'D'
+    assert CRISPRessoShared.CIGAR_LOOKUP['A', 'A'] == 'M'
+    assert CRISPRessoShared.CIGAR_LOOKUP['A', '-'] == 'I'
+    assert CRISPRessoShared.CIGAR_LOOKUP['-', 'A'] == 'D'
 
 
 def test_unexplode_cigar_basic():
@@ -1986,7 +1986,6 @@ def test_cigar_unexplode_pattern():
     """Test CIGAR_UNEXPLODE_PATTERN regex exists."""
     assert hasattr(CRISPRessoShared, 'cigarUnexplodePattern')
     # Test it can match CIGAR operations
-    import re
     result = CRISPRessoShared.cigarUnexplodePattern.findall("MMMIID")
     assert len(result) > 0
 
@@ -2161,3 +2160,115 @@ def test_check_custom_config_enforces_guardrail_types(monkeypatch):
 
     with pytest.raises(CRISPRessoShared.BadParameterException, match="guide_len"):
         CRISPRessoShared.check_custom_config(args)
+
+
+# =============================================================================
+# Tests for --storage_backend flag plumbing (PR 1: deps + no-op flag)
+# =============================================================================
+
+
+def test_storage_backend_default_is_pandas():
+    """The --storage_backend flag must default to 'pandas' so the current path
+    remains the parity oracle until the parquet backend ships and is validated.
+    """
+    parser = CRISPRessoShared.getCRISPRessoArgParser("Core")
+    args = parser.parse_args([])
+    assert args.storage_backend == "pandas"
+
+
+def test_storage_backend_accepts_parquet():
+    parser = CRISPRessoShared.getCRISPRessoArgParser("Core")
+    args = parser.parse_args(["--storage_backend", "parquet"])
+    assert args.storage_backend == "parquet"
+
+
+def test_storage_backend_rejects_unknown_value():
+    """Argparse choices= must reject anything outside {pandas, parquet}."""
+    parser = CRISPRessoShared.getCRISPRessoArgParser("Core")
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--storage_backend", "duckdb"])
+
+
+def test_storage_backend_present_in_core_options_for_propagation():
+    """Downstream tools (Batch/Pooled/WGS) propagate Core options to the
+    CRISPResso subprocess. storage_backend must be in that set so the flag
+    passes through with no per-tool changes.
+    """
+    opts = CRISPRessoShared.get_core_crispresso_options()
+    assert "storage_backend" in opts
+
+
+@pytest.mark.parametrize("tool", ["Core", "Batch", "Pooled", "WGS"])
+def test_storage_backend_available_on_all_core_tools(tool):
+    """The flag is registered for Core/Batch/Pooled/WGS so every entry point
+    exposes it (Batch/Pooled/WGS shell out to CRISPResso and propagate it).
+    """
+    parser = CRISPRessoShared.getCRISPRessoArgParser(tool)
+    dests = {a.dest for a in parser._actions}
+    assert "storage_backend" in dests
+
+
+def test_validate_storage_backend_lowercases_and_accepts_valid():
+    assert CRISPRessoShared.validate_storage_backend("pandas") == "pandas"
+    assert CRISPRessoShared.validate_storage_backend("Parquet") == "parquet"
+
+
+def test_validate_storage_backend_rejects_none():
+    with pytest.raises(CRISPRessoShared.BadParameterException):
+        CRISPRessoShared.validate_storage_backend(None)
+
+
+def test_validate_storage_backend_rejects_unknown():
+    with pytest.raises(CRISPRessoShared.BadParameterException, match="Unknown storage backend"):
+        CRISPRessoShared.validate_storage_backend("sqlite")
+
+
+def test_assert_storage_backend_importable_pandas_needs_no_extra_deps():
+    """The default pandas backend must never require an import guard."""
+    assert CRISPRessoShared.assert_storage_backend_importable("pandas") == "pandas"
+
+
+def test_assert_storage_backend_importable_parquet_when_deps_present():
+    """When polars+pyarrow are importable, the parquet guard passes."""
+    import importlib  # noqa: F401
+    try:
+        import polars  # noqa: F401
+        import pyarrow  # noqa: F401
+    except ImportError:
+        pytest.skip("polars/pyarrow not installed in this env")
+    assert CRISPRessoShared.assert_storage_backend_importable("parquet") == "parquet"
+
+
+def test_assert_storage_backend_importable_parquet_raises_when_missing(monkeypatch):
+    """If polars cannot be imported, the guard must raise InstallationException
+    with an actionable message before any pipeline work begins.
+    """
+    import builtins
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "polars":
+            raise ImportError("simulated missing polars")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    with pytest.raises(CRISPRessoShared.InstallationException, match="polars"):
+        CRISPRessoShared.assert_storage_backend_importable("parquet")
+
+
+def test_storage_backend_propagates_through_overwrite_crispresso_options():
+    """Batch/Pooled/WGS use overwrite_crispresso_options to push Core args onto
+    the CRISPResso subprocess command. storage_backend must survive this.
+    """
+    parser = CRISPRessoShared.getCRISPRessoArgParser("Core")
+    base_cmd = "CRISPResso -r1 reads.fastq -a ACGT"
+    ns = argparse.Namespace(storage_backend="parquet")
+    new_cmd = CRISPRessoShared.overwrite_crispresso_options(
+        cmd=base_cmd, tool="Core",
+        option_names_to_overwrite=["storage_backend"],
+        option_values=ns,
+    )
+    assert "--storage_backend parquet" in new_cmd
+    # and the parsed result round-trips
+    parsed = parser.parse_args(new_cmd.split()[1:])
+    assert parsed.storage_backend == "parquet"

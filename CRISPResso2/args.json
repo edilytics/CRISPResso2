@@ -678,6 +678,15 @@
             "default": "1",
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
+        "storage_backend": {
+            "name": "Storage Backend",
+            "keys": ["--storage_backend"],
+            "type": "str",
+            "help": "R|Storage backend used for read alignment and allele aggregation.\n  - pandas: (default) the current in-memory path; held fully in RAM.\n  - parquet: spilling/streaming path backed by parquet + polars; keeps peak memory flat as read count scales (intended for long-read / high-diversity amplicon data).\nThe parquet backend is experimental and gated behind this flag; output parity with the pandas backend is enforced in tests.",
+            "default": "pandas",
+            "choices": ["pandas", "parquet"],
+            "tools": ["Core", "Batch", "Pooled", "WGS"]
+        },
         "bam_input": {
             "keys": ["--bam_input"],
             "type": "str",

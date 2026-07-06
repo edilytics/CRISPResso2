@@ -19,6 +19,8 @@ bowtie2 = "*"
 samtools = "*"
 setuptools = "*"
 pip = "*"
+polars = "*"
+pyarrow = "*"
 
 [feature.test.dependencies]
 pytest = "*"

@@ -200,6 +200,7 @@ def getCRISPRessoArgParser(tool, parser_title="CRISPResso Parameters"):
                 else:
                     kwargs = {'help': arg_help, 'type': type_mapper[type_value]}
                     if default is not None: kwargs['default'] = default
+                    if 'choices' in value: kwargs['choices'] = value['choices']
                     parser.add_argument(*value['keys'], **kwargs)
 
     _add_args_from_dict(args_dict, tool, parser, type_mapper)
@@ -228,6 +229,56 @@ def get_core_crispresso_options():
         crispresso_options.add(d2)
 
     return crispresso_options
+
+
+VALID_STORAGE_BACKENDS = ("pandas", "parquet")
+
+
+def validate_storage_backend(storage_backend):
+    """Validate the --storage_backend flag value.
+
+    Returns the canonical lowercased backend name. Raises BadParameterException for
+    unknown values. This is the single source of truth for backend enumeration so
+    that downstream phases (VariantStore etc.) can import it.
+    """
+    if storage_backend is None:
+        raise BadParameterException("--storage_backend must be one of %s" % (VALID_STORAGE_BACKENDS,))
+    backend = str(storage_backend).lower()
+    if backend not in VALID_STORAGE_BACKENDS:
+        raise BadParameterException(
+            "Unknown storage backend '%s'. Valid values: %s" % (storage_backend, VALID_STORAGE_BACKENDS)
+        )
+    return backend
+
+
+def assert_storage_backend_importable(storage_backend):
+    """Fail-fast import guard for the parquet storage backend.
+
+    The pandas (default) backend has no extra dependencies. The parquet backend
+    requires polars and pyarrow; if they cannot be imported we raise an
+    InstallationException with an actionable message before any work begins, rather
+    than failing deep in the pipeline.
+    """
+    backend = validate_storage_backend(storage_backend)
+    if backend == "parquet":
+        missing = []
+        try:
+            import polars  # noqa: F401
+        except ImportError:
+            missing.append("polars")
+        try:
+            import pyarrow  # noqa: F401
+        except ImportError:
+            missing.append("pyarrow")
+        if missing:
+            raise InstallationException(
+                "The 'parquet' storage backend requires the following Python package(s) "
+                "which could not be imported: %s. Please install them (e.g. `pip install %s`) "
+                "or use the default '--storage_backend pandas' backend." % (
+                    ", ".join(missing), " ".join(missing),
+                )
+            )
+    return backend
 
 
 def get_crispresso_options_lookup(tool):

@@ -11,7 +11,9 @@ dependencies = [
     "seaborn",
     "jinja2",
     "scipy",
-    "numpy"
+    "numpy",
+    "polars",
+    "pyarrow",
 ]
 description = "Software pipeline for the analysis of genome editing outcomes from deep sequencing data"
 authors = [
