@@ -675,9 +675,12 @@ def test_shard_schema_uniformity(temp_dir):
 
 from CRISPResso2.storage import (
     collapse_aligned_shards,
+    get_slice_from_collapsed,
 )
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+import pandas as pd
 
 
 def _shard_payload(ref_name="ref1", aln_seq="ATCGATCG--ATCGATCGAT",
@@ -1998,3 +2001,326 @@ def test_allele_tsv_streaming_batched_byte_parity(temp_dir):
                                        collapsed_path=collapsed_path, batch_size=5)
     ref = _ref_allele_tsv(allele_rows, n_total, write_detailed=False)
     assert open(got_path).read() == ref
+
+
+# ---------------------------------------------------------------------------
+# Stage 5 — df_alleles lazy view + get_slice (PR 7, Phase 3 item 8)
+# ---------------------------------------------------------------------------
+#
+# Parity strategy: build the reference pandas ``df_alleles`` from the collapsed
+# ``allele_rows`` (the exact shape ``CRISPRessoCORE.main`` produces via
+# ``pd.DataFrame(alleles_list)`` + ``%Reads`` + int cast + sort), then assert
+# ``CollapsedAlleles.get_slice`` reproduces it — both the whole-table view and
+# per-reference slices — with byte-identical cell types (numpy int arrays for
+# positions, tuple-lists for coordinates, numpy ``<U1`` array for
+# ``substitution_values``) so plot code (``iterrows``, ``str``, array indexing)
+# is unaffected.
+
+from CRISPResso2.storage import (
+    _CRISPRESSO2_COLS as _STORAGE_CRISPRESSO2_COLS,
+    _DETAILED_ALLELE_COLS as _STORAGE_DETAILED_COLS,
+)
+
+
+# Position/size columns that alleles_list stores as numpy int arrays.
+_SLICE_POS_COLS = [
+    "ref_positions", "all_insertion_positions", "all_insertion_left_positions",
+    "insertion_positions", "insertion_sizes", "all_deletion_positions",
+    "deletion_positions", "deletion_sizes", "all_substitution_positions",
+    "substitution_positions",
+]
+
+
+def _ref_df_alleles(allele_rows, n_total):
+    """Build the pandas ``df_alleles`` from collapsed ``allele_rows``.
+
+    Mirrors ``CRISPRessoCORE.main`` ~line 4307-4312: ``pd.DataFrame(alleles_list)``
+    + ``%Reads = #Reads / N_TOTAL * 100`` + ``n_*`` int cast. ``allele_rows`` come
+    from collapse (parquet-round-tripped → Python lists), so convert position
+    arrays to numpy and ``substitution_values`` to numpy ``<U1`` to match the
+    native ``alleles_list`` cell types (find_indels_substitutions emits numpy).
+    The rows are already sorted by collapse (same key as ``df_alleles.sort_values``).
+    """
+    converted = []
+    for r in allele_rows:
+        d = dict(r)
+        for c in _SLICE_POS_COLS:
+            if c in d:
+                v = d[c]
+                d[c] = np.asarray(v if v is not None else [], dtype=int)
+        if "substitution_values" in d:
+            sv = d["substitution_values"]
+            # find_indels_substitutions emits a string numpy array; the canned
+            # test payloads use np.array([]) (float64) for the empty case, so
+            # always (re)cast to <U1 to match the real alleles_list cell type.
+            d["substitution_values"] = np.asarray(sv if sv is not None else [], dtype="<U1")
+        converted.append(d)
+    df = pd.DataFrame(converted)
+    if len(df):
+        df["%Reads"] = df["#Reads"] / n_total * 100 if n_total > 0 else 0.0
+        df[["n_deleted", "n_inserted", "n_mutated"]] = df[
+            ["n_deleted", "n_inserted", "n_mutated"]
+        ].astype(int)
+    return df
+
+
+def _assert_slice_matches(df_got, df_ref):
+    """Element-wise parity between a get_slice result and the reference df_alleles.
+
+    ``pd.testing.assert_frame_equal`` does not handle object-dtype columns whose
+    cells are numpy arrays / tuple-lists, so compare cell-by-cell.
+    """
+    assert list(df_got.columns) == list(df_ref.columns), (
+        f"columns differ:\n got={list(df_got.columns)}\n ref={list(df_ref.columns)}")
+    assert len(df_got) == len(df_ref), (
+        f"row count differs: got={len(df_got)} ref={len(df_ref)}")
+    df_got = df_got.reset_index(drop=True)
+    df_ref = df_ref.reset_index(drop=True)
+    for col in df_ref.columns:
+        for i in range(len(df_ref)):
+            g = df_got.at[i, col]
+            r = df_ref.at[i, col]
+            if isinstance(r, np.ndarray):
+                assert isinstance(g, np.ndarray), f"row {i} col {col}: expected ndarray, got {type(g)}"
+                assert g.dtype == r.dtype, f"row {i} col {col}: dtype {g.dtype} != {r.dtype}"
+                assert np.array_equal(g, r), f"row {i} col {col}: {g} != {r}"
+            elif isinstance(r, list):
+                assert g == r, f"row {i} col {col}: {g!r} != {r!r}"
+            else:
+                assert g == r, f"row {i} col {col}: {g!r} != {r!r}"
+
+
+def _multi_ref_rows():
+    """Canned payloads spanning two refs (for slice-by-ref tests)."""
+    p1 = _allele_with(ref_name="ref1", aln_seq="ATCGATCG--ATCGATCGAT",
+                      deletion_n=2, all_deletion_positions=[8, 9],
+                      deletion_coordinates=[(8, 10)], deletion_sizes=[2])
+    p1["variant_ref1"]["substitution_values"] = np.array([])
+    p2 = _allele_with(ref_name="ref2", aln_seq="ATCGATCGAAATCGATCGAT",
+                      aln_ref="ATCGATCGAAATCGATCGAT", classification="UNMODIFIED",
+                      deletion_n=0, all_deletion_positions=[], deletion_positions=[],
+                      deletion_coordinates=[], deletion_sizes=[])
+    p2["class_name"] = "ref2_UNMODIFIED"
+    p3 = _allele_with(ref_name="ref1", aln_seq="ATCGATCG--ATCGATCGGT",
+                      aln_ref="ATCGATCGAAATCGATCGAT", deletion_n=2, substitution_n=1,
+                      all_deletion_positions=[8, 9], all_substitution_positions=[18],
+                      deletion_coordinates=[(8, 10)], deletion_sizes=[2])
+    p3["variant_ref1"]["substitution_values"] = np.array(["G"])
+    p3["variant_ref1"]["substitution_positions"] = [18]
+    return [("ACGTACGA", 4, p1), ("TTTTACGC", 3, p2), ("ACGTACGG", 2, p3)]
+
+
+def test_get_slice_whole_table_matches_df_alleles(temp_dir):
+    """get_slice() (no ref, no cols) == full df_alleles (detailed + %Reads)."""
+    allele_rows, n_total, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    df_got = res.get_slice()
+    _assert_slice_matches(df_got, df_ref)
+
+
+def test_get_slice_by_ref_name_matches_loc_filter(temp_dir):
+    """get_slice(ref_name='ref1') == df_alleles.loc[df_alleles.Reference_Name=='ref1']."""
+    allele_rows, n_total, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    df_ref = df_ref.loc[df_ref["Reference_Name"] == "ref1"].reset_index(drop=True)
+    df_got = res.get_slice(ref_name="ref1")
+    _assert_slice_matches(df_got, df_ref)
+
+
+def test_get_slice_other_ref(temp_dir):
+    """get_slice(ref_name='ref2') returns the ref2 rows only."""
+    allele_rows, n_total, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    df_ref = df_ref.loc[df_ref["Reference_Name"] == "ref2"].reset_index(drop=True)
+    df_got = res.get_slice(ref_name="ref2")
+    _assert_slice_matches(df_got, df_ref)
+    # both rows are ref2? no — only one ref2 row in _multi_ref_rows
+    assert len(df_got) == 1
+
+
+def test_get_slice_pct_reads_computed(temp_dir):
+    """%Reads = #Reads / n_total * 100 (float64), matching df_alleles derivation."""
+    allele_rows, n_total, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    df_got = res.get_slice()
+    for i in range(len(df_ref)):
+        assert df_got.at[i, "%Reads"] == df_ref.at[i, "%Reads"]
+    # 4/9*100 = 44.44...
+    assert df_got.at[0, "%Reads"] == pytest.approx(4 / 9 * 100)
+
+
+def test_get_slice_n_deleted_cast_to_int(temp_dir):
+    """n_deleted/n_inserted/n_mutated cast to int (parity with df_alleles ~line 4310)."""
+    _, _, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df = res.get_slice()
+    for c in ("n_deleted", "n_inserted", "n_mutated"):
+        assert df[c].dtype.kind in "iu", f"{c} dtype={df[c].dtype}"
+
+
+def test_get_slice_cell_types_numpy_arrays(temp_dir):
+    """Position arrays are numpy int arrays; coords are tuple-lists; sub_values is <U1 array."""
+    _, _, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df = res.get_slice()
+    # ref_positions is a numpy int array for every row
+    for v in df["ref_positions"]:
+        assert isinstance(v, np.ndarray)
+        assert v.dtype.kind in "iu"
+    # deletion_coordinates is a list of (start, end) tuples
+    for v in df["deletion_coordinates"]:
+        assert isinstance(v, list)
+        for t in v:
+            assert isinstance(t, tuple) and len(t) == 2
+    # substitution_values is a numpy <U1 array (empty or ['G'])
+    for v in df["substitution_values"]:
+        assert isinstance(v, np.ndarray)
+        assert v.dtype.kind in "US"
+
+
+def test_get_slice_column_projection(temp_dir):
+    """get_slice(columns=[...]) projects to those columns, order preserved."""
+    allele_rows, n_total, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    cols = ["Aligned_Sequence", "Reference_Name", "#Reads", "%Reads"]
+    df = res.get_slice(columns=cols)
+    assert list(df.columns) == cols
+    df_ref = _ref_df_alleles(allele_rows, n_total).loc[:, cols].reset_index(drop=True)
+    _assert_slice_matches(df, df_ref)
+
+
+def test_get_slice_non_detailed_projection_matches_crispresso2cols(temp_dir):
+    """get_slice(columns=crispresso2Cols) == df_alleles.loc[:, crispresso2Cols]."""
+    allele_rows, n_total, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    df_got = res.get_slice(columns=list(_STORAGE_CRISPRESSO2_COLS))
+    df_ref = df_ref.loc[:, list(_STORAGE_CRISPRESSO2_COLS)].reset_index(drop=True)
+    _assert_slice_matches(df_got, df_ref)
+
+
+def test_get_slice_ref_plus_columns_combined(temp_dir):
+    """get_slice(ref_name=..., columns=...) filters AND projects together."""
+    allele_rows, n_total, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    cols = ["Aligned_Sequence", "#Reads", "%Reads"]
+    df_ref = df_ref.loc[df_ref["Reference_Name"] == "ref1", cols].reset_index(drop=True)
+    df_got = res.get_slice(ref_name="ref1", columns=cols)
+    _assert_slice_matches(df_got, df_ref)
+
+
+def test_get_slice_nonexistent_ref_returns_empty(temp_dir):
+    """Slice for a ref not present → empty frame with the requested columns."""
+    _, _, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df = res.get_slice(ref_name="ref9")
+    assert len(df) == 0
+    # full detailed column set + %Reads (default columns=None)
+    assert "%Reads" in df.columns
+    assert "Aligned_Sequence" in df.columns
+
+
+def test_get_slice_nonexistent_ref_with_columns_returns_empty(temp_dir):
+    """Empty slice with explicit columns → those columns, zero rows."""
+    _, _, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    cols = ["Aligned_Sequence", "#Reads"]
+    df = res.get_slice(ref_name="ref9", columns=cols)
+    assert len(df) == 0
+    assert list(df.columns) == cols
+
+
+def test_get_slice_empty_input(temp_dir):
+    """Empty collapsed table → get_slice returns an empty frame, no crash."""
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    with AlignedShardWriter(shard) as w:
+        pass
+    res = collapse_aligned_shards([shard], temp_dir, is_paired=False)
+    df = res.get_slice()
+    assert len(df) == 0
+    # header (column set) is present even with no rows
+    assert "%Reads" in df.columns
+
+
+def test_get_slice_in_memory_fallback_no_parquet(temp_dir):
+    """write_parquet=False → get_slice materializes from allele_rows (no parquet)."""
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    _write_shard(shard, _multi_ref_rows())
+    res = collapse_aligned_shards(
+        [shard], temp_dir, is_paired=False,
+        write_detailed_allele_table=True, write_parquet=False)
+    assert res.parquet_path is None
+    allele_rows = res.allele_rows
+    n_total = res.n_total
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    # whole table
+    _assert_slice_matches(res.get_slice(), df_ref)
+    # per-ref slice (exercises the in-memory filter path)
+    df_ref1 = df_ref.loc[df_ref["Reference_Name"] == "ref1"].reset_index(drop=True)
+    _assert_slice_matches(res.get_slice(ref_name="ref1"), df_ref1)
+
+
+def test_get_slice_preserves_sort_order(temp_dir):
+    """Slice rows are in collapse's sort order (#Reads desc, Aligned asc, Ref asc)."""
+    allele_rows, n_total, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df = res.get_slice()
+    # verify sorted: #Reads non-increasing
+    reads = df["#Reads"].tolist()
+    assert reads == sorted(reads, reverse=True), f"not sorted desc: {reads}"
+
+
+def test_get_slice_wrapper_matches_bound_method(temp_dir):
+    """get_slice_from_collapsed convenience wrapper == CollapsedAlleles.get_slice."""
+    allele_rows, n_total, collapsed_path, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    df_via_wrapper = get_slice_from_collapsed(res, ref_name="ref1")
+    df_ref = df_ref.loc[df_ref["Reference_Name"] == "ref1"].reset_index(drop=True)
+    _assert_slice_matches(df_via_wrapper, df_ref)
+    # also via an explicit collapsed_path argument
+    df_via_path = get_slice_from_collapsed(
+        res, ref_name="ref1", collapsed_path=collapsed_path)
+    _assert_slice_matches(df_via_path, df_ref)
+
+
+def test_get_slice_include_pct_reads_false(temp_dir):
+    """include_pct_reads=False omits %Reads even when columns=None."""
+    _, _, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df = res.get_slice(include_pct_reads=False)
+    assert "%Reads" not in df.columns
+    # the detailed columns are all present
+    for c in _STORAGE_DETAILED_COLS:
+        assert c in df.columns
+
+
+def test_get_slice_to_csv_byte_parity(temp_dir):
+    """get_slice().to_csv == df_alleles.to_csv (the design's parity bar: plots
+    receive a pandas DataFrame; its CSV output must be byte-identical)."""
+    allele_rows, n_total, _, res = _collapse_to_rows(_multi_ref_rows(), temp_dir)
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    df_got = res.get_slice()
+    buf_got = io.StringIO()
+    df_got.to_csv(buf_got, sep="\t", header=True, index=None)
+    buf_ref = io.StringIO()
+    df_ref.to_csv(buf_ref, sep="\t", header=True, index=None)
+    assert buf_got.getvalue() == buf_ref.getvalue()
+
+
+def test_get_slice_multi_batch_byte_parity(temp_dir):
+    """Many alleles / small batch_size → multi-batch scan still byte-identical."""
+    rows = []
+    bases = "ACGT"
+    for i in range(40):
+        ref = "ref1" if i % 2 == 0 else "ref2"
+        seq = "".join(bases[(i + j) % 4] for j in range(8))
+        ref_seq = "ATCGATCGAAATCGATCGAT"
+        gap_pos = i % 20
+        aln_seq = ref_seq[:gap_pos] + "-" + ref_seq[gap_pos + 1:]
+        p = _allele_with(ref_name=ref, aln_seq=aln_seq, aln_ref=ref_seq,
+                         deletion_n=1, classification="MODIFIED",
+                         all_deletion_positions=[gap_pos],
+                         deletion_positions=[gap_pos],
+                         deletion_coordinates=[(gap_pos, gap_pos + 1)],
+                         deletion_sizes=[1])
+        rows.append((seq, (i % 4) + 1, p))
+    allele_rows, n_total, collapsed_path, res = _collapse_to_rows(rows, temp_dir)
+    df_ref = _ref_df_alleles(allele_rows, n_total)
+    # tiny batch_size forces multiple iter_batches batches through get_slice
+    df_got = res.get_slice(batch_size=5)
+    _assert_slice_matches(df_got, df_ref)
+    # per-ref slice with tiny batches
+    df_ref1 = df_ref.loc[df_ref["Reference_Name"] == "ref1"].reset_index(drop=True)
+    _assert_slice_matches(res.get_slice(ref_name="ref1", batch_size=5), df_ref1)

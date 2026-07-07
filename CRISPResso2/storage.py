@@ -25,10 +25,11 @@ Stages 2 (worker parquet writers), 3 (streaming collapse), and 4 (stream-out:
 count vectors + allele TSV sink) are implemented; this module exposes the
 Stage 1 ``VariantStore.count_reads`` API, the ``ReadCounts`` result handle,
 the Stage 2 worker parquet writer, the Stage 3 ``VariantStore.collapse``
-streaming collapse, and the Stage 4 ``VariantStore.compute_count_vectors`` /
-``VariantStore.write_allele_frequency_table`` stream-outs. None of these are
-wired into ``CRISPRessoCORE.main`` yet — they are exercised by unit tests
-against the current pandas path for parity.
+streaming collapse, the Stage 4 ``VariantStore.compute_count_vectors`` /
+``VariantStore.write_allele_frequency_table`` stream-outs, and the Stage 5
+``CollapsedAlleles.get_slice`` lazy view. None of these are wired into
+``CRISPRessoCORE.main`` yet — they are exercised by unit tests against the
+current pandas path for parity.
 """
 
 from __future__ import annotations
@@ -523,6 +524,7 @@ __all__ = [
     "VariantStore",
     "compute_count_vectors_from_collapsed",
     "count_reads_from_fastq",
+    "get_slice_from_collapsed",
     "iter_aligned_shard",
     "payload_to_row",
     "row_to_payload",
@@ -1474,6 +1476,8 @@ def collapse_aligned_shards(
     discard_indel_reads: bool = False,
     write_detailed_allele_table: bool = False,
     vcf_output: bool = False,
+    write_parquet: bool = True,
+    collapsed_path: Optional[str] = None,
     memory_budget_mb: int = DEFAULT_MEMORY_BUDGET_MB,
 ) -> CollapsedAlleles:
     """Convenience wrapper: create a :class:`VariantStore` and collapse shards.
@@ -1488,6 +1492,8 @@ def collapse_aligned_shards(
         discard_indel_reads=discard_indel_reads,
         write_detailed_allele_table=write_detailed_allele_table,
         vcf_output=vcf_output,
+        write_parquet=write_parquet,
+        collapsed_path=collapsed_path,
     )
 
 
@@ -1956,5 +1962,249 @@ def write_allele_frequency_table(
         n_total,
         write_detailed_allele_table=write_detailed_allele_table,
         dsODN=dsODN,
+        collapsed_path=collapsed_path,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Stage 5 — df_alleles lazy view + get_slice (PR 7, Phase 3 item 8)
+# ---------------------------------------------------------------------------
+#
+# The collapsed allele parquet (Stage 3 output) is the persisted artifact
+# that replaces the in-memory ``df_alleles`` pandas DataFrame. Consumers fall
+# into two groups (design premise #4):
+#
+#   * Whole-table consumers (allele TSV sink [PR 6], VCF writer, report) —
+#     already served by Stage 4 stream-outs and ``CollapsedAlleles.
+#     allele_rows_dataframe()``.
+#   * Slice consumers (~30 plot callsites in ``plots/data_prep.py`` and
+#     ``CRISPRessoCORE.py``) — they call
+#     ``df_alleles.loc[df_alleles['Reference_Name'] == ref]`` and then
+#     ``iterrows()`` / ``groupby`` / ``str.find``. These receive a pandas
+#     DataFrame materialized from a *filtered, projected* parquet slice via
+#     ``get_slice()`` rather than a slice of the whole in-RAM frame.
+#
+# ``get_slice(ref_name, columns)`` scans the collapsed parquet with a row filter
+# (``Reference_Name == ref_name``) and column projection at the pyarrow level
+# (``iter_batches(columns=...)``), so peak memory for a plot is bounded by the
+# slice size, not the whole allele table. Cell types are reconstructed to
+# match the pandas ``alleles_list`` exactly (numpy int arrays for positions,
+# tuple-lists for coordinates, numpy <U1 array for substitution_values) so plot
+# code — which calls ``str()`` on cells, slices arrays, indexes them — is
+# byte-for-byte identical to the pandas backend.
+#
+# NOT wired into CRISPRessoCORE.main — exercised by unit tests only. The
+# callsite adaptation (item 9) builds on this API: when ``backend == parquet``
+# the plot context's ``df_alleles`` will be a thin object whose
+# ``.loc[Reference_Name == ref]`` materializes via ``get_slice``; until then,
+# ``get_slice`` is a standalone parity-tested method.
+
+# Columns whose parquet values (arrow list<int64> / list<struct>) must be
+# reconstructed to the pandas ``alleles_list`` cell types for plot parity:
+#   * position / size arrays  -> np.array(list, dtype=int)
+#   * coordinate columns       -> list of (start, end) tuples
+#   * substitution_values     -> np.array(list, dtype='<U1')
+_INT_ARRAY_SLICE_COLS = frozenset([
+    "ref_positions",
+    "all_insertion_positions",
+    "all_insertion_left_positions",
+    "insertion_positions",
+    "insertion_sizes",
+    "all_deletion_positions",
+    "deletion_positions",
+    "deletion_sizes",
+    "all_substitution_positions",
+    "substitution_positions",
+])
+_COORD_SLICE_COLS = frozenset(["insertion_coordinates", "deletion_coordinates"])
+_STR_ARRAY_SLICE_COLS = frozenset(["substitution_values"])
+
+
+def _reconstruct_slice_cell(col_name, val):
+    """Convert a parquet cell to the pandas ``alleles_list`` cell type.
+
+    Parity with ``CRISPRessoCORE.main``'s ``alleles_list`` (and thus
+    ``df_alleles``): numpy int arrays for position/size columns, tuple-lists
+    for coordinate columns, numpy ``<U1`` array for ``substitution_values``.
+    Scalar columns pass through unchanged.
+
+    Tolerant of both storage shapes: parquet-scan cells (arrow lists of int /
+    lists of struct dicts) and in-memory ``allele_rows`` cells (Python lists /
+    lists of tuples / numpy arrays) so the same reconstruction applies on both
+    the persisted-parquet and the write_parquet=False paths.
+    """
+    if col_name in _INT_ARRAY_SLICE_COLS:
+        if isinstance(val, np.ndarray):
+            return val if val.dtype.kind in "iu" else np.asarray(val, dtype=int)
+        return _to_np_int_array(val)
+    if col_name in _COORD_SLICE_COLS:
+        if val is None:
+            return []
+        if isinstance(val, np.ndarray):
+            return _structs_to_coords(val.tolist())
+        if val and isinstance(val[0], tuple):
+            return list(val)  # already a tuple-list (in-memory path)
+        return _structs_to_coords(val)
+    if col_name in _STR_ARRAY_SLICE_COLS:
+        if isinstance(val, np.ndarray):
+            return val if val.dtype.kind in "US" else np.asarray(val, dtype="<U1")
+        return _to_np_str_array(val)
+    return val
+
+
+def _collapsed_get_slice(
+    self: "CollapsedAlleles",
+    ref_name=None,
+    columns=None,
+    *,
+    include_pct_reads=True,
+    collapsed_path=None,
+    batch_size=50_000,
+):
+    """Return a pandas DataFrame slice of the collapsed allele table.
+
+    Replaces ``df_alleles.loc[df_alleles['Reference_Name'] == ref_name]``
+    (and the whole-frame ``df_alleles`` when ``ref_name`` / ``columns`` are
+    ``None``) for the parquet backend, with row filtering and column
+    projection pushed down to the parquet scan so peak memory is bounded by
+    the slice, not the whole table.
+
+    Parameters
+    ----------
+    ref_name : str or None
+        Filter rows to ``Reference_Name == ref_name``. ``None`` returns all
+        rows (the whole-table view). ``AMBIGUOUS_<ref>`` / ``DISCARDED_<ref>``
+        rows are returned like any other — the caller filters if needed.
+    columns : list[str] or None
+        Project to these columns (order preserved). ``None`` returns the full
+        detailed column set (``_DETAILED_ALLELE_COLS``) plus ``%Reads``. Pass
+        ``_CRISPRESSO2_COLS`` for the non-detailed projection.
+    include_pct_reads : bool
+        If True and ``"%Reads"`` is in the output columns (or ``columns`` is
+        None), add ``%Reads = #Reads / n_total * 100`` — matching the pandas
+        ``df_alleles['%Reads']`` derivation.
+    collapsed_path : str or None
+        Path to the collapsed allele parquet. Defaults to
+        :attr:`CollapsedAlleles.parquet_path`. When absent (or the file does
+        not exist), falls back to materializing from the in-memory
+        :attr:`allele_rows` — so ``get_slice`` works whether or not the
+        parquet artifact was persisted.
+    batch_size : int
+        Row batch size for ``pyarrow.iter_batches`` (bounds peak memory).
+
+    Returns
+    -------
+    pandas.DataFrame
+        Cell types match ``df_alleles`` exactly (numpy int arrays for
+        positions, tuple-lists for coordinates, numpy ``<U1`` array for
+        ``substitution_values``); ``n_deleted`` / ``n_inserted`` / ``n_mutated``
+        cast to int. An empty slice returns a frame with the requested columns
+        and zero rows (no crash), matching pandas ``df_alleles.loc[...]`` on
+        a no-match filter.
+
+    Notes
+    -----
+    * Row filtering is currently applied per-batch in Python (pyarrow's
+      ``iter_batches`` does not accept a predicate). True predicate pushdown
+      (via ``pyarrow.dataset`` filters) is a follow-up; for typical per-ref
+      slices the Python filter is cheap because the projection already
+      trimmed the row width. The batched scan keeps peak memory bounded by
+      ``batch_size`` rows × projected width regardless.
+    * The in-memory fallback path does *not* reconstruct cell types —
+      ``allele_rows`` already carry the native payload types (numpy arrays /
+      tuple-lists) from :func:`_get_allele_row`.
+    """
+    import pandas as pd
+
+    # Resolve the output column order.
+    if columns is None:
+        select = list(_DETAILED_ALLELE_COLS)
+        if include_pct_reads:
+            select.append("%Reads")
+    else:
+        select = list(columns)
+
+    # Columns we must read from parquet to reconstruct the requested output.
+    # ``%Reads`` is computed, not stored; it needs ``#Reads`` + ``n_total``.
+    read_cols = [c for c in select if c != "%Reads"]
+    if "%Reads" in select and "#Reads" not in read_cols:
+        read_cols.append("#Reads")
+    # When filtering by ref_name we must read Reference_Name to apply the row
+    # filter, even if the caller did not ask for it in the output columns.
+    if ref_name is not None and "Reference_Name" not in read_cols:
+        read_cols.append("Reference_Name")
+    # Preserve insertion order without duplicates.
+    seen = set()
+    read_cols = [c for c in read_cols if not (c in seen or seen.add(c))]
+
+    path = collapsed_path or self.parquet_path
+    row_dicts: list = []
+
+    if path is not None and os.path.exists(path):
+        import pyarrow.parquet as pq
+
+        pf = pq.ParquetFile(path)
+        for batch in pf.iter_batches(columns=read_cols, batch_size=batch_size):
+            n = batch.num_rows
+            if n == 0:
+                continue
+            col_values = {c: batch.column(c).to_pylist() for c in read_cols}
+            ref_col = col_values.get("Reference_Name")
+            for i in range(n):
+                if ref_name is not None:
+                    rn = ref_col[i] if ref_col is not None else None
+                    if rn != ref_name:
+                        continue
+                row = {c: _reconstruct_slice_cell(c, col_values[c][i]) for c in read_cols}
+                if include_pct_reads and "%Reads" in select:
+                    reads = int(row["#Reads"])
+                    row["%Reads"] = (reads / self.n_total * 100) if self.n_total > 0 else 0.0
+                row_dicts.append(row)
+    else:
+        # In-memory fallback (e.g. write_parquet=False): allele_rows already
+        # carry native cell types from _get_allele_row, but the position arrays
+        # round-tripped through the parquet shard as Python lists — reconstruct
+        # them to numpy so the slice matches df_alleles on both paths.
+        for r in self.allele_rows:
+            if ref_name is not None and r.get("Reference_Name") != ref_name:
+                continue
+            row = {c: _reconstruct_slice_cell(c, r.get(c)) for c in read_cols}
+            if include_pct_reads and "%Reads" in select:
+                reads = int(r.get("#Reads", 0))
+                row["%Reads"] = (reads / self.n_total * 100) if self.n_total > 0 else 0.0
+            row_dicts.append(row)
+
+    if not row_dicts:
+        # Empty slice: return a frame with the requested columns, zero rows.
+        return pd.DataFrame({c: pd.Series(dtype=object) for c in select})
+
+    df = pd.DataFrame(row_dicts)
+    # Cast n_* to int (parity with df_alleles ~line 4310).
+    for c in ("n_deleted", "n_inserted", "n_mutated"):
+        if c in df.columns:
+            df[c] = df[c].astype(int)
+    return df.loc[:, select]
+
+
+CollapsedAlleles.get_slice = _collapsed_get_slice
+
+
+def get_slice_from_collapsed(
+    collapsed: CollapsedAlleles,
+    ref_name=None,
+    columns=None,
+    *,
+    include_pct_reads=True,
+    collapsed_path=None,
+):
+    """Convenience wrapper: :meth:`CollapsedAlleles.get_slice` in one call.
+
+    Provided so parity tests and future wiring can materialize a slice without
+    referencing the bound method directly.
+    """
+    return collapsed.get_slice(
+        ref_name=ref_name,
+        columns=columns,
+        include_pct_reads=include_pct_reads,
         collapsed_path=collapsed_path,
     )
