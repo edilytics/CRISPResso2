@@ -48,10 +48,18 @@ _logger = logging.getLogger("CRISPResso2")
 info = _logger.info
 
 # Default in-memory budget for the eager dedup dict (Stage 1 spectrum threshold).
-# Chosen so a typical short-read amplicon run stays eager (fast, parity path)
-# while multi-million-read long-read inputs spill to disk. Exposed via
+# The eager path holds the full dedup dict in RAM — inherently O(unique_reads),
+# so for the flat-memory success criterion (SC #1) the budget must be small
+# enough that only genuinely-small inputs stay eager. 128 MB keeps ~50k short
+# reads (or ~10k × 2 kb long reads) eager — the "fast end of the spectrum"
+# where the eager path has no measurable slowdown vs. the current pandas path
+# (SC #4) — while spilling the multi-million-read long-read regime to the
+# external-sort path (peak RSS bounded by the sort buffer, not by read count).
+# lowered from 512 MB after the PR 7 end-to-end RSS benchmark
+# (scripts/bench_pipeline_memory.py) showed 1 M × 200 bp high-diversity reads
+# (~280 MB dict) stayed eager and scaled linearly. Exposed via
 # ``VariantStore(memory_budget_mb=...)`` so tests and future auto-select can tune.
-DEFAULT_MEMORY_BUDGET_MB = 512
+DEFAULT_MEMORY_BUDGET_MB = 128
 
 # Cap the in-memory sort buffer so the external merge-sort spills to disk by
 # design rather than grabbing a fraction of available RAM (spike S1b showed BSD

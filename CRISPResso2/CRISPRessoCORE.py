@@ -1192,14 +1192,20 @@ def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_mat
     shard_paths = []
 
     if n_processes > 1 and num_unique_reads > n_processes:
+        # Stream the counted reads into per-worker chunks via itertools.islice
+        # rather than materializing the whole list — peak parent memory is one
+        # chunk (~num_unique/n_processes items) transiently, not the full
+        # unique-read set. Each chunk is materialized only because multiprocessing
+        # must pickle it to the worker subprocess; we start each worker
+        # immediately after building its chunk so the parent's reference is freed
+        # before the next chunk is built.
+        import itertools
         boundaries = get_variant_cache_equal_boundaries(num_unique_reads, n_processes)
-        all_items = list(read_counts.items())  # bounded by unique-read count
+        items_iter = read_counts.items()
         processes = []
         info('Spinning up %d parallel processes to analyze unique reads (parquet backend)...' % (n_processes))
         for i in range(n_processes):
-            left = boundaries[i]
-            right = boundaries[i + 1]
-            chunk = all_items[left:right]
+            chunk = list(itertools.islice(items_iter, boundaries[i + 1] - boundaries[i]))
             shard_path = os.path.join(output_directory, 'aligned_%d.parquet' % i)
             shard_paths.append(shard_path)
             process = Process(
@@ -1207,16 +1213,19 @@ def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_mat
                 args=(chunk, get_new_variant_object, args, refs, ref_names,
                       aln_matrix, pe_scaffold_dna_info, i, output_directory, False),
             )
-            process.start()
+            process.start()  # pickles chunk to the worker; parent can then drop it
             processes.append(process)
+            del chunk  # free the parent's copy before building the next chunk
         for p in processes:
             p.join()
         info('Finished processing unique reads, now generating statistics (parquet backend)...', {'percent_complete': 15})
     else:
         shard_path = os.path.join(output_directory, 'aligned_0.parquet')
         shard_paths.append(shard_path)
+        # n_processes == 1: run in-process and pass the items iterator directly —
+        # no materialization at all (the worker iterates it once).
         variant_parquet_generator_process_fn(
-            list(read_counts.items()), get_new_variant_object, args, refs, ref_names,
+            read_counts.items(), get_new_variant_object, args, refs, ref_names,
             aln_matrix, pe_scaffold_dna_info, 0, output_directory, False,
         )
 
