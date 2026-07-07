@@ -30,6 +30,7 @@ and the ``ReadCounts`` result handle. Nothing here is wired into
 from __future__ import annotations
 
 import gzip
+import logging
 import os
 import subprocess
 import tempfile
@@ -37,6 +38,9 @@ from dataclasses import dataclass, field
 from typing import Iterator, Optional
 
 from CRISPResso2 import CRISPRessoShared
+
+_logger = logging.getLogger("CRISPResso2")
+info = _logger.info
 
 # Default in-memory budget for the eager dedup dict (Stage 1 spectrum threshold).
 # Chosen so a typical short-read amplicon run stays eager (fast, parity path)
@@ -505,8 +509,382 @@ def count_reads_from_fastq(
 
 
 __all__ = [
+    "ALIGNED_SCHEMA",
     "DEFAULT_MEMORY_BUDGET_MB",
+    "AlignedShardWriter",
     "ReadCounts",
     "VariantStore",
     "count_reads_from_fastq",
+    "iter_aligned_shard",
+    "payload_to_row",
+    "row_to_payload",
+    "variant_parquet_generator_process",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: Worker parquet writer (replaces variants_{i}.tsv JSON output)
+# ---------------------------------------------------------------------------
+#
+# Each alignment worker writes its own parquet shard (aligned_{i}.parquet)
+# containing one row per unique read, with the full alignment payload stored
+# as native arrow types (arrays as lists, coordinates as list-of-structs) —
+# no JSON serialization. The schema is derived once (here) so all shards share
+# an identical schema and scan_parquet over the glob concats cleanly (edge #7).
+#
+# The per-reference payloads (variant_{ref_name} sub-dicts in the current
+# code) are stored as a list-of-structs column ``payloads``. Stage 3 (PR 5)
+# will explode this column to produce per-allele rows.
+#
+# NOT wired into CRISPRessoCORE.main yet — exercised by unit tests only.
+
+import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+# A (start, end) coordinate — stored as a struct for round-trip fidelity
+# (edge #18: insertion/deletion coordinates are tuples of (start, end)).
+_COORD_STRUCT = pa.struct([
+    pa.field("start", pa.int64()),
+    pa.field("end", pa.int64()),
+])
+
+# Per-reference payload struct — mirrors the fields of
+# CRISPRessoCOREResources.find_indels_substitutions output + the fields added
+# by get_new_variant_object. Every field that get_allele_row consumes is here.
+_PAYLOAD_STRUCT = pa.struct([
+    pa.field("ref_name", pa.string()),
+    pa.field("aln_seq", pa.string()),
+    pa.field("aln_ref", pa.string()),
+    pa.field("aln_strand", pa.string()),
+    pa.field("classification", pa.string()),
+    pa.field("irregular_ends", pa.bool_()),
+    pa.field("insertions_outside_window", pa.int64()),
+    pa.field("deletions_outside_window", pa.int64()),
+    pa.field("substitutions_outside_window", pa.int64()),
+    pa.field("total_mods", pa.int64()),
+    pa.field("mods_in_window", pa.int64()),
+    pa.field("mods_outside_window", pa.int64()),
+    pa.field("insertion_n", pa.int64()),
+    pa.field("deletion_n", pa.int64()),
+    pa.field("substitution_n", pa.int64()),
+    pa.field("ref_positions", pa.list_(pa.int64())),
+    pa.field("all_insertion_positions", pa.list_(pa.int64())),
+    pa.field("all_insertion_left_positions", pa.list_(pa.int64())),
+    pa.field("insertion_positions", pa.list_(pa.int64())),
+    pa.field("insertion_coordinates", pa.list_(_COORD_STRUCT)),
+    pa.field("insertion_sizes", pa.list_(pa.int64())),
+    pa.field("all_deletion_positions", pa.list_(pa.int64())),
+    pa.field("deletion_positions", pa.list_(pa.int64())),
+    pa.field("deletion_coordinates", pa.list_(_COORD_STRUCT)),
+    pa.field("deletion_sizes", pa.list_(pa.int64())),
+    pa.field("all_substitution_positions", pa.list_(pa.int64())),
+    pa.field("substitution_positions", pa.list_(pa.int64())),
+    pa.field("substitution_values", pa.list_(pa.string())),
+])
+
+# The full shard schema. One row per unique read.
+ALIGNED_SCHEMA = pa.schema([
+    pa.field("read_key", pa.string()),
+    pa.field("count", pa.int64()),
+    pa.field("best_match_score", pa.float64()),
+    pa.field("class_name", pa.string()),
+    pa.field("best_match_name", pa.string()),
+    pa.field("aln_ref_names", pa.list_(pa.string())),
+    pa.field("aln_scores", pa.list_(pa.float64())),
+    pa.field("caching_is_ok", pa.bool_()),
+    pa.field("payloads", pa.list_(_PAYLOAD_STRUCT)),
+])
+
+# Fields NOT stored (deliberately dropped — not consumed downstream by
+# get_allele_row or the count-vector aggregation):
+#   - ref_aln_details      (only for fastq_output annotation; edge #12 follow-up)
+#   - all_deletion_coordinates (only for deletions_outside_window, already computed)
+#   - all_substitution_values  (not in get_allele_row; substitution_values is)
+
+
+def _to_int_list(val):
+    """Convert a numpy array, Python list, or scalar to a list of ints."""
+    if val is None:
+        return None
+    if hasattr(val, "tolist"):
+        val = val.tolist()
+    return [int(x) for x in val]
+
+
+def _to_str_list(val):
+    """Convert a numpy array or list to a list of Python strings."""
+    if val is None:
+        return None
+    if hasattr(val, "tolist"):
+        val = val.tolist()
+    return [str(x) for x in val]
+
+
+def _coords_to_structs(tuples):
+    """Convert a list of (start, end) tuples to arrow struct dicts."""
+    if tuples is None:
+        return None
+    return [{"start": int(s), "end": int(e)} for s, e in tuples]
+
+
+def _structs_to_coords(structs):
+    """Convert arrow struct dicts back to (start, end) tuples."""
+    if structs is None:
+        return []
+    return [(c["start"], c["end"]) for c in structs]
+
+
+def _payload_to_struct(payload):
+    """Convert a per-reference payload dict to an arrow struct dict.
+
+    Handles numpy arrays (via .tolist()), Python lists, and tuples (coordinates).
+    """
+    return {
+        "ref_name": payload.get("ref_name"),
+        "aln_seq": payload.get("aln_seq"),
+        "aln_ref": payload.get("aln_ref"),
+        "aln_strand": payload.get("aln_strand"),
+        "classification": payload.get("classification"),
+        "irregular_ends": bool(payload.get("irregular_ends", False)),
+        "insertions_outside_window": int(payload.get("insertions_outside_window", 0)),
+        "deletions_outside_window": int(payload.get("deletions_outside_window", 0)),
+        "substitutions_outside_window": int(payload.get("substitutions_outside_window", 0)),
+        "total_mods": int(payload.get("total_mods", 0)),
+        "mods_in_window": int(payload.get("mods_in_window", 0)),
+        "mods_outside_window": int(payload.get("mods_outside_window", 0)),
+        "insertion_n": int(payload.get("insertion_n", 0)),
+        "deletion_n": int(payload.get("deletion_n", 0)),
+        "substitution_n": int(payload.get("substitution_n", 0)),
+        "ref_positions": _to_int_list(payload.get("ref_positions")),
+        "all_insertion_positions": _to_int_list(payload.get("all_insertion_positions")),
+        "all_insertion_left_positions": _to_int_list(payload.get("all_insertion_left_positions")),
+        "insertion_positions": _to_int_list(payload.get("insertion_positions")),
+        "insertion_coordinates": _coords_to_structs(payload.get("insertion_coordinates")),
+        "insertion_sizes": _to_int_list(payload.get("insertion_sizes")),
+        "all_deletion_positions": _to_int_list(payload.get("all_deletion_positions")),
+        "deletion_positions": _to_int_list(payload.get("deletion_positions")),
+        "deletion_coordinates": _coords_to_structs(payload.get("deletion_coordinates")),
+        "deletion_sizes": _to_int_list(payload.get("deletion_sizes")),
+        "all_substitution_positions": _to_int_list(payload.get("all_substitution_positions")),
+        "substitution_positions": _to_int_list(payload.get("substitution_positions")),
+        "substitution_values": _to_str_list(payload.get("substitution_values")),
+    }
+
+
+def _struct_to_payload(struct_row):
+    """Convert an arrow struct dict back to a per-reference payload dict.
+
+    Reconstructs numpy arrays for substitution_values (matching the original
+    # payload from find_indels_substitutions) and tuples for coordinates.
+    """
+    return {
+        "ref_name": struct_row["ref_name"],
+        "aln_seq": struct_row["aln_seq"],
+        "aln_ref": struct_row["aln_ref"],
+        "aln_strand": struct_row["aln_strand"],
+        "classification": struct_row["classification"],
+        "irregular_ends": struct_row["irregular_ends"],
+        "insertions_outside_window": struct_row["insertions_outside_window"],
+        "deletions_outside_window": struct_row["deletions_outside_window"],
+        "substitutions_outside_window": struct_row["substitutions_outside_window"],
+        "total_mods": struct_row["total_mods"],
+        "mods_in_window": struct_row["mods_in_window"],
+        "mods_outside_window": struct_row["mods_outside_window"],
+        "insertion_n": struct_row["insertion_n"],
+        "deletion_n": struct_row["deletion_n"],
+        "substitution_n": struct_row["substitution_n"],
+        "ref_positions": list(struct_row["ref_positions"]) if struct_row["ref_positions"] else [],
+        "all_insertion_positions": list(struct_row["all_insertion_positions"]) if struct_row["all_insertion_positions"] else [],
+        "all_insertion_left_positions": list(struct_row["all_insertion_left_positions"]) if struct_row["all_insertion_left_positions"] else [],
+        "insertion_positions": list(struct_row["insertion_positions"]) if struct_row["insertion_positions"] else [],
+        "insertion_coordinates": _structs_to_coords(struct_row["insertion_coordinates"]),
+        "insertion_sizes": list(struct_row["insertion_sizes"]) if struct_row["insertion_sizes"] else [],
+        "all_deletion_positions": list(struct_row["all_deletion_positions"]) if struct_row["all_deletion_positions"] else [],
+        "deletion_positions": list(struct_row["deletion_positions"]) if struct_row["deletion_positions"] else [],
+        "deletion_coordinates": _structs_to_coords(struct_row["deletion_coordinates"]),
+        "deletion_sizes": list(struct_row["deletion_sizes"]) if struct_row["deletion_sizes"] else [],
+        "all_substitution_positions": list(struct_row["all_substitution_positions"]) if struct_row["all_substitution_positions"] else [],
+        "substitution_positions": list(struct_row["substitution_positions"]) if struct_row["substitution_positions"] else [],
+        "substitution_values": np.array(struct_row["substitution_values"]) if struct_row["substitution_values"] else np.array([]),
+    }
+
+
+def payload_to_row(read_key, count, payload):
+    """Convert a variant payload dict to an arrow row dict matching ALIGNED_SCHEMA.
+
+    The payload is the dict returned by ``get_new_variant_object`` (single-read)
+    or ``get_new_variant_object_from_paired`` (paired). For unaligned reads
+    (``best_match_score <= 0``), the payload has no ``aln_ref_names`` or
+    per-ref sub-dicts — those fields become null in the row.
+    """
+    aln_ref_names = payload.get("aln_ref_names")
+    payloads = None
+    if aln_ref_names:
+        payloads = []
+        for ref_name in aln_ref_names:
+            sub = payload.get("variant_" + ref_name)
+            if sub is not None:
+                payloads.append(_payload_to_struct(sub))
+        if not payloads:
+            payloads = None
+    aln_scores = payload.get("aln_scores", [])
+    return {
+        "read_key": read_key,
+        "count": int(count),
+        "best_match_score": float(payload.get("best_match_score", 0)),
+        "class_name": payload.get("class_name"),
+        "best_match_name": payload.get("best_match_name"),
+        "aln_ref_names": list(aln_ref_names) if aln_ref_names else None,
+        "aln_scores": [float(s) for s in aln_scores] if aln_scores else None,
+        "caching_is_ok": bool(payload.get("caching_is_ok", True)),
+        "payloads": payloads,
+    }
+
+
+def row_to_payload(row):
+    """Convert a parquet row (dict) back to a variant payload dict.
+
+    This is the inverse of :func:`payload_to_row` — used by Stage 3 (collapse)
+    to reconstruct payloads from parquet shards. Reconstructs numpy arrays for
+    ``substitution_values`` and tuples for coordinates to match the original
+    payload shape from ``find_indels_substitutions``.
+    """
+    payloads = row.get("payloads")
+    payload = {
+        "count": row["count"],
+        "best_match_score": row["best_match_score"],
+        "class_name": row.get("class_name"),
+        "best_match_name": row.get("best_match_name"),
+        "aln_ref_names": list(row["aln_ref_names"]) if row.get("aln_ref_names") else [],
+        "aln_scores": list(row["aln_scores"]) if row.get("aln_scores") else [],
+        "caching_is_ok": row.get("caching_is_ok", True),
+    }
+    if payloads:
+        for sub in payloads:
+            sub_payload = _struct_to_payload(sub)
+            ref_name = sub.get("ref_name")
+            if ref_name is not None:
+                payload["variant_" + ref_name] = sub_payload
+    return payload
+
+
+class AlignedShardWriter:
+    """Writes aligned payload rows to a parquet shard in batches.
+
+    Wraps a :class:`pyarrow.parquet.ParquetWriter` with the shared
+    :data:`ALIGNED_SCHEMA` so all shards across workers are schema-identical
+    (edge #7). Rows are buffered and flushed in batches to amortize I/O.
+    """
+
+    def __init__(self, path, *, batch_size=10_000, schema=ALIGNED_SCHEMA):
+        self.path = str(path)
+        self._schema = schema
+        self._writer = pq.ParquetWriter(self.path, schema)
+        self._batch_size = batch_size
+        self._buf = []
+
+    def write_row(self, row):
+        """Buffer a row dict (from :func:`payload_to_row`) for batched write."""
+        self._buf.append(row)
+        if len(self._buf) >= self._batch_size:
+            self._flush()
+
+    def _flush(self):
+        if not self._buf:
+            return
+        table = pa.Table.from_pylist(self._buf, schema=self._schema)
+        self._writer.write_table(table)
+        self._buf.clear()
+
+    def close(self):
+        """Flush remaining rows and close the writer."""
+        self._flush()
+        if self._writer is not None:
+            self._writer.close()
+            self._writer = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+
+
+def iter_aligned_shard(path):
+    """Stream ``(read_key, count, payload)`` from a parquet shard.
+
+    Used by Stage 3 (collapse) to iterate aligned payloads without
+    materializing the whole shard. Reads row-group by row-group via
+    ``iter_batches`` so peak memory is bounded by one batch.
+    """
+    pf = pq.ParquetFile(str(path))
+    for batch in pf.iter_batches(batch_size=50_000):
+        table = pa.Table.from_batches([batch], schema=ALIGNED_SCHEMA)
+        for row in table.to_pylist():
+            yield row["read_key"], row["count"], row_to_payload(row)
+
+
+def variant_parquet_generator_process(
+    read_items,
+    get_new_variant_object,
+    args,
+    refs,
+    ref_names,
+    aln_matrix,
+    pe_scaffold_dna_info,
+    process_id,
+    output_dir,
+    is_paired=False,
+):
+    """Multiprocessing target: align reads and write a parquet shard.
+
+    Mirrors :func:`CRISPRessoCORE.variant_file_generator_process` but writes
+    parquet (``aligned_{process_id}.parquet``) instead of JSON TSV. Active only
+    under ``--storage_backend parquet`` (the caller decides whether to invoke
+    this or the TSV path). The TSV path is untouched.
+
+    Parameters
+    ----------
+    read_items : list of (read_key, count, quals_or_None)
+        The chunk of counted reads for this worker (from ReadCounts.items()).
+    get_new_variant_object : callable
+        The alignment function (``get_new_variant_object`` for single-read,
+        ``get_new_variant_object_from_paired`` for paired).
+    args, refs, ref_names, aln_matrix, pe_scaffold_dna_info
+        Same as the TSV worker — passed through to the alignment function.
+    process_id : int
+        Worker ID (determines shard filename).
+    output_dir : str
+        Directory to write the shard.
+    is_paired : bool
+        If True, splits read_key on '+' and quals on ' ' to get R1/R2 (matching
+        ``args.crispresso_merge`` in the TSV worker).
+
+    """
+    shard_path = os.path.join(output_dir, f"aligned_{process_id}.parquet")
+    num_processed = 0
+    with AlignedShardWriter(shard_path) as writer:
+        for index, (read_key, count, quals) in enumerate(read_items):
+            num_processed = index + 1
+            if is_paired:
+                fastq1_seq, fastq2_seq = read_key.split("+")
+                if quals is not None:
+                    fastq1_qual, fastq2_qual = quals.split(" ")
+                else:
+                    fastq1_qual, fastq2_qual = "", ""
+                new_variant = get_new_variant_object(
+                    args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual,
+                    refs, ref_names, aln_matrix, pe_scaffold_dna_info,
+                )
+            else:
+                new_variant = get_new_variant_object(
+                    args, read_key, refs, ref_names, aln_matrix, pe_scaffold_dna_info,
+                )
+            new_variant["count"] = count
+            row = payload_to_row(read_key, count, new_variant)
+            writer.write_row(row)
+            if index % 10000 == 0 and index != 0:
+                info(f"Process {process_id + 1} has processed {index} unique reads", {"percent_complete": 10})
+    info(f"Process {process_id + 1} has finished processing {num_processed} unique reads", {"percent_complete": 10})
