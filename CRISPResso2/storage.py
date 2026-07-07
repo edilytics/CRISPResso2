@@ -516,12 +516,15 @@ def count_reads_from_fastq(
 __all__ = [
     "ALIGNED_SCHEMA",
     "COLLAPSED_SCHEMA",
+    "AlleleAggregates",
     "CountVectors",
     "DEFAULT_MEMORY_BUDGET_MB",
     "AlignedShardWriter",
     "CollapsedAlleles",
     "ReadCounts",
     "VariantStore",
+    "aggregate_alleles_from_collapsed",
+    "compute_aln_stats_and_homology_from_shards",
     "compute_count_vectors_from_collapsed",
     "count_reads_from_fastq",
     "get_slice_from_collapsed",
@@ -592,6 +595,14 @@ _PAYLOAD_STRUCT = pa.struct([
     pa.field("all_substitution_positions", pa.list_(pa.int64())),
     pa.field("substitution_positions", pa.list_(pa.int64())),
     pa.field("substitution_values", pa.list_(pa.string())),
+    # all_substitution_values: per-position substituted base across the WHOLE
+    # amplicon (length = ref_len; '-' where not substituted). NOT consumed by
+    # get_allele_row (so absent from the detailed allele TSV) but required by
+    # the per-base substitution count vectors (all_substitution_base_vectors)
+    # built in the CRISPRessoCORE.main aggregation loop. Added here + to
+    # COLLAPSED_SCHEMA so PR 7's streaming aggregation can build those vectors
+    # from the collapsed parquet.
+    pa.field("all_substitution_values", pa.list_(pa.string())),
 ])
 
 # The full shard schema. One row per unique read.
@@ -608,21 +619,18 @@ ALIGNED_SCHEMA = pa.schema([
 ])
 
 # Fields NOT stored (deliberately dropped — not consumed downstream by
-# get_allele_row, and not by the PR 6 count-vector aggregation which streams the
-# collapsed allele parquet, whose schema is a superset of get_allele_row):
-#   - ref_aln_details          (only for fastq_output annotation; edge #12 follow-up)
-#   - all_deletion_coordinates (only for deletions_outside_window, already computed)
-#   - all_substitution_values  (needed by all_substitution_base_vectors — the per-base
-#     substitution count vector built in the CRISPRessoCORE.main aggregation loop
-#     ~line 4060. NOT in get_allele_row, so absent from the collapsed allele
-#     parquet. The per-base vectors (all_substitution_base_vectors /
-#     all_base_count_vectors) and the windowed vectors (insertion_count_vectors,
-#     etc.) are deferred to PR 7's consumer wiring: they feed plot functions
-#     directly and require refs/window context. PR 6's Stream-Out B covers the
-#     four all_* position vectors + all_indelsub_count_vectors that are persisted
-#     to Modification_count_vectors.txt — these need only fields already in
-#     COLLAPSED_SCHEMA. Adding all_substitution_values to _PAYLOAD_STRUCT +
-#     COLLAPSED_SCHEMA is the prerequisite for the per-base vectors (see PR 7).
+# get_allele_row or the PR 7 streaming aggregation):
+#   - ref_aln_details          (only for the HDR/prime-editing re-alignment
+#     block and fastq_output annotation; edge #12 follow-up. The parquet
+#     backend raises NotImplementedError on those paths until wired.)
+#   - all_deletion_coordinates (only for deletions_outside_window, already
+#     computed as a scalar in the payload)
+# all_substitution_values IS stored (in _PAYLOAD_STRUCT + COLLAPSED_SCHEMA)
+# as of PR 7 — it is needed by the per-base substitution count vectors
+# (all_substitution_base_vectors) built in the CRISPRessoCORE.main aggregation
+# loop. It is NOT in get_allele_row / _DETAILED_ALLELE_COLS, so it does not
+# appear in the detailed allele TSV or the get_slice default projection; it is
+# consumed only by the streaming aggregation (aggregate_alleles).
 
 
 def _to_int_list(val):
@@ -661,7 +669,13 @@ def _payload_to_struct(payload):
     """Convert a per-reference payload dict to an arrow struct dict.
 
     Handles numpy arrays (via .tolist()), Python lists, and tuples (coordinates).
+    The per-ref sub-payload emitted by ``find_indels_substitutions`` is a Cython
+    ``ResultsSlotsDict`` (not a plain ``dict``); coerce it via ``vars()`` so the
+    ``.get()`` calls below work uniformly on both the Cython and plain-dict
+    shapes (the latter is what the unit-test canned payloads use).
     """
+    if not isinstance(payload, dict):
+        payload = vars(payload)
     return {
         "ref_name": payload.get("ref_name"),
         "aln_seq": payload.get("aln_seq"),
@@ -691,6 +705,7 @@ def _payload_to_struct(payload):
         "all_substitution_positions": _to_int_list(payload.get("all_substitution_positions")),
         "substitution_positions": _to_int_list(payload.get("substitution_positions")),
         "substitution_values": _to_str_list(payload.get("substitution_values")),
+        "all_substitution_values": _to_str_list(payload.get("all_substitution_values")),
     }
 
 
@@ -729,6 +744,7 @@ def _struct_to_payload(struct_row):
         "all_substitution_positions": list(struct_row["all_substitution_positions"]) if struct_row["all_substitution_positions"] else [],
         "substitution_positions": list(struct_row["substitution_positions"]) if struct_row["substitution_positions"] else [],
         "substitution_values": np.array(struct_row["substitution_values"]) if struct_row["substitution_values"] else np.array([]),
+        "all_substitution_values": np.array(struct_row["all_substitution_values"]) if struct_row["all_substitution_values"] else np.array([]),
     }
 
 
@@ -1010,6 +1026,12 @@ COLLAPSED_SCHEMA = pa.schema([
     pa.field("all_substitution_positions", pa.list_(pa.int64())),
     pa.field("substitution_positions", pa.list_(pa.int64())),
     pa.field("substitution_values", pa.list_(pa.string())),
+    # all_substitution_values (see _PAYLOAD_STRUCT): per-position substituted
+    # base across the whole amplicon; needed by the streaming per-base
+    # substitution count vectors. NOT part of the detailed allele TSV
+    # (_DETAILED_ALLELE_COLS) — the TSV sink and get_slice default projection
+    # do not emit it.
+    pa.field("all_substitution_values", pa.list_(pa.string())),
 ])
 
 
@@ -1099,6 +1121,7 @@ def _allele_dict_to_parquet_row(d: dict) -> dict:
         "all_substitution_positions": _to_int_list(d["all_substitution_positions"]),
         "substitution_positions": _to_int_list(d["substitution_positions"]),
         "substitution_values": _to_str_list(d["substitution_values"]),
+        "all_substitution_values": _to_str_list(d.get("all_substitution_values")),
     }
 
 
@@ -1400,13 +1423,13 @@ def _collapse_fanout(
 
         if class_name == "AMBIGUOUS":
             variant_payload = payload["variant_" + aln_ref_names[0]]
-            allele_rows.append(
-                _get_allele_row(
-                    "AMBIGUOUS_" + aln_ref_names[0],
-                    variant_count, aln_ref_names_str, aln_ref_scores_str,
-                    variant_payload, write_detailed=True,
-                )
+            allele_row = _get_allele_row(
+                "AMBIGUOUS_" + aln_ref_names[0],
+                variant_count, aln_ref_names_str, aln_ref_scores_str,
+                variant_payload, write_detailed=True,
             )
+            allele_row["all_substitution_values"] = variant_payload.get("all_substitution_values")
+            allele_rows.append(allele_row)
             continue
 
         for ref_name in aln_ref_names:
@@ -1415,25 +1438,25 @@ def _collapse_fanout(
                 variant_payload["deletion_n"] > 0 or variant_payload["insertion_n"] > 0
             ):
                 counts_discarded[ref_name] = counts_discarded.get(ref_name, 0) + variant_count
-                allele_rows.append(
-                    _get_allele_row(
-                        "DISCARDED_" + aln_ref_names[0],
-                        variant_count, aln_ref_names_str, aln_ref_scores_str,
-                        variant_payload, write_detailed=True,
-                    )
+                allele_row = _get_allele_row(
+                    "DISCARDED_" + aln_ref_names[0],
+                    variant_count, aln_ref_names_str, aln_ref_scores_str,
+                    variant_payload, write_detailed=True,
                 )
+                allele_row["all_substitution_values"] = variant_payload.get("all_substitution_values")
+                allele_rows.append(allele_row)
                 continue
             counts_total[ref_name] = counts_total.get(ref_name, 0) + variant_count
             if variant_payload["classification"] == "MODIFIED":
                 counts_modified[ref_name] = counts_modified.get(ref_name, 0) + variant_count
             else:
                 counts_unmodified[ref_name] = counts_unmodified.get(ref_name, 0) + variant_count
-            allele_rows.append(
-                _get_allele_row(
-                    ref_name, variant_count, aln_ref_names_str, aln_ref_scores_str,
-                    variant_payload, write_detailed=True,
-                )
+            allele_row = _get_allele_row(
+                ref_name, variant_count, aln_ref_names_str, aln_ref_scores_str,
+                variant_payload, write_detailed=True,
             )
+            allele_row["all_substitution_values"] = variant_payload.get("all_substitution_values")
+            allele_rows.append(allele_row)
 
     return (
         allele_rows, n_total, class_counts,
@@ -1709,6 +1732,693 @@ def compute_count_vectors_from_collapsed(
     """Convenience wrapper: create a :class:`VariantStore` and compute vectors."""
     store = VariantStore(output_directory, memory_budget_mb=memory_budget_mb)
     return store.compute_count_vectors(ref_lengths, collapsed_path=collapsed_path)
+
+
+# ---------------------------------------------------------------------------
+# Stage 4b — Streaming per-allele aggregation (PR 7, Phase 3 item 9)
+# ---------------------------------------------------------------------------
+#
+# ``CRISPRessoCORE.main``'s allele loop (~line 3973-4180) does more than the
+# four ``all_*`` position vectors + ``class_counts`` covered by Stage 4 / the
+# ``CollapsedAlleles`` pre-fanout outputs. In a single pass over
+# ``variantCache`` it also builds, per reference:
+#
+#   * the windowed count vectors (``insertion_count_vectors``, etc.),
+#   * the per-base vectors (``all_substitution_base_vectors``,
+#     ``all_base_count_vectors``),
+#   * the length vectors (``insertion_length_vectors``, ``deletion_length_vectors``),
+#   * the per-allele-size Counters (``inserted_n_dicts``, etc.),
+#   * the composite modification counts (``counts_only_*``, ``counts_*_and_*``),
+#   * the exon / splicing / frameshift counts + ``hists_inframe`` / ``hists_frameshift``.
+#
+# Under the parquet backend these are built by a *streaming pass* over the
+# collapsed allele parquet (Stage 3 output): scan row-group by row-group, and
+# for each (allele, reference) row run the per-ref aggregation body verbatim.
+# The pre-fanout parts (``class_counts``, ``N_TOTAL``,
+# ``counts_total/modified/unmodified/discarded``) are already computed by
+# ``CollapsedAlleles`` (collapse) and are NOT recomputed here; AMBIGUOUS and
+# DISCARDED rows are skipped (the pandas loop ``continue``\ s before the per-ref
+# body for them).
+#
+# Parity note: every accumulator is integer arithmetic (exact in float64 up to
+# 2^53) or a Counter (commutative), so the result is independent of row order —
+# the collapsed parquet's ``(-#Reads, Aligned, Ref)`` sort order yields identical
+# totals to the pandas loop's ``variantCache`` insertion order. This is the key
+# fact that lets the streaming pass match the pandas path byte-for-byte.
+#
+# Scope: replicates the FULL per-ref body including the exon/splicing/frameshift
+# logic (gated by ``refs[ref_name]['contains_coding_seq']``), so it is correct
+# for coding-seq amplicons too. The HDR / prime-editing re-alignment block
+# (~line 4230) is NOT replicated — it needs ``ref_aln_details`` (raw alignment
+# strings) which are deliberately not stored (see _PAYLOAD_STRUCT comment); the
+# parquet backend raises ``NotImplementedError`` on that path until wired.
+
+
+@dataclass
+class AlleleAggregates:
+    """Per-reference aggregation outputs from the streaming allele pass.
+
+    Mirrors the dict/numpy/Counter structures ``CRISPRessoCORE.main`` builds in
+    the allele loop, so the downstream plot/quantification code consumes them
+    unchanged under the parquet backend. All fields are keyed by ``ref_name``
+    (or ``ref_name + "_" + nuc`` for the per-base vectors), matching the pandas
+    path's initialization (~line 3850).
+    """
+
+    all_insertion_count_vectors: dict
+    all_insertion_left_count_vectors: dict
+    all_deletion_count_vectors: dict
+    all_substitution_count_vectors: dict
+    all_indelsub_count_vectors: dict
+    all_substitution_base_vectors: dict
+    all_base_count_vectors: dict
+    insertion_count_vectors: dict
+    deletion_count_vectors: dict
+    substitution_count_vectors: dict
+    indelsub_count_vectors: dict
+    insertion_count_vectors_noncoding: dict
+    deletion_count_vectors_noncoding: dict
+    substitution_count_vectors_noncoding: dict
+    insertion_length_vectors: dict
+    deletion_length_vectors: dict
+    inserted_n_dicts: dict
+    deleted_n_dicts: dict
+    substituted_n_dicts: dict
+    effective_len_dicts: dict
+    hists_inframe: dict
+    hists_frameshift: dict
+    counts_insertion: dict
+    counts_deletion: dict
+    counts_substitution: dict
+    counts_only_insertion: dict
+    counts_only_deletion: dict
+    counts_only_substitution: dict
+    counts_insertion_and_deletion: dict
+    counts_insertion_and_substitution: dict
+    counts_deletion_and_substitution: dict
+    counts_insertion_and_deletion_and_substitution: dict
+    counts_modified_frameshift: dict
+    counts_modified_non_frameshift: dict
+    counts_non_modified_non_frameshift: dict
+    counts_splicing_sites_modified: dict
+    substitution_base_vectors: dict  # windowed subset, populated in finalize()
+
+
+@dataclass
+class _AggState:
+    """Mutable accumulator state for the streaming per-allele pass.
+
+    Held in a single dataclass so :func:`_aggregate_one_row` can mutate it
+    without a long argument list, and so :func:`_finalize_aggregates` can derive
+    the post-loop vectors (``all_indelsub``, ``indelsub``, ``substitution_base_vectors``)
+    in one place — matching the pandas post-loop block (~line 4184-4190).
+    """
+
+    refs: dict
+    ref_names: list
+    ignore_insertions: bool
+    ignore_deletions: bool
+    ignore_substitutions: bool
+    all_insertion_count_vectors: dict = field(default_factory=dict)
+    all_insertion_left_count_vectors: dict = field(default_factory=dict)
+    all_deletion_count_vectors: dict = field(default_factory=dict)
+    all_substitution_count_vectors: dict = field(default_factory=dict)
+    insertion_count_vectors: dict = field(default_factory=dict)
+    deletion_count_vectors: dict = field(default_factory=dict)
+    substitution_count_vectors: dict = field(default_factory=dict)
+    insertion_count_vectors_noncoding: dict = field(default_factory=dict)
+    deletion_count_vectors_noncoding: dict = field(default_factory=dict)
+    substitution_count_vectors_noncoding: dict = field(default_factory=dict)
+    insertion_length_vectors: dict = field(default_factory=dict)
+    deletion_length_vectors: dict = field(default_factory=dict)
+    all_substitution_base_vectors: dict = field(default_factory=dict)
+    all_base_count_vectors: dict = field(default_factory=dict)
+    inserted_n_dicts: dict = field(default_factory=dict)
+    deleted_n_dicts: dict = field(default_factory=dict)
+    substituted_n_dicts: dict = field(default_factory=dict)
+    effective_len_dicts: dict = field(default_factory=dict)
+    hists_inframe: dict = field(default_factory=dict)
+    hists_frameshift: dict = field(default_factory=dict)
+    counts_insertion: dict = field(default_factory=dict)
+    counts_deletion: dict = field(default_factory=dict)
+    counts_substitution: dict = field(default_factory=dict)
+    counts_only_insertion: dict = field(default_factory=dict)
+    counts_only_deletion: dict = field(default_factory=dict)
+    counts_only_substitution: dict = field(default_factory=dict)
+    counts_insertion_and_deletion: dict = field(default_factory=dict)
+    counts_insertion_and_substitution: dict = field(default_factory=dict)
+    counts_deletion_and_substitution: dict = field(default_factory=dict)
+    counts_insertion_and_deletion_and_substitution: dict = field(default_factory=dict)
+    counts_modified_frameshift: dict = field(default_factory=dict)
+    counts_modified_non_frameshift: dict = field(default_factory=dict)
+    counts_non_modified_non_frameshift: dict = field(default_factory=dict)
+    counts_splicing_sites_modified: dict = field(default_factory=dict)
+
+
+def _init_agg_state(refs: dict, ref_names: list, args) -> _AggState:
+    """Initialize the per-ref accumulator structures.
+
+    Verbatim replica of ``CRISPRessoCORE.main``'s init block (~line 3850-3855):
+    one zeroed numpy vector per ref for each position vector, one Counter per
+    ref for each size/effective-length/hist dict, and zero-initialized scalars
+    for every count bucket.
+    """
+    from collections import Counter
+
+    st = _AggState(
+        refs=refs,
+        ref_names=ref_names,
+        ignore_insertions=getattr(args, "ignore_insertions", False),
+        ignore_deletions=getattr(args, "ignore_deletions", False),
+        ignore_substitutions=getattr(args, "ignore_substitutions", False),
+    )
+    for ref_name in ref_names:
+        n = refs[ref_name]["sequence_length"]
+        st.all_insertion_count_vectors[ref_name] = np.zeros(n)
+        st.all_insertion_left_count_vectors[ref_name] = np.zeros(n)
+        st.all_deletion_count_vectors[ref_name] = np.zeros(n)
+        st.all_substitution_count_vectors[ref_name] = np.zeros(n)
+        st.insertion_count_vectors[ref_name] = np.zeros(n)
+        st.deletion_count_vectors[ref_name] = np.zeros(n)
+        st.substitution_count_vectors[ref_name] = np.zeros(n)
+        st.insertion_count_vectors_noncoding[ref_name] = np.zeros(n)
+        st.deletion_count_vectors_noncoding[ref_name] = np.zeros(n)
+        st.substitution_count_vectors_noncoding[ref_name] = np.zeros(n)
+        st.insertion_length_vectors[ref_name] = np.zeros(n)
+        st.deletion_length_vectors[ref_name] = np.zeros(n)
+        for nuc in ("A", "C", "G", "T", "N"):
+            st.all_substitution_base_vectors[ref_name + "_" + nuc] = np.zeros(n)
+        for nuc in ("A", "C", "G", "T", "N", "-"):
+            st.all_base_count_vectors[ref_name + "_" + nuc] = np.zeros(n)
+        st.inserted_n_dicts[ref_name] = Counter()
+        st.deleted_n_dicts[ref_name] = Counter()
+        st.substituted_n_dicts[ref_name] = Counter()
+        st.effective_len_dicts[ref_name] = Counter()
+        st.hists_inframe[ref_name] = Counter()
+        st.hists_inframe[ref_name][0] = 0
+        st.hists_frameshift[ref_name] = Counter()
+        st.hists_frameshift[ref_name][0] = 0
+        for attr in (
+            "counts_insertion", "counts_deletion", "counts_substitution",
+            "counts_only_insertion", "counts_only_deletion", "counts_only_substitution",
+            "counts_insertion_and_deletion", "counts_insertion_and_substitution",
+            "counts_deletion_and_substitution", "counts_insertion_and_deletion_and_substitution",
+            "counts_modified_frameshift", "counts_modified_non_frameshift",
+            "counts_non_modified_non_frameshift", "counts_splicing_sites_modified",
+        ):
+            getattr(st, attr)[ref_name] = 0
+    return st
+
+
+def _agg_acc(arr, positions, count):
+    """``arr[positions] += count`` with empty/None positions as a no-op."""
+    if positions is None or len(positions) == 0:
+        return
+    arr[positions] += count
+
+
+def _aggregate_one_row(st: _AggState, ref_name: str, variant_count: int, p: dict) -> None:
+    """Run the per-ref aggregation body for one collapsed allele row.
+
+    ``p`` is a payload-shaped dict (keys matching ``variant_payload`` in the
+    pandas loop: ``aln_seq``, ``ref_positions``, ``all_insertion_positions``,
+    ``insertion_n``, ``all_substitution_values``, ``insertion_coordinates``,
+    etc.) built by :func:`_collapsed_row_to_payload`. This is a verbatim
+    replica of ``CRISPRessoCORE.main``'s per-ref body (~line 4006-4180) minus
+    the ``counts_total/modified/unmodified`` lines (handled by collapse) and
+    the ``alleles_list.append`` (df_alleles comes from collapse / get_slice).
+    """
+    refs = st.refs
+    this_effective_len = refs[ref_name]["sequence_length"]
+
+    this_has_insertions = False
+    _agg_acc(st.all_insertion_count_vectors[ref_name], p["all_insertion_positions"], variant_count)
+    _agg_acc(st.all_insertion_left_count_vectors[ref_name], p["all_insertion_left_positions"], variant_count)
+
+    if not st.ignore_insertions:
+        st.inserted_n_dicts[ref_name][p["insertion_n"]] += variant_count
+        _agg_acc(st.insertion_count_vectors[ref_name], p["insertion_positions"], variant_count)
+        this_effective_len = this_effective_len + p["insertion_n"]
+        if p["insertion_n"] > 0:
+            st.counts_insertion[ref_name] += variant_count
+            this_has_insertions = True
+
+    this_has_deletions = False
+    _agg_acc(st.all_deletion_count_vectors[ref_name], p["all_deletion_positions"], variant_count)
+    if not st.ignore_deletions:
+        st.deleted_n_dicts[ref_name][p["deletion_n"]] += variant_count
+        _agg_acc(st.deletion_count_vectors[ref_name], p["deletion_positions"], variant_count)
+        this_effective_len = this_effective_len - p["deletion_n"]
+        if p["deletion_n"] > 0:
+            st.counts_deletion[ref_name] += variant_count
+            this_has_deletions = True
+
+    st.effective_len_dicts[ref_name][this_effective_len] += variant_count
+
+    this_has_substitutions = False
+    _agg_acc(st.all_substitution_count_vectors[ref_name], p["all_substitution_positions"], variant_count)
+
+    if not st.ignore_substitutions:
+        st.substituted_n_dicts[ref_name][p["substitution_n"]] += variant_count
+        _agg_acc(st.substitution_count_vectors[ref_name], p["substitution_positions"], variant_count)
+        if p["substitution_n"] > 0:
+            st.counts_substitution[ref_name] += variant_count
+            this_has_substitutions = True
+
+        nucs = ["A", "T", "C", "G", "N"]
+        all_sub_values = p["all_substitution_values"]
+        all_sub_positions = p["all_substitution_positions"]
+        for nuc in nucs:
+            isNuc = [n == nuc for n in all_sub_values]
+            if np.sum(isNuc) > 0:
+                locs = np.array(all_sub_positions)[isNuc]
+                st.all_substitution_base_vectors[ref_name + "_" + nuc][locs] += variant_count
+
+    if this_has_deletions:
+        if this_has_insertions:
+            if this_has_substitutions:
+                st.counts_insertion_and_deletion_and_substitution[ref_name] += variant_count
+            else:
+                st.counts_insertion_and_deletion[ref_name] += variant_count
+        elif this_has_substitutions:
+            st.counts_deletion_and_substitution[ref_name] += variant_count
+        else:
+            st.counts_only_deletion[ref_name] += variant_count
+    elif this_has_insertions:
+        if this_has_substitutions:
+            st.counts_insertion_and_substitution[ref_name] += variant_count
+        else:
+            st.counts_only_insertion[ref_name] += variant_count
+    elif this_has_substitutions:
+        st.counts_only_substitution[ref_name] += variant_count
+
+    # set all_base_count_vectors
+    aln_seq = p["aln_seq"]
+    ref_pos = p["ref_positions"]
+    for i in range(len(aln_seq)):
+        if ref_pos[i] < 0:
+            continue
+        nuc = aln_seq[i]
+        st.all_base_count_vectors[ref_name + "_" + nuc][ref_pos[i]] += variant_count
+
+    exon_len_mods = refs[ref_name]["exon_len_mods"]
+    tot_exon_len_mod = sum(exon_len_mods)
+    if this_has_insertions or this_has_deletions or this_has_substitutions or tot_exon_len_mod != 0:
+        exon_positions = refs[ref_name]["exon_positions"]
+        splicing_positions = refs[ref_name]["splicing_positions"]
+        insertion_coordinates = p["insertion_coordinates"]
+        insertion_sizes = p["insertion_sizes"]
+        insertion_positions = p["insertion_positions"]
+        deletion_coordinates = p["deletion_coordinates"]
+        deletion_sizes = p["deletion_sizes"]
+        deletion_positions = p["deletion_positions"]
+        substitution_positions = p["substitution_positions"]
+
+        length_modified_positions_exons = []
+        current_read_exons_modified = False
+        current_read_spliced_modified = False
+
+        for idx_ins, (ins_start, ins_end) in enumerate(insertion_coordinates):
+            st.insertion_length_vectors[ref_name][ins_start] += (insertion_sizes[idx_ins] * variant_count)
+            st.insertion_length_vectors[ref_name][ins_end] += (insertion_sizes[idx_ins] * variant_count)
+
+            if refs[ref_name]["contains_coding_seq"]:
+                if set(exon_positions).intersection((ins_start, ins_end)):
+                    current_read_exons_modified = True
+                    length_modified_positions_exons.append((insertion_sizes[idx_ins]))
+
+        for idx_del, (del_start, del_end) in enumerate(deletion_coordinates):
+            st.deletion_length_vectors[ref_name][list(range(del_start, del_end))] += (deletion_sizes[idx_del] * variant_count)
+
+        if refs[ref_name]["contains_coding_seq"]:
+            del_positions_to_append = sorted(set(exon_positions).intersection(set(deletion_positions)))
+            if del_positions_to_append:
+                current_read_exons_modified = True
+                length_modified_positions_exons.append(-len(del_positions_to_append))
+
+            if set(exon_positions).intersection(substitution_positions):
+                current_read_exons_modified = True
+
+            if set(splicing_positions).intersection(deletion_positions):
+                current_read_spliced_modified = True
+            if set(splicing_positions).intersection(insertion_positions):
+                current_read_spliced_modified = True
+            if set(splicing_positions).intersection(substitution_positions):
+                current_read_spliced_modified = True
+
+            if current_read_spliced_modified:
+                st.counts_splicing_sites_modified[ref_name] += variant_count
+
+            if tot_exon_len_mod != 0:
+                effective_length = sum(length_modified_positions_exons) + tot_exon_len_mod
+                if (effective_length % 3) == 0:
+                    st.counts_modified_non_frameshift[ref_name] += variant_count
+                    st.hists_inframe[ref_name][effective_length] += variant_count
+                else:
+                    st.counts_modified_frameshift[ref_name] += variant_count
+                    st.hists_frameshift[ref_name][effective_length] += variant_count
+            elif current_read_exons_modified:
+                if not length_modified_positions_exons:
+                    st.counts_modified_non_frameshift[ref_name] += variant_count
+                    st.hists_inframe[ref_name][0] += variant_count
+                else:
+                    effective_length = sum(length_modified_positions_exons)
+                    if (effective_length % 3) == 0:
+                        st.counts_modified_non_frameshift[ref_name] += variant_count
+                        st.hists_inframe[ref_name][effective_length] += variant_count
+                    else:
+                        st.counts_modified_frameshift[ref_name] += variant_count
+                        st.hists_frameshift[ref_name][effective_length] += variant_count
+            else:
+                st.counts_non_modified_non_frameshift[ref_name] += variant_count
+                _agg_acc(st.insertion_count_vectors_noncoding[ref_name], insertion_positions, variant_count)
+                _agg_acc(st.deletion_count_vectors_noncoding[ref_name], deletion_positions, variant_count)
+                _agg_acc(st.substitution_count_vectors_noncoding[ref_name], substitution_positions, variant_count)
+                st.hists_inframe[ref_name][0] += variant_count
+    elif tot_exon_len_mod != 0:
+        if (tot_exon_len_mod % 3) == 0:
+            st.counts_modified_non_frameshift[ref_name] += variant_count
+            st.hists_inframe[ref_name][tot_exon_len_mod] += variant_count
+        else:
+            st.counts_modified_frameshift[ref_name] += variant_count
+            st.hists_frameshift[ref_name][tot_exon_len_mod] += variant_count
+
+
+def _finalize_aggregates(st: _AggState) -> AlleleAggregates:
+    """Derive the post-loop vectors and pack into :class:`AlleleAggregates`.
+
+    Verbatim replica of ``CRISPRessoCORE.main``'s post-loop block (~line
+    4184-4190): ``all_indelsub = all_ins + all_del + all_sub``; ``indelsub =
+    ins + del + sub`` (windowed); ``substitution_base_vectors`` = the windowed
+    subset of ``all_substitution_base_vectors`` via ``refs[ref]['include_idxs']``.
+    """
+    all_indelsub = {}
+    indelsub = {}
+    substitution_base_vectors = {}
+    for ref_name in st.ref_names:
+        all_indelsub[ref_name] = (
+            st.all_insertion_count_vectors[ref_name]
+            + st.all_deletion_count_vectors[ref_name]
+            + st.all_substitution_count_vectors[ref_name]
+        )
+        indelsub[ref_name] = (
+            st.insertion_count_vectors[ref_name]
+            + st.deletion_count_vectors[ref_name]
+            + st.substitution_count_vectors[ref_name]
+        )
+        this_include_idx = st.refs[ref_name]["include_idxs"]
+        for nuc in ("A", "C", "G", "T", "N"):
+            substitution_base_vectors[ref_name + "_" + nuc] = [
+                st.all_substitution_base_vectors[ref_name + "_" + nuc][x] for x in this_include_idx
+            ]
+    return AlleleAggregates(
+        all_insertion_count_vectors=st.all_insertion_count_vectors,
+        all_insertion_left_count_vectors=st.all_insertion_left_count_vectors,
+        all_deletion_count_vectors=st.all_deletion_count_vectors,
+        all_substitution_count_vectors=st.all_substitution_count_vectors,
+        all_indelsub_count_vectors=all_indelsub,
+        all_substitution_base_vectors=st.all_substitution_base_vectors,
+        all_base_count_vectors=st.all_base_count_vectors,
+        insertion_count_vectors=st.insertion_count_vectors,
+        deletion_count_vectors=st.deletion_count_vectors,
+        substitution_count_vectors=st.substitution_count_vectors,
+        indelsub_count_vectors=indelsub,
+        insertion_count_vectors_noncoding=st.insertion_count_vectors_noncoding,
+        deletion_count_vectors_noncoding=st.deletion_count_vectors_noncoding,
+        substitution_count_vectors_noncoding=st.substitution_count_vectors_noncoding,
+        insertion_length_vectors=st.insertion_length_vectors,
+        deletion_length_vectors=st.deletion_length_vectors,
+        inserted_n_dicts=st.inserted_n_dicts,
+        deleted_n_dicts=st.deleted_n_dicts,
+        substituted_n_dicts=st.substituted_n_dicts,
+        effective_len_dicts=st.effective_len_dicts,
+        hists_inframe=st.hists_inframe,
+        hists_frameshift=st.hists_frameshift,
+        counts_insertion=st.counts_insertion,
+        counts_deletion=st.counts_deletion,
+        counts_substitution=st.counts_substitution,
+        counts_only_insertion=st.counts_only_insertion,
+        counts_only_deletion=st.counts_only_deletion,
+        counts_only_substitution=st.counts_only_substitution,
+        counts_insertion_and_deletion=st.counts_insertion_and_deletion,
+        counts_insertion_and_substitution=st.counts_insertion_and_substitution,
+        counts_deletion_and_substitution=st.counts_deletion_and_substitution,
+        counts_insertion_and_deletion_and_substitution=st.counts_insertion_and_deletion_and_substitution,
+        counts_modified_frameshift=st.counts_modified_frameshift,
+        counts_modified_non_frameshift=st.counts_modified_non_frameshift,
+        counts_non_modified_non_frameshift=st.counts_non_modified_non_frameshift,
+        counts_splicing_sites_modified=st.counts_splicing_sites_modified,
+        substitution_base_vectors=substitution_base_vectors,
+    )
+
+
+def _collapsed_row_to_payload(row: dict) -> dict:
+    """Convert a collapsed-parquet row (dict) to a payload-shaped dict.
+
+    Maps the collapsed parquet's column names to the ``variant_payload`` keys
+    that :func:`_aggregate_one_row` (a verbatim replica of the pandas per-ref
+    body) expects: ``Aligned_Sequence`` → ``aln_seq``, ``Read_Status`` →
+    ``classification``, ``n_inserted`` → ``insertion_n``, etc. Position arrays
+    are reconstructed to numpy int arrays and coordinate columns to tuple-lists
+    so the fancy-indexing / iteration in the per-ref body behaves identically to
+    the pandas path (where ``variant_payload`` comes from
+    ``find_indels_substitutions`` emitting numpy arrays).
+    """
+    return {
+        "aln_seq": row["Aligned_Sequence"],
+        "aln_ref": row["Reference_Sequence"],
+        "classification": row["Read_Status"],
+        "insertion_n": int(row["n_inserted"]),
+        "deletion_n": int(row["n_deleted"]),
+        "substitution_n": int(row["n_mutated"]),
+        "ref_positions": _to_np_int_array(row.get("ref_positions")),
+        "all_insertion_positions": _to_np_int_array(row.get("all_insertion_positions")),
+        "all_insertion_left_positions": _to_np_int_array(row.get("all_insertion_left_positions")),
+        "insertion_positions": _to_np_int_array(row.get("insertion_positions")),
+        "insertion_coordinates": _structs_to_coords(row.get("insertion_coordinates")) or [],
+        "insertion_sizes": _to_np_int_array(row.get("insertion_sizes")),
+        "all_deletion_positions": _to_np_int_array(row.get("all_deletion_positions")),
+        "deletion_positions": _to_np_int_array(row.get("deletion_positions")),
+        "deletion_coordinates": _structs_to_coords(row.get("deletion_coordinates")) or [],
+        "deletion_sizes": _to_np_int_array(row.get("deletion_sizes")),
+        "all_substitution_positions": _to_np_int_array(row.get("all_substitution_positions")),
+        "substitution_positions": _to_np_int_array(row.get("substitution_positions")),
+        "all_substitution_values": _to_np_str_array(row.get("all_substitution_values")),
+    }
+
+
+def _aggregate_alleles(
+    self: "VariantStore",
+    refs: dict,
+    args,
+    ref_names: list,
+    *,
+    collapsed_path: Optional[str] = None,
+    batch_size: int = 50_000,
+) -> AlleleAggregates:
+    """Stream the collapsed allele parquet → per-reference aggregation outputs.
+
+    Replaces the per-ref body of ``CRISPRessoCORE.main``'s allele loop for the
+    parquet backend. Scans the collapsed parquet row-group by row-group
+    (``pyarrow.iter_batches``), reconstructs each row as a payload-shaped dict,
+    and runs :func:`_aggregate_one_row` for every normal (non-AMBIGUOUS,
+    non-DISCARDED) row. Peak memory is bounded by one batch + the accumulator
+    vectors (O(amplicon_length × num_refs × num_base_types) — the design's
+    stated bounded lower-order term), not by the allele count.
+
+    Parameters
+    ----------
+    refs
+        ``{ref_name: ref_dict}`` — must carry ``sequence_length``,
+        ``include_idxs``, ``exon_len_mods``, ``exon_positions``,
+        ``splicing_positions``, ``contains_coding_seq`` (same structures the
+        pandas loop reads from ``refs[ref_name]``).
+    args
+        The CRISPResso args namespace (reads ``ignore_insertions`` /
+        ``ignore_deletions`` / ``ignore_substitutions``).
+    ref_names
+        Ordered list of reference names (defines accumulator initialization).
+    collapsed_path
+        Path to the collapsed allele parquet (Stage 3 output). Defaults to
+        ``<output_directory>/collapsed.allele.parquet``.
+    batch_size
+        Row batch size for ``pyarrow.iter_batches`` (bounds peak memory).
+
+    Returns
+    -------
+    AlleleAggregates
+        All per-ref accumulator dicts/vectors/Counters, with the post-loop
+        derived vectors (``all_indelsub``, ``indelsub``,
+        ``substitution_base_vectors``) finalized — matching the pandas loop's
+        outputs for direct consumption by the downstream plot / quantification
+        code.
+    """
+    path = collapsed_path or os.path.join(self.output_directory, "collapsed.allele.parquet")
+    st = _init_agg_state(refs, ref_names, args)
+
+    columns = [
+        "#Reads",
+        "Reference_Name",
+        "Aligned_Sequence",
+        "Reference_Sequence",
+        "Read_Status",
+        "n_inserted",
+        "n_deleted",
+        "n_mutated",
+        "ref_positions",
+        "all_insertion_positions",
+        "all_insertion_left_positions",
+        "insertion_positions",
+        "insertion_coordinates",
+        "insertion_sizes",
+        "all_deletion_positions",
+        "deletion_positions",
+        "deletion_coordinates",
+        "deletion_sizes",
+        "all_substitution_positions",
+        "substitution_positions",
+        "all_substitution_values",
+    ]
+    pf = pq.ParquetFile(path)
+    for batch in pf.iter_batches(columns=columns, batch_size=batch_size):
+        n = batch.num_rows
+        if n == 0:
+            continue
+        col_values = {c: batch.column(c).to_pylist() for c in columns}
+        ref_col = col_values["Reference_Name"]
+        reads_col = col_values["#Reads"]
+        for i in range(n):
+            ref_name = ref_col[i]
+            # AMBIGUOUS_* / DISCARDED_* rows do not contribute to the per-ref
+            # aggregations — the pandas loop ``continue``\ s before the per-ref
+            # body for them (class_counts / counts_discarded are handled by
+            # collapse). Their Reference_Name is not in ref_names.
+            if ref_name not in st.refs:
+                continue
+            row = {c: col_values[c][i] for c in columns}
+            p = _collapsed_row_to_payload(row)
+            _aggregate_one_row(st, ref_name, int(reads_col[i]), p)
+
+    return _finalize_aggregates(st)
+
+
+VariantStore.aggregate_alleles = _aggregate_alleles
+
+
+def compute_aln_stats_and_homology_from_shards(
+    shard_paths,
+    num_unique_reads: int,
+    *,
+    expand_ambiguous_alignments: bool = False,
+):
+    """Stream aligned shards → (aln_stats, aln_homology, not_aln_homology).
+
+    Replaces the read-back half of ``CRISPRessoCORE.process_fastq`` (~line
+    1910-1985) for the parquet backend. One streaming pass over the per-worker
+    shards (``iter_aligned_shard``) computes:
+
+    * ``aln_stats`` — the ``N_TOT_READS`` / ``N_COMPUTED_ALN`` / ``N_CACHED_ALN``
+      / ``N_GLOBAL_SUBS`` / ... dict that ``CRISPResso_mapping_statistics.txt``
+      and the guardrails consume. Uses the PRE-merge per-unique-read counts
+      (the shards are pre-collapse), matching the pandas read-back which counts
+      each unique read once before the 3b RC-merge folds partner counts to 0.
+    * ``aln_homology`` — ``{read_key: {'aln_scores': list, 'count': int}}`` for
+      aligned reads (``best_match_score > 0``), for ``get_and_save_homology_scores``.
+    * ``not_aln_homology`` — same shape for unaligned reads
+      (``best_match_score <= 0``).
+
+    Notes
+    -----
+    * ``READ_LENGTH`` is taken from the first aligned read's primary ``aln_seq``
+      in scan order — matching the pandas read-back (which sets it from the
+      first aligned read in worker-file order). For typical amplicon data every
+      read is the same length, so this is order-independent.
+    * Homology counts here are PRE-RC-merge (both RC partners carry their
+      original counts). The pandas ``variantCache`` at homology time is
+      POST-merge (folded partners have ``count = 0``). These differ only when
+      the input contains reverse-complement read pairs; the wiring handles
+      that case by building homology from the post-merge variant store when
+      needed (see the ``CollapsedAlleles`` variants parquet — TODO if the basic
+      test reveals RC pairs).
+    """
+    N_TOT_READS = 0
+    N_CACHED_ALN = 0
+    N_CACHED_NOTALN = 0
+    N_COMPUTED_ALN = 0
+    N_COMPUTED_NOTALN = 0
+    N_GLOBAL_SUBS = 0
+    N_SUBS_OUTSIDE_WINDOW = 0
+    N_MODS_IN_WINDOW = 0
+    N_MODS_OUTSIDE_WINDOW = 0
+    N_READS_IRREGULAR_ENDS = 0
+    READ_LENGTH = 0
+    aln_homology: dict = {}
+    not_aln_homology: dict = {}
+
+    for path in _expand_shard_paths(shard_paths):
+        for read_key, count, payload in iter_aligned_shard(path):
+            count = int(count)
+            N_TOT_READS += count
+            best = payload.get("best_match_score", 0)
+            if best <= 0:
+                N_COMPUTED_NOTALN += 1
+                N_CACHED_NOTALN += (count - 1)
+                not_aln_homology[read_key] = {
+                    "aln_scores": list(payload.get("aln_scores", []) or []),
+                    "count": count,
+                }
+                continue
+            N_COMPUTED_ALN += 1
+            N_CACHED_ALN += (count - 1)
+            aln_homology[read_key] = {
+                "aln_scores": list(payload.get("aln_scores", []) or []),
+                "count": count,
+            }
+            aln_ref_names = payload.get("aln_ref_names", []) or []
+            if len(aln_ref_names) == 1 or expand_ambiguous_alignments:
+                for name in aln_ref_names:
+                    sub = payload.get("variant_" + name)
+                    if sub is None:
+                        continue
+                    if READ_LENGTH == 0:
+                        READ_LENGTH = len(sub["aln_seq"])
+                    N_GLOBAL_SUBS += (sub["substitution_n"] + sub["substitutions_outside_window"]) * count
+                    N_SUBS_OUTSIDE_WINDOW += sub["substitutions_outside_window"] * count
+                    N_MODS_IN_WINDOW += sub["mods_in_window"] * count
+                    N_MODS_OUTSIDE_WINDOW += sub["mods_outside_window"] * count
+                    if sub["irregular_ends"]:
+                        N_READS_IRREGULAR_ENDS += count
+
+    aln_stats = {
+        "N_TOT_READS": N_TOT_READS,
+        "N_CACHED_ALN": N_CACHED_ALN,
+        "N_CACHED_NOTALN": N_CACHED_NOTALN,
+        "N_COMPUTED_ALN": N_COMPUTED_ALN,
+        "N_COMPUTED_NOTALN": N_COMPUTED_NOTALN,
+        "N_GLOBAL_SUBS": N_GLOBAL_SUBS,
+        "N_SUBS_OUTSIDE_WINDOW": N_SUBS_OUTSIDE_WINDOW,
+        "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
+        "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
+        "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
+        "READ_LENGTH": READ_LENGTH,
+    }
+    return aln_stats, aln_homology, not_aln_homology
+
+
+def aggregate_alleles_from_collapsed(
+    collapsed_path: str,
+    refs: dict,
+    args,
+    ref_names: list,
+    output_directory: str,
+    *,
+    memory_budget_mb: int = DEFAULT_MEMORY_BUDGET_MB,
+) -> AlleleAggregates:
+    """Convenience wrapper: create a :class:`VariantStore` and aggregate."""
+    store = VariantStore(output_directory, memory_budget_mb=memory_budget_mb)
+    return store.aggregate_alleles(
+        refs, args, ref_names, collapsed_path=collapsed_path,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2024,9 +2734,13 @@ def _reconstruct_slice_cell(col_name, val):
     """Convert a parquet cell to the pandas ``alleles_list`` cell type.
 
     Parity with ``CRISPRessoCORE.main``'s ``alleles_list`` (and thus
-    ``df_alleles``): numpy int arrays for position/size columns, tuple-lists
-    for coordinate columns, numpy ``<U1`` array for ``substitution_values``.
-    Scalar columns pass through unchanged.
+    ``df_alleles``): ``find_indels_substitutions`` (``CRISPRessoCOREResources.pyx``)
+    emits the position/size arrays as **Python lists** (``ref_positions=[]`` +
+    ``.append``), the coordinate arrays as lists of tuples, and ONLY
+    ``substitution_values`` / ``all_substitution_values`` as numpy arrays
+    (``np.array(...)``). Plot code calls ``.index()`` on ``ref_positions``
+    (~line 790, 1653), which requires a list — so position/size columns must
+    round-trip as lists, not numpy. Scalar columns pass through unchanged.
 
     Tolerant of both storage shapes: parquet-scan cells (arrow lists of int /
     lists of struct dicts) and in-memory ``allele_rows`` cells (Python lists /
@@ -2034,9 +2748,12 @@ def _reconstruct_slice_cell(col_name, val):
     the persisted-parquet and the write_parquet=False paths.
     """
     if col_name in _INT_ARRAY_SLICE_COLS:
+        # find_indels emits Python lists; preserve that (plot code .index()es them).
+        if val is None:
+            return []
         if isinstance(val, np.ndarray):
-            return val if val.dtype.kind in "iu" else np.asarray(val, dtype=int)
-        return _to_np_int_array(val)
+            return val.tolist()
+        return [int(x) for x in val]
     if col_name in _COORD_SLICE_COLS:
         if val is None:
             return []
@@ -2046,6 +2763,8 @@ def _reconstruct_slice_cell(col_name, val):
             return list(val)  # already a tuple-list (in-memory path)
         return _structs_to_coords(val)
     if col_name in _STR_ARRAY_SLICE_COLS:
+        # substitution_values / all_substitution_values are numpy arrays in the
+        # real payload (find_indels emits np.array(...)).
         if isinstance(val, np.ndarray):
             return val if val.dtype.kind in "US" else np.asarray(val, dtype="<U1")
         return _to_np_str_array(val)

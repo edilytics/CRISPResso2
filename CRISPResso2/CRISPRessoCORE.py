@@ -1169,6 +1169,72 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
     return new_variant
 
 
+def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_matrix,
+                         pe_scaffold_dna_info, output_directory, get_new_variant_object,
+                         variant_parquet_generator_process_fn,
+                         compute_aln_stats_and_homology_fn):
+    """Stage 2 for the parquet backend: split counted reads into N worker chunks,
+    align each chunk via ``variant_parquet_generator_process_fn`` (writing one
+    parquet shard per worker), then stream the shards to compute aln_stats +
+    homology dicts.
+
+    Mirrors the n_processes>1 branch of :func:`process_fastq` (~line 1880) but
+    writes ``aligned_{i}.parquet`` shards instead of ``variants_{i}.tsv`` and
+    reads them back via ``iter_aligned_shard`` (no JSON, no eager
+    re-materialization). For n_processes==1 (or few unique reads) it runs a
+    single worker in-process.
+
+    Returns ``(shard_paths, aln_stats, not_aln_homology, aln_homology)``.
+    """
+    from CRISPResso2 import CRISPRessoMultiProcessing as CMP
+
+    num_unique_reads = read_counts.num_unique
+    shard_paths = []
+
+    if n_processes > 1 and num_unique_reads > n_processes:
+        boundaries = get_variant_cache_equal_boundaries(num_unique_reads, n_processes)
+        all_items = list(read_counts.items())  # bounded by unique-read count
+        processes = []
+        info('Spinning up %d parallel processes to analyze unique reads (parquet backend)...' % (n_processes))
+        for i in range(n_processes):
+            left = boundaries[i]
+            right = boundaries[i + 1]
+            chunk = all_items[left:right]
+            shard_path = os.path.join(output_directory, 'aligned_%d.parquet' % i)
+            shard_paths.append(shard_path)
+            process = Process(
+                target=variant_parquet_generator_process_fn,
+                args=(chunk, get_new_variant_object, args, refs, ref_names,
+                      aln_matrix, pe_scaffold_dna_info, i, output_directory, False),
+            )
+            process.start()
+            processes.append(process)
+        for p in processes:
+            p.join()
+        info('Finished processing unique reads, now generating statistics (parquet backend)...', {'percent_complete': 15})
+    else:
+        shard_path = os.path.join(output_directory, 'aligned_0.parquet')
+        shard_paths.append(shard_path)
+        variant_parquet_generator_process_fn(
+            list(read_counts.items()), get_new_variant_object, args, refs, ref_names,
+            aln_matrix, pe_scaffold_dna_info, 0, output_directory, False,
+        )
+
+    for sp in shard_paths:
+        if not os.path.exists(sp):
+            raise CRISPRessoShared.OutputFolderIncompleteException(
+                'Could not find generated aligned shard %s, try deleting output folder and rerunning CRISPResso' % sp)
+
+    aln_stats, aln_homology, not_aln_homology = compute_aln_stats_and_homology_fn(
+        shard_paths, num_unique_reads,
+        expand_ambiguous_alignments=getattr(args, 'expand_ambiguous_alignments', False),
+    )
+    if aln_stats['N_COMPUTED_ALN'] + aln_stats['N_COMPUTED_NOTALN'] != num_unique_reads:
+        raise CRISPRessoShared.OutputFolderIncompleteException(
+            'Number of unique reads processed by parallel processes does not match the number of unique reads found in the fastq file. Try rerunning CRISPResso.')
+    return shard_paths, aln_stats, not_aln_homology, aln_homology
+
+
 def get_variant_cache_equal_boundaries(num_unique_sequences, n_processes):
     """Determines the boundaries for the number of unique sequences to be processed by each process
 
@@ -3743,7 +3809,75 @@ def main():
         variantCache = {}
 
         # operates on variantCache
-        if args.bam_input:
+        if storage_backend == 'parquet':
+            # Parquet backend: Stage 1 (count_reads) + Stage 2 (parquet workers)
+            # replace the process_* read/dedup/align functions. The downstream
+            # allele loop is skipped (see _parquet_outputs below) and the
+            # per-ref aggregations come from VariantStore.aggregate_alleles.
+            # Currently wired for the standard single-read amplicon path
+            # (process_fastq branch). Paired / bam_input / fastq_output /
+            # bam_output paths and the HDR / prime-editing re-alignment block
+            # are NOT yet supported under the parquet backend.
+            if args.bam_input or args.crispresso_merge or args.fastq_output or args.bam_output:
+                raise CRISPRessoShared.BadParameterException(
+                    "--storage_backend parquet is not yet supported for bam_input / "
+                    "crispresso_merge / fastq_output / bam_output paths (PR 7 wires "
+                    "the standard single-read amplicon path; the rest are follow-up). "
+                    "Please use --storage_backend pandas for this run.")
+            if args.expected_hdr_amplicon_seq != "" or args.prime_editing_pegRNA_extension_seq != "":
+                raise CRISPRessoShared.BadParameterException(
+                    "--storage_backend parquet is not yet supported for HDR / "
+                    "prime-editing re-alignment (the re-alignment block needs "
+                    "ref_aln_details, which is not persisted; see PR 7 notes). "
+                    "Please use --storage_backend pandas for this run.")
+            from CRISPResso2.storage import (
+                VariantStore as _VariantStore,
+                count_reads_from_fastq as _count_reads_from_fastq,
+                variant_parquet_generator_process as _variant_parquet_generator_process,
+                compute_aln_stats_and_homology_from_shards as _compute_aln_stats_and_homology_from_shards,
+            )
+            from CRISPResso2 import CRISPRessoMultiProcessing as _CMP
+            # aln_matrix + pe_scaffold_dna_info are computed inside process_fastq
+            # for the pandas path; replicate that here since we bypass it.
+            _aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
+            CRISPRessoShared.check_file(_aln_matrix_loc)
+            _aln_matrix = CRISPResso2Align.read_matrix(_aln_matrix_loc)
+            _pe_scaffold_dna_info = (0, None)
+            if args.prime_editing_pegRNA_scaffold_seq != "" and args.prime_editing_pegRNA_extension_seq != "":
+                _pe_scaffold_dna_info = CRISPRessoPlotData.get_pe_scaffold_search(
+                    refs['Prime-edited']['sequence'],
+                    args.prime_editing_pegRNA_extension_seq,
+                    args.prime_editing_pegRNA_scaffold_seq,
+                    args.prime_editing_pegRNA_scaffold_min_match_length)
+            _store = _VariantStore(OUTPUT_DIRECTORY)
+            info('Counting reads (parquet backend)...')
+            _read_counts = _count_reads_from_fastq(
+                processed_output_filename, None, OUTPUT_DIRECTORY,
+                keep_quals=False, memory_budget_mb=_store.memory_budget_bytes // (1024 * 1024),
+            )
+            if _read_counts.num_total == 0:
+                raise CRISPRessoShared.NoReadsAlignedException('No reads in input or no reads survived the average or single bp quality filtering.')
+            # Stage 2: split unique reads into N worker chunks and align.
+            _n_proc = 1
+            if args.n_processes == 'max':
+                _n_proc = _CMP.get_max_processes()
+            elif args.n_processes.isdigit():
+                _n_proc = int(args.n_processes)
+            _shard_paths, _aln_stats, _not_aln_homology, _aln_homology = run_parquet_workers(
+                _read_counts, _n_proc, args, refs, ref_names, _aln_matrix,
+                _pe_scaffold_dna_info, OUTPUT_DIRECTORY,
+                get_new_variant_object, _variant_parquet_generator_process,
+                _compute_aln_stats_and_homology_from_shards,
+            )
+            files_to_remove.extend(_shard_paths)
+            aln_stats = _aln_stats
+            not_aln_variant_objects = _not_aln_homology
+            # Stash the aligned homology dict; variantCache stays empty so the
+            # existing allele loop below is a no-op. variantCache is restored
+            # to the homology dict before get_and_save_homology_scores runs.
+            _parquet_aln_homology = _aln_homology
+            variantCache = {}
+        elif args.bam_input:
             aln_stats, not_aln_variant_objects = process_bam(args.bam_input, args.bam_chr_loc, crispresso2_info['bam_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
         elif args.fastq_output and not args.crispresso_merge:
             aln_stats, not_aln_variant_objects = process_fastq_write_out(processed_output_filename, crispresso2_info['fastq_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
@@ -3968,6 +4102,82 @@ def main():
             return allele_row
 
         # end get_allele_row() definition
+
+        if storage_backend == 'parquet':
+            # Stage 3 (collapse) + Stage 4b (aggregate_alleles) + Stage 5
+            # (get_slice) replace the pandas allele loop + df_alleles
+            # construction. The allele loop below iterates an EMPTY variantCache
+            # (set above) and is therefore a no-op; the post-loop all_indelsub /
+            # indelsub / substitution_base_vectors recompute (lines ~4310) is
+            # redundant-but-identical to aggregate_alleles' finalize; the HDR
+            # block (~line 4350) is gated out by the BadParameterException above;
+            # class_counts_order (~line 4410) runs on our class_counts; the
+            # df_alleles construction (~line 4429) is guarded out below.
+            from CRISPResso2.storage import VariantStore as _VS
+            _pq_store = _VS(OUTPUT_DIRECTORY)
+            info('Collapsing aligned shards (parquet backend)...')
+            _collapsed = _pq_store.collapse(
+                _shard_paths, is_paired=False,
+                discard_indel_reads=args.discard_indel_reads,
+                write_detailed_allele_table=args.write_detailed_allele_table,
+                vcf_output=args.vcf_output,
+            )
+            if _collapsed.parquet_path is not None:
+                files_to_remove.append(_collapsed.parquet_path)
+            # df_alleles via the lazy view (PR 7 item 8)
+            df_alleles = _collapsed.get_slice()
+            N_TOTAL = _collapsed.n_total
+            class_counts = _collapsed.class_counts
+            # merge per-ref counts (keep the 0-init entries from the init block
+            # above for refs with no contributing reads)
+            counts_total.update(_collapsed.counts_total)
+            counts_modified.update(_collapsed.counts_modified)
+            counts_unmodified.update(_collapsed.counts_unmodified)
+            counts_discarded.update(_collapsed.counts_discarded)
+            N_DISCARDED = sum(_collapsed.counts_discarded.values())
+            # Stage 4b: streaming per-allele aggregation (PR 7 item 9)
+            info('Aggregating per-allele vectors (parquet backend)...')
+            _agg = _pq_store.aggregate_alleles(
+                refs, args, ref_names, collapsed_path=_collapsed.parquet_path)
+            all_insertion_count_vectors = _agg.all_insertion_count_vectors
+            all_insertion_left_count_vectors = _agg.all_insertion_left_count_vectors
+            all_deletion_count_vectors = _agg.all_deletion_count_vectors
+            all_substitution_count_vectors = _agg.all_substitution_count_vectors
+            all_indelsub_count_vectors = _agg.all_indelsub_count_vectors
+            all_substitution_base_vectors = _agg.all_substitution_base_vectors
+            all_base_count_vectors = _agg.all_base_count_vectors
+            insertion_count_vectors = _agg.insertion_count_vectors
+            deletion_count_vectors = _agg.deletion_count_vectors
+            substitution_count_vectors = _agg.substitution_count_vectors
+            indelsub_count_vectors = _agg.indelsub_count_vectors
+            insertion_count_vectors_noncoding = _agg.insertion_count_vectors_noncoding
+            deletion_count_vectors_noncoding = _agg.deletion_count_vectors_noncoding
+            substitution_count_vectors_noncoding = _agg.substitution_count_vectors_noncoding
+            insertion_length_vectors = _agg.insertion_length_vectors
+            deletion_length_vectors = _agg.deletion_length_vectors
+            inserted_n_dicts = _agg.inserted_n_dicts
+            deleted_n_dicts = _agg.deleted_n_dicts
+            substituted_n_dicts = _agg.substituted_n_dicts
+            effective_len_dicts = _agg.effective_len_dicts
+            hists_inframe = _agg.hists_inframe
+            hists_frameshift = _agg.hists_frameshift
+            counts_insertion = _agg.counts_insertion
+            counts_deletion = _agg.counts_deletion
+            counts_substitution = _agg.counts_substitution
+            counts_only_insertion = _agg.counts_only_insertion
+            counts_only_deletion = _agg.counts_only_deletion
+            counts_only_substitution = _agg.counts_only_substitution
+            counts_insertion_and_deletion = _agg.counts_insertion_and_deletion
+            counts_insertion_and_substitution = _agg.counts_insertion_and_substitution
+            counts_deletion_and_substitution = _agg.counts_deletion_and_substitution
+            counts_insertion_and_deletion_and_substitution = _agg.counts_insertion_and_deletion_and_substitution
+            counts_modified_frameshift = _agg.counts_modified_frameshift
+            counts_modified_non_frameshift = _agg.counts_modified_non_frameshift
+            counts_non_modified_non_frameshift = _agg.counts_non_modified_non_frameshift
+            counts_splicing_sites_modified = _agg.counts_splicing_sites_modified
+            substitution_base_vectors = _agg.substitution_base_vectors
+            alleles_list = []  # df_alleles already materialized via get_slice
+            info('Done!', {'percent_complete': 30})
 
         # iterate through variants
         for variant in variantCache:
@@ -4304,12 +4514,13 @@ def main():
         info('Calculating allele frequencies...')
 
         # set up allele table
-        df_alleles = pd.DataFrame(alleles_list)
-        # df_alleles['%Reads']=df_alleles['#Reads']/df_alleles['#Reads'].sum()*100 # sum of #reads will be >= N_TOTAL because an allele appears once for each reference it aligns to
-        df_alleles['%Reads'] = df_alleles['#Reads'] / N_TOTAL * 100
-        df_alleles[['n_deleted', 'n_inserted', 'n_mutated']] = df_alleles[['n_deleted', 'n_inserted', 'n_mutated']].astype(int)
+        if storage_backend != 'parquet':
+            df_alleles = pd.DataFrame(alleles_list)
+            # df_alleles['%Reads']=df_alleles['#Reads']/df_alleles['#Reads'].sum()*100 # sum of #reads will be >= N_TOTAL because an allele appears once for each reference it aligns to
+            df_alleles['%Reads'] = df_alleles['#Reads'] / N_TOTAL * 100
+            df_alleles[['n_deleted', 'n_inserted', 'n_mutated']] = df_alleles[['n_deleted', 'n_inserted', 'n_mutated']].astype(int)
 
-        df_alleles.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
+            df_alleles.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
 
         def calculate_99_max(d):
             """Input is a dictionary of keys->counts
@@ -4807,6 +5018,11 @@ def main():
 
         # Compute homology scores (needed by both Pro and non-Pro paths)
         alleles_homology_scores_filename = _jp('Alleles_homology_scores.txt')
+        if storage_backend == 'parquet':
+            # variantCache was emptied for the no-op allele loop; restore it to
+            # the aligned-read homology dict (pre-RC-merge counts from the
+            # shards) so get_and_save_homology_scores sees the aligned reads.
+            variantCache = _parquet_aln_homology
         homology_scores, homology_counts = get_and_save_homology_scores(
             variantCache, not_aln_variant_objects,
             alleles_homology_scores_filename,
