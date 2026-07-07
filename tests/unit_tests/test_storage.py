@@ -8,6 +8,7 @@ arithmetic the current pandas path uses in ``CRISPRessoCORE.process_fastq`` and
 that the spill path reproduces the same counts (and first-occurrence quals).
 """
 import gzip
+import io
 import os
 
 import numpy as np
@@ -1432,3 +1433,568 @@ def test_full_parity_fuzz_vs_reference(temp_dir):
                 assert res.counts_modified == ref[4]
                 assert res.counts_unmodified == ref[5]
                 assert res.counts_discarded == ref[6]
+
+
+# -- Stage 4: count-vector aggregation (Stream-Out B, PR 6) ------------------
+#
+# Parity strategy: each test builds a *reference* set of count vectors by
+# replicating the exact CRISPRessoCORE.main aggregation loop arithmetic
+# (``np.zeros(seq_len)``; ``arr[all_*_positions] += variant_count`` for every
+# normal allele row; ``all_indelsub = ins+del+sub``) on the same canned payloads
+# fed through collapse, then asserts ``compute_count_vectors`` reproduces the
+# accumulator arrays byte-for-byte (``np.array_equal``) and that
+# ``save_modification_count_vectors`` is byte-identical to the pandas
+# ``save_count_vectors_to_file`` output.
+
+from CRISPResso2.storage import (
+    CountVectors,
+    compute_count_vectors_from_collapsed,
+    write_allele_frequency_table,
+)
+
+
+def _ref_count_vectors(allele_rows, ref_lengths):
+    """Reference replica of the CRISPRessoCORE.main count-vector aggregation.
+
+    Mirrors ~line 3874 (``np.zeros(seq_len)``) + ~line 4025-4049
+    (``all_*_count_vectors[ref][payload['all_*_positions']] += variant_count``)
+    + ~line 4200 (``all_indelsub = ins+del+sub``). Operates on the collapsed
+    allele rows (one per allele,reference); AMBIGUOUS/DISCARDED rows are skipped
+    because their Reference_Name is not in ref_lengths — exactly as the pandas
+    loop skips them via ``continue`` before the count-vector lines.
+    """
+    ins = {r: np.zeros(n) for r, n in ref_lengths.items()}
+    ins_l = {r: np.zeros(n) for r, n in ref_lengths.items()}
+    dele = {r: np.zeros(n) for r, n in ref_lengths.items()}
+    sub = {r: np.zeros(n) for r, n in ref_lengths.items()}
+    counts_total = {r: 0 for r in ref_lengths}
+    for row in allele_rows:
+        ref = row["Reference_Name"]
+        if ref not in ref_lengths:
+            continue  # AMBIGUOUS_*/DISCARDED_*
+        count = int(row["#Reads"])
+        counts_total[ref] += count
+        _ref_acc(ins[ref], row.get("all_insertion_positions"), count)
+        _ref_acc(ins_l[ref], row.get("all_insertion_left_positions"), count)
+        _ref_acc(dele[ref], row.get("all_deletion_positions"), count)
+        _ref_acc(sub[ref], row.get("all_substitution_positions"), count)
+    indelsub = {r: ins[r] + dele[r] + sub[r] for r in ref_lengths}
+    return ins, ins_l, dele, sub, indelsub, counts_total
+
+
+def _ref_acc(arr, positions, count):
+    """``arr[positions] += count`` with empty/None as a no-op (int dtype)."""
+    if not positions:
+        return
+    arr[np.asarray(positions, dtype=int)] += count
+
+
+def _allele_with(ref_name="ref1", aln_seq="ATCGATCG--ATCGATCGAT",
+                  aln_ref="ATCGATCGAAATCGATCGAT", *, deletion_n=2,
+                  insertion_n=0, substitution_n=0,
+                  all_insertion_positions=None, all_insertion_left_positions=None,
+                  all_deletion_positions=None, all_substitution_positions=None,
+                  deletion_positions=None, deletion_coordinates=None,
+                  deletion_sizes=None, classification="MODIFIED"):
+    """Build a single-ref shard payload with overridable position arrays."""
+    sub = _shard_payload(
+        ref_name, aln_seq=aln_seq, aln_ref=aln_ref, classification=classification,
+        deletion_n=deletion_n, insertion_n=insertion_n, substitution_n=substitution_n,
+    )["variant_" + ref_name]
+    if all_insertion_positions is not None:
+        sub["all_insertion_positions"] = all_insertion_positions
+    if all_insertion_left_positions is not None:
+        sub["all_insertion_left_positions"] = all_insertion_left_positions
+    if all_deletion_positions is not None:
+        sub["all_deletion_positions"] = all_deletion_positions
+        sub["deletion_positions"] = list(all_deletion_positions)
+    if all_substitution_positions is not None:
+        sub["all_substitution_positions"] = all_substitution_positions
+    if deletion_positions is not None:
+        sub["deletion_positions"] = deletion_positions
+    if deletion_coordinates is not None:
+        sub["deletion_coordinates"] = deletion_coordinates
+    if deletion_sizes is not None:
+        sub["deletion_sizes"] = deletion_sizes
+    payload = {
+        "count": 1, "aln_ref_names": [ref_name], "aln_scores": [95.0],
+        "best_match_score": 95.0, "class_name": ref_name + "_" + classification,
+        "best_match_name": ref_name, "caching_is_ok": True,
+        "variant_" + ref_name: sub,
+    }
+    return payload
+
+
+def _collapse_to_rows(shard_rows, temp_dir, *, is_paired=False, **kw):
+    """Run collapse and return (allele_rows, n_total, collapsed_path, res)."""
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    _write_shard(shard, shard_rows)
+    res = collapse_aligned_shards([shard], temp_dir, is_paired=is_paired,
+                                  write_detailed_allele_table=True, **kw)
+    return res.allele_rows, res.n_total, res.parquet_path, res
+
+
+def _assert_vectors_equal(got, ref):
+    """got/ref: (ins, ins_l, dele, sub, indelsub, counts_total)."""
+    for d_got, d_ref in zip(got[:5], ref[:5]):
+        assert set(d_got) == set(d_ref)
+        for k in d_ref:
+            assert np.array_equal(d_got[k], d_ref[k]), (
+                f"vector {k} mismatch:\n{d_got[k]}\n!=\n{d_ref[k]}")
+    assert got[5] == ref[5], f"counts_total {got[5]} != {ref[5]}"
+
+
+def test_count_vectors_three_allele_parity(temp_dir):
+    """P0 gate: 3 alleles → all_*_count_vectors byte-identical to pandas loop."""
+    # three distinct alleles (no RC pairs), each with indels/subs at known spots
+    p1 = _allele_with(all_deletion_positions=[8, 9], deletion_n=2,
+                      deletion_coordinates=[(8, 10)], deletion_sizes=[2])
+    p2 = _allele_with(aln_seq="ATCGATCGAAATCGATCGAT", aln_ref="ATCGATCGAAATCGATCGAT",
+                      deletion_n=0, classification="UNMODIFIED",
+                      all_deletion_positions=[], deletion_positions=[],
+                      deletion_coordinates=[], deletion_sizes=[])
+    p2["class_name"] = "ref1_UNMODIFIED"
+    p3 = _allele_with(aln_seq="ATCGATCG--ATCGATCGGT", aln_ref="ATCGATCGAAATCGATCGAT",
+                      deletion_n=2, substitution_n=1,
+                      all_deletion_positions=[8, 9],
+                      all_substitution_positions=[18],
+                      deletion_coordinates=[(8, 10)], deletion_sizes=[2])
+    p3["variant_ref1"]["substitution_values"] = np.array(["G"])
+    p3["variant_ref1"]["substitution_positions"] = [18]
+    rows = [("ACGTACGA", 4, p1), ("ACGTACGC", 3, p2), ("ACGTACGG", 2, p3)]
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    ref_lengths = {"ref1": 20}
+    cv = compute_count_vectors_from_collapsed(collapsed_path, ref_lengths, temp_dir)
+    ref = _ref_count_vectors(allele_rows, ref_lengths)
+    _assert_vectors_equal(
+        (cv.all_insertion_count_vectors, cv.all_insertion_left_count_vectors,
+         cv.all_deletion_count_vectors, cv.all_substitution_count_vectors,
+         cv.all_indelsub_count_vectors, cv.counts_total), ref)
+    # spot-check the arithmetic: deletions at 8,9 with counts 4+2=6; subs at 18 with count 2
+    assert cv.all_deletion_count_vectors["ref1"][8] == 6.0
+    assert cv.all_deletion_count_vectors["ref1"][9] == 6.0
+    assert cv.all_substitution_count_vectors["ref1"][18] == 2.0
+    # insertion vectors all zero (no insertions)
+    assert np.all(cv.all_insertion_count_vectors["ref1"] == 0)
+    # indelsub = ins + del + sub
+    assert np.array_equal(
+        cv.all_indelsub_count_vectors["ref1"],
+        cv.all_insertion_count_vectors["ref1"] + cv.all_deletion_count_vectors["ref1"]
+        + cv.all_substitution_count_vectors["ref1"],
+    )
+    # counts_total = 4 + 3 + 2 (all normal rows)
+    assert cv.counts_total == {"ref1": 9}
+    assert n_total == 9
+
+
+def test_count_vectors_insertion_at_boundary(temp_dir):
+    """P1 edge: insertion at amplicon boundary (positions at len-1)."""
+    # insertion right before the last base → all_insertion_positions = [18, 19]
+    p = _allele_with(aln_seq="ATCGATCGAAATCGATCGAT" + "TT",  # extended by insertion
+                     aln_ref="ATCGATCGAAATCGATCGAT",
+                     deletion_n=0, insertion_n=2, classification="MODIFIED",
+                     all_insertion_positions=[18, 19],
+                     all_insertion_left_positions=[18],
+                     all_deletion_positions=[], deletion_positions=[],
+                     deletion_coordinates=[], deletion_sizes=[])
+    p["variant_ref1"]["insertion_positions"] = [18, 19]
+    p["variant_ref1"]["insertion_coordinates"] = [(18, 20)]
+    p["variant_ref1"]["insertion_sizes"] = [2]
+    rows = [("ACGTACGA", 5, p)]
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    ref_lengths = {"ref1": 20}
+    cv = compute_count_vectors_from_collapsed(collapsed_path, ref_lengths, temp_dir)
+    ref = _ref_count_vectors(allele_rows, ref_lengths)
+    _assert_vectors_equal(
+        (cv.all_insertion_count_vectors, cv.all_insertion_left_count_vectors,
+         cv.all_deletion_count_vectors, cv.all_substitution_count_vectors,
+         cv.all_indelsub_count_vectors, cv.counts_total), ref)
+    assert cv.all_insertion_count_vectors["ref1"][18] == 5.0
+    assert cv.all_insertion_count_vectors["ref1"][19] == 5.0
+    assert cv.all_insertion_left_count_vectors["ref1"][18] == 5.0
+    assert cv.all_insertion_left_count_vectors["ref1"][19] == 0.0
+
+
+def test_count_vectors_multi_reference(temp_dir):
+    """Multi-ref fan-out: each ref accumulates only its own rows."""
+    sub1 = _allele_with("ref1", aln_seq="AAAA", aln_ref="AAAA", deletion_n=0,
+                        classification="UNMODIFIED",
+                        all_deletion_positions=[], deletion_positions=[],
+                        deletion_coordinates=[], deletion_sizes=[])["variant_ref1"]
+    sub2 = _allele_with("ref2", aln_seq="CCCC", aln_ref="CCCC", deletion_n=1,
+                        classification="MODIFIED",
+                        all_deletion_positions=[1],
+                        deletion_positions=[1],
+                        deletion_coordinates=[(1, 2)], deletion_sizes=[1])["variant_ref2"]
+    sub2["ref_name"] = "ref2"
+    payload = {
+        "count": 1, "aln_ref_names": ["ref1", "ref2"], "aln_scores": [95.0, 95.0],
+        "best_match_score": 95.0, "class_name": "ref1_UNMODIFIED&ref2_MODIFIED",
+        "best_match_name": "ref1", "caching_is_ok": True,
+        "variant_ref1": sub1, "variant_ref2": sub2,
+    }
+    rows = [("KEY+YYY", 6, payload)]
+    allele_rows, n_total, collapsed_path, res = _collapse_to_rows(rows, temp_dir, is_paired=True)
+    ref_lengths = {"ref1": 4, "ref2": 4}
+    cv = compute_count_vectors_from_collapsed(collapsed_path, ref_lengths, temp_dir)
+    ref = _ref_count_vectors(allele_rows, ref_lengths)
+    _assert_vectors_equal(
+        (cv.all_insertion_count_vectors, cv.all_insertion_left_count_vectors,
+         cv.all_deletion_count_vectors, cv.all_substitution_count_vectors,
+         cv.all_indelsub_count_vectors, cv.counts_total), ref)
+    # ref1 unmodified (no del); ref2 has deletion at pos 1 with count 6
+    assert np.all(cv.all_deletion_count_vectors["ref1"] == 0)
+    assert cv.all_deletion_count_vectors["ref2"][1] == 6.0
+    assert cv.counts_total == {"ref1": 6, "ref2": 6}
+    # cross-check: streaming counts_total == CollapsedAlleles.counts_total
+    assert cv.counts_total == res.counts_total
+
+
+def test_count_vectors_skip_ambiguous_and_discarded(temp_dir):
+    """AMBIGUOUS and DISCARDED rows do not contribute to count vectors."""
+    amb_payload = {
+        "count": 1, "aln_ref_names": ["ref1", "ref2"], "aln_scores": [88.0, 88.0],
+        "best_match_score": 88.0, "class_name": "AMBIGUOUS",
+        "best_match_name": "ref1", "caching_is_ok": True,
+        "variant_ref1": _allele_with("ref1", aln_seq="AAAA", aln_ref="AAAA",
+                                     deletion_n=1, all_deletion_positions=[0],
+                                     deletion_positions=[0],
+                                     deletion_coordinates=[(0, 1)],
+                                     deletion_sizes=[1])["variant_ref1"],
+        "variant_ref2": _allele_with("ref2", aln_seq="AAAA", aln_ref="AAAA",
+                                     deletion_n=0)["variant_ref2"],
+    }
+    amb_payload["variant_ref2"]["ref_name"] = "ref2"
+    norm = _allele_with(all_deletion_positions=[5], deletion_n=1,
+                        deletion_coordinates=[(5, 6)], deletion_sizes=[1])
+    rows = [("AMB+XXX", 7, amb_payload), ("NRM", 4, norm)]
+    # ambiguous → AMBIGUOUS_ref1 row (skipped); normal → ref1 row (counted)
+    allele_rows, n_total, collapsed_path, res = _collapse_to_rows(rows, temp_dir, is_paired=True)
+    ref_lengths = {"ref1": 20, "ref2": 20}
+    cv = compute_count_vectors_from_collapsed(collapsed_path, ref_lengths, temp_dir)
+    ref = _ref_count_vectors(allele_rows, ref_lengths)
+    _assert_vectors_equal(
+        (cv.all_insertion_count_vectors, cv.all_insertion_left_count_vectors,
+         cv.all_deletion_count_vectors, cv.all_substitution_count_vectors,
+         cv.all_indelsub_count_vectors, cv.counts_total), ref)
+    # only the normal row (count 4) contributes; ambiguous (count 7) does not
+    assert cv.all_deletion_count_vectors["ref1"][5] == 4.0
+    assert cv.counts_total == {"ref1": 4, "ref2": 0}
+
+
+def test_count_vectors_empty_input(temp_dir):
+    """No aligned reads → zero vectors, zero counts_total."""
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    with AlignedShardWriter(shard) as w:
+        pass
+    res = collapse_aligned_shards([shard], temp_dir, is_paired=False)
+    ref_lengths = {"ref1": 10}
+    cv = compute_count_vectors_from_collapsed(res.parquet_path, ref_lengths, temp_dir)
+    assert np.all(cv.all_insertion_count_vectors["ref1"] == 0)
+    assert np.all(cv.all_deletion_count_vectors["ref1"] == 0)
+    assert cv.counts_total == {"ref1": 0}
+    assert cv.all_indelsub_count_vectors["ref1"].shape == (10,)
+
+
+def test_count_vectors_dtype_float64(temp_dir):
+    """Vectors are float64 (np.zeros default) — parity with pandas ~line 3874."""
+    p = _allele_with()
+    rows = [("ACGTACGA", 1, p)]
+    _, _, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    cv = compute_count_vectors_from_collapsed(collapsed_path, {"ref1": 20}, temp_dir)
+    assert cv.all_insertion_count_vectors["ref1"].dtype == np.float64
+    assert cv.all_deletion_count_vectors["ref1"].dtype == np.float64
+    assert cv.all_indelsub_count_vectors["ref1"].dtype == np.float64
+
+
+def test_save_modification_count_vectors_byte_parity(temp_dir):
+    """save_modification_count_vectors is byte-identical to save_count_vectors_to_file."""
+    p1 = _allele_with(all_deletion_positions=[8, 9], deletion_n=2,
+                      deletion_coordinates=[(8, 10)], deletion_sizes=[2])
+    p2 = _allele_with(aln_seq="ATCGATCGAAATCGATCGAT", aln_ref="ATCGATCGAAATCGATCGAT",
+                      deletion_n=0, classification="UNMODIFIED",
+                      all_deletion_positions=[], deletion_positions=[],
+                      deletion_coordinates=[], deletion_sizes=[])
+    p2["class_name"] = "ref1_UNMODIFIED"
+    rows = [("ACGTACGA", 4, p1), ("ACGTACGC", 3, p2)]
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    ref_lengths = {"ref1": 20}
+    cv = compute_count_vectors_from_collapsed(collapsed_path, ref_lengths, temp_dir)
+    ref = _ref_count_vectors(allele_rows, ref_lengths)
+    ref_ins, ref_ins_l, ref_dele, ref_sub, ref_indelsub, ref_total = ref
+    ref_seq = "ATCGATCGAAATCGATCGAT"
+
+    # reference: exact save_count_vectors_to_file replica
+    def ref_save(path):
+        vectors = [ref_ins["ref1"], ref_ins_l["ref1"], ref_dele["ref1"],
+                   ref_sub["ref1"], ref_indelsub["ref1"],
+                   [ref_total["ref1"]] * ref_lengths["ref1"]]
+        names = ["Insertions", "Insertions_Left", "Deletions", "Substitutions",
+                 "All_modifications", "Total"]
+        with open(path, "w") as f:
+            f.write("Sequence\t" + "\t".join(list(ref_seq)) + "\n")
+            for v, n in zip(vectors, names):
+                f.write(n + "\t" + "\t".join([str(x) for x in v]) + "\n")
+
+    got_path = os.path.join(temp_dir, "got.txt")
+    ref_path = os.path.join(temp_dir, "ref.txt")
+    cv.save_modification_count_vectors("ref1", ref_seq, got_path)
+    ref_save(ref_path)
+    assert open(got_path).read() == open(ref_path).read()
+    # spot-check the header + a deletion value (float repr "6.0")
+    text = open(got_path).read()
+    assert text.startswith("Sequence\tA\tT\tC\tG\tA\tT\tC\tG\tA\tA\tA\tT\tC\tG\tA\tT\tC\tG\tA\tT\n")
+    assert "\nDeletions\t0.0\t0.0\t0.0\t0.0\t0.0\t0.0\t0.0\t0.0\t4.0\t4.0" in text
+    assert "\nTotal\t7\t7" in text  # int, not 7.0
+
+
+def test_count_vectors_fuzz_vs_reference(temp_dir):
+    """Fuzz: random alleles through collapse → vectors match the reference loop."""
+    import random
+    rng = random.Random(99)
+    ref_len = 12
+    rows = []
+    for i in range(30):
+        ndel = rng.randint(0, 3)
+        nsub = rng.randint(0, 2)
+        delpos = sorted(rng.sample(range(ref_len), ndel)) if ndel else []
+        subpos = sorted(rng.sample(range(ref_len), nsub)) if nsub else []
+        # build an aln_seq/aln_ref consistent with the positions (values don't
+        # matter for count vectors — only the position arrays do)
+        aln_ref = "A" * ref_len
+        aln_seq = list(aln_ref)
+        for d in delpos:
+            aln_seq[d] = "-"
+        for s in subpos:
+            aln_seq[s] = rng.choice("CGT")
+        aln_seq = "".join(aln_seq)
+        p = _allele_with(aln_seq=aln_seq, aln_ref=aln_ref, deletion_n=ndel,
+                         substitution_n=nsub,
+                         all_deletion_positions=delpos,
+                         all_substitution_positions=subpos,
+                         deletion_positions=delpos,
+                         deletion_coordinates=[(d, d + 1) for d in delpos],
+                         deletion_sizes=[1] * ndel,
+                         classification="MODIFIED" if (ndel or nsub) else "UNMODIFIED")
+        if not (ndel or nsub):
+            p["class_name"] = "ref1_UNMODIFIED"
+        rows.append(("AAAA" + "ACGT"[(i >> 2) % 4] + "ACGT"[i % 4] + "ACGT"[(i >> 1) % 4] + "A", rng.randint(1, 5), p))
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    ref_lengths = {"ref1": ref_len}
+    cv = compute_count_vectors_from_collapsed(collapsed_path, ref_lengths, temp_dir)
+    ref = _ref_count_vectors(allele_rows, ref_lengths)
+    _assert_vectors_equal(
+        (cv.all_insertion_count_vectors, cv.all_insertion_left_count_vectors,
+         cv.all_deletion_count_vectors, cv.all_substitution_count_vectors,
+         cv.all_indelsub_count_vectors, cv.counts_total), ref)
+
+
+# -- Stage 4: allele TSV sink (Stream-Out A, PR 6) --------------------------
+#
+# Parity strategy: build the *reference* TSV by constructing a pandas
+# DataFrame from the same collapsed allele_rows exactly as CRISPRessoCORE.main
+# does (df_alleles = pd.DataFrame(alleles_list); %Reads; int cast; sort;
+# to_csv with crispresso2Cols / detailed projection / dsODN cols), then assert
+# the streaming write_allele_frequency_table output is byte-identical.
+
+import pandas as pd
+
+
+def _ref_allele_tsv(allele_rows, n_total, *, write_detailed, dsODN=""):
+    """Reference replica of the CRISPRessoCORE.main allele TSV write."""
+    # Convert cells to real-pandas types: CRISPRessoCORE.main's alleles_list
+    # stores numpy arrays for position/size columns (find_indels_substitutions
+    # emits numpy, not Python lists) and tuple-lists for coordinates. collapse's
+    # allele_rows round-tripped through parquet so positions are Python lists —
+    # convert them so the reference DataFrame matches what real pandas formats.
+    _pos_cols = [
+        "ref_positions", "all_insertion_positions", "all_insertion_left_positions",
+        "insertion_positions", "insertion_sizes", "all_deletion_positions",
+        "deletion_positions", "deletion_sizes", "all_substitution_positions",
+        "substitution_positions",
+    ]
+    converted = []
+    for r in allele_rows:
+        d = dict(r)
+        for c in _pos_cols:
+            if c in d:
+                d[c] = np.asarray(d[c] if d[c] is not None else [], dtype=int)
+        if "substitution_values" in d and not isinstance(d["substitution_values"], np.ndarray):
+            d["substitution_values"] = np.asarray(d["substitution_values"] or [], dtype="<U1")
+        # ensure coordinate columns are tuple-lists (collapse already returns them so)
+        converted.append(d)
+    df = pd.DataFrame(converted)
+    if n_total > 0:
+        df["%Reads"] = df["#Reads"] / n_total * 100
+    else:
+        df["%Reads"] = 0.0
+    df[["n_deleted", "n_inserted", "n_mutated"]] = df[
+        ["n_deleted", "n_inserted", "n_mutated"]
+    ].astype(int)
+    df.sort_values(by=["#Reads", "Aligned_Sequence", "Reference_Sequence"],
+                   inplace=True, ascending=[False, True, True])
+    crispresso2Cols = ["Aligned_Sequence", "Reference_Sequence", "Reference_Name",
+                       "Read_Status", "n_deleted", "n_inserted", "n_mutated",
+                       "#Reads", "%Reads"]
+    buf = io.StringIO()
+    if dsODN == "":
+        if write_detailed:
+            df.to_csv(buf, sep="\t", header=True, index=None)
+        else:
+            df.loc[:, crispresso2Cols].to_csv(buf, sep="\t", header=True, index=None)
+    else:
+        df["contains dsODN fw"] = df["Aligned_Sequence"].str.find(dsODN) > 0
+        df["contains dsODN rv"] = df["Aligned_Sequence"].str.find(
+            CRISPRessoShared.reverse_complement(dsODN)) > 0
+        df["contains dsODN"] = df["contains dsODN fw"] | df["contains dsODN rv"]
+        dsODN_cols = crispresso2Cols[:]
+        dsODN_cols.append("contains dsODN")
+        if len(dsODN) > 6:
+            sub_dsODN = dsODN[3:-3]
+            df["contains dsODN fragment fw"] = df["Aligned_Sequence"].str.find(sub_dsODN) > 0
+            df["contains dsODN fragment rv"] = df["Aligned_Sequence"].str.find(
+                CRISPRessoShared.reverse_complement(sub_dsODN)) > 0
+            df["contains dsODN fragment"] = (
+                df["contains dsODN fragment fw"] | df["contains dsODN fragment rv"])
+        dsODN_cols.append("contains dsODN fragment")
+        if write_detailed:
+            # replicate the pandas latent bug: only include fragment col if created
+            if len(dsODN) > 6:
+                df.to_csv(buf, sep="\t", header=True, index=None)
+            else:
+                df.loc[:, [c for c in df.columns if c != "contains dsODN fragment"]].to_csv(
+                    buf, sep="\t", header=True, index=None)
+        else:
+            df.loc[:, dsODN_cols].to_csv(buf, sep="\t", header=True, index=None)
+    return buf.getvalue()
+
+
+def _tsv_rows_for_sink():
+    """Canned allele payloads that exercise arrays + scalars for the TSV sink."""
+    p1 = _allele_with(all_deletion_positions=[8, 9], deletion_n=2,
+                      deletion_coordinates=[(8, 10)], deletion_sizes=[2])
+    p1["variant_ref1"]["substitution_values"] = np.array([])
+    p2 = _allele_with(aln_seq="ATCGATCGAAATCGATCGAT", aln_ref="ATCGATCGAAATCGATCGAT",
+                      deletion_n=0, substitution_n=0, classification="UNMODIFIED",
+                      all_deletion_positions=[], deletion_positions=[],
+                      deletion_coordinates=[], deletion_sizes=[])
+    p2["class_name"] = "ref1_UNMODIFIED"
+    p3 = _allele_with(aln_seq="ATCGATCG--ATCGATCGGT", aln_ref="ATCGATCGAAATCGATCGAT",
+                      deletion_n=2, substitution_n=1,
+                      all_deletion_positions=[8, 9],
+                      all_substitution_positions=[18],
+                      deletion_coordinates=[(8, 10)], deletion_sizes=[2])
+    p3["variant_ref1"]["substitution_values"] = np.array(["G"])
+    p3["variant_ref1"]["substitution_positions"] = [18]
+    return [("ACGTACGA", 4, p1), ("ACGTACGC", 3, p2), ("ACGTACGG", 2, p3)]
+
+
+def test_allele_tsv_non_detailed_byte_parity(temp_dir):
+    """Non-detailed TSV byte-identical to pandas df_alleles.loc[:,crispresso2Cols].to_csv."""
+    rows = _tsv_rows_for_sink()
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    got_path = os.path.join(temp_dir, "Alleles_frequency_table.txt")
+    write_allele_frequency_table(collapsed_path, got_path, n_total, temp_dir,
+                                 write_detailed_allele_table=False)
+    ref = _ref_allele_tsv(allele_rows, n_total, write_detailed=False)
+    assert open(got_path).read() == ref
+
+
+def test_allele_tsv_detailed_byte_parity(temp_dir):
+    """Detailed TSV (with array columns) byte-identical to pandas df_alleles.to_csv."""
+    rows = _tsv_rows_for_sink()
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    got_path = os.path.join(temp_dir, "Alleles_frequency_table.txt")
+    write_allele_frequency_table(collapsed_path, got_path, n_total, temp_dir,
+                                 write_detailed_allele_table=True)
+    ref = _ref_allele_tsv(allele_rows, n_total, write_detailed=True)
+    assert open(got_path).read() == ref
+
+
+def test_allele_tsv_detailed_array_formatting(temp_dir):
+    """Detailed arrays format as numpy str (no commas) / tuple-lists — byte parity."""
+    rows = _tsv_rows_for_sink()
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    got_path = os.path.join(temp_dir, "Alleles_frequency_table.txt")
+    write_allele_frequency_table(collapsed_path, got_path, n_total, temp_dir,
+                                 write_detailed_allele_table=True)
+    text = open(got_path).read()
+    # ref_positions numpy int array → aligned str (numpy pads to width of -8/10)
+    assert "[ 0  1  2  3  4  5  6  7 -8 -8  8  9 10 11 12 13 14 15 16 17]" in text
+    # deletion_coordinates tuple-list → "[(8, 10)]"
+    assert "[(8, 10)]" in text
+    # substitution_values numpy str array → "['G']" (no commas)
+    assert "['G']" in text
+    # %Reads float → "44.44444444444444" for 4/9*100
+    assert "44.44444444444444" in text
+
+
+def test_allele_tsv_dsODN_non_detailed_byte_parity(temp_dir):
+    """dsODN non-detailed TSV byte-identical to pandas (contains dsODN cols)."""
+    rows = _tsv_rows_for_sink()
+    # make one allele contain the dsODN so the bool column is non-trivial
+    dsODN = "GATCGATCGA"  # len > 6 → fragment columns exercised
+    rows[0][2]["variant_ref1"]["aln_seq"] = "ATCGATCG--" + dsODN + "AT"
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    got_path = os.path.join(temp_dir, "Alleles_frequency_table.txt")
+    write_allele_frequency_table(collapsed_path, got_path, n_total, temp_dir,
+                                 write_detailed_allele_table=False, dsODN=dsODN)
+    ref = _ref_allele_tsv(allele_rows, n_total, write_detailed=False, dsODN=dsODN)
+    assert open(got_path).read() == ref
+
+
+def test_allele_tsv_dsODN_detailed_byte_parity(temp_dir):
+    """dsODN detailed TSV byte-identical to pandas (all cols + dsODN bools)."""
+    rows = _tsv_rows_for_sink()
+    dsODN = "GATCGATCGA"  # len > 6 → fragment cols
+    rows[0][2]["variant_ref1"]["aln_seq"] = "ATCGATCG--" + dsODN + "AT"
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    got_path = os.path.join(temp_dir, "Alleles_frequency_table.txt")
+    write_allele_frequency_table(collapsed_path, got_path, n_total, temp_dir,
+                                 write_detailed_allele_table=True, dsODN=dsODN)
+    ref = _ref_allele_tsv(allele_rows, n_total, write_detailed=True, dsODN=dsODN)
+    assert open(got_path).read() == ref
+
+
+def test_allele_tsv_empty_input(temp_dir):
+    """Empty allele table → header-only TSV (non-detailed: crispresso2Cols)."""
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    with AlignedShardWriter(shard) as w:
+        pass
+    res = collapse_aligned_shards([shard], temp_dir, is_paired=False)
+    got_path = os.path.join(temp_dir, "Alleles_frequency_table.txt")
+    write_allele_frequency_table(res.parquet_path, got_path, 0, temp_dir,
+                                 write_detailed_allele_table=False)
+    text = open(got_path).read()
+    # header only (crispresso2Cols), no data rows
+    assert text == "Aligned_Sequence\tReference_Sequence\tReference_Name\t" \
+        "Read_Status\tn_deleted\tn_inserted\tn_mutated\t#Reads\t%Reads\n"
+
+
+def test_allele_tsv_streaming_batched_byte_parity(temp_dir):
+    """Multiple row groups / batches concat to byte-identical whole-frame to_csv."""
+    # many alleles so iter_batches yields >1 batch with batch_size=5
+    rows = []
+    for i in range(40):
+        # distinct ACGT read_keys (all start "AAAA" so none are RC-pairs) and
+        # distinct gap-containing aln_seqs (deletion at position i%20).
+        read_key = "AAAA" + "ACGT"[i % 4] + "ACGT"[(i >> 1) % 4] + "ACGT"[(i >> 2) % 4] + "A"
+        ref_seq = "ATCGATCGAAATCGATCGAT"
+        gap_pos = i % 20
+        aln_seq = ref_seq[:gap_pos] + "-" + ref_seq[gap_pos + 1:]
+        p = _allele_with(aln_seq=aln_seq, aln_ref=ref_seq,
+                         deletion_n=1, classification="MODIFIED",
+                         all_deletion_positions=[gap_pos],
+                         deletion_positions=[gap_pos],
+                         deletion_coordinates=[(gap_pos, gap_pos + 1)],
+                         deletion_sizes=[1])
+        rows.append((read_key, (i % 4) + 1, p))
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    got_path = os.path.join(temp_dir, "Alleles_frequency_table.txt")
+    # use a tiny batch_size to force multiple batches through the sink
+    store = VariantStore(temp_dir)
+    store.write_allele_frequency_table(got_path, n_total,
+                                       write_detailed_allele_table=False,
+                                       collapsed_path=collapsed_path, batch_size=5)
+    ref = _ref_allele_tsv(allele_rows, n_total, write_detailed=False)
+    assert open(got_path).read() == ref

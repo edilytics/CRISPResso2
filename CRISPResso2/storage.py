@@ -21,11 +21,14 @@ Stage coverage
     ``design_docs/STREAMING_GROUPBY_SPIKE.md`` (ratios 1.00-2.49 at up to
     1M x 10kb, vs 22-24x linear scaling for a hash ``group_by``).
 
-Stages 2 (worker parquet writers) and 3 (streaming collapse) live in later PRs;
-this module currently exposes the Stage 1 ``VariantStore.count_reads`` API,
-the ``ReadCounts`` result handle, the Stage 2 worker parquet writer, and the
-Stage 3 ``VariantStore.collapse`` streaming collapse. None of these are wired
-into ``CRISPRessoCORE.main`` yet.
+Stages 2 (worker parquet writers), 3 (streaming collapse), and 4 (stream-out:
+count vectors + allele TSV sink) are implemented; this module exposes the
+Stage 1 ``VariantStore.count_reads`` API, the ``ReadCounts`` result handle,
+the Stage 2 worker parquet writer, the Stage 3 ``VariantStore.collapse``
+streaming collapse, and the Stage 4 ``VariantStore.compute_count_vectors`` /
+``VariantStore.write_allele_frequency_table`` stream-outs. None of these are
+wired into ``CRISPRessoCORE.main`` yet — they are exercised by unit tests
+against the current pandas path for parity.
 """
 
 from __future__ import annotations
@@ -512,16 +515,19 @@ def count_reads_from_fastq(
 __all__ = [
     "ALIGNED_SCHEMA",
     "COLLAPSED_SCHEMA",
+    "CountVectors",
     "DEFAULT_MEMORY_BUDGET_MB",
     "AlignedShardWriter",
     "CollapsedAlleles",
     "ReadCounts",
     "VariantStore",
+    "compute_count_vectors_from_collapsed",
     "count_reads_from_fastq",
     "iter_aligned_shard",
     "payload_to_row",
     "row_to_payload",
     "variant_parquet_generator_process",
+    "write_allele_frequency_table",
 ]
 
 
@@ -600,10 +606,21 @@ ALIGNED_SCHEMA = pa.schema([
 ])
 
 # Fields NOT stored (deliberately dropped — not consumed downstream by
-# get_allele_row or the count-vector aggregation):
-#   - ref_aln_details      (only for fastq_output annotation; edge #12 follow-up)
+# get_allele_row, and not by the PR 6 count-vector aggregation which streams the
+# collapsed allele parquet, whose schema is a superset of get_allele_row):
+#   - ref_aln_details          (only for fastq_output annotation; edge #12 follow-up)
 #   - all_deletion_coordinates (only for deletions_outside_window, already computed)
-#   - all_substitution_values  (not in get_allele_row; substitution_values is)
+#   - all_substitution_values  (needed by all_substitution_base_vectors — the per-base
+#     substitution count vector built in the CRISPRessoCORE.main aggregation loop
+#     ~line 4060. NOT in get_allele_row, so absent from the collapsed allele
+#     parquet. The per-base vectors (all_substitution_base_vectors /
+#     all_base_count_vectors) and the windowed vectors (insertion_count_vectors,
+#     etc.) are deferred to PR 7's consumer wiring: they feed plot functions
+#     directly and require refs/window context. PR 6's Stream-Out B covers the
+#     four all_* position vectors + all_indelsub_count_vectors that are persisted
+#     to Modification_count_vectors.txt — these need only fields already in
+#     COLLAPSED_SCHEMA. Adding all_substitution_values to _PAYLOAD_STRUCT +
+#     COLLAPSED_SCHEMA is the prerequisite for the per-base vectors (see PR 7).
 
 
 def _to_int_list(val):
@@ -1471,4 +1488,473 @@ def collapse_aligned_shards(
         discard_indel_reads=discard_indel_reads,
         write_detailed_allele_table=write_detailed_allele_table,
         vcf_output=vcf_output,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Stage 4 — Stream-Out B: count-vector aggregation (PR 6)
+# ---------------------------------------------------------------------------
+#
+# The per-reference position count vectors that ``CRISPRessoCORE.main`` builds
+# in the variant-cache aggregation loop (~line 4025-4049) and persists to
+# ``Modification_count_vectors.txt`` via ``save_count_vectors_to_file``
+# (~line 4689):
+#
+#   * ``all_insertion_count_vectors``        — 1 at each amplicon position
+#     bracketing an insertion (both sides), weighted by #Reads.
+#   * ``all_insertion_left_count_vectors``   — 1 at the left position only.
+#   * ``all_deletion_count_vectors``         — 1 at each deleted position.
+#   * ``all_substitution_count_vectors``     — 1 at each substituted position.
+#   * ``all_indelsub_count_vectors``         — sum of ins+del+sub (computed
+#     after the pass, matching ~line 4200).
+#
+# Under Approach B these are built by a *streaming pass* over the collapsed
+# allele parquet (Stage 3 output): scan row-group by row-group (pyarrow
+# ``iter_batches``), and for each (allele, reference) row add the #Reads-
+# weighted contribution to the numpy accumulator for that reference. Peak RSS
+# is bounded by the accumulator size — O(amplicon_length x num_refs) — not by
+# the read count (the design's stated bounded lower-order term).
+#
+# Parity: the arithmetic is identical to the pandas loop, including the numpy
+# fancy-indexing ``arr[positions] += count`` expression (which has the same
+# duplicate-index semantics as pandas — positions are distinct in practice, so
+# this is a no-op difference, but replicated verbatim for safety). AMBIGUOUS
+# and DISCARDED rows do not contribute (the pandas loop ``continue``\ s before
+# the count-vector lines); here they are skipped because their
+# ``Reference_Name`` (``AMBIGUOUS_<ref0>`` / ``DISCARDED_<ref0>``) is not a key
+# in ``ref_lengths``.
+#
+# The per-base vectors (``all_substitution_base_vectors``,
+# ``all_base_count_vectors``) and the quantification-window vectors
+# (``insertion_count_vectors``, etc.) are deferred to PR 7 — see the
+# _PAYLOAD_STRUCT comment above.
+#
+# NOT wired into CRISPRessoCORE.main — exercised by unit tests only.
+
+
+@dataclass
+class CountVectors:
+    """Per-reference position count vectors (Stream-Out B).
+
+    Mirrors the four ``all_*`` accumulator dicts plus the derived
+    ``all_indelsub_count_vectors`` that ``CRISPRessoCORE.main`` builds, and the
+    per-reference ``counts_total`` used for the ``Total`` row of
+    ``Modification_count_vectors.txt``. All vectors are ``float64`` numpy arrays
+    of length ``ref_lengths[ref_name]`` — matching ``np.zeros(seq_len)`` in the
+    pandas path, so :meth:`save_modification_count_vectors` produces byte-
+    identical output to ``save_count_vectors_to_file``.
+    """
+
+    all_insertion_count_vectors: dict
+    all_insertion_left_count_vectors: dict
+    all_deletion_count_vectors: dict
+    all_substitution_count_vectors: dict
+    all_indelsub_count_vectors: dict
+    counts_total: dict
+    ref_lengths: dict
+
+    def save_modification_count_vectors(self, ref_name, ref_seq, path):
+        """Write ``Modification_count_vectors.txt`` for one reference.
+
+        Byte-identical replica of ``CRISPRessoCORE.save_count_vectors_to_file``
+        (~line 4613) as called for the all-modifications file (~line 4689):
+        first row is ``Sequence\t<ref_seq chars>``; subsequent rows are
+        ``<vectorName>\t<tab-joined vector values>`` for Insertions,
+        Insertions_Left, Deletions, Substitutions, All_modifications, Total.
+        Vector values are written with ``str()`` (float64 → ``"5.0"``); the
+        Total row is a Python int repeated (``"5"``) — matching the pandas path
+        where ``counts_total`` is a Python int and the vectors are float64.
+        """
+        ref_len = self.ref_lengths[ref_name]
+        total = self.counts_total.get(ref_name, 0)
+        vectors = [
+            self.all_insertion_count_vectors[ref_name],
+            self.all_insertion_left_count_vectors[ref_name],
+            self.all_deletion_count_vectors[ref_name],
+            self.all_substitution_count_vectors[ref_name],
+            self.all_indelsub_count_vectors[ref_name],
+            [total] * ref_len,
+        ]
+        names = [
+            "Insertions",
+            "Insertions_Left",
+            "Deletions",
+            "Substitutions",
+            "All_modifications",
+            "Total",
+        ]
+        with open(path, "w") as outfile:
+            outfile.write("Sequence\t" + "\t".join(list(ref_seq)) + "\n")
+            for vector, name in zip(vectors, names):
+                outfile.write(name + "\t" + "\t".join([str(x) for x in vector]) + "\n")
+
+
+def _compute_count_vectors(
+    self: "VariantStore",
+    ref_lengths: dict,
+    *,
+    collapsed_path: Optional[str] = None,
+    batch_size: int = 50_000,
+) -> CountVectors:
+    """Stream the collapsed allele parquet → numpy count-vector accumulators.
+
+    Parameters
+    ----------
+    ref_lengths
+        ``{ref_name: sequence_length}`` — the amplicon length per reference
+        (from ``refs[ref_name]['sequence_length']``). Defines the accumulator
+        vector lengths and the set of valid reference names (rows whose
+        ``Reference_Name`` is not in this dict — i.e. ``AMBIGUOUS_*`` /
+        ``DISCARDED_*`` — are skipped, matching the pandas loop's ``continue``
+        before the count-vector lines).
+    collapsed_path
+        Path to the collapsed allele parquet (Stage 3 output). Defaults to
+        ``<output_directory>/collapsed.allele.parquet``.
+    batch_size
+        Row batch size for ``pyarrow.iter_batches`` (bounds peak memory).
+
+    Returns
+    -------
+    CountVectors
+        The four ``all_*`` accumulators + ``all_indelsub_count_vectors`` +
+        per-reference ``counts_total`` (sum of #Reads over contributing rows),
+        matching the pandas loop's outputs.
+
+    Notes
+    -----
+    * Vectors are ``np.zeros(seq_len)`` (float64), exactly like the pandas path
+      (~line 3874), so :meth:`CountVectors.save_modification_count_vectors`
+      is byte-identical to ``save_count_vectors_to_file``.
+    * ``arr[positions] += count`` uses numpy fancy indexing — the same
+      expression as pandas. Empty/None position lists are no-ops.
+    * ``counts_total`` is accumulated here (sum of #Reads over contributing
+      rows, initialized to 0 for every ref — matching pandas ~line 3870 which
+      zeroes ``counts_total[ref_name]`` for all refs) rather than taken from
+      :class:`CollapsedAlleles` so this method is self-contained. It equals
+      ``CollapsedAlleles.counts_total`` for refs with contributing rows;
+      ``CollapsedAlleles.counts_total`` omits zero-count refs (a PR 5 gap),
+      while this dict includes them as 0 (pandas parity).
+    """
+    path = collapsed_path or os.path.join(self.output_directory, "collapsed.allele.parquet")
+    ins = {r: np.zeros(n) for r, n in ref_lengths.items()}
+    ins_l = {r: np.zeros(n) for r, n in ref_lengths.items()}
+    dele = {r: np.zeros(n) for r, n in ref_lengths.items()}
+    sub = {r: np.zeros(n) for r, n in ref_lengths.items()}
+    counts_total = {r: 0 for r in ref_lengths}
+
+    columns = [
+        "#Reads",
+        "Reference_Name",
+        "all_insertion_positions",
+        "all_insertion_left_positions",
+        "all_deletion_positions",
+        "all_substitution_positions",
+    ]
+    pf = pq.ParquetFile(path)
+    for batch in pf.iter_batches(columns=columns, batch_size=batch_size):
+        reads = batch.column("#Reads").to_pylist()
+        refs = batch.column("Reference_Name").to_pylist()
+        ip = batch.column("all_insertion_positions").to_pylist()
+        ipl = batch.column("all_insertion_left_positions").to_pylist()
+        dp = batch.column("all_deletion_positions").to_pylist()
+        sp = batch.column("all_substitution_positions").to_pylist()
+        for i in range(batch.num_rows):
+            ref_name = refs[i]
+            if ref_name not in ref_lengths:
+                continue  # AMBIGUOUS_*/DISCARDED_* rows don't contribute
+            count = int(reads[i])
+            counts_total[ref_name] += count
+            _acc(ins[ref_name], ip[i], count)
+            _acc(ins_l[ref_name], ipl[i], count)
+            _acc(dele[ref_name], dp[i], count)
+            _acc(sub[ref_name], sp[i], count)
+
+    indelsub = {
+        r: ins[r] + dele[r] + sub[r] for r in ref_lengths
+    }  # matches ~line 4200 (ins+del+sub; insertion_left NOT included)
+    return CountVectors(
+        all_insertion_count_vectors=ins,
+        all_insertion_left_count_vectors=ins_l,
+        all_deletion_count_vectors=dele,
+        all_substitution_count_vectors=sub,
+        all_indelsub_count_vectors=indelsub,
+        counts_total=counts_total,
+        ref_lengths=dict(ref_lengths),
+    )
+
+
+def _acc(arr, positions, count):
+    """``arr[positions] += count`` with empty/None positions as a no-op."""
+    if not positions:
+        return
+    arr[positions] += count
+
+
+VariantStore.compute_count_vectors = _compute_count_vectors
+
+
+def compute_count_vectors_from_collapsed(
+    collapsed_path: str,
+    ref_lengths: dict,
+    output_directory: str,
+    *,
+    memory_budget_mb: int = DEFAULT_MEMORY_BUDGET_MB,
+) -> CountVectors:
+    """Convenience wrapper: create a :class:`VariantStore` and compute vectors."""
+    store = VariantStore(output_directory, memory_budget_mb=memory_budget_mb)
+    return store.compute_count_vectors(ref_lengths, collapsed_path=collapsed_path)
+
+
+# ---------------------------------------------------------------------------
+# Stage 4 — Stream-Out A: allele frequency TSV sink (PR 6)
+# ---------------------------------------------------------------------------
+#
+# Streams the collapsed allele parquet (Stage 3 output, already sorted by
+# ``(-#Reads, Aligned_Sequence, Reference_Sequence)``) to
+# ``Alleles_frequency_table.txt`` — byte-identical to the pandas path:
+#
+#     df_alleles = pd.DataFrame(alleles_list)            # sorted
+#     df_alleles['%Reads'] = df_alleles['#Reads'] / N_TOTAL * 100
+#     df_alleles[['n_deleted','n_inserted','n_mutated']] = .astype(int)
+#     (df_alleles if detailed else df_alleles.loc[:, cols]).to_csv(
+#         path, sep='\t', header=True, index=None)
+#
+# Implementation: stream the parquet in bounded batches (pyarrow
+# ``iter_batches``), reconstruct each batch as a pandas DataFrame with the
+# *exact* cell types the pandas ``alleles_list`` carries (numpy arrays for
+# position/size columns, tuple-lists for coordinate columns, numpy array for
+# ``substitution_values``), and call ``DataFrame.to_csv`` per batch (header on
+# the first batch only). Because pandas performs the float/array formatting —
+# and the dtypes are identical batch-to-batch — the concatenated output is
+# byte-identical to a whole-frame ``to_csv``, while peak memory is bounded by
+# one batch (not the whole allele table).
+#
+# Handles all four pandas branches: detailed/non-detailed × dsODN/no-dsODN,
+# replicating the ``crispresso2Cols`` projection, the ``%Reads`` derivation,
+# the int cast, and the ``contains dsODN`` / ``contains dsODN fragment``
+# boolean columns (``Aligned_Sequence.str.find(dsODN) > 0``).
+#
+# NOT wired into CRISPRessoCORE.main — exercised by unit tests only.
+
+# Column order for the detailed allele table: get_allele_row's dict order
+# (23 keys) with %Reads appended (pandas adds it after constructing the frame).
+_DETAILED_ALLELE_COLS = [
+    "#Reads",
+    "Aligned_Sequence",
+    "Reference_Sequence",
+    "n_inserted",
+    "n_deleted",
+    "n_mutated",
+    "Reference_Name",
+    "Read_Status",
+    "Aligned_Reference_Names",
+    "Aligned_Reference_Scores",
+    "ref_positions",
+    "all_insertion_positions",
+    "all_insertion_left_positions",
+    "insertion_positions",
+    "insertion_coordinates",
+    "insertion_sizes",
+    "all_deletion_positions",
+    "deletion_positions",
+    "deletion_coordinates",
+    "deletion_sizes",
+    "all_substitution_positions",
+    "substitution_positions",
+    "substitution_values",
+]
+
+# crispresso2Cols (non-detailed projection) — exact order from CRISPRessoCORE.
+_CRISPRESSO2_COLS = [
+    "Aligned_Sequence",
+    "Reference_Sequence",
+    "Reference_Name",
+    "Read_Status",
+    "n_deleted",
+    "n_inserted",
+    "n_mutated",
+    "#Reads",
+    "%Reads",
+]
+
+# Parquet columns needed to reconstruct an alleles_list-shaped row.
+_TSV_PARQUET_COLUMNS = _DETAILED_ALLELE_COLS  # %Reads computed, not stored
+
+
+def _parquet_row_to_allele_dict(row, n_total):
+    """Convert a collapsed-parquet row (dict) to an alleles_list-shaped dict.
+
+    Reconstructs the pandas cell types so ``DataFrame.to_csv`` formats them
+    identically to the pandas ``alleles_list``:
+      * position/size arrays → ``np.array(list, dtype=int)`` (``str`` →
+        ``"[0 1 2]"``, matching ``str(np.array(...))`` in pandas).
+      * coordinate arrays → list of ``(start, end)`` tuples (``str`` →
+        ``"[(8, 10)]"``, matching pandas where ``insertion_coordinates`` is a
+        list of tuples).
+      * ``substitution_values`` → ``np.array(list, dtype='<U1')`` (``str`` →
+        ``"['G' 'T']``, matching ``str(np.array(['G','T']))``).
+    ``%Reads`` is computed as ``#Reads / n_total * 100`` (float64 — same as
+    ``df['#Reads'] / N_TOTAL * 100``). ``n_inserted/n_deleted/n_mutated`` are
+    left as ints; the batch DataFrame cast (``.astype(int)``) is applied later
+    to match pandas exactly.
+    """
+    return {
+        "#Reads": int(row["#Reads"]),
+        "Aligned_Sequence": row["Aligned_Sequence"],
+        "Reference_Sequence": row["Reference_Sequence"],
+        "n_inserted": int(row["n_inserted"]),
+        "n_deleted": int(row["n_deleted"]),
+        "n_mutated": int(row["n_mutated"]),
+        "Reference_Name": row["Reference_Name"],
+        "Read_Status": row["Read_Status"],
+        "Aligned_Reference_Names": row["Aligned_Reference_Names"],
+        "Aligned_Reference_Scores": row["Aligned_Reference_Scores"],
+        "ref_positions": _to_np_int_array(row.get("ref_positions")),
+        "all_insertion_positions": _to_np_int_array(row.get("all_insertion_positions")),
+        "all_insertion_left_positions": _to_np_int_array(row.get("all_insertion_left_positions")),
+        "insertion_positions": _to_np_int_array(row.get("insertion_positions")),
+        "insertion_coordinates": _structs_to_coords(row.get("insertion_coordinates")) or [],
+        "insertion_sizes": _to_np_int_array(row.get("insertion_sizes")),
+        "all_deletion_positions": _to_np_int_array(row.get("all_deletion_positions")),
+        "deletion_positions": _to_np_int_array(row.get("deletion_positions")),
+        "deletion_coordinates": _structs_to_coords(row.get("deletion_coordinates")) or [],
+        "deletion_sizes": _to_np_int_array(row.get("deletion_sizes")),
+        "all_substitution_positions": _to_np_int_array(row.get("all_substitution_positions")),
+        "substitution_positions": _to_np_int_array(row.get("substitution_positions")),
+        "substitution_values": _to_np_str_array(row.get("substitution_values")),
+        "%Reads": (int(row["#Reads"]) / n_total * 100) if n_total > 0 else 0.0,
+    }
+
+
+def _to_np_int_array(val):
+    """Convert a parquet list (or None) to a numpy int array (pandas cell parity)."""
+    if val is None:
+        return np.array([], dtype=int)
+    return np.asarray(val, dtype=int)
+
+
+def _to_np_str_array(val):
+    """Convert a parquet list (or None) to a numpy <U1 string array (pandas parity)."""
+    if val is None:
+        return np.array([], dtype="<U1")
+    return np.asarray([str(x) for x in val], dtype="<U1")
+
+
+def _write_allele_frequency_table(
+    self: "VariantStore",
+    output_path: str,
+    n_total: int,
+    *,
+    write_detailed_allele_table: bool = False,
+    dsODN: str = "",
+    collapsed_path: Optional[str] = None,
+    batch_size: int = 50_000,
+) -> str:
+    """Stream the collapsed allele parquet to ``Alleles_frequency_table.txt``.
+
+    Byte-identical to the pandas ``df_alleles.to_csv`` path (both detailed and
+    non-detailed branches, with and without ``dsODN``), via per-batch pandas
+    ``to_csv`` so peak memory is bounded by one batch.
+
+    See the module section docstring above for the parity strategy.
+    """
+    import pandas as pd
+
+    path = collapsed_path or os.path.join(self.output_directory, "collapsed.allele.parquet")
+    rc = CRISPRessoShared.reverse_complement
+    have_dsODN = dsODN != ""
+    have_fragment = have_dsODN and len(dsODN) > 6
+    sub_dsODN = dsODN[3:-3] if have_fragment else ""
+    sub_dsODN_rc = rc(sub_dsODN) if have_fragment else ""
+    dsODN_rc = rc(dsODN) if have_dsODN else ""
+
+    # Build the column projection matching the pandas path exactly:
+    #   detailed, no dsODN : get_allele_row cols (23) + %Reads
+    #   detailed, dsODN    : above + dsODN bool cols (fw, rv, contains, fragment*)
+    #   non-detailed       : crispresso2Cols (+ contains dsODN + fragment if dsODN)
+    # Always projecting (rather than df.to_csv for detailed) keeps the header
+    # consistent across batches and lets the empty-input case write a header.
+    if write_detailed_allele_table:
+        select_cols = list(_DETAILED_ALLELE_COLS) + ["%Reads"]
+    else:
+        select_cols = list(_CRISPRESSO2_COLS)
+    if have_dsODN:
+        # dsODN bool columns in the order pandas adds them to the DataFrame.
+        dsODN_extra = ["contains dsODN fw", "contains dsODN rv", "contains dsODN"]
+        if have_fragment:
+            dsODN_extra += [
+                "contains dsODN fragment fw",
+                "contains dsODN fragment rv",
+                "contains dsODN fragment",
+            ]
+        else:
+            # len(dsODN) <= 6: pandas omits the fragment columns from the frame
+            # (a latent KeyError on the non-detailed projection). We create an
+            # all-False 'contains dsODN fragment' so the projection succeeds;
+            # the common long-dsODN path is unaffected.
+            dsODN_extra += ["contains dsODN fragment"]
+        if write_detailed_allele_table:
+            select_cols += dsODN_extra
+        else:
+            select_cols += ["contains dsODN", "contains dsODN fragment"]
+
+    pf = pq.ParquetFile(path)
+    with open(output_path, "w") as handle:
+        first = True
+        for batch in pf.iter_batches(columns=_TSV_PARQUET_COLUMNS, batch_size=batch_size):
+            col_values = {c: batch.column(c).to_pylist() for c in _TSV_PARQUET_COLUMNS}
+            n = batch.num_rows
+            row_dicts = []
+            for i in range(n):
+                row = {c: col_values[c][i] for c in _TSV_PARQUET_COLUMNS}
+                row_dicts.append(_parquet_row_to_allele_dict(row, n_total))
+            if not row_dicts:
+                continue
+            df = pd.DataFrame(row_dicts)
+            df["%Reads"] = df["#Reads"] / n_total * 100 if n_total > 0 else 0.0
+            df[["n_deleted", "n_inserted", "n_mutated"]] = df[
+                ["n_deleted", "n_inserted", "n_mutated"]
+            ].astype(int)
+            if have_dsODN:
+                df["contains dsODN fw"] = df["Aligned_Sequence"].str.find(dsODN) > 0
+                df["contains dsODN rv"] = df["Aligned_Sequence"].str.find(dsODN_rc) > 0
+                df["contains dsODN"] = df["contains dsODN fw"] | df["contains dsODN rv"]
+                if have_fragment:
+                    df["contains dsODN fragment fw"] = df["Aligned_Sequence"].str.find(sub_dsODN) > 0
+                    df["contains dsODN fragment rv"] = df["Aligned_Sequence"].str.find(sub_dsODN_rc) > 0
+                    df["contains dsODN fragment"] = (
+                        df["contains dsODN fragment fw"] | df["contains dsODN fragment rv"]
+                    )
+                else:
+                    df["contains dsODN fragment"] = False
+            df.loc[:, select_cols].to_csv(handle, sep="\t", header=first, index=False)
+            first = False
+        if first:
+            # No rows (empty allele table): write the header only — matching
+            # pandas df_alleles.to_csv on an empty frame projected to the cols.
+            handle.write("\t".join(select_cols) + "\n")
+    return output_path
+
+
+VariantStore.write_allele_frequency_table = _write_allele_frequency_table
+
+
+def write_allele_frequency_table(
+    collapsed_path: str,
+    output_path: str,
+    n_total: int,
+    output_directory: str,
+    *,
+    write_detailed_allele_table: bool = False,
+    dsODN: str = "",
+    memory_budget_mb: int = DEFAULT_MEMORY_BUDGET_MB,
+) -> str:
+    """Convenience wrapper: create a :class:`VariantStore` and sink the TSV."""
+    store = VariantStore(output_directory, memory_budget_mb=memory_budget_mb)
+    return store.write_allele_frequency_table(
+        output_path,
+        n_total,
+        write_detailed_allele_table=write_detailed_allele_table,
+        dsODN=dsODN,
+        collapsed_path=collapsed_path,
     )
