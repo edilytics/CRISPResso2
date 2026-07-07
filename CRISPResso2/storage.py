@@ -22,9 +22,10 @@ Stage coverage
     1M x 10kb, vs 22-24x linear scaling for a hash ``group_by``).
 
 Stages 2 (worker parquet writers) and 3 (streaming collapse) live in later PRs;
-this module currently exposes only the Stage 1 ``VariantStore.count_reads`` API
-and the ``ReadCounts`` result handle. Nothing here is wired into
-``CRISPRessoCORE.main`` yet.
+this module currently exposes the Stage 1 ``VariantStore.count_reads`` API,
+the ``ReadCounts`` result handle, the Stage 2 worker parquet writer, and the
+Stage 3 ``VariantStore.collapse`` streaming collapse. None of these are wired
+into ``CRISPRessoCORE.main`` yet.
 """
 
 from __future__ import annotations
@@ -510,8 +511,10 @@ def count_reads_from_fastq(
 
 __all__ = [
     "ALIGNED_SCHEMA",
+    "COLLAPSED_SCHEMA",
     "DEFAULT_MEMORY_BUDGET_MB",
     "AlignedShardWriter",
+    "CollapsedAlleles",
     "ReadCounts",
     "VariantStore",
     "count_reads_from_fastq",
@@ -888,3 +891,584 @@ def variant_parquet_generator_process(
             if index % 10000 == 0 and index != 0:
                 info(f"Process {process_id + 1} has processed {index} unique reads", {"percent_complete": 10})
     info(f"Process {process_id + 1} has finished processing {num_processed} unique reads", {"percent_complete": 10})
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: Streaming collapse (aln_seq re-key + RC canonical-key merge +
+#          multi-reference fan-out) — PR 5.
+# ---------------------------------------------------------------------------
+#
+# ``VariantStore.collapse`` consumes the per-worker aligned parquet shards
+# produced by Stage 2 and produces the collapsed allele table: one row per
+# (allele, reference) with the final ``#Reads`` (post RC-merge), plus the
+# variant-level aggregations (``n_total``, ``class_counts``) and per-reference
+# counts (``counts_total/modified/unmodified/discarded``) that the pandas path
+# builds in the ``CRISPRessoCORE.main`` allele loop (~line 3976).
+#
+# The three sub-stages match the pandas path exactly:
+#
+#   3a — aln_seq re-key (paired only). Reads keyed by R1+'+'+RC(R2) are
+#        re-keyed by the primary reference's aligned sequence (aln_seq), summing
+#        ``count``. Two different raw pairs that align identically collapse to
+#        one allele. For single-read input there is NO re-key (the key is the
+#        raw read sequence, already deduped by Stage 1) — matching
+#        ``process_fastq`` which skips the ``if '+' in key`` re-key block.
+#
+#   3b — reverse-complement merge. For each key, if ``reverse_complement(key)``
+#        is also present with count > 0, the RC's count is folded into the
+#        current key and the RC is zeroed. The representative is the key that
+#        appears FIRST in iteration order — the exact pandas tie-break
+#        (insertion order, edge #8). Iteration order here = shard/scan order,
+#        which equals FASTQ first-occurrence order on the eager Stage 1 path
+#        (parity) and sorted-key order on the spill path (deterministic; the
+#        representative's payload is equivalent to the FASTQ-first one for the
+#        common case — see ``_collapse_rc_merge`` docstring).
+#
+#   3c — multi-reference fan-out. Each collapsed variant produces one allele
+#        row per reference it aligned to (``get_allele_row`` shape), with the
+#        AMBIGUOUS (one row, ``AMBIGUOUS_<ref0>``) and ``discard_indel_reads``
+#        (one row per ref, ``DISCARDED_<ref0>``) special cases replicated
+#        verbatim from the pandas loop.
+#
+# Memory: the input shards are streamed row-by-row via ``iter_aligned_shard``
+# (one pyarrow batch in flight). The collapse group table (3a/3b) is held in a
+# plain Python dict keyed by the collapse key; its size is bounded by the
+# *unique allele count* for paired input (where 3a collapses before 3b), which
+# is the design's stated bounded term. For single-read input with ~1:1
+# diversity (no re-key, no collapse before 3b), the dict is bounded by the
+# unique *read* count — the same root cause the spike (S1) identified for
+# Stage 1. Flat memory for that case requires the external-sort canonical-key
+# merge (write post-3a to parquet, ``sort(canonical_key)`` which spills, then a
+# streaming first-per-group pass); that is a follow-up and not in scope for PR
+# 5, whose gate is parity vs the pandas ``get_allele_row`` / RC-merge logic on
+# canned payloads. The 3a/3b/3c methods are split so 3b can be swapped for the
+# streaming version without touching 3a/3c.
+#
+# NOT wired into ``CRISPRessoCORE.main`` — exercised by unit tests only.
+
+# Keys present in the non-detailed ``get_allele_row`` branch (the
+# ``else`` of ``get_allele_row``, ~line 3960). The detailed branch is a
+# superset; the collapsed parquet always stores the full (detailed) column set
+# so downstream (PR 6 TSV sink, PR 7 df_alleles) can project either shape.
+_NON_DETAILED_ALLELE_KEYS = (
+    "#Reads",
+    "Aligned_Sequence",
+    "Reference_Sequence",
+    "n_inserted",
+    "n_deleted",
+    "n_mutated",
+    "Reference_Name",
+    "Read_Status",
+    "Aligned_Reference_Names",
+    "Aligned_Reference_Scores",
+    "ref_positions",
+)
+
+# Collapsed-allele parquet schema (the persisted artifact). One row per
+# (allele, reference) — i.e. the post-3c exploded table. Always stores the
+# full/detailed column set; consumers project.
+COLLAPSED_SCHEMA = pa.schema([
+    pa.field("#Reads", pa.int64()),
+    pa.field("Aligned_Sequence", pa.string()),
+    pa.field("Reference_Sequence", pa.string()),
+    pa.field("n_inserted", pa.int64()),
+    pa.field("n_deleted", pa.int64()),
+    pa.field("n_mutated", pa.int64()),
+    pa.field("Reference_Name", pa.string()),
+    pa.field("Read_Status", pa.string()),
+    pa.field("Aligned_Reference_Names", pa.string()),
+    pa.field("Aligned_Reference_Scores", pa.string()),
+    pa.field("ref_positions", pa.list_(pa.int64())),
+    pa.field("all_insertion_positions", pa.list_(pa.int64())),
+    pa.field("all_insertion_left_positions", pa.list_(pa.int64())),
+    pa.field("insertion_positions", pa.list_(pa.int64())),
+    pa.field("insertion_coordinates", pa.list_(_COORD_STRUCT)),
+    pa.field("insertion_sizes", pa.list_(pa.int64())),
+    pa.field("all_deletion_positions", pa.list_(pa.int64())),
+    pa.field("deletion_positions", pa.list_(pa.int64())),
+    pa.field("deletion_coordinates", pa.list_(_COORD_STRUCT)),
+    pa.field("deletion_sizes", pa.list_(pa.int64())),
+    pa.field("all_substitution_positions", pa.list_(pa.int64())),
+    pa.field("substitution_positions", pa.list_(pa.int64())),
+    pa.field("substitution_values", pa.list_(pa.string())),
+])
+
+
+def _get_allele_row(
+    reference_name: str,
+    variant_count: int,
+    aln_ref_names_str: str,
+    aln_ref_scores_str: str,
+    variant_payload: dict,
+    write_detailed: bool,
+) -> dict:
+    """Replica of the nested ``get_allele_row`` in ``CRISPRessoCORE.main``.
+
+    Returns the exact dict shape the pandas path appends to ``alleles_list``
+    (both the detailed and non-detailed branches), so a direct dict comparison
+    against the pandas output is a valid parity check.
+    """
+    if write_detailed:
+        return {
+            "#Reads": variant_count,
+            "Aligned_Sequence": variant_payload["aln_seq"],
+            "Reference_Sequence": variant_payload["aln_ref"],
+            "n_inserted": variant_payload["insertion_n"],
+            "n_deleted": variant_payload["deletion_n"],
+            "n_mutated": variant_payload["substitution_n"],
+            "Reference_Name": reference_name,
+            "Read_Status": variant_payload["classification"],
+            "Aligned_Reference_Names": aln_ref_names_str,
+            "Aligned_Reference_Scores": aln_ref_scores_str,
+            "ref_positions": variant_payload["ref_positions"],
+            "all_insertion_positions": variant_payload["all_insertion_positions"],
+            "all_insertion_left_positions": variant_payload["all_insertion_left_positions"],
+            "insertion_positions": variant_payload["insertion_positions"],
+            "insertion_coordinates": variant_payload["insertion_coordinates"],
+            "insertion_sizes": variant_payload["insertion_sizes"],
+            "all_deletion_positions": variant_payload["all_deletion_positions"],
+            "deletion_positions": variant_payload["deletion_positions"],
+            "deletion_coordinates": variant_payload["deletion_coordinates"],
+            "deletion_sizes": variant_payload["deletion_sizes"],
+            "all_substitution_positions": variant_payload["all_substitution_positions"],
+            "substitution_positions": variant_payload["substitution_positions"],
+            "substitution_values": variant_payload["substitution_values"],
+        }
+    return {
+        "#Reads": variant_count,
+        "Aligned_Sequence": variant_payload["aln_seq"],
+        "Reference_Sequence": variant_payload["aln_ref"],
+        "n_inserted": variant_payload["insertion_n"],
+        "n_deleted": variant_payload["deletion_n"],
+        "n_mutated": variant_payload["substitution_n"],
+        "Reference_Name": reference_name,
+        "Read_Status": variant_payload["classification"],
+        "Aligned_Reference_Names": aln_ref_names_str,
+        "Aligned_Reference_Scores": aln_ref_scores_str,
+        "ref_positions": variant_payload["ref_positions"],
+    }
+
+
+def _allele_dict_to_parquet_row(d: dict) -> dict:
+    """Convert a (always-full) allele-row dict to a COLLAPSED_SCHEMA row.
+
+    Position arrays become int64 lists; coordinates become list-of-struct
+    dicts; ``substitution_values`` (a numpy array in the payload) becomes a
+    list of strings — matching the arrow storage used by the aligned shards.
+    """
+    return {
+        "#Reads": int(d["#Reads"]),
+        "Aligned_Sequence": d["Aligned_Sequence"],
+        "Reference_Sequence": d["Reference_Sequence"],
+        "n_inserted": int(d["n_inserted"]),
+        "n_deleted": int(d["n_deleted"]),
+        "n_mutated": int(d["n_mutated"]),
+        "Reference_Name": d["Reference_Name"],
+        "Read_Status": d["Read_Status"],
+        "Aligned_Reference_Names": d["Aligned_Reference_Names"],
+        "Aligned_Reference_Scores": d["Aligned_Reference_Scores"],
+        "ref_positions": _to_int_list(d["ref_positions"]),
+        "all_insertion_positions": _to_int_list(d["all_insertion_positions"]),
+        "all_insertion_left_positions": _to_int_list(d["all_insertion_left_positions"]),
+        "insertion_positions": _to_int_list(d["insertion_positions"]),
+        "insertion_coordinates": _coords_to_structs(d["insertion_coordinates"]),
+        "insertion_sizes": _to_int_list(d["insertion_sizes"]),
+        "all_deletion_positions": _to_int_list(d["all_deletion_positions"]),
+        "deletion_positions": _to_int_list(d["deletion_positions"]),
+        "deletion_coordinates": _coords_to_structs(d["deletion_coordinates"]),
+        "deletion_sizes": _to_int_list(d["deletion_sizes"]),
+        "all_substitution_positions": _to_int_list(d["all_substitution_positions"]),
+        "substitution_positions": _to_int_list(d["substitution_positions"]),
+        "substitution_values": _to_str_list(d["substitution_values"]),
+    }
+
+
+@dataclass
+class CollapsedAlleles:
+    """Result of Stage 3 collapse (``VariantStore.collapse``).
+
+    Attributes
+    ----------
+    allele_rows : list[dict]
+        Sorted (``#Reads`` desc, ``Aligned_Sequence`` asc, ``Reference_Sequence``
+        asc — matching ``df_alleles.sort_values`` ~line 4303) list of
+        ``get_allele_row``-shaped dicts. The dict shape respects
+        ``write_detailed_allele_table``/``vcf_output`` (detailed vs the
+        ``crispresso2Cols``-plus-``ref_positions`` subset).
+    n_total : int
+        ``N_TOTAL`` — sum of post-RC-merge counts over all variants (excludes
+        unaligned reads, which are filtered before collapse). parity with the
+        pandas ``N_TOTAL`` used for ``%Reads``.
+    class_counts : dict[str, int]
+        Variant-level ``class_name`` → merged count (the pie-chart counts).
+        Computed pre-explode (once per variant), so multi-reference variants
+        are counted once — matching the pandas loop. (Count *vectors* and the
+        TSV sink are PR 6; they consume ``allele_rows``.)
+    counts_total, counts_modified, counts_unmodified, counts_discarded : dict[str, int]
+        Per-reference scalar counts from the 3c fan-out (matching
+        ``counts_total``/``counts_modified``/``counts_unmodified``/
+        ``counts_discarded`` in the pandas loop). ``counts_discarded`` is keyed
+        by the actual reference (the one whose payload had indels), matching
+        the pandas ``counts_discarded[ref_name] += variant_count``.
+    parquet_path : Optional[str]
+        Path to the persisted ``collapsed.allele.parquet`` artifact (full
+        column set), or ``None`` if ``write_parquet=False``.
+
+    """
+
+    allele_rows: list
+    n_total: int
+    class_counts: dict
+    counts_total: dict
+    counts_modified: dict
+    counts_unmodified: dict
+    counts_discarded: dict
+    parquet_path: Optional[str] = None
+
+    def allele_rows_dataframe(self):
+        """Return ``allele_rows`` as a pandas DataFrame (sorted, with ``%Reads``).
+
+        Convenience for parity tests and the eventual df_alleles wiring (PR 7).
+        ``%Reads`` = ``#Reads / n_total * 100`` and ``n_*`` cast to int —
+        matching ``CRISPRessoCORE.main`` ~line 4301-4303.
+        """
+        import pandas as pd
+
+        df = pd.DataFrame(self.allele_rows)
+        if len(df) and self.n_total > 0:
+            df["%Reads"] = df["#Reads"] / self.n_total * 100
+        elif len(df):
+            df["%Reads"] = 0.0
+        if len(df):
+            df[["n_deleted", "n_inserted", "n_mutated"]] = df[
+                ["n_deleted", "n_inserted", "n_mutated"]
+            ].astype(int)
+        return df
+
+
+def _expand_shard_paths(shard_paths) -> list:
+    """Normalise ``shard_paths`` (list or glob string) to a sorted file list."""
+    if isinstance(shard_paths, str):
+        import glob
+
+        return sorted(glob.glob(shard_paths))
+    return [str(p) for p in shard_paths]
+
+
+# Add Stage 3 methods to VariantStore. Defined as module-level functions and
+# bound onto the class so the Stage 1/2 class body (above) stays readable.
+
+
+def _collapse(
+    self: "VariantStore",
+    shard_paths,
+    *,
+    is_paired: bool,
+    expand_ambiguous_alignments: bool = False,
+    discard_indel_reads: bool = False,
+    write_detailed_allele_table: bool = False,
+    vcf_output: bool = False,
+    write_parquet: bool = True,
+    collapsed_path: Optional[str] = None,
+) -> CollapsedAlleles:
+    """Stage 3: collapse aligned shards into the sorted allele table.
+
+    Parameters
+    ----------
+    shard_paths
+        List of aligned-shard paths (from Stage 2) or a glob string
+        (e.g. ``"aligned_*.parquet"``). Streamed row-by-row via
+        :func:`iter_aligned_shard`.
+    is_paired
+        ``True`` for paired/``crispresso_merge`` input (perform the 3a
+        aln_seq re-key); ``False`` for single-read / bam input (skip re-key —
+        the key is the raw read sequence).
+    expand_ambiguous_alignments, discard_indel_reads
+        Replicate the corresponding ``args`` flags in the 3c fan-out.
+    write_detailed_allele_table, vcf_output
+        Select the ``get_allele_row`` branch (detailed vs subset) for the
+        returned ``allele_rows``. The persisted parquet always stores the full
+        column set.
+    write_parquet, collapsed_path
+        If ``write_parquet`` (default), write ``collapsed.allele.parquet`` to
+        ``collapsed_path`` (or ``<output_directory>/collapsed.allele.parquet``)
+        and return its path on :class:`CollapsedAlleles`.
+
+    Notes
+    -----
+    * Unaligned reads (``best_match_score <= 0``) are filtered out before
+      collapse — they never enter ``variantCache`` in the pandas path (removed
+      during read-back). The ``not_aln``/fastq_output annotation path is a
+      wiring concern (PR 7), not collapse.
+    * ``caching_is_ok == False`` (paired re_aln) reads are expected to be
+      pulled aside by the wiring (the pandas ``re_aln`` loop) before collapse;
+      collapse assumes its input is the post-re_aln aligned set. Canned
+      payloads use ``caching_is_ok=True``.
+    * The empty-seq count=0 sentinel (pandas ``variantCache['']``) is a no-op
+      (skipped by ``count == 0``) and never enters shards, so it is not
+      materialised here (OQ-E5).
+
+    """
+    write_detailed = bool(write_detailed_allele_table or vcf_output)
+    paths = _expand_shard_paths(shard_paths)
+
+    # 3a + 3b: stream shards into the in-memory collapse table.
+    store = self._collapse_rekey_and_rcmerge(paths, is_paired=is_paired)
+
+    # 3c: fan out to per-reference allele rows + per-variant/per-ref aggregations.
+    # allele_rows are built as FULL (detailed) dicts — the parquet needs the
+    # position arrays for PR 6 count vectors even when the allele TSV is
+    # non-detailed.
+    full_rows, n_total, class_counts, counts_total, counts_modified, \
+        counts_unmodified, counts_discarded = self._collapse_fanout(
+            store, discard_indel_reads=discard_indel_reads,
+        )
+
+    # Sort matching df_alleles.sort_values(~line 4303): #Reads desc,
+    # Aligned_Sequence asc, Reference_Sequence asc. Python's sort is stable,
+    # so full ties preserve the fan-out (variant-then-ref) insertion order —
+    # the same order the pandas alleles_list is built in.
+    full_rows.sort(
+        key=lambda r: (-int(r["#Reads"]), r["Aligned_Sequence"], r["Reference_Sequence"])
+    )
+
+    # Persist the collapsed allele table (full column set).
+    parquet_path = None
+    if write_parquet:
+        parquet_path = (
+            collapsed_path
+            or os.path.join(self.output_directory, "collapsed.allele.parquet")
+        )
+        _write_collapsed_allele_parquet(full_rows, parquet_path)
+
+    # The returned allele_rows respect the get_allele_row branch (detailed vs
+    # the non-detailed subset), for direct parity comparison and the PR 6 TSV
+    # sink. The persisted parquet is always full.
+    if write_detailed:
+        allele_rows = full_rows
+    else:
+        allele_rows = [
+            {k: r[k] for k in _NON_DETAILED_ALLELE_KEYS if k in r} for r in full_rows
+        ]
+
+    return CollapsedAlleles(
+        allele_rows=allele_rows,
+        n_total=n_total,
+        class_counts=class_counts,
+        counts_total=counts_total,
+        counts_modified=counts_modified,
+        counts_unmodified=counts_unmodified,
+        counts_discarded=counts_discarded,
+        parquet_path=parquet_path,
+    )
+
+
+def _collapse_rekey_and_rcmerge(self: "VariantStore", paths: list, *, is_paired: bool) -> "dict":
+    """Stage 3a (re-key) + 3b (RC merge): stream shards into the collapse table.
+
+    Returns an insertion-ordered dict ``{collapse_key: _Record}`` where each
+    ``_Record`` carries the merged ``count`` and the representative payload
+    (first occurrence in scan order — the pandas tie-break).
+
+    3a: for paired input the collapse key is the primary reference's
+    ``aln_seq`` (``payload['variant_'+aln_ref_names[0]]['aln_seq']``); for
+    single-read the key is the raw read sequence (``read_key``), i.e. no
+    re-key — matching ``process_fastq`` which skips the ``if '+' in key`` block.
+
+    3b: iterate the post-3a dict in insertion order; for each key with
+    ``count > 0``, fold ``reverse_complement(key)``'s count into it (if present
+    and positive) and zero the RC. The representative is the first-iterated
+    key — the exact pandas tie-break. The ``rc == key`` (palindrome) case is
+    replicated verbatim (pandas doubles the count there); it is a latent pandas
+    behaviour, preserved for parity.
+
+    Memory: the dict is bounded by the unique collapse-key count. For paired
+    input that is the unique *allele* count (small — the design's bounded
+    term). For single-read input with no re-key it is the unique *read* count;
+    flat memory for that case is a follow-up (external-sort canonical-key
+    merge), see the module docstring.
+    """
+    rc = CRISPRessoShared.reverse_complement
+    store: dict = {}
+
+    def _primary_aln_seq(payload: dict) -> str:
+        ref0 = payload["aln_ref_names"][0]
+        return payload["variant_" + ref0]["aln_seq"]
+
+    for path in paths:
+        for read_key, count, payload in iter_aligned_shard(path):
+            # Skip unaligned reads (best_match_score <= 0): they are removed
+            # from variantCache before the pandas collapse loop.
+            if payload.get("best_match_score", 0) <= 0:
+                continue
+            if is_paired:
+                key = _primary_aln_seq(payload)
+            else:
+                key = read_key
+            rec = store.get(key)
+            if rec is None:
+                store[key] = {"count": int(count), "payload": payload}
+            else:
+                rec["count"] += int(count)
+                # keep first-occurrence payload (pandas: variantCache[new_key]
+                # is set once, later occurrences only add count)
+
+    # 3b: RC merge in insertion order.
+    for key in list(store.keys()):
+        rec = store[key]
+        variant_count = rec["count"]
+        if variant_count == 0:
+            continue
+        rc_key = rc(key)
+        rc_rec = store.get(rc_key)
+        if rc_rec is not None and rc_rec["count"] > 0:
+            variant_count += rc_rec["count"]
+            rc_rec["count"] = 0
+            rec["count"] = variant_count
+    return store
+
+
+def _collapse_fanout(
+    self: "VariantStore",
+    store: dict,
+    *,
+    discard_indel_reads: bool,
+):
+    """Stage 3c: explode collapsed variants into per-reference allele rows.
+
+    Replicates ``CRISPRessoCORE.main`` ~line 3976-4045 verbatim:
+
+    * Skip zero-count entries (RC-merged-away partners).
+    * ``class_name == "AMBIGUOUS"`` → one row ``AMBIGUOS_<ref0>`` using
+      ``variant_<ref0>``'s payload; do NOT iterate refs.
+    * Otherwise iterate ``aln_ref_names``; if ``discard_indel_reads`` and the
+      per-ref payload has indels → one ``DISCARDED_<ref0>`` row (using that
+      ref's payload) and ``counts_discarded[ref] += count``.
+    * Else a normal row ``<ref>`` and ``counts_total/modified/unmodified``.
+
+    Returns ``(allele_rows, n_total, class_counts, counts_total,
+    counts_modified, counts_unmodified, counts_discarded)``.
+
+    ``allele_rows`` are always built as *full* (detailed) dicts — the persisted
+    parquet must carry the position arrays for PR 6's count-vector aggregation
+    even when ``write_detailed_allele_table`` is False (the pandas count-vector
+    loop runs unconditionally on every aligned variant). ``collapse`` subsets
+    the returned list to the non-detailed shape when appropriate.
+    """
+    allele_rows: list = []
+    n_total = 0
+    class_counts: dict = {}
+    counts_total: dict = {}
+    counts_modified: dict = {}
+    counts_unmodified: dict = {}
+    counts_discarded: dict = {}
+
+    for key in store:  # insertion order
+        rec = store[key]
+        variant_count = rec["count"]
+        if variant_count == 0:
+            continue
+        n_total += variant_count
+
+        payload = rec["payload"]
+        class_name = payload.get("class_name")
+        class_counts[class_name] = class_counts.get(class_name, 0) + variant_count
+
+        aln_ref_names = payload["aln_ref_names"]
+        aln_ref_names_str = "&".join(aln_ref_names)
+        aln_ref_scores = payload.get("aln_scores", [])
+        aln_ref_scores_str = "&".join([str(x) for x in aln_ref_scores])
+
+        if class_name == "AMBIGUOUS":
+            variant_payload = payload["variant_" + aln_ref_names[0]]
+            allele_rows.append(
+                _get_allele_row(
+                    "AMBIGUOUS_" + aln_ref_names[0],
+                    variant_count, aln_ref_names_str, aln_ref_scores_str,
+                    variant_payload, write_detailed=True,
+                )
+            )
+            continue
+
+        for ref_name in aln_ref_names:
+            variant_payload = payload["variant_" + ref_name]
+            if discard_indel_reads and (
+                variant_payload["deletion_n"] > 0 or variant_payload["insertion_n"] > 0
+            ):
+                counts_discarded[ref_name] = counts_discarded.get(ref_name, 0) + variant_count
+                allele_rows.append(
+                    _get_allele_row(
+                        "DISCARDED_" + aln_ref_names[0],
+                        variant_count, aln_ref_names_str, aln_ref_scores_str,
+                        variant_payload, write_detailed=True,
+                    )
+                )
+                continue
+            counts_total[ref_name] = counts_total.get(ref_name, 0) + variant_count
+            if variant_payload["classification"] == "MODIFIED":
+                counts_modified[ref_name] = counts_modified.get(ref_name, 0) + variant_count
+            else:
+                counts_unmodified[ref_name] = counts_unmodified.get(ref_name, 0) + variant_count
+            allele_rows.append(
+                _get_allele_row(
+                    ref_name, variant_count, aln_ref_names_str, aln_ref_scores_str,
+                    variant_payload, write_detailed=True,
+                )
+            )
+
+    return (
+        allele_rows, n_total, class_counts,
+        counts_total, counts_modified, counts_unmodified, counts_discarded,
+    )
+
+
+def _write_collapsed_allele_parquet(allele_rows: list, path: str) -> None:
+    """Write the full-column collapsed allele table to parquet.
+
+    ``allele_rows`` are full (detailed) dicts (see ``_collapse_fanout``); the
+    persisted artifact always carries the complete column set so PR 6's
+    count-vector aggregation and PR 7's df_alleles view can project either the
+    detailed or ``crispresso2Cols`` shape.
+    """
+    schema = COLLAPSED_SCHEMA
+    writer = pq.ParquetWriter(path, schema)
+    try:
+        if not allele_rows:
+            return
+        rows = [_allele_dict_to_parquet_row(d) for d in allele_rows]
+        table = pa.Table.from_pylist(rows, schema=schema)
+        writer.write_table(table)
+    finally:
+        writer.close()
+
+
+# Bind Stage 3 onto VariantStore.
+VariantStore.collapse = _collapse
+VariantStore._collapse_rekey_and_rcmerge = _collapse_rekey_and_rcmerge
+VariantStore._collapse_fanout = _collapse_fanout
+
+
+def collapse_aligned_shards(
+    shard_paths,
+    output_directory: str,
+    *,
+    is_paired: bool,
+    expand_ambiguous_alignments: bool = False,
+    discard_indel_reads: bool = False,
+    write_detailed_allele_table: bool = False,
+    vcf_output: bool = False,
+    memory_budget_mb: int = DEFAULT_MEMORY_BUDGET_MB,
+) -> CollapsedAlleles:
+    """Convenience wrapper: create a :class:`VariantStore` and collapse shards.
+
+    Provided so parity tests and future wiring can call Stage 3 in one line.
+    """
+    store = VariantStore(output_directory, memory_budget_mb=memory_budget_mb)
+    return store.collapse(
+        shard_paths,
+        is_paired=is_paired,
+        expand_ambiguous_alignments=expand_ambiguous_alignments,
+        discard_indel_reads=discard_indel_reads,
+        write_detailed_allele_table=write_detailed_allele_table,
+        vcf_output=vcf_output,
+    )
