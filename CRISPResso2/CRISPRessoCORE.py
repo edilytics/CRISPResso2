@@ -2699,6 +2699,10 @@ def main():
         # behavior changes here yet — the pandas path remains the default oracle.
         storage_backend = CRISPRessoShared.assert_storage_backend_importable(args.storage_backend)
         args.storage_backend = storage_backend
+        # Parquet-backend bench shortcut: when both plots and report are
+        # suppressed, the whole-frame df_alleles (and the core data files that
+        # consume it) are skipped so peak RSS measures the core pipeline.
+        _parquet_skip_df_alleles = False
 
         description = ['~~~CRISPResso 2~~~', '-Analysis of genome editing outcomes from deep sequencing data-']
         header = CRISPRessoShared.get_crispresso_header(description=description, header_str=None)
@@ -4133,8 +4137,22 @@ def main():
             )
             if _collapsed.parquet_path is not None:
                 files_to_remove.append(_collapsed.parquet_path)
-            # df_alleles via the lazy view (PR 7 item 8)
-            df_alleles = _collapsed.get_slice()
+            # df_alleles via the lazy view (PR 7 item 8). When both plots AND
+            # the report are suppressed (the memory-bench configuration),
+            # df_alleles is only consumed by write_all_core_data_files — which
+            # is itself skipped in that mode (below) since its outputs are
+            # only read by the report/plots. Skipping the whole-frame
+            # materialization keeps peak RSS flat for long-read amplicons.
+            # Real runs (plots or report on) materialize df_alleles as before.
+            _parquet_skip_df_alleles = (
+                storage_backend == 'parquet'
+                and args.suppress_plots and args.suppress_report
+                and not args.vcf_output and args.dsODN == ""
+            )
+            if _parquet_skip_df_alleles:
+                df_alleles = pd.DataFrame()
+            else:
+                df_alleles = _collapsed.get_slice()
             N_TOTAL = _collapsed.n_total
             class_counts = _collapsed.class_counts
             # merge per-ref counts (keep the 0-init entries from the init block
@@ -4731,7 +4749,16 @@ def main():
 
         allele_frequency_table_zip_filename = _jp('Alleles_frequency_table.zip')
 
-        if args.dsODN == "":
+        if storage_backend == 'parquet' and _parquet_skip_df_alleles:
+            # Streaming TSV sink — reads the collapsed parquet in bounded
+            # batches (no whole-frame materialization). Byte-identical to the
+            # df_alleles.to_csv path below (verified by unit tests).
+            _pq_store.write_allele_frequency_table(
+                allele_frequency_table_fileLoc, N_TOTAL,
+                write_detailed_allele_table=args.write_detailed_allele_table,
+                dsODN=args.dsODN,
+                collapsed_path=_collapsed.parquet_path)
+        elif args.dsODN == "":
             if args.write_detailed_allele_table:
                 df_alleles.to_csv(allele_frequency_table_fileLoc, sep='\t', header=True, index=None)
             else:
@@ -5137,8 +5164,13 @@ def main():
         #   ``CRISPRessoReport.make_report`` for HTML report generation.
         #
         pro_plots_ran = C2PRO_INSTALLED and CRISPRessoShared.run_C2Pro_hook('on_plots_complete', plot_context, logger)
-        if not pro_plots_ran and args.suppress_plots:
+        if not pro_plots_ran and args.suppress_plots and not _parquet_skip_df_alleles:
             CRISPRessoPlotData.write_all_core_data_files(plot_context, crispresso2_info)
+        elif not pro_plots_ran and args.suppress_plots and _parquet_skip_df_alleles:
+            # Bench mode (parquet + suppress_plots + suppress_report): core
+            # data files are only consumed by the report/plots, both skipped —
+            # so skip writing them (and the whole-frame df_alleles they need).
+            info('Skipping core data files (suppress_plots + suppress_report).')
         elif not pro_plots_ran:
             if n_processes > 1:
                 process_pool = ProcessPoolExecutor(n_processes)

@@ -1442,6 +1442,185 @@ def test_full_parity_fuzz_vs_reference(temp_dir):
                 assert res.counts_discarded == ref[6]
 
 
+# -- Stage 3 (single-read streaming): forced external-sort path parity ---------
+#
+# The streaming single-read collapse (``_collapse_streaming_single_read``)
+# has two final-ordering sub-paths: in-memory sort (small inputs, default
+# budget) and external JSON-carry sort (large inputs). Forcing a zero memory
+# budget routes through the external path on tiny canned data, so these tests
+# verify the external-sort path produces byte-identical output to the in-memory
+# path (and thus the pandas oracle).
+
+from CRISPResso2.storage import _structs_to_coords
+
+
+def _read_collapsed_parquet_full_rows(path):
+    """Read the collapsed allele parquet into full allele-row dicts.
+
+    Cell types match ``_get_allele_row`` (Python lists for positions, tuple-lists
+    for coordinates, numpy arrays for substitution_values) so ``_assert_rows_equal``
+    compares cleanly against the in-memory path's ``allele_rows``.
+    """
+    tbl = pq.read_table(path)
+    rows = []
+    for r in tbl.to_pylist():
+        rows.append({
+            "#Reads": int(r["#Reads"]),
+            "Aligned_Sequence": r["Aligned_Sequence"],
+            "Reference_Sequence": r["Reference_Sequence"],
+            "n_inserted": int(r["n_inserted"]),
+            "n_deleted": int(r["n_deleted"]),
+            "n_mutated": int(r["n_mutated"]),
+            "Reference_Name": r["Reference_Name"],
+            "Read_Status": r["Read_Status"],
+            "Aligned_Reference_Names": r["Aligned_Reference_Names"],
+            "Aligned_Reference_Scores": r["Aligned_Reference_Scores"],
+            "ref_positions": list(r.get("ref_positions") or []),
+            "all_insertion_positions": list(r.get("all_insertion_positions") or []),
+            "all_insertion_left_positions": list(r.get("all_insertion_left_positions") or []),
+            "insertion_positions": list(r.get("insertion_positions") or []),
+            "insertion_coordinates": _structs_to_coords(r.get("insertion_coordinates")),
+            "insertion_sizes": list(r.get("insertion_sizes") or []),
+            "all_deletion_positions": list(r.get("all_deletion_positions") or []),
+            "deletion_positions": list(r.get("deletion_positions") or []),
+            "deletion_coordinates": _structs_to_coords(r.get("deletion_coordinates")),
+            "deletion_sizes": list(r.get("deletion_sizes") or []),
+            "all_substitution_positions": list(r.get("all_substitution_positions") or []),
+            "substitution_positions": list(r.get("substitution_positions") or []),
+            "substitution_values": np.array(r.get("substitution_values") or [], dtype="<U1"),
+            "all_substitution_values": np.array(r.get("all_substitution_values") or [], dtype="<U1"),
+        })
+    return rows
+
+
+def _assert_collapsed_equal(res_got, res_ref):
+    """Compare two CollapsedAlleles (parquet rows + aggregations)."""
+    got_rows = _read_collapsed_parquet_full_rows(res_got.parquet_path)
+    ref_rows = _read_collapsed_parquet_full_rows(res_ref.parquet_path)
+    _assert_rows_equal(got_rows, ref_rows)
+    assert res_got.n_total == res_ref.n_total, f"n_total {res_got.n_total} != {res_ref.n_total}"
+    assert res_got.class_counts == res_ref.class_counts
+    assert res_got.counts_total == res_ref.counts_total
+    assert res_got.counts_modified == res_ref.counts_modified
+    assert res_got.counts_unmodified == res_ref.counts_unmodified
+    assert res_got.counts_discarded == res_ref.counts_discarded
+
+
+def test_streaming_external_matches_in_memory_rc_pair(temp_dir):
+    """External-sort path: an RC pair collapses to one row, +strand representative."""
+    p1 = _shard_payload()
+    # rc("ATCGATCG") = "CGATCGAT" — a real RC pair, distinct read keys.
+    rows = [("ATCGATCG", 3, p1), ("CGATCGAT", 2, p1)]
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    _write_shard(shard, rows)
+    res_mem = collapse_aligned_shards([shard], os.path.join(temp_dir, "mem"),
+                                      is_paired=False, write_detailed_allele_table=True)
+    res_ext = collapse_aligned_shards([shard], os.path.join(temp_dir, "ext"),
+                                      is_paired=False, write_detailed_allele_table=True,
+                                      memory_budget_mb=0)
+    # external path leaves allele_rows empty (parquet is the artifact) — verify
+    # it actually took the external branch.
+    assert res_ext.allele_rows == []
+    _assert_collapsed_equal(res_ext, res_mem)
+    # one collapsed row, count summed (3 + 2 = 5), +strand rep (first in scan)
+    rows_ext = _read_collapsed_parquet_full_rows(res_ext.parquet_path)
+    assert len(rows_ext) == 1
+    assert rows_ext[0]["#Reads"] == 5
+    assert res_ext.n_total == 5
+
+
+def test_streaming_external_palindrome_doubles(temp_dir):
+    """External-sort path replicates the palindrome count-doubling parity."""
+    p = _shard_payload(aln_seq="ATAT", aln_ref="ATAT", classification="UNMODIFIED", deletion_n=0)
+    p["class_name"] = "ref1_UNMODIFIED"
+    p["variant_ref1"]["ref_positions"] = [0, 1, 2, 3]
+    p["variant_ref1"]["all_deletion_positions"] = []
+    p["variant_ref1"]["deletion_positions"] = []
+    p["variant_ref1"]["deletion_coordinates"] = []
+    p["variant_ref1"]["deletion_sizes"] = []
+    rows = [("ATAT", 5, p)]
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    _write_shard(shard, rows)
+    res_mem = collapse_aligned_shards([shard], os.path.join(temp_dir, "mem"),
+                                      is_paired=False, write_detailed_allele_table=True)
+    res_ext = collapse_aligned_shards([shard], os.path.join(temp_dir, "ext"),
+                                      is_paired=False, write_detailed_allele_table=True,
+                                      memory_budget_mb=0)
+    _assert_collapsed_equal(res_ext, res_mem)
+    rows_ext = _read_collapsed_parquet_full_rows(res_ext.parquet_path)
+    assert rows_ext[0]["#Reads"] == 10  # doubled (pandas parity)
+    assert res_ext.n_total == 10
+
+
+def test_streaming_external_fuzz_matches_in_memory(temp_dir):
+    """Fuzz: forced external-sort path == in-memory path on random canned payloads."""
+    import random
+    rng = random.Random(999)
+    bases = "ACGT"
+    rows = []
+    for i in range(30):
+        ref = rng.choice(["ref1", "ref2"])
+        seq = "".join(rng.choice(bases) for _ in range(8))
+        if rng.random() < 0.3:
+            refs = ["ref1", "ref2"]
+            cn = rng.choice(["AMBIGUOUS", "ref1_MODIFIED&ref2_UNMODIFIED"])
+        else:
+            refs = [ref]
+            cn = ref + "_" + rng.choice(["MODIFIED", "UNMODIFIED"])
+        payload = {
+            "count": 1, "aln_ref_names": refs,
+            "aln_scores": [float(rng.randint(80, 99)) for _ in refs],
+            "best_match_score": float(rng.randint(80, 99)),
+            "class_name": cn, "best_match_name": refs[0], "caching_is_ok": True,
+        }
+        for r in refs:
+            sub = _shard_payload(r)["variant_" + r]
+            sub["aln_seq"] = seq
+            sub["aln_ref"] = seq
+            sub["ref_positions"] = list(range(8))
+            sub["all_deletion_positions"] = []
+            sub["deletion_positions"] = []
+            sub["deletion_coordinates"] = []
+            sub["deletion_sizes"] = []
+            sub["all_insertion_positions"] = []
+            sub["insertion_positions"] = []
+            sub["insertion_coordinates"] = []
+            sub["insertion_sizes"] = []
+            sub["all_substitution_positions"] = []
+            sub["substitution_positions"] = []
+            sub["substitution_values"] = np.array([])
+            sub["deletion_n"] = 0
+            sub["insertion_n"] = 0
+            sub["substitution_n"] = 0
+            sub["classification"] = ("UNMODIFIED" if cn.endswith("UNMODIFIED")
+                                     or cn == "AMBIGUOUS" else "MODIFIED")
+            payload["variant_" + r] = sub
+        rows.append((seq, rng.randint(1, 5), payload))
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    _write_shard(shard, rows)
+    for discard in (False, True):
+        res_mem = collapse_aligned_shards([shard], os.path.join(temp_dir, f"mem_{discard}"),
+                                          is_paired=False, discard_indel_reads=discard,
+                                          write_detailed_allele_table=True)
+        res_ext = collapse_aligned_shards([shard], os.path.join(temp_dir, f"ext_{discard}"),
+                                          is_paired=False, discard_indel_reads=discard,
+                                          write_detailed_allele_table=True,
+                                          memory_budget_mb=0)
+        _assert_collapsed_equal(res_ext, res_mem)
+
+
+def test_streaming_external_empty_input(temp_dir):
+    """External-sort path on empty/all-unaligned input → empty parquet, parity."""
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    _write_shard(shard, [])  # no rows
+    res_ext = collapse_aligned_shards([shard], os.path.join(temp_dir, "ext"),
+                                      is_paired=False, memory_budget_mb=0)
+    assert res_ext.parquet_path and os.path.exists(res_ext.parquet_path)
+    assert pq.read_table(res_ext.parquet_path).num_rows == 0
+    assert res_ext.n_total == 0
+    assert res_ext.allele_rows == []
+
+
 # -- Stage 4: count-vector aggregation (Stream-Out B, PR 6) ------------------
 #
 # Parity strategy: each test builds a *reference* set of count vectors by

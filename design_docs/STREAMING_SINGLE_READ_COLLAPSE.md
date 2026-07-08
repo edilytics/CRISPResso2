@@ -1,6 +1,7 @@
 # Fix #3 — Streaming single-read collapse (external-sort canonical-key merge)
 
-**Status:** DESIGN (2026-07-07) — not yet implemented.
+**Status:** IMPLEMENTED (2026-07-07) — streaming single-read collapse live;
+SC #1 verified at 2000 bp (RSS(100k)/RSS(10k) = 2.20 < 3).
 **Blocks:** Success Criterion #1 (flat peak RSS).
 **Supersedes:** the master-plan Stage 3b spec (polars `group_by(canonical_key)`),
 which the spike (`STREAMING_GROUPBY_SPIKE.md`) falsified for high-cardinality
