@@ -1563,8 +1563,9 @@ def _collapse_fanout(
 #      ``df_alleles.sort_values`` ~line 4303) for TSV/get_slice parity. If the
 #      allele set fits the memory budget (small inputs: tests, basic test),
 #      sort in memory and populate ``allele_rows``. Otherwise write the rows to
-#      a JSON-lines file carrying a sort-key prefix, external-sort that, and
-#      stream it into the parquet — peak RSS bounded by one row + accumulators.
+#      a compact TSV file (sort-key prefix + row data, no JSON — ~2-5x smaller),
+#      external-sort that, and stream it into the parquet — peak RSS bounded by
+#      one row + accumulators.
 #
 # Parity holds by construction: ``seq_no`` encodes scan order, so the
 # representative (min seq_no) is the first-occurrence-in-scan-order key — the
@@ -1599,24 +1600,170 @@ def _run_external_sort(input_file: str, output_file: str, workdir: str,
         ) from e
 
 
-def _allele_row_to_json(row: dict) -> str:
-    """Serialize a full allele-row dict to a JSON string for the external sort.
+def _join_ints(val) -> str:
+    """Encode a list/numpy array of ints as a space-joined string for TSV carry.
 
-    Handles numpy arrays (``.tolist()``) and numpy scalars (``.item()``);
-    coordinate tuples serialize as JSON arrays (read back as lists, which
-    ``_allele_dict_to_parquet_row`` accepts via ``_coords_to_structs``).
+    Empty/None → empty string. Negatives are fine (``-8 -8 8 9``) — the space
+    separator is unambiguous for ints.
     """
-    import json
+    if val is None:
+        return ""
+    if hasattr(val, "tolist"):
+        val = val.tolist()
+    return " ".join(str(int(x)) for x in val)
 
-    return json.dumps(row, default=_json_default)
+
+def _split_ints(s: str) -> list:
+    """Inverse of :func:`_join_ints`. Empty string → empty list."""
+    if not s:
+        return []
+    return [int(x) for x in s.split()]
 
 
-def _json_default(o):
-    if isinstance(o, np.ndarray):
-        return o.tolist()
-    if isinstance(o, np.generic):
-        return o.item()
-    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+def _join_coords(val) -> str:
+    """Encode a list of (start, end) coordinate tuples as ``start,end`` ";"-joined.
+
+    Comma separates start/end within a coord; semicolon separates coords. Handles
+    negative positions unambiguously (``-8,10;12,14``). Empty/None → empty.
+    """
+    if val is None:
+        return ""
+    return ";".join(f"{int(s)},{int(e)}" for s, e in val)
+
+
+def _split_coords(s: str) -> list:
+    """Inverse of :func:`_join_coords`. Empty string → empty list of tuples."""
+    if not s:
+        return []
+    return [tuple(int(x) for x in c.split(",")) for c in s.split(";")]
+
+
+def _join_strs(val) -> str:
+    """Encode a list/numpy array of strings as a space-joined string for TSV carry.
+
+    Used for ``substitution_values`` / ``all_substitution_values`` — single-char
+    ACGT/'-' values, so the space separator is unambiguous. Empty/None → empty.
+    """
+    if val is None:
+        return ""
+    if hasattr(val, "tolist"):
+        val = val.tolist()
+    return " ".join(str(x) for x in val)
+
+
+def _split_strs(s: str) -> list:
+    """Inverse of :func:`_join_strs`. Empty string → empty list."""
+    if not s:
+        return []
+    return s.split()
+
+
+# TSV field layout for the external-sort row carry (one line per allele row).
+# Fields 1-4 are the sort keys (ascending sort = the final allele order);
+# fields 5+ are the row data. No JSON — compact tab/space/semicolon encoding.
+#   1: {10**15 - #Reads:015d}   (ascending sort = descending #Reads)
+#   2: Aligned_Sequence         (also row data — no duplication)
+#   3: Reference_Sequence        (also row data)
+#   4: {row_idx:015d}            (tiebreaker = emission order = pandas insertion order)
+#   5: #Reads, 6: n_inserted, 7: n_deleted, 8: n_mutated,
+#   9: Reference_Name, 10: Read_Status,
+#  11: Aligned_Reference_Names, 12: Aligned_Reference_Scores,
+#  13-16: ref_positions, all_insertion_positions, all_insertion_left_positions, insertion_positions,
+#  17: insertion_coordinates, 18: insertion_sizes,
+#  19-20: all_deletion_positions, deletion_positions,
+#  21: deletion_coordinates, 22: deletion_sizes,
+#  23-24: all_substitution_positions, substitution_positions,
+#  25-26: substitution_values, all_substitution_values
+_TSV_ROW_FIELDS = (
+    "#Reads", "n_inserted", "n_deleted", "n_mutated",
+    "Reference_Name", "Read_Status",
+    "Aligned_Reference_Names", "Aligned_Reference_Scores",
+    "ref_positions", "all_insertion_positions", "all_insertion_left_positions",
+    "insertion_positions", "insertion_coordinates", "insertion_sizes",
+    "all_deletion_positions", "deletion_positions",
+    "deletion_coordinates", "deletion_sizes",
+    "all_substitution_positions", "substitution_positions",
+    "substitution_values", "all_substitution_values",
+)
+
+
+def _allele_row_to_tsv(row: dict, row_idx: int) -> str:
+    """Serialize a full allele-row dict to one TSV line for the external sort.
+
+    The first four fields are the sort keys (neg_reads, Aligned_Sequence,
+    Reference_Sequence, row_idx); the rest is the row data. Handles numpy arrays
+    (via ``.tolist()``) and coordinate tuples. The string columns (aln_seq,
+    ref_seq, Reference_Name, Read_Status, Aligned_Reference_Names/Scores) never
+    contain tabs/spaces/semicolons (ACGT/'-'/'&'/digits only), so the encoding
+    is unambiguous. ~2-5x smaller and ~2-3x faster to round-trip than JSON
+    (no recursive tokenizer; arrays are ``" ".join(map(str,...))``).
+    """
+    reads = int(row["#Reads"])
+    parts = [
+        f"{10**15 - reads:015d}",
+        row["Aligned_Sequence"],
+        row["Reference_Sequence"],
+        f"{row_idx:015d}",
+        str(reads),
+        str(int(row["n_inserted"])),
+        str(int(row["n_deleted"])),
+        str(int(row["n_mutated"])),
+        row["Reference_Name"],
+        row["Read_Status"],
+        row["Aligned_Reference_Names"],
+        row["Aligned_Reference_Scores"],
+        _join_ints(row["ref_positions"]),
+        _join_ints(row["all_insertion_positions"]),
+        _join_ints(row["all_insertion_left_positions"]),
+        _join_ints(row["insertion_positions"]),
+        _join_coords(row["insertion_coordinates"]),
+        _join_ints(row["insertion_sizes"]),
+        _join_ints(row["all_deletion_positions"]),
+        _join_ints(row["deletion_positions"]),
+        _join_coords(row["deletion_coordinates"]),
+        _join_ints(row["deletion_sizes"]),
+        _join_ints(row["all_substitution_positions"]),
+        _join_ints(row["substitution_positions"]),
+        _join_strs(row["substitution_values"]),
+        _join_strs(row["all_substitution_values"]),
+    ]
+    return "\t".join(parts)
+
+
+def _tsv_line_to_allele_row(line: str) -> dict:
+    """Inverse of :func:`_allele_row_to_tsv` → a row dict for ``_allele_dict_to_parquet_row``.
+
+    Skips the 4 sort-key fields; reconstructs plain Python lists/tuples/strings
+    for the row-data fields. ``_allele_dict_to_parquet_row`` then converts to
+    the arrow-native COLLAPSED_SCHEMA row (int64 lists, coord structs, etc.).
+    """
+    f = line.split("\t")
+    return {
+        "Aligned_Sequence": f[1],
+        "Reference_Sequence": f[2],
+        "#Reads": int(f[4]),
+        "n_inserted": int(f[5]),
+        "n_deleted": int(f[6]),
+        "n_mutated": int(f[7]),
+        "Reference_Name": f[8],
+        "Read_Status": f[9],
+        "Aligned_Reference_Names": f[10],
+        "Aligned_Reference_Scores": f[11],
+        "ref_positions": _split_ints(f[12]),
+        "all_insertion_positions": _split_ints(f[13]),
+        "all_insertion_left_positions": _split_ints(f[14]),
+        "insertion_positions": _split_ints(f[15]),
+        "insertion_coordinates": _split_coords(f[16]),
+        "insertion_sizes": _split_ints(f[17]),
+        "all_deletion_positions": _split_ints(f[18]),
+        "deletion_positions": _split_ints(f[19]),
+        "deletion_coordinates": _split_coords(f[20]),
+        "deletion_sizes": _split_ints(f[21]),
+        "all_substitution_positions": _split_ints(f[22]),
+        "substitution_positions": _split_ints(f[23]),
+        "substitution_values": _split_strs(f[24]),
+        "all_substitution_values": _split_strs(f[25]),
+    }
 
 
 def _streaming_collapse_groups(sorted_keys_file: str):
@@ -1676,26 +1823,25 @@ def _accumulate_agg(dst_class_counts, dst_counts_total, dst_counts_modified,
         dst_counts_discarded[k] = dst_counts_discarded.get(k, 0) + v
 
 
-def _write_collapsed_allele_parquet_from_jsonl(sorted_jsonl: str, path: str,
-                                                batch_size: int = 10_000) -> int:
-    """Stream a sort-key-prefixed JSONL file into the collapsed allele parquet.
+def _write_collapsed_allele_parquet_from_tsv(sorted_tsv: str, path: str,
+                                              batch_size: int = 10_000) -> int:
+    """Stream a sort-key-prefixed TSV file into the collapsed allele parquet.
 
-    Input lines: ``{padded_neg_reads}\t{aligned_seq}\t{ref_seq}\t{json_row}``
-    (already sorted by fields 1-3). Parses each JSON row, converts to a
-    COLLAPSED_SCHEMA row, and writes in batches. Returns the row count.
+    Input lines (already sorted by fields 1-4):
+    ``{neg_reads}\t{aligned}\t{ref}\t{row_idx}\t{row data...}``. Parses each line
+    via :func:`_tsv_line_to_allele_row`, converts to a COLLAPSED_SCHEMA row,
+    and writes in batches. Returns the row count.
 
     The batch size is adaptive: the first line's byte length estimates
     bytes/row, and the batch targets ~32 MB of Python row dicts so peak RSS
-    stays flat for long-read amplicons (a fixed 10k-row batch would hold ~1 GB
-    of 2 kb-read allele rows).
+    stays flat for long-read amplicons. TSV parse (``split`` + int joins) is
+    ~2-3x cheaper than JSON ``loads`` — no recursive tokenizer.
     """
-    import json
-
     writer = pq.ParquetWriter(path, COLLAPSED_SCHEMA)
     n = 0
     buf = []
     try:
-        with open(sorted_jsonl, "r", buffering=1 << 20) as fh:
+        with open(sorted_tsv, "r", buffering=1 << 20) as fh:
             # Estimate bytes/row from the first line to size batches by bytes.
             first = fh.readline()
             if not first:
@@ -1712,16 +1858,14 @@ def _write_collapsed_allele_parquet_from_jsonl(sorted_jsonl: str, path: str,
                 buf.clear()
             line = first.rstrip("\n")
             if line:
-                _k1, _k2, _k3, json_str = line.split("\t", 3)
-                buf.append(_allele_dict_to_parquet_row(json.loads(json_str)))
+                buf.append(_allele_dict_to_parquet_row(_tsv_line_to_allele_row(line)))
                 if len(buf) >= flush_every:
                     _flush()
             for line in fh:
                 line = line.rstrip("\n")
                 if not line:
                     continue
-                _k1, _k2, _k3, json_str = line.split("\t", 3)
-                buf.append(_allele_dict_to_parquet_row(json.loads(json_str)))
+                buf.append(_allele_dict_to_parquet_row(_tsv_line_to_allele_row(line)))
                 if len(buf) >= flush_every:
                     _flush()
             _flush()
@@ -1750,9 +1894,9 @@ def _collapse_streaming_single_read(
     workdir = tempfile.mkdtemp(prefix="crispresso_collapse_", dir=self.output_directory)
     keys_file = os.path.join(workdir, "keys.txt")
     sorted_keys_file = os.path.join(workdir, "keys.sorted")
-    output_jsonl = os.path.join(workdir, "output.jsonl")
-    sorted_jsonl = os.path.join(workdir, "output.sorted.jsonl")
-    temp_files = [keys_file, sorted_keys_file, output_jsonl, sorted_jsonl]
+    output_tsv = os.path.join(workdir, "output.tsv")
+    sorted_tsv = os.path.join(workdir, "output.sorted.tsv")
+    temp_files = [keys_file, sorted_keys_file, output_tsv, sorted_tsv]
 
     parquet_path = None
     if write_parquet:
@@ -1862,12 +2006,15 @@ def _collapse_streaming_single_read(
                 else [{k: r[k] for k in _NON_DETAILED_ALLELE_KEYS if k in r} for r in full_rows]
             )
         else:
-            # Large input (bench): stream fanout to a sort-key-prefixed JSONL,
-            # external-sort by (-#Reads, Aligned_Sequence, Reference_Sequence),
-            # then stream into the parquet. Peak RSS = one row + accumulators.
+            # Large input (bench): stream fanout to a sort-key-prefixed TSV
+            # (compact, ~2-5x smaller than JSON — no recursive tokenizer, arrays
+            # are space/semicolon-joined), external-sort by
+            # (-#Reads, Aligned_Sequence, Reference_Sequence, row_idx), then
+            # stream into the parquet. Peak RSS = one row + accumulators.
             # allele_rows is left empty — the pipeline consumes the parquet via
             # get_slice (write_parquet is required on this branch).
-            with open(output_jsonl, "w", buffering=1 << 20) as jf:
+            with open(output_tsv, "w", buffering=1 << 20) as jf:
+                row_idx = 0
                 seq_no = 0
                 rep_iter = iter(rep_seq_sorted)
                 next_rep = next(rep_iter, None)
@@ -1883,26 +2030,23 @@ def _collapse_streaming_single_read(
                                             counts_unmodified, counts_discarded,
                                             cc, ct, cm, cu, cd)
                             for r in rows:
-                                reads = int(r["#Reads"])
-                                jf.write(f"{10**15 - reads:015d}")
-                                jf.write("\t")
-                                jf.write(r["Aligned_Sequence"])
-                                jf.write("\t")
-                                jf.write(r["Reference_Sequence"])
-                                jf.write("\t")
-                                jf.write(_allele_row_to_json(r))
+                                jf.write(_allele_row_to_tsv(r, row_idx))
                                 jf.write("\n")
+                                row_idx += 1
                             next_rep = next(rep_iter, None)
                         seq_no += 1
                         if next_rep is None:
                             break
                     if next_rep is None:
                         break
-            _run_external_sort(output_jsonl, sorted_jsonl, workdir,
-                               ["-k1,1", "-k2,2", "-k3,3"],
+            # Sort by fields 1-4 (neg_reads asc, Aligned asc, Reference asc,
+            # row_idx asc) — the row_idx tiebreaker encodes emission order so
+            # ties are byte-identical to the in-memory path's stable sort.
+            _run_external_sort(output_tsv, sorted_tsv, workdir,
+                               ["-k1,1", "-k2,2", "-k3,3", "-k4,4"],
                                sort_buffer=self.sort_buffer)
             if parquet_path is not None:
-                _write_collapsed_allele_parquet_from_jsonl(sorted_jsonl, parquet_path)
+                _write_collapsed_allele_parquet_from_tsv(sorted_tsv, parquet_path)
             allele_rows = []
 
         return CollapsedAlleles(

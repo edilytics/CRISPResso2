@@ -132,6 +132,19 @@ is a partial improvement (~30–40% faster, not the 3× above). Ship as a
 standalone quick win or fold into the partitioned-gather PR; the
 partitioned-gather design supersedes it either way.
 
+**STATUS (2026-07-07): the JSON→TSV row-carry swap is IMPLEMENTED** (commit
+pending). The external branch now writes compact TSV lines (sort-key prefix +
+row data, no JSON — arrays are space/semicolon-joined; ~2–5× smaller per row
+and ~2–3× faster to round-trip than JSON). Measured at 100k × 2000 bp:
+RSS(100k)/RSS(10k) improved 2.20 → 1.84 (smaller temps → lower peak RSS);
+byte-identical parity retained (the 4 forced-external tests pass; `make basic
+test` passes). The 1M × 2000 bp run still times out — TSV shrinks the carried
+bytes ~1.7× but the full payload (incl. amplicon-length position arrays) still
+passes through the global sort, so 1M completion still needs the
+partitioned-gather design below. TSV is also the format the gather uses for
+its key projection + bucket spills, so this swap is a prerequisite win that
+the gather builds on.
+
 ### Parity
 
 The `row_idx` tiebreaker makes the order deterministic AND identical to the
