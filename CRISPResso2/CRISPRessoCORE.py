@@ -1171,12 +1171,10 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
 
 def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_matrix,
                          pe_scaffold_dna_info, output_directory, get_new_variant_object,
-                         variant_parquet_generator_process_fn,
-                         compute_aln_stats_and_homology_fn):
+                         variant_parquet_generator_process_fn):
     """Stage 2 for the parquet backend: split counted reads into N worker chunks,
     align each chunk via ``variant_parquet_generator_process_fn`` (writing one
-    parquet shard per worker), then stream the shards to compute aln_stats +
-    homology dicts.
+    parquet shard per worker).
 
     Mirrors the n_processes>1 branch of :func:`process_fastq` (~line 1880) but
     writes ``aligned_{i}.parquet`` shards instead of ``variants_{i}.tsv`` and
@@ -1184,7 +1182,11 @@ def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_mat
     re-materialization). For n_processes==1 (or few unique reads) it runs a
     single worker in-process.
 
-    Returns ``(shard_paths, aln_stats, not_aln_homology, aln_homology)``.
+    Returns ``shard_paths``. The aln_stats + homology dicts are NO LONGER
+    computed here — they are fused into Stage 3 (``VariantStore.collapse``
+    Pass 2) so homology free-rides on the payloads read that fanout already
+    needs (one fewer full shard scan; see ``storage.py`` fix #3). The
+    per-unique-read guardrail moves to the caller (after collapse).
     """
     from CRISPResso2 import CRISPRessoMultiProcessing as CMP
 
@@ -1234,14 +1236,7 @@ def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_mat
             raise CRISPRessoShared.OutputFolderIncompleteException(
                 'Could not find generated aligned shard %s, try deleting output folder and rerunning CRISPResso' % sp)
 
-    aln_stats, aln_homology, not_aln_homology = compute_aln_stats_and_homology_fn(
-        shard_paths, num_unique_reads,
-        expand_ambiguous_alignments=getattr(args, 'expand_ambiguous_alignments', False),
-    )
-    if aln_stats['N_COMPUTED_ALN'] + aln_stats['N_COMPUTED_NOTALN'] != num_unique_reads:
-        raise CRISPRessoShared.OutputFolderIncompleteException(
-            'Number of unique reads processed by parallel processes does not match the number of unique reads found in the fastq file. Try rerunning CRISPResso.')
-    return shard_paths, aln_stats, not_aln_homology, aln_homology
+    return shard_paths
 
 
 def get_variant_cache_equal_boundaries(num_unique_sequences, n_processes):
@@ -3847,7 +3842,6 @@ def main():
                 VariantStore as _VariantStore,
                 count_reads_from_fastq as _count_reads_from_fastq,
                 variant_parquet_generator_process as _variant_parquet_generator_process,
-                compute_aln_stats_and_homology_from_shards as _compute_aln_stats_and_homology_from_shards,
             )
             from CRISPResso2 import CRISPRessoMultiProcessing as _CMP
             # aln_matrix + pe_scaffold_dna_info are computed inside process_fastq
@@ -3876,19 +3870,17 @@ def main():
                 _n_proc = _CMP.get_max_processes()
             elif args.n_processes.isdigit():
                 _n_proc = int(args.n_processes)
-            _shard_paths, _aln_stats, _not_aln_homology, _aln_homology = run_parquet_workers(
+            _shard_paths = run_parquet_workers(
                 _read_counts, _n_proc, args, refs, ref_names, _aln_matrix,
                 _pe_scaffold_dna_info, OUTPUT_DIRECTORY,
                 get_new_variant_object, _variant_parquet_generator_process,
-                _compute_aln_stats_and_homology_from_shards,
             )
             files_to_remove.extend(_shard_paths)
-            aln_stats = _aln_stats
-            not_aln_variant_objects = _not_aln_homology
-            # Stash the aligned homology dict; variantCache stays empty so the
-            # existing allele loop below is a no-op. variantCache is restored
-            # to the homology dict before get_and_save_homology_scores runs.
-            _parquet_aln_homology = _aln_homology
+            # aln_stats + homology are now fused into Stage 3 (collapse Pass 2)
+            # — pulled from ``_collapsed`` after the collapse call below.
+            # ``_read_counts.num_unique`` is stashed for the per-unique-read
+            # guardrail (moved here from run_parquet_workers).
+            _parquet_num_unique = _read_counts.num_unique
             variantCache = {}
         elif args.bam_input:
             aln_stats, not_aln_variant_objects = process_bam(args.bam_input, args.bam_chr_loc, crispresso2_info['bam_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
@@ -4131,12 +4123,23 @@ def main():
             info('Collapsing aligned shards (parquet backend)...')
             _collapsed = _pq_store.collapse(
                 _shard_paths, is_paired=False,
+                expand_ambiguous_alignments=getattr(args, 'expand_ambiguous_alignments', False),
                 discard_indel_reads=args.discard_indel_reads,
                 write_detailed_allele_table=args.write_detailed_allele_table,
                 vcf_output=args.vcf_output,
             )
             if _collapsed.parquet_path is not None:
                 files_to_remove.append(_collapsed.parquet_path)
+            # aln_stats + homology are fused into collapse's Pass 2 (one
+            # fewer full shard scan vs. the pre-fix run_parquet_workers path).
+            aln_stats = _collapsed.aln_stats
+            not_aln_variant_objects = _collapsed.not_aln_homology
+            _parquet_aln_homology = _collapsed.aln_homology
+            if (aln_stats is not None
+                    and aln_stats['N_COMPUTED_ALN'] + aln_stats['N_COMPUTED_NOTALN']
+                            != _parquet_num_unique):
+                raise CRISPRessoShared.OutputFolderIncompleteException(
+                    'Number of unique reads processed by parallel processes does not match the number of unique reads found in the fastq file. Try rerunning CRISPResso.')
             # df_alleles via the lazy view (PR 7 item 8). When both plots AND
             # the report are suppressed (the memory-bench configuration),
             # df_alleles is only consumed by write_all_core_data_files — which

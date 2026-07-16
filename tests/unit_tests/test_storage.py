@@ -1621,6 +1621,71 @@ def test_streaming_external_empty_input(temp_dir):
     assert res_ext.allele_rows == []
 
 
+def test_streaming_external_partitioned_gather_multi_row_buckets(temp_dir):
+    """Partitioned gather with multiple rows per bucket == in-memory path.
+
+    The other ``test_streaming_external_*`` tests force ``memory_budget_mb=0``
+    so ``chunk_size=1`` (every row is its own bucket). This test uses a 1 MB
+    budget with ~260 unique reads (8 bp amplicon → ``est_row_size``≈4736 B),
+    which forces the external branch (``num_groups * est_row_size``≈1.3 MB ≥ 1
+    MB) while keeping ``chunk_size``≈73 rows/bucket → ~4 buckets each holding
+    many rows. This exercises the bucket scatter (Step D) AND the in-bucket
+    ``out_pos`` re-ordering (Step E) that the 1-row-bucket tests do not cover.
+    """
+    import random
+    rng = random.Random(2026)
+    bases = "ACGT"
+    rows = []
+    for _ in range(260):
+        ref = rng.choice(["ref1", "ref2"])
+        seq = "".join(rng.choice(bases) for _ in range(8))
+        if rng.random() < 0.3:
+            refs = ["ref1", "ref2"]
+            cn = rng.choice(["AMBIGUOUS", "ref1_MODIFIED&ref2_UNMODIFIED"])
+        else:
+            refs = [ref]
+            cn = ref + "_" + rng.choice(["MODIFIED", "UNMODIFIED"])
+        payload = {
+            "count": 1, "aln_ref_names": refs,
+            "aln_scores": [float(rng.randint(80, 99)) for _ in refs],
+            "best_match_score": float(rng.randint(80, 99)),
+            "class_name": cn, "best_match_name": refs[0], "caching_is_ok": True,
+        }
+        for r in refs:
+            sub = _shard_payload(r)["variant_" + r]
+            sub["aln_seq"] = seq
+            sub["aln_ref"] = seq
+            sub["ref_positions"] = list(range(8))
+            sub["all_deletion_positions"] = []
+            sub["deletion_positions"] = []
+            sub["deletion_coordinates"] = []
+            sub["deletion_sizes"] = []
+            sub["all_insertion_positions"] = []
+            sub["insertion_positions"] = []
+            sub["insertion_coordinates"] = []
+            sub["insertion_sizes"] = []
+            sub["all_substitution_positions"] = []
+            sub["substitution_positions"] = []
+            sub["substitution_values"] = np.array([])
+            sub["deletion_n"] = 0
+            sub["insertion_n"] = 0
+            sub["substitution_n"] = 0
+            sub["classification"] = ("UNMODIFIED" if cn.endswith("UNMODIFIED")
+                                     or cn == "AMBIGUOUS" else "MODIFIED")
+            payload["variant_" + r] = sub
+        rows.append((seq, rng.randint(1, 5), payload))
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    _write_shard(shard, rows)
+    res_mem = collapse_aligned_shards([shard], os.path.join(temp_dir, "mem"),
+                                      is_paired=False, write_detailed_allele_table=True)
+    res_ext = collapse_aligned_shards([shard], os.path.join(temp_dir, "ext"),
+                                      is_paired=False, write_detailed_allele_table=True,
+                                      memory_budget_mb=1)
+    # The external branch was actually taken (allele_rows left empty).
+    assert res_ext.allele_rows == []
+    _assert_collapsed_equal(res_ext, res_mem)
+
+
 # -- Stage 4: count-vector aggregation (Stream-Out B, PR 6) ------------------
 #
 # Parity strategy: each test builds a *reference* set of count vectors by

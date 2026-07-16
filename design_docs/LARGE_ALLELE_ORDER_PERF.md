@@ -1,6 +1,11 @@
 # Performance: large-allele final ordering (external sort without JSON carry)
 
-**Status:** DESIGN (2026-07-07) — not yet implemented.
+**Status:** IMPLEMENTED (2026-07-14) — the external branch of
+``_collapse_streaming_single_read`` now uses the key-sort + partitioned gather
+(steps A–F below). The in-memory branch for small inputs (tests,
+``make basic test``) is unchanged. The 4 forced-external parity tests pass
+byte-identical, plus a new multi-row-bucket parity test
+(`test_streaming_external_partitioned_gather_multi_row_buckets`).
 **Blocks:** Success Criterion #2 (long-read completion) at scale — RSS is flat
 (`STREAMING_SINGLE_READ_COLLAPSE.md`), but the 1M × 2000 bp run times out
 because the final allele ordering carries ~12.8 GB of JSON through a global

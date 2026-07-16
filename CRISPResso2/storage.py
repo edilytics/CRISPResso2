@@ -37,6 +37,7 @@ from __future__ import annotations
 import gzip
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -858,7 +859,7 @@ class AlignedShardWriter:
         return False
 
 
-def iter_aligned_shard(path, batch_size=None):
+def iter_aligned_shard(path, batch_size=None, *, columns=None):
     """Stream ``(read_key, count, payload)`` from a parquet shard.
 
     Used by Stage 3 (collapse) and the homology/stat stream-outs to iterate
@@ -870,11 +871,21 @@ def iter_aligned_shard(path, batch_size=None):
     is sized to target ~50 MB of arrow data per batch. This keeps peak RSS
     flat for long-read amplicons (a fixed 50k-row batch would hold ~8 GB of
     2 kb-read payloads). Pass an explicit ``batch_size`` to override.
+
+    ``columns`` selects which top-level columns to read off disk (parquet is
+    columnar, so unnamed columns are never read). Pass a minimal set for
+    passes that only need scalars — e.g. the canonical-key projection needs
+    only ``["read_key", "count", "best_match_score"]`` and must NOT pay to
+    read/decompress the amplicon-length ``payloads`` struct. ``None`` (default)
+    reads all columns (full payload) for backward compatibility. NOTE: pyarrow
+    cannot project nested struct leaves (``payloads.aln_seq`` is silently
+    ignored), so ``payloads`` is all-or-nothing; passes that need *any* nested
+    field must read the whole ``payloads`` column.
     """
     pf = pq.ParquetFile(str(path))
     if batch_size is None:
         batch_size = _adaptive_batch_size(pf)
-    for batch in pf.iter_batches(batch_size=batch_size):
+    for batch in pf.iter_batches(batch_size=batch_size, columns=columns):
         # Iterate row-by-row via column-cell access (``.as_py()``) rather than
         # ``batch.to_pylist()``: the latter materializes the WHOLE batch as
         # Python objects at once, which blows up ~10-50x for string-array
@@ -1078,9 +1089,15 @@ COLLAPSED_SCHEMA = pa.schema([
     # base across the whole amplicon; needed by the streaming per-base
     # substitution count vectors. NOT part of the detailed allele TSV
     # (_DETAILED_ALLELE_COLS) — the TSV sink and get_slice default projection
-    # do not emit it.
     pa.field("all_substitution_values", pa.list_(pa.string())),
 ])
+
+# COLLAPSED_SCHEMA + a synthetic ``row_idx`` column. Used by the partitioned
+# gather (``design_docs/LARGE_ALLELE_ORDER_PERF.md``) to write the unsorted
+# full-row parquet in Step A and seek rows back by index in Step D.
+_COLLAPSED_SCHEMA_WITH_ROW_IDX = COLLAPSED_SCHEMA.append(
+    pa.field("row_idx", pa.int64())
+)
 
 
 def _get_allele_row(
@@ -1203,6 +1220,13 @@ class CollapsedAlleles:
     parquet_path : Optional[str]
         Path to the persisted ``collapsed.allele.parquet`` artifact (full
         column set), or ``None`` if ``write_parquet=False``.
+    aln_stats, aln_homology, not_aln_homology : Optional
+        Alignment statistics + homology dicts (the outputs of
+        ``compute_aln_stats_and_homology_from_shards``), fused into the
+        single-read Pass 2 scan so homology free-rides on the payloads read
+        that fanout already needs (no separate shard pass). Populated by the
+        single-read branch; ``None`` for the paired/empty paths (which don't
+        compute homology here).
 
     """
 
@@ -1214,6 +1238,9 @@ class CollapsedAlleles:
     counts_unmodified: dict
     counts_discarded: dict
     parquet_path: Optional[str] = None
+    aln_stats: Optional[dict] = None
+    aln_homology: Optional[dict] = None
+    not_aln_homology: Optional[dict] = None
 
     def allele_rows_dataframe(self):
         """Return ``allele_rows`` as a pandas DataFrame (sorted, with ``%Reads``).
@@ -1313,6 +1340,7 @@ def _collapse(
             write_detailed=write_detailed,
             write_parquet=write_parquet,
             collapsed_path=collapsed_path,
+            expand_ambiguous_alignments=expand_ambiguous_alignments,
         )
 
     # 3a + 3b: stream shards into the in-memory collapse table.
@@ -1562,10 +1590,14 @@ def _collapse_fanout(
 #      ``(-#Reads, Aligned_Sequence, Reference_Sequence)`` (matching
 #      ``df_alleles.sort_values`` ~line 4303) for TSV/get_slice parity. If the
 #      allele set fits the memory budget (small inputs: tests, basic test),
-#      sort in memory and populate ``allele_rows``. Otherwise write the rows to
-#      a compact TSV file (sort-key prefix + row data, no JSON — ~2-5x smaller),
-#      external-sort that, and stream it into the parquet — peak RSS bounded by
-#      one row + accumulators.
+#      sort in memory and populate ``allele_rows``. Otherwise use the
+#      partitioned external gather from ``LARGE_ALLELE_ORDER_PERF.md``: write
+#      full rows to an unsorted parquet + a small sort-key projection,
+#      external-sort ONLY the key projection, then gather full rows into
+#      in-memory buckets (one bucket at a time) and emit each in order. The
+#      full row data never passes through a global text sort — peak RSS is
+#      bounded by one bucket + accumulators, and the 1M x 2 kb run completes
+#      (the JSON/TSV-carry global sort that preceded it timed out).
 #
 # Parity holds by construction: ``seq_no`` encodes scan order, so the
 # representative (min seq_no) is the first-occurrence-in-scan-order key — the
@@ -1573,6 +1605,26 @@ def _collapse_fanout(
 # pandas store insertion order, so the final stable sort's tie-break is
 # identical. Paired input stays on the in-memory path (genuinely bounded by
 # allele count); only single-read routes here.
+
+
+def _ensure_nofile(needed: int) -> None:
+    """Raise the soft ``RLIMIT_NOFILE`` so the partitioned gather can keep
+    ``needed`` bucket spill files open simultaneously.
+
+    No-ops if the soft limit already suffices or the platform lacks
+    ``resource``. Never raises — a failure here is non-fatal (the gather will
+    surface a clear ``OSError: Too many open files`` if it truly cannot
+    proceed, and ``n_buckets`` is sized to stay within the hard limit on the
+    platforms CRISPResso2 supports: macOS hard ≥ 1024, Linux ≥ 4096).
+    """
+    try:
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        target = int(min(hard, needed))
+        if target > soft:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+    except (ImportError, OSError, ValueError):
+        pass
 
 
 def _run_external_sort(input_file: str, output_file: str, workdir: str,
@@ -1625,10 +1677,20 @@ def _join_coords(val) -> str:
 
     Comma separates start/end within a coord; semicolon separates coords. Handles
     negative positions unambiguously (``-8,10;12,14``). Empty/None → empty.
+    Accepts either (start, end) tuples/lists or arrow struct dicts
+    (``{"start": .., "end": ..}``) so it can encode rows read back from a
+    collapsed parquet (Step D of the partitioned gather) without a separate
+    struct→tuple conversion.
     """
     if val is None:
         return ""
-    return ";".join(f"{int(s)},{int(e)}" for s, e in val)
+    parts = []
+    for c in val:
+        if isinstance(c, dict):
+            parts.append(f"{int(c['start'])},{int(c['end'])}")
+        else:
+            parts.append(f"{int(c[0])},{int(c[1])}")
+    return ";".join(parts)
 
 
 def _split_coords(s: str) -> list:
@@ -1874,6 +1936,193 @@ def _write_collapsed_allele_parquet_from_tsv(sorted_tsv: str, path: str,
     return n
 
 
+def _partitioned_gather_write_unsorted(
+    self: "VariantStore",
+    paths: list,
+    rep_seq_sorted,
+    rep_map: dict,
+    *,
+    discard_indel_reads: bool,
+    est_row_size: int,
+    unsorted_parquet: str,
+    gather_keys_file: str,
+    homology_state: Optional["_AlnStatsHomologyState"] = None,
+) -> tuple:
+    """Step A of the partitioned gather (``LARGE_ALLELE_ORDER_PERF.md``).
+
+    One streaming pass over the aligned shards: for each representative
+    (``seq_no`` match) run ``_collapse_fanout`` and (a) write the FULL row to
+    ``unsorted_parquet`` (native arrow, ``_COLLAPSED_SCHEMA_WITH_ROW_IDX``) and
+    (b) append the small sort-key projection to ``gather_keys_file``
+    (``neg_reads \t Aligned_Sequence \t Reference_Sequence \t row_idx``).
+    Returns ``(n_allele_rows, n_total, class_counts, counts_total,
+    counts_modified, counts_unmodified, counts_discarded)``.
+    """
+    n_total = 0
+    class_counts: dict = {}
+    counts_total: dict = {}
+    counts_modified: dict = {}
+    counts_unmodified: dict = {}
+    counts_discarded: dict = {}
+
+    flush_every = max(100, min(8192, 32_000_000 // max(1, est_row_size)))
+    writer = pq.ParquetWriter(unsorted_parquet, _COLLAPSED_SCHEMA_WITH_ROW_IDX)
+    try:
+        buf: list = []
+        row_idx = 0
+        seq_no = 0
+        rep_iter = iter(rep_seq_sorted)
+        next_rep = next(rep_iter, None)
+        with open(gather_keys_file, "w", buffering=1 << 20) as kf:
+            for path in paths:
+                for read_key, count, payload in iter_aligned_shard(path):
+                    if homology_state is not None:
+                        homology_state.accumulate(read_key, int(count), payload)
+                    if next_rep is not None and seq_no == next_rep:
+                        ck, tc = rep_map[seq_no]
+                        store = {ck: {"count": tc, "payload": payload}}
+                        rows, nt, cc, ct, cm, cu, cd = self._collapse_fanout(
+                            store, discard_indel_reads=discard_indel_reads)
+                        n_total += nt
+                        _accumulate_agg(class_counts, counts_total, counts_modified,
+                                        counts_unmodified, counts_discarded,
+                                        cc, ct, cm, cu, cd)
+                        for r in rows:
+                            d = _allele_dict_to_parquet_row(r)
+                            d["row_idx"] = row_idx
+                            buf.append(d)
+                            kf.write(
+                                f"{10**15 - int(r['#Reads']):015d}\t"
+                                f"{r['Aligned_Sequence']}\t"
+                                f"{r['Reference_Sequence']}\t"
+                                f"{row_idx:015d}\n")
+                            row_idx += 1
+                            if len(buf) >= flush_every:
+                                writer.write_table(pa.Table.from_pylist(
+                                    buf, schema=_COLLAPSED_SCHEMA_WITH_ROW_IDX))
+                                buf.clear()
+                        next_rep = next(rep_iter, None)
+                    seq_no += 1
+                    # No early break — homology accumulation must visit every row.
+        if buf:
+            writer.write_table(pa.Table.from_pylist(
+                buf, schema=_COLLAPSED_SCHEMA_WITH_ROW_IDX))
+            buf.clear()
+    finally:
+        writer.close()
+
+    return (row_idx, n_total, class_counts, counts_total, counts_modified,
+            counts_unmodified, counts_discarded)
+
+
+def _partitioned_gather_emit(
+    self: "VariantStore",
+    *,
+    n_allele_rows: int,
+    est_row_size: int,
+    unsorted_parquet: str,
+    gather_keys_sorted: str,
+    bucket_dir: str,
+    parquet_path: str,
+) -> None:
+    """Steps C–E of the partitioned gather.
+
+    *C* — read ``gather_keys_sorted`` (output order) and build
+    ``out_pos[row_idx] = output index``.
+    *D* — stream ``unsorted_parquet`` once; scatter each row to a per-bucket TSV
+    spill file (``out_pos`` + the row's TSV encoding). Peak RSS = K small write
+    buffers + one arrow batch.
+    *E* — per bucket (in output order): read, sort in memory by ``out_pos``, and
+    write to ``parquet_path`` (batched arrow writes). Peak RSS = one bucket.
+    """
+    import numpy as _np
+
+    # -- Step C: out_pos[row_idx] = output index (from the sorted key projection).
+    out_pos = _np.empty(n_allele_rows, dtype=_np.int64)
+    pos = 0
+    with open(gather_keys_sorted, "r", buffering=1 << 20) as sf:
+        for line in sf:
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            f = line.split("\t")
+            out_pos[int(f[3])] = pos
+            pos += 1
+
+    # Bucket size: one bucket materialised as Python dicts in Step E should
+    # stay within the memory budget (dict overhead ≈ 3× the arrow row).
+    chunk_size = max(1, int(self.memory_budget_bytes // max(1, est_row_size * 3)))
+    n_buckets = (n_allele_rows + chunk_size - 1) // chunk_size
+
+    os.makedirs(bucket_dir, exist_ok=True)
+    bucket_paths = [
+        os.path.join(bucket_dir, f"bucket_{b:06d}.tsv") for b in range(n_buckets)
+    ]
+    # Step D keeps all n_buckets spill files open simultaneously; raise the FD
+    # soft limit so this does not hit the (often 256) default.
+    _ensure_nofile(n_buckets + 128)
+
+    # -- Step D: partitioned gather (one streaming pass over the unsorted parquet).
+    bucket_fhs = [open(p, "w", buffering=1 << 20) for p in bucket_paths]
+    try:
+        pf = pq.ParquetFile(unsorted_parquet)
+        read_batch = _adaptive_batch_size(pf)
+        for batch in pf.iter_batches(batch_size=read_batch):
+            names = batch.schema.names
+            # Column access + per-row .as_py() (mirrors ``iter_aligned_shard``):
+            # materialises ONE row's Python objects at a time so peak RSS is the
+            # (compact) arrow batch + one payload, not the whole batch as pylist.
+            cols = {n: batch.column(n) for n in names}
+            row_idx_col = cols["row_idx"]
+            data_names = [n for n in names if n != "row_idx"]
+            for i in range(batch.num_rows):
+                ri = row_idx_col[i].as_py()
+                op = int(out_pos[ri])
+                b = op // chunk_size
+                if b >= n_buckets:  # guard against rounding edge
+                    b = n_buckets - 1
+                row = {n: cols[n][i].as_py() for n in data_names}
+                # ``_allele_row_to_tsv`` encodes coords via ``_join_coords``,
+                # which accepts the struct dicts read back from parquet.
+                bucket_fhs[b].write(f"{op:015d}\t{_allele_row_to_tsv(row, ri)}\n")
+    finally:
+        for fh in bucket_fhs:
+            try:
+                fh.close()
+            except OSError:
+                pass
+
+    # -- Step E: emit (per bucket, in output order).
+    final_writer = pq.ParquetWriter(parquet_path, COLLAPSED_SCHEMA)
+    try:
+        flush_every = max(100, min(8192, 32_000_000 // max(1, est_row_size)))
+        for b in range(n_buckets):
+            entries = []
+            with open(bucket_paths[b], "r", buffering=1 << 20) as bf:
+                for line in bf:
+                    line = line.rstrip("\n")
+                    if not line:
+                        continue
+                    op_s, _, rest = line.partition("\t")
+                    entries.append((int(op_s), rest))
+            entries.sort(key=lambda e: e[0])
+            buf = []
+            for _, rest in entries:
+                buf.append(_allele_dict_to_parquet_row(
+                    _tsv_line_to_allele_row(rest)))
+                if len(buf) >= flush_every:
+                    final_writer.write_table(
+                        pa.Table.from_pylist(buf, schema=COLLAPSED_SCHEMA))
+                    buf.clear()
+            if buf:
+                final_writer.write_table(
+                    pa.Table.from_pylist(buf, schema=COLLAPSED_SCHEMA))
+                buf.clear()
+            del entries
+    finally:
+        final_writer.close()
+
+
 def _collapse_streaming_single_read(
     self: "VariantStore",
     paths: list,
@@ -1882,6 +2131,7 @@ def _collapse_streaming_single_read(
     write_detailed: bool = False,
     write_parquet: bool = True,
     collapsed_path: Optional[str] = None,
+    expand_ambiguous_alignments: bool = False,
 ) -> CollapsedAlleles:
     """Stage 3 for single-read input: streaming external-sort canonical-key merge.
 
@@ -1889,14 +2139,16 @@ def _collapse_streaming_single_read(
     Produces the same ``CollapsedAlleles`` as the in-memory path, but with peak
     RSS bounded by one payload + the group index (O(unique_reads) scalars) +
     accumulators, instead of one full payload per unique read.
+
+    Homology (``aln_stats`` / ``aln_homology`` / ``not_aln_homology``) is fused
+    into the Pass 2 fanout scan — that scan already reads ``payloads`` for
+    fanout, so the per-row homology accumulation free-rides on it (no separate
+    shard pass). Populated on the returned ``CollapsedAlleles``.
     """
     rc = CRISPRessoShared.reverse_complement
     workdir = tempfile.mkdtemp(prefix="crispresso_collapse_", dir=self.output_directory)
     keys_file = os.path.join(workdir, "keys.txt")
     sorted_keys_file = os.path.join(workdir, "keys.sorted")
-    output_tsv = os.path.join(workdir, "output.tsv")
-    sorted_tsv = os.path.join(workdir, "output.sorted.tsv")
-    temp_files = [keys_file, sorted_keys_file, output_tsv, sorted_tsv]
 
     parquet_path = None
     if write_parquet:
@@ -1907,12 +2159,21 @@ def _collapse_streaming_single_read(
 
     try:
         # -- Pass 1: stream shards → text projection (canonical_key, seq_no, count).
+        # Column-projected to the 3 top-level scalars this pass needs — it must
+        # NOT read/decompress the amplicon-length ``payloads`` struct (the
+        # dominant shard cost). ``best_match_score`` is a top-level column, so
+        # the unaligned-skip needs no payload access. ``est_amplicon_len``
+        # (which only sizes the in-memory-vs-external threshold) is taken from
+        # ``len(read_key)`` — for single-read input read_key IS the read
+        # sequence, ≈ amplicon length — avoiding a dive into ``payloads``.
         est_amplicon_len = 0
         seq_no = 0
         any_aligned = False
+        _pass1_columns = ["read_key", "count", "best_match_score"]
         with open(keys_file, "w", buffering=1 << 20) as kf:
             for path in paths:
-                for read_key, count, payload in iter_aligned_shard(path):
+                for read_key, count, payload in iter_aligned_shard(
+                        path, columns=_pass1_columns):
                     if payload.get("best_match_score", 0) <= 0:
                         seq_no += 1  # consume seq_no for seek-back parity
                         continue
@@ -1920,11 +2181,7 @@ def _collapse_streaming_single_read(
                     rc_read = rc(read_key)
                     canonical_key = read_key if read_key <= rc_read else rc_read
                     if est_amplicon_len == 0:
-                        aln_refs = payload.get("aln_ref_names") or []
-                        if aln_refs:
-                            vp = payload.get("variant_" + aln_refs[0])
-                            if vp and vp.get("ref_positions"):
-                                est_amplicon_len = len(vp["ref_positions"])
+                        est_amplicon_len = len(read_key)
                     kf.write(canonical_key)
                     kf.write("\t")
                     kf.write(str(seq_no))
@@ -1938,10 +2195,22 @@ def _collapse_streaming_single_read(
         if not any_aligned:
             if parquet_path is not None:
                 _write_collapsed_allele_parquet([], parquet_path)
+            # No aligned reads → Pass 2 won't run, so accumulate homology for
+            # the (all-unaligned) rows here via the shared state. Rare edge;
+            # the normal path fuses this into Pass 2.
+            _st = _AlnStatsHomologyState(
+                expand_ambiguous_alignments=expand_ambiguous_alignments)
+            _unaln_cols = ["read_key", "count", "best_match_score", "aln_scores"]
+            for path in paths:
+                for read_key, count, payload in iter_aligned_shard(
+                        path, columns=_unaln_cols):
+                    _st.accumulate(read_key, int(count), payload)
+            _as, _ah, _nah = _st.finalize()
             return CollapsedAlleles(
                 allele_rows=[], n_total=0, class_counts={},
                 counts_total={}, counts_modified={}, counts_unmodified={},
                 counts_discarded={}, parquet_path=parquet_path,
+                aln_stats=_as, aln_homology=_ah, not_aln_homology=_nah,
             )
 
         # -- External sort by canonical_key (stable → ascending seq_no within a group).
@@ -1969,6 +2238,12 @@ def _collapse_streaming_single_read(
         counts_modified: dict = {}
         counts_unmodified: dict = {}
         counts_discarded: dict = {}
+        # Homology/stats accumulators — fused into the Pass 2 fanout scan
+        # (both branches) so homology free-rides on the payloads read that
+        # fanout already needs. ``compute_aln_stats_and_homology_from_shards``
+        # is NOT called separately on the wired path (fix #3).
+        _homology_st = _AlnStatsHomologyState(
+            expand_ambiguous_alignments=expand_ambiguous_alignments)
 
         if use_in_memory:
             # Small input (tests, basic test): hold allele rows in memory,
@@ -1980,6 +2255,7 @@ def _collapse_streaming_single_read(
             next_rep = next(rep_iter, None)
             for path in paths:
                 for read_key, count, payload in iter_aligned_shard(path):
+                    _homology_st.accumulate(read_key, int(count), payload)
                     if next_rep is not None and seq_no == next_rep:
                         ck, tc = rep_map[seq_no]
                         store = {ck: {"count": tc, "payload": payload}}
@@ -1992,10 +2268,9 @@ def _collapse_streaming_single_read(
                                         cc, ct, cm, cu, cd)
                         next_rep = next(rep_iter, None)
                     seq_no += 1
-                    if next_rep is None:
-                        break
-                if next_rep is None:
-                    break
+                    # NOTE: no early break once reps are consumed — homology
+                    # accumulation (fused into this scan) must visit EVERY row,
+                    # including unaligned reads trailing the last representative.
 
             full_rows.sort(key=lambda r: (
                 -int(r["#Reads"]), r["Aligned_Sequence"], r["Reference_Sequence"]))
@@ -2006,49 +2281,61 @@ def _collapse_streaming_single_read(
                 else [{k: r[k] for k in _NON_DETAILED_ALLELE_KEYS if k in r} for r in full_rows]
             )
         else:
-            # Large input (bench): stream fanout to a sort-key-prefixed TSV
-            # (compact, ~2-5x smaller than JSON — no recursive tokenizer, arrays
-            # are space/semicolon-joined), external-sort by
-            # (-#Reads, Aligned_Sequence, Reference_Sequence, row_idx), then
-            # stream into the parquet. Peak RSS = one row + accumulators.
-            # allele_rows is left empty — the pipeline consumes the parquet via
-            # get_slice (write_parquet is required on this branch).
-            with open(output_tsv, "w", buffering=1 << 20) as jf:
-                row_idx = 0
-                seq_no = 0
-                rep_iter = iter(rep_seq_sorted)
-                next_rep = next(rep_iter, None)
-                for path in paths:
-                    for read_key, count, payload in iter_aligned_shard(path):
-                        if next_rep is not None and seq_no == next_rep:
-                            ck, tc = rep_map[seq_no]
-                            store = {ck: {"count": tc, "payload": payload}}
-                            rows, nt, cc, ct, cm, cu, cd = self._collapse_fanout(
-                                store, discard_indel_reads=discard_indel_reads)
-                            n_total += nt
-                            _accumulate_agg(class_counts, counts_total, counts_modified,
-                                            counts_unmodified, counts_discarded,
-                                            cc, ct, cm, cu, cd)
-                            for r in rows:
-                                jf.write(_allele_row_to_tsv(r, row_idx))
-                                jf.write("\n")
-                                row_idx += 1
-                            next_rep = next(rep_iter, None)
-                        seq_no += 1
-                        if next_rep is None:
-                            break
-                    if next_rep is None:
-                        break
-            # Sort by fields 1-4 (neg_reads asc, Aligned asc, Reference asc,
-            # row_idx asc) — the row_idx tiebreaker encodes emission order so
-            # ties are byte-identical to the in-memory path's stable sort.
-            _run_external_sort(output_tsv, sorted_tsv, workdir,
-                               ["-k1,1", "-k2,2", "-k3,3", "-k4,4"],
-                               sort_buffer=self.sort_buffer)
-            if parquet_path is not None:
-                _write_collapsed_allele_parquet_from_tsv(sorted_tsv, parquet_path)
+            # Large input (bench): partitioned external gather — key-sort +
+            # bucketed gather. The full row data never passes through a global
+            # text sort (the bottleneck that timed out 1M x 2000 bp under the
+            # old JSON/TSV-carry global sort). See
+            # ``design_docs/LARGE_ALLELE_ORDER_PERF.md``.
+            #
+            #   A. fanout → write FULL rows to an unsorted parquet (native
+            #      arrow, ``_COLLAPSED_SCHEMA_WITH_ROW_IDX``) + a small
+            #      ``gather.keys.txt`` (sort-key prefix + row_idx only).
+            #   B. external-sort the small key projection (stable, by output
+            #      keys — byte-identical order to the old global TSV sort).
+            #   C. build ``out_pos[row_idx]`` (output index) from keys.sorted.
+            #   D. stream the unsorted parquet once; scatter each row to a
+            #      per-bucket TSV spill file (``out_pos`` + row TSV).
+            #   E. per bucket (in output order): read, sort by ``out_pos`` in
+            #      memory, write to the final parquet. Peak RSS = one bucket.
+            #
+            # ``allele_rows`` is left empty — the pipeline consumes the parquet
+            # via ``get_slice`` (``write_parquet`` is required on this branch).
+            unsorted_parquet = os.path.join(workdir, "collapsed.unsorted.parquet")
+            gather_keys_file = os.path.join(workdir, "gather.keys.txt")
+            gather_keys_sorted = os.path.join(workdir, "gather.keys.sorted")
+            bucket_dir = os.path.join(workdir, "buckets")
+
+            (n_allele_rows, n_total, class_counts, counts_total,
+             counts_modified, counts_unmodified, counts_discarded) = \
+                _partitioned_gather_write_unsorted(
+                    self, paths, rep_seq_sorted, rep_map,
+                    discard_indel_reads=discard_indel_reads,
+                    est_row_size=est_row_size,
+                    unsorted_parquet=unsorted_parquet,
+                    gather_keys_file=gather_keys_file,
+                    homology_state=_homology_st)
+
+            if parquet_path is not None and n_allele_rows > 0:
+                # Step B — sort the small key projection (sort keys + row_idx
+                # only; ~4 kB/row at 2 kb amplicon vs ~26 kB/row for full TSV).
+                _run_external_sort(gather_keys_file, gather_keys_sorted, workdir,
+                                   ["-k1,1", "-k2,2", "-k3,3", "-k4,4"],
+                                   sort_buffer=self.sort_buffer)
+                # Steps C–E — bucket assignment + gather + emit.
+                _partitioned_gather_emit(
+                    self,
+                    n_allele_rows=n_allele_rows,
+                    est_row_size=est_row_size,
+                    unsorted_parquet=unsorted_parquet,
+                    gather_keys_sorted=gather_keys_sorted,
+                    bucket_dir=bucket_dir,
+                    parquet_path=parquet_path)
+            elif parquet_path is not None:
+                # Fan-out produced zero rows (all representatives discarded).
+                _write_collapsed_allele_parquet([], parquet_path)
             allele_rows = []
 
+        _as, _ah, _nah = _homology_st.finalize()
         return CollapsedAlleles(
             allele_rows=allele_rows,
             n_total=n_total,
@@ -2058,17 +2345,13 @@ def _collapse_streaming_single_read(
             counts_unmodified=counts_unmodified,
             counts_discarded=counts_discarded,
             parquet_path=parquet_path,
+            aln_stats=_as, aln_homology=_ah, not_aln_homology=_nah,
         )
     finally:
-        for f in temp_files:
-            try:
-                os.remove(f)
-            except OSError:
-                pass
-        try:
-            os.rmdir(workdir)
-        except OSError:
-            pass
+        # All temp artifacts live under ``workdir`` (keys files, the unsorted
+        # parquet, and the per-bucket spill dir). ``shutil.rmtree`` removes
+        # the bucket subdirectory and every spill file in one go (edges #15/#21).
+        shutil.rmtree(workdir, ignore_errors=True)
 
 
 def _write_collapsed_allele_parquet(allele_rows: list, path: str) -> None:
@@ -2919,6 +3202,81 @@ def _aggregate_alleles(
 VariantStore.aggregate_alleles = _aggregate_alleles
 
 
+@dataclass
+class _AlnStatsHomologyState:
+    """Mutable accumulators for ``aln_stats`` + homology dicts, built per-row.
+
+    Extracted so the SAME per-row logic runs either as a standalone shard
+    scan (``compute_aln_stats_and_homology_from_shards``) OR fused into
+    collapse's Pass 2 (the fanout scan that already reads ``payloads``),
+    avoiding a second full payloads read for homology.
+    """
+    expand_ambiguous_alignments: bool = False
+    N_TOT_READS: int = 0
+    N_CACHED_ALN: int = 0
+    N_CACHED_NOTALN: int = 0
+    N_COMPUTED_ALN: int = 0
+    N_COMPUTED_NOTALN: int = 0
+    N_GLOBAL_SUBS: int = 0
+    N_SUBS_OUTSIDE_WINDOW: int = 0
+    N_MODS_IN_WINDOW: int = 0
+    N_MODS_OUTSIDE_WINDOW: int = 0
+    N_READS_IRREGULAR_ENDS: int = 0
+    READ_LENGTH: int = 0
+    aln_homology: dict = field(default_factory=dict)
+    not_aln_homology: dict = field(default_factory=dict)
+
+    def accumulate(self, read_key, count: int, payload):
+        """Fold one shard row (pre-merge) into the stats + homology dicts."""
+        self.N_TOT_READS += count
+        best = payload.get("best_match_score", 0)
+        if best <= 0:
+            self.N_COMPUTED_NOTALN += 1
+            self.N_CACHED_NOTALN += (count - 1)
+            self.not_aln_homology[read_key] = {
+                "aln_scores": list(payload.get("aln_scores", []) or []),
+                "count": count,
+            }
+            return
+        self.N_COMPUTED_ALN += 1
+        self.N_CACHED_ALN += (count - 1)
+        self.aln_homology[read_key] = {
+            "aln_scores": list(payload.get("aln_scores", []) or []),
+            "count": count,
+        }
+        aln_ref_names = payload.get("aln_ref_names", []) or []
+        if len(aln_ref_names) == 1 or self.expand_ambiguous_alignments:
+            for name in aln_ref_names:
+                sub = payload.get("variant_" + name)
+                if sub is None:
+                    continue
+                if self.READ_LENGTH == 0:
+                    self.READ_LENGTH = len(sub["aln_seq"])
+                self.N_GLOBAL_SUBS += (sub["substitution_n"] + sub["substitutions_outside_window"]) * count
+                self.N_SUBS_OUTSIDE_WINDOW += sub["substitutions_outside_window"] * count
+                self.N_MODS_IN_WINDOW += sub["mods_in_window"] * count
+                self.N_MODS_OUTSIDE_WINDOW += sub["mods_outside_window"] * count
+                if sub["irregular_ends"]:
+                    self.N_READS_IRREGULAR_ENDS += count
+
+    def finalize(self):
+        """Return ``(aln_stats, aln_homology, not_aln_homology)``."""
+        aln_stats = {
+            "N_TOT_READS": self.N_TOT_READS,
+            "N_CACHED_ALN": self.N_CACHED_ALN,
+            "N_CACHED_NOTALN": self.N_CACHED_NOTALN,
+            "N_COMPUTED_ALN": self.N_COMPUTED_ALN,
+            "N_COMPUTED_NOTALN": self.N_COMPUTED_NOTALN,
+            "N_GLOBAL_SUBS": self.N_GLOBAL_SUBS,
+            "N_SUBS_OUTSIDE_WINDOW": self.N_SUBS_OUTSIDE_WINDOW,
+            "N_MODS_IN_WINDOW": self.N_MODS_IN_WINDOW,
+            "N_MODS_OUTSIDE_WINDOW": self.N_MODS_OUTSIDE_WINDOW,
+            "N_READS_IRREGULAR_ENDS": self.N_READS_IRREGULAR_ENDS,
+            "READ_LENGTH": self.READ_LENGTH,
+        }
+        return aln_stats, self.aln_homology, self.not_aln_homology
+
+
 def compute_aln_stats_and_homology_from_shards(
     shard_paths,
     num_unique_reads: int,
@@ -2954,69 +3312,17 @@ def compute_aln_stats_and_homology_from_shards(
       that case by building homology from the post-merge variant store when
       needed (see the ``CollapsedAlleles`` variants parquet — TODO if the basic
       test reveals RC pairs).
+    * In the wired parquet path this standalone scan is NOT used — homology is
+      fused into collapse's Pass 2 (``_collapse_streaming_single_read``) to
+      avoid a second ``payloads`` read. This function is kept for the exported
+      API and standalone use; it shares the per-row logic via
+      :class:`_AlnStatsHomologyState`.
     """
-    N_TOT_READS = 0
-    N_CACHED_ALN = 0
-    N_CACHED_NOTALN = 0
-    N_COMPUTED_ALN = 0
-    N_COMPUTED_NOTALN = 0
-    N_GLOBAL_SUBS = 0
-    N_SUBS_OUTSIDE_WINDOW = 0
-    N_MODS_IN_WINDOW = 0
-    N_MODS_OUTSIDE_WINDOW = 0
-    N_READS_IRREGULAR_ENDS = 0
-    READ_LENGTH = 0
-    aln_homology: dict = {}
-    not_aln_homology: dict = {}
-
+    st = _AlnStatsHomologyState(expand_ambiguous_alignments=expand_ambiguous_alignments)
     for path in _expand_shard_paths(shard_paths):
         for read_key, count, payload in iter_aligned_shard(path):
-            count = int(count)
-            N_TOT_READS += count
-            best = payload.get("best_match_score", 0)
-            if best <= 0:
-                N_COMPUTED_NOTALN += 1
-                N_CACHED_NOTALN += (count - 1)
-                not_aln_homology[read_key] = {
-                    "aln_scores": list(payload.get("aln_scores", []) or []),
-                    "count": count,
-                }
-                continue
-            N_COMPUTED_ALN += 1
-            N_CACHED_ALN += (count - 1)
-            aln_homology[read_key] = {
-                "aln_scores": list(payload.get("aln_scores", []) or []),
-                "count": count,
-            }
-            aln_ref_names = payload.get("aln_ref_names", []) or []
-            if len(aln_ref_names) == 1 or expand_ambiguous_alignments:
-                for name in aln_ref_names:
-                    sub = payload.get("variant_" + name)
-                    if sub is None:
-                        continue
-                    if READ_LENGTH == 0:
-                        READ_LENGTH = len(sub["aln_seq"])
-                    N_GLOBAL_SUBS += (sub["substitution_n"] + sub["substitutions_outside_window"]) * count
-                    N_SUBS_OUTSIDE_WINDOW += sub["substitutions_outside_window"] * count
-                    N_MODS_IN_WINDOW += sub["mods_in_window"] * count
-                    N_MODS_OUTSIDE_WINDOW += sub["mods_outside_window"] * count
-                    if sub["irregular_ends"]:
-                        N_READS_IRREGULAR_ENDS += count
-
-    aln_stats = {
-        "N_TOT_READS": N_TOT_READS,
-        "N_CACHED_ALN": N_CACHED_ALN,
-        "N_CACHED_NOTALN": N_CACHED_NOTALN,
-        "N_COMPUTED_ALN": N_COMPUTED_ALN,
-        "N_COMPUTED_NOTALN": N_COMPUTED_NOTALN,
-        "N_GLOBAL_SUBS": N_GLOBAL_SUBS,
-        "N_SUBS_OUTSIDE_WINDOW": N_SUBS_OUTSIDE_WINDOW,
-        "N_MODS_IN_WINDOW": N_MODS_IN_WINDOW,
-        "N_MODS_OUTSIDE_WINDOW": N_MODS_OUTSIDE_WINDOW,
-        "N_READS_IRREGULAR_ENDS": N_READS_IRREGULAR_ENDS,
-        "READ_LENGTH": READ_LENGTH,
-    }
-    return aln_stats, aln_homology, not_aln_homology
+            st.accumulate(read_key, int(count), payload)
+    return st.finalize()
 
 
 def aggregate_alleles_from_collapsed(
