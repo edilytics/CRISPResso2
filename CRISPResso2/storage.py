@@ -525,11 +525,11 @@ def count_reads_from_fastq(
 __all__ = [
     "ALIGNED_SCHEMA",
     "COLLAPSED_SCHEMA",
-    "AlleleAggregates",
-    "CountVectors",
     "DEFAULT_MEMORY_BUDGET_MB",
     "AlignedShardWriter",
+    "AlleleAggregates",
     "CollapsedAlleles",
+    "CountVectors",
     "ReadCounts",
     "VariantStore",
     "aggregate_alleles_from_collapsed",
@@ -1937,6 +1937,7 @@ def _write_collapsed_allele_parquet_from_tsv(sorted_tsv: str, path: str,
                 return 0
             bytes_per_row = max(1, len(first))
             flush_every = max(100, min(batch_size, 32_000_000 // bytes_per_row))
+
             def _flush():
                 nonlocal n
                 if not buf:
@@ -2629,6 +2630,7 @@ def _compute_count_vectors(
       ``CollapsedAlleles.counts_total`` for refs with contributing rows;
       ``CollapsedAlleles.counts_total`` omits zero-count refs (a PR 5 gap),
       while this dict includes them as 0 (pandas parity).
+
     """
     path = collapsed_path or os.path.join(self.output_directory, "collapsed.allele.parquet")
     ins = {r: np.zeros(n) for r, n in ref_lengths.items()}
@@ -3224,6 +3226,7 @@ def _aggregate_alleles(
         ``substitution_base_vectors``) finalized — matching the pandas loop's
         outputs for direct consumption by the downstream plot / quantification
         code.
+
     """
     path = collapsed_path or os.path.join(self.output_directory, "collapsed.allele.parquet")
     st = _init_agg_state(refs, ref_names, args)
@@ -3402,6 +3405,7 @@ def compute_aln_stats_and_homology_from_shards(
       avoid a second ``payloads`` read. This function is kept for the exported
       API and standalone use; it shares the per-row logic via
       :class:`_AlnStatsHomologyState`.
+
     """
     st = _AlnStatsHomologyState(expand_ambiguous_alignments=expand_ambiguous_alignments)
     for path in _expand_shard_paths(shard_paths):
@@ -3862,6 +3866,7 @@ def _collapsed_get_slice(
     * The in-memory fallback path does *not* reconstruct cell types —
       ``allele_rows`` already carry the native payload types (numpy arrays /
       tuple-lists) from :func:`_get_allele_row`.
+
     """
     import pandas as pd
 

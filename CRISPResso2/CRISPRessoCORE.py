@@ -1188,8 +1188,6 @@ def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_mat
     needs (one fewer full shard scan; see ``storage.py`` fix #3). The
     per-unique-read guardrail moves to the caller (after collapse).
     """
-    from CRISPResso2 import CRISPRessoMultiProcessing as CMP
-
     num_unique_reads = read_counts.num_unique
     shard_paths = []
 
