@@ -52,12 +52,12 @@ info = _logger.info
 # The eager path holds the full dedup dict in RAM — inherently O(unique_reads),
 # so for the flat-memory success criterion (SC #1) the budget must be small
 # enough that only genuinely-small inputs stay eager. 128 MB keeps ~50k short
-# reads (or ~10k × 2 kb long reads) eager — the "fast end of the spectrum"
+# reads (or ~10k x 2 kb long reads) eager — the "fast end of the spectrum"
 # where the eager path has no measurable slowdown vs. the current pandas path
 # (SC #4) — while spilling the multi-million-read long-read regime to the
 # external-sort path (peak RSS bounded by the sort buffer, not by read count).
 # lowered from 512 MB after the PR 7 end-to-end RSS benchmark
-# (scripts/bench_pipeline_memory.py) showed 1 M × 200 bp high-diversity reads
+# (scripts/bench_pipeline_memory.py) showed 1 M x 200 bp high-diversity reads
 # (~280 MB dict) stayed eager and scaled linearly. Exposed via
 # ``VariantStore(memory_budget_mb=...)`` so tests and future auto-select can tune.
 DEFAULT_MEMORY_BUDGET_MB = 128
@@ -1588,8 +1588,8 @@ def _collapse_fanout(
 # count for paired input (3a re-key collapses first), but for single-read input
 # there is no re-key, so the store holds one entry per unique *read* — the
 # dominant memory term that OOMs long-read / high-diversity data (see
-# ``design_docs/STREAMING_SINGLE_READ_COLLAPSE.md``: ~3.5 GB at 1M×200 bp,
-# ~40× the Stage 1 dedup dict). This streaming path keeps peak RSS bounded by
+# ``design_docs/STREAMING_SINGLE_READ_COLLAPSE.md``: ~3.5 GB at 1Mx200 bp,
+# ~40x the Stage 1 dedup dict). This streaming path keeps peak RSS bounded by
 # one payload + the (tiny) group index, regardless of unique-read count.
 #
 # Algorithm (mirrors Stage 1's S1b-proven external merge-sort pattern):
@@ -1856,7 +1856,7 @@ def _tsv_line_to_allele_row(line: str) -> dict:
 
 
 def _streaming_collapse_groups(sorted_keys_file: str):
-    """Stream a canonical-key-sorted text file → one (key, total_count, rep_seq_no) per group.
+    r"""Stream a canonical-key-sorted text file → one (key, total_count, rep_seq_no) per group.
 
     Input lines: ``canonical_key \t seq_no \t count``. Stable sort guarantees
     ascending seq_no within a group, so the first row is the representative
@@ -1914,7 +1914,7 @@ def _accumulate_agg(dst_class_counts, dst_counts_total, dst_counts_modified,
 
 def _write_collapsed_allele_parquet_from_tsv(sorted_tsv: str, path: str,
                                               batch_size: int = 10_000) -> int:
-    """Stream a sort-key-prefixed TSV file into the collapsed allele parquet.
+    r"""Stream a sort-key-prefixed TSV file into the collapsed allele parquet.
 
     Input lines (already sorted by fields 1-4):
     ``{neg_reads}\t{aligned}\t{ref}\t{row_idx}\t{row data...}``. Parses each line
@@ -1976,7 +1976,7 @@ def _partitioned_gather_write_unsorted(
     gather_keys_file: str,
     homology_state: Optional["_AlnStatsHomologyState"] = None,
 ) -> tuple:
-    """Step A of the partitioned gather (``LARGE_ALLELE_ORDER_PERF.md``).
+    r"""Step A of the partitioned gather (``LARGE_ALLELE_ORDER_PERF.md``).
 
     One streaming pass over the aligned shards: for each representative
     (``seq_no`` match) run ``_collapse_fanout`` and (a) write the FULL row to
@@ -2053,7 +2053,7 @@ def _partitioned_gather_emit(
     bucket_dir: str,
     parquet_path: str,
 ) -> None:
-    """Steps C–E of the partitioned gather.
+    """Steps C-E of the partitioned gather.
 
     *C* — read ``gather_keys_sorted`` (output order) and build
     ``out_pos[row_idx] = output index``.
@@ -2078,7 +2078,7 @@ def _partitioned_gather_emit(
             pos += 1
 
     # Bucket size: one bucket materialised as Python dicts in Step E should
-    # stay within the memory budget (dict overhead ≈ 3× the arrow row).
+    # stay within the memory budget (dict overhead ≈ 3x the arrow row).
     chunk_size = max(1, int(self.memory_budget_bytes // max(1, est_row_size * 3)))
     n_buckets = (n_allele_rows + chunk_size - 1) // chunk_size
 
@@ -2361,7 +2361,7 @@ def _collapse_streaming_single_read(
                 _run_external_sort(gather_keys_file, gather_keys_sorted, workdir,
                                    ["-k1,1", "-k2,2", "-k3,3", "-k4,4"],
                                    sort_buffer=self.sort_buffer)
-                # Steps C–E — bucket assignment + gather + emit.
+                # Steps C-E — bucket assignment + gather + emit.
                 _partitioned_gather_emit(
                     self,
                     n_allele_rows=n_allele_rows,
@@ -2550,7 +2550,7 @@ class CountVectors:
     ref_lengths: dict
 
     def save_modification_count_vectors(self, ref_name, ref_seq, path):
-        """Write ``Modification_count_vectors.txt`` for one reference.
+        r"""Write ``Modification_count_vectors.txt`` for one reference.
 
         Byte-identical replica of ``CRISPRessoCORE.save_count_vectors_to_file``
         (~line 4613) as called for the all-modifications file (~line 4689):
@@ -3197,7 +3197,7 @@ def _aggregate_alleles(
     (``pyarrow.iter_batches``), reconstructs each row as a payload-shaped dict,
     and runs :func:`_aggregate_one_row` for every normal (non-AMBIGUOUS,
     non-DISCARDED) row. Peak memory is bounded by one batch + the accumulator
-    vectors (O(amplicon_length × num_refs × num_base_types) — the design's
+    vectors (O(amplicon_length x num_refs x num_base_types) — the design's
     stated bounded lower-order term), not by the allele count.
 
     Parameters
@@ -3454,7 +3454,7 @@ def aggregate_alleles_from_collapsed(
 # byte-identical to a whole-frame ``to_csv``, while peak memory is bounded by
 # one batch (not the whole allele table).
 #
-# Handles all four pandas branches: detailed/non-detailed × dsODN/no-dsODN,
+# Handles all four pandas branches: detailed/non-detailed x dsODN/no-dsODN,
 # replicating the ``crispresso2Cols`` projection, the ``%Reads`` derivation,
 # the int cast, and the ``contains dsODN`` / ``contains dsODN fragment``
 # boolean columns (``Aligned_Sequence.str.find(dsODN) > 0``).
@@ -3862,7 +3862,7 @@ def _collapsed_get_slice(
       (via ``pyarrow.dataset`` filters) is a follow-up; for typical per-ref
       slices the Python filter is cheap because the projection already
       trimmed the row width. The batched scan keeps peak memory bounded by
-      ``batch_size`` rows × projected width regardless.
+      ``batch_size`` rows x projected width regardless.
     * The in-memory fallback path does *not* reconstruct cell types —
       ``allele_rows`` already carry the native payload types (numpy arrays /
       tuple-lists) from :func:`_get_allele_row`.

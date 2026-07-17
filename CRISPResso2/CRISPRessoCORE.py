@@ -3841,7 +3841,6 @@ def main():
                 count_reads_from_fastq as _count_reads_from_fastq,
                 variant_parquet_generator_process as _variant_parquet_generator_process,
             )
-            from CRISPResso2 import CRISPRessoMultiProcessing as _CMP
             # aln_matrix + pe_scaffold_dna_info are computed inside process_fastq
             # for the pandas path; replicate that here since we bypass it.
             _aln_matrix_loc = os.path.join(_ROOT, args.needleman_wunsch_aln_matrix_loc)
@@ -3865,7 +3864,7 @@ def main():
             # Stage 2: split unique reads into N worker chunks and align.
             _n_proc = 1
             if args.n_processes == 'max':
-                _n_proc = _CMP.get_max_processes()
+                _n_proc = CRISPRessoMultiProcessing.get_max_processes()
             elif args.n_processes.isdigit():
                 _n_proc = int(args.n_processes)
             _shard_paths = run_parquet_workers(
@@ -4122,7 +4121,7 @@ def main():
             # block (~line 4350) is gated out by the BadParameterException above;
             # class_counts_order (~line 4410) runs on our class_counts; the
             # df_alleles construction (~line 4429) is guarded out below.
-            from CRISPResso2.storage import VariantStore as _VS
+            from CRISPResso2.storage import VariantStore as _VS  # noqa: N814
             _pq_store = _VS(OUTPUT_DIRECTORY)
             # Compute the df_alleles-skip flag up front so it can also gate
             # ``keep_allele_rows`` in collapse: when both plots AND the report

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Spike: does polars streaming ``sort`` on a multi-kb string key spill to disk?
+r"""Spike: does polars streaming ``sort`` on a multi-kb string key spill to disk?
 
 Answers the one open implementation question in
 ``design_docs/STREAMING_SINGLE_READ_COLLAPSE.md``: for the streaming

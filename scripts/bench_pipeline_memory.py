@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""End-to-end peak-RSS benchmark for the CRISPResso2 storage backends.
+r"""End-to-end peak-RSS benchmark for the CRISPResso2 storage backends.
 
 Measures Success Criterion #1 from the flat-memory design: *peak RSS does not
 increase as read count scales*. Generates synthetic high-diversity FASTQs on a
