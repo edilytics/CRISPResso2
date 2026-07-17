@@ -572,6 +572,28 @@ _COORD_STRUCT = pa.struct([
     pa.field("end", pa.int64()),
 ])
 
+# Narrow physical dtype for the per-position / per-event int list columns
+# (ref_positions, all_*_positions, *_sizes). These values are
+# amplicon-relative indices/sizes, so they are bounded by the amplicon length.
+# int16 (range -32768..32767) covers amplicons up to ~32 kb — the realistic
+# envelope for CRISPResso2 amplicon analysis (PCR amplicons are typically
+# 100 bp–3 kb; long-read amplicons rarely exceed 10–20 kb). This is a 4x
+# reduction vs the previous int64 physical encoding (see
+# ``design_docs/PAYLOAD_COMPRESSION.md`` + ``scripts/bench_payload_shape_results.md``).
+# pyarrow raises ``ArrowInvalid`` on out-of-range values (no silent overflow),
+# so a workload with a > 32 kb amplicon fails loudly at write time rather than
+# corrupting data — the parquet backend is amplicon-bounded by design.
+# Read-back is unaffected: pyarrow deserializes list<int16> cells to plain
+# Python ``list[int]`` (values are regular ints), so every downstream consumer
+# (``.index()`` on ref_positions in plot/VCF code, numpy fancy-indexing in the
+# count-vector aggregation, ``get_slice`` list reconstruction) works identically.
+_NARROW_INT = pa.int16()
+_NARROW_INT_NP = np.int16
+# Guardrail: max supported amplicon-bounded position/size value for the
+# parquet backend. Raises a clear error before pyarrow's generic ArrowInvalid.
+_NARROW_INT_MAX = 32767
+_NARROW_INT_MIN = -32768
+
 # Per-reference payload struct — mirrors the fields of
 # CRISPRessoCOREResources.find_indels_substitutions output + the fields added
 # by get_new_variant_object. Every field that get_allele_row consumes is here.
@@ -591,18 +613,18 @@ _PAYLOAD_STRUCT = pa.struct([
     pa.field("insertion_n", pa.int64()),
     pa.field("deletion_n", pa.int64()),
     pa.field("substitution_n", pa.int64()),
-    pa.field("ref_positions", pa.list_(pa.int64())),
-    pa.field("all_insertion_positions", pa.list_(pa.int64())),
-    pa.field("all_insertion_left_positions", pa.list_(pa.int64())),
-    pa.field("insertion_positions", pa.list_(pa.int64())),
+    pa.field("ref_positions", pa.list_(_NARROW_INT)),
+    pa.field("all_insertion_positions", pa.list_(_NARROW_INT)),
+    pa.field("all_insertion_left_positions", pa.list_(_NARROW_INT)),
+    pa.field("insertion_positions", pa.list_(_NARROW_INT)),
     pa.field("insertion_coordinates", pa.list_(_COORD_STRUCT)),
-    pa.field("insertion_sizes", pa.list_(pa.int64())),
-    pa.field("all_deletion_positions", pa.list_(pa.int64())),
-    pa.field("deletion_positions", pa.list_(pa.int64())),
+    pa.field("insertion_sizes", pa.list_(_NARROW_INT)),
+    pa.field("all_deletion_positions", pa.list_(_NARROW_INT)),
+    pa.field("deletion_positions", pa.list_(_NARROW_INT)),
     pa.field("deletion_coordinates", pa.list_(_COORD_STRUCT)),
-    pa.field("deletion_sizes", pa.list_(pa.int64())),
-    pa.field("all_substitution_positions", pa.list_(pa.int64())),
-    pa.field("substitution_positions", pa.list_(pa.int64())),
+    pa.field("deletion_sizes", pa.list_(_NARROW_INT)),
+    pa.field("all_substitution_positions", pa.list_(_NARROW_INT)),
+    pa.field("substitution_positions", pa.list_(_NARROW_INT)),
     pa.field("substitution_values", pa.list_(pa.string())),
     # all_substitution_values: per-position substituted base across the WHOLE
     # amplicon (length = ref_len; '-' where not substituted). NOT consumed by
@@ -643,23 +665,48 @@ ALIGNED_SCHEMA = pa.schema([
 
 
 def _to_int_list(val):
-    """Convert a numpy array, Python list, or scalar to an int64 numpy array.
+    """Convert a numpy array, Python list, or scalar to a narrow int16 numpy array.
 
     Returns a ``numpy.ndarray`` (NOT a Python list) so pyarrow's
-    ``Table.from_pylist`` builds the list<int64> column directly from the
+    ``Table.from_pylist`` builds the list<int16> column directly from the
     contiguous buffer instead of materializing a Python list of boxed ints
     first (a ~3x transient reduction per position-array column — see
-    ``design_docs/PARQUET_MEMORY_PROFILE.md`` item 3). Callers that consume
-    the value only via pyarrow are unaffected; the parquet round-trip reader
-    (``_struct_to_payload``) does ``list(...)`` on the way back out, so
-    read-back values remain Python lists.
+    ``design_docs/PARQUET_MEMORY_PROFILE.md`` item 3). The int16 physical
+    dtype (vs the previous int64) is a further 4x on-disk + in-flight arrow
+    reduction for the amplicon-bounded position/size columns — see
+    ``design_docs/PAYLOAD_COMPRESSION.md``. Read-back is unaffected: pyarrow
+    deserializes list<int16> cells to plain Python ``list[int]``, and the
+    round-trip reader (``_struct_to_payload``) does ``list(...)`` on the way
+    back out.
+
+    Raises ``ValueError`` if any value exceeds the int16 range — the parquet
+    backend is amplicon-bounded by design (amplicons up to ~32 kb). pyarrow
+    would also raise ``ArrowInvalid`` on overflow, but this guardrail produces
+    a clearer error message naming the offending value.
     """
     if val is None:
         return None
     import numpy as _np
     if hasattr(val, "tolist"):  # numpy array
-        return _np.asarray(val, dtype=_np.int64)
-    return _np.asarray([int(x) for x in val], dtype=_np.int64)
+        # Validate range on a widened view BEFORE casting — numpy's own
+        # int16 cast raises a generic OverflowError that doesn't name the
+        # value or explain the amplicon-bounded constraint.
+        widened = _np.asarray(val, dtype=_np.int64)
+    else:
+        widened = _np.asarray([int(x) for x in val], dtype=_np.int64)
+    if widened.size:
+        amax = int(widened.max())
+        amin = int(widened.min())
+        if amax > _NARROW_INT_MAX or amin < _NARROW_INT_MIN:
+            raise ValueError(
+                "Value out of int16 range (%d..%d) for parquet payload "
+                "column: min=%d max=%d. The parquet storage backend uses "
+                "int16 for amplicon-bounded position/size arrays (amplicons "
+                "up to ~32 kb). For larger amplicons use the default pandas "
+                "storage backend."
+                % (_NARROW_INT_MIN, _NARROW_INT_MAX, amin, amax)
+            )
+    return widened.astype(_NARROW_INT_NP)
 
 
 def _to_str_list(val):
@@ -1089,18 +1136,18 @@ COLLAPSED_SCHEMA = pa.schema([
     pa.field("Read_Status", pa.string()),
     pa.field("Aligned_Reference_Names", pa.string()),
     pa.field("Aligned_Reference_Scores", pa.string()),
-    pa.field("ref_positions", pa.list_(pa.int64())),
-    pa.field("all_insertion_positions", pa.list_(pa.int64())),
-    pa.field("all_insertion_left_positions", pa.list_(pa.int64())),
-    pa.field("insertion_positions", pa.list_(pa.int64())),
+    pa.field("ref_positions", pa.list_(_NARROW_INT)),
+    pa.field("all_insertion_positions", pa.list_(_NARROW_INT)),
+    pa.field("all_insertion_left_positions", pa.list_(_NARROW_INT)),
+    pa.field("insertion_positions", pa.list_(_NARROW_INT)),
     pa.field("insertion_coordinates", pa.list_(_COORD_STRUCT)),
-    pa.field("insertion_sizes", pa.list_(pa.int64())),
-    pa.field("all_deletion_positions", pa.list_(pa.int64())),
-    pa.field("deletion_positions", pa.list_(pa.int64())),
+    pa.field("insertion_sizes", pa.list_(_NARROW_INT)),
+    pa.field("all_deletion_positions", pa.list_(_NARROW_INT)),
+    pa.field("deletion_positions", pa.list_(_NARROW_INT)),
     pa.field("deletion_coordinates", pa.list_(_COORD_STRUCT)),
-    pa.field("deletion_sizes", pa.list_(pa.int64())),
-    pa.field("all_substitution_positions", pa.list_(pa.int64())),
-    pa.field("substitution_positions", pa.list_(pa.int64())),
+    pa.field("deletion_sizes", pa.list_(_NARROW_INT)),
+    pa.field("all_substitution_positions", pa.list_(_NARROW_INT)),
+    pa.field("substitution_positions", pa.list_(_NARROW_INT)),
     pa.field("substitution_values", pa.list_(pa.string())),
     # all_substitution_values (see _PAYLOAD_STRUCT): per-position substituted
     # base across the whole amplicon; needed by the streaming per-base

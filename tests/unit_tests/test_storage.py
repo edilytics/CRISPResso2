@@ -528,6 +528,68 @@ def test_s2_round_trip_numpy_int_arrays(temp_dir):
     assert sub_back["all_substitution_positions"] == [1]
 
 
+def test_narrow_int16_schema_and_round_trip(temp_dir):
+    """Position/size arrays are physically int16 on disk (4x vs int64).
+
+    See ``design_docs/PAYLOAD_COMPRESSION.md``. Values round-trip identically
+    (pyarrow deserializes list<int16> to plain Python list[int]), so every
+    downstream consumer (numpy fancy-indexing, ``.index()`` on ref_positions,
+    get_slice list reconstruction) is unaffected.
+    """
+    from CRISPResso2.storage import _PAYLOAD_STRUCT, COLLAPSED_SCHEMA
+    # schema: position/size columns are int16, not int64
+    for schema in (_PAYLOAD_STRUCT, COLLAPSED_SCHEMA):
+        assert schema.field("ref_positions").type == pa.list_(pa.int16())
+        assert schema.field("all_deletion_positions").type == pa.list_(pa.int16())
+        assert schema.field("insertion_sizes").type == pa.list_(pa.int16())
+        assert schema.field("deletion_sizes").type == pa.list_(pa.int16())
+        assert schema.field("all_substitution_positions").type == pa.list_(pa.int16())
+
+    # round-trip with values exercising the int16 range (incl. negative
+    # insertion sentinels and repeats from deletion columns)
+    payload = _make_realistic_payload()
+    sub = payload["variant_ref1"]
+    sub["ref_positions"] = [0, 1, 2, -3, -3, 4, 5, 32000, -32000]
+    sub["all_deletion_positions"] = [8, 9, 100, 101, 102]
+    sub["deletion_sizes"] = [2, 3]
+    row = payload_to_row("ATCG", 1, payload)
+    shard = os.path.join(temp_dir, "narrow.parquet")
+    with AlignedShardWriter(shard) as w:
+        w.write_row(row)
+    _, _, back = next(iter(iter_aligned_shard(shard)))
+    sub_back = back["variant_ref1"]
+    assert sub_back["ref_positions"] == [0, 1, 2, -3, -3, 4, 5, 32000, -32000]
+    assert sub_back["all_deletion_positions"] == [8, 9, 100, 101, 102]
+    assert sub_back["deletion_sizes"] == [2, 3]
+    # values come back as plain Python ints (not numpy) — .index() works
+    assert isinstance(sub_back["ref_positions"], list)
+    assert isinstance(sub_back["ref_positions"][0], int)
+    assert sub_back["ref_positions"].index(4) == 5
+    assert sub_back["ref_positions"].index(-3) == 3
+
+
+def test_narrow_int16_guardrail_rejects_overflow(temp_dir):
+    """Values exceeding int16 range raise ValueError (parquet backend is
+    amplicon-bounded by design — amplicons up to ~32 kb).
+
+    pyarrow would also raise ArrowInvalid on overflow, but the guardrail in
+    ``_to_int_list`` produces a clearer error naming the offending value.
+    """
+    from CRISPResso2.storage import _to_int_list
+    # in-range: ok
+    _to_int_list([0, 1, 32767, -32768])
+    _to_int_list(np.array([0, 1, 2], dtype=np.int64))
+    # over max -> ValueError
+    with pytest.raises(ValueError, match="out of int16 range"):
+        _to_int_list([0, 32768])
+    # under min -> ValueError
+    with pytest.raises(ValueError, match="out of int16 range"):
+        _to_int_list([-32769, 0])
+    # None passes through (empty/unset column)
+    assert _to_int_list(None) is None
+    assert _to_int_list([]).tolist() == []
+
+
 def test_empty_shard_tolerated(temp_dir):
     """A worker whose slice has 0 aligned reads writes a valid empty parquet (edge #6)."""
     shard = os.path.join(temp_dir, "empty.parquet")
@@ -1214,8 +1276,14 @@ def test_output_sorted_by_reads_desc_then_aligned_then_ref(temp_dir):
     assert seqs == ["AACA", "ACAA", "AAAC"]
 
 
-def test_dtype_count_int64_positions_int64(temp_dir):
-    """Collapsed parquet stores #Reads and position arrays as int64 (edge #17)."""
+def test_dtype_count_int64_positions_narrow(temp_dir):
+    """Collapsed parquet stores #Reads as int64 and position/size arrays as int16.
+
+    The position/size arrays are amplicon-bounded (values < 32 kb) and were
+    narrowed from int64 to int16 for a 4x memory/disk reduction (see
+    ``design_docs/PAYLOAD_COMPRESSION.md``). #Reads stays int64 (unbounded
+    read counts). Coordinates stay int64 (small count, not worth narrowing).
+    """
     p = _shard_payload()
     rows = [("ATCGATCG", 5, p)]
     shard = os.path.join(temp_dir, "aligned_0.parquet")
@@ -1225,9 +1293,9 @@ def test_dtype_count_int64_positions_int64(temp_dir):
     pf = pq.ParquetFile(res.parquet_path)
     schema = pf.schema_arrow
     assert schema.field("#Reads").type == pa.int64()
-    assert schema.field("ref_positions").type == pa.list_(pa.int64())
-    assert schema.field("all_deletion_positions").type == pa.list_(pa.int64())
-    # coordinates are list of struct{start,end:int64} (edge #18)
+    assert schema.field("ref_positions").type == pa.list_(pa.int16())
+    assert schema.field("all_deletion_positions").type == pa.list_(pa.int16())
+    # coordinates are list of struct{start,end:int64} (edge #18; not narrowed)
     coord_t = schema.field("deletion_coordinates").type
     assert pa.types.is_list(coord_t)
     struct_t = coord_t.value_type
