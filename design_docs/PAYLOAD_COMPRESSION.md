@@ -1,6 +1,6 @@
 # Payload Array Compression — Investigation & Plan
 
-**Status:** Step 3 (int16 narrowing) IMPLEMENTED + parity-tested. Steps 4–5 pending.
+**Status:** Steps 3 (int16 narrowing) + 4 (all_deletion_coordinates compact storage) IMPLEMENTED + parity-tested. Step 5 deferred.
 **Scope:** The per-reference alignment payload stored in parquet shards
 (`aligned_{i}.parquet` → `COLLAPSED_SCHEMA`) and streamed between Stage 2
 (workers) → Stage 3 (collapse) → Stage 4 (count-vector stream-out). This is
@@ -177,13 +177,30 @@ canned + real alignments.
    `test_narrow_int16_guardrail_rejects_overflow`, updated
    `test_dtype_count_int64_positions_narrow`; full 891-test unit suite green.
 
-4. **Step 4 — Range-pair encoding for `all_deletion_positions` (C).** Add an
-   `all_deletion_ranges` (list<struct(start,end)>) column, drop the expanded
-   int list, and expand at the single consumption site (`CRISPRessoCORE.py:4283`).
-   The bench shows the expansion ratio is **55× on FANC / 58× on HEK3** (221-
-   element array from 2 ranges) — large for the common short-amplicon heavy-
-   editing CRISPR knockout regime, near-zero for long-read small-deletion
-   workloads. Parity test.
+4. **Step 4 — Range-pair encoding for `all_deletion_positions` (DONE, aligned-shard scoped).**
+   The aligned shard (`_PAYLOAD_STRUCT`) now stores `all_deletion_coordinates`
+   (compact, 2 int16s/deletion) instead of the range-expanded
+   `all_deletion_positions` (N int16s/deletion). On FANC.Cas9 this is a **110×
+   reduction** in the deletion column's in-flight arrow footprint (51,051
+   expanded int16s → 462 coord tuples). `_struct_to_payload` reconstructs the
+   expanded form via `_expand_deletion_coords` at read-back so the payload dict
+   matches the pandas-path shape — zero downstream changes.
+
+   **Scope decision:** only the aligned shard (per-read, highest cardinality +
+   the in-flight arrow RSS driver) was compacted. The collapsed parquet
+   (per-allele, low cardinality) keeps `all_deletion_positions` because
+   compacting it would require an expand/compress dance across the
+   parity-tested allele-row boundary (`_assert_rows_equal` enforces exact
+   key-set equality with the pandas `get_allele_row` replica) — not worth the
+   complexity for the small per-allele RSS term. The aligned shard captures
+   essentially all the win.
+
+   The producer's `all_deletion_coordinates` is used directly when present
+   (always, for real payloads); a `_compress_deletion_positions` RLE fallback
+   derives it from `all_deletion_positions` for canned test fixtures. Tests:
+   `test_all_deletion_coordinates_compact_storage_round_trip` (expand/compress
+   inverse, multi-deletion, trailing-deletion semantics, derive-fallback);
+   full 892-test unit suite green.
 
 5. **Step 5 — Drop / reconstruct `ref_positions` (A) — DEFERRED.**
    `ref_positions` is used via `.index()` in ~15 places (plot code, VCF

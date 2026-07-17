@@ -619,7 +619,7 @@ _PAYLOAD_STRUCT = pa.struct([
     pa.field("insertion_positions", pa.list_(_NARROW_INT)),
     pa.field("insertion_coordinates", pa.list_(_COORD_STRUCT)),
     pa.field("insertion_sizes", pa.list_(_NARROW_INT)),
-    pa.field("all_deletion_positions", pa.list_(_NARROW_INT)),
+    pa.field("all_deletion_coordinates", pa.list_(_COORD_STRUCT)),
     pa.field("deletion_positions", pa.list_(_NARROW_INT)),
     pa.field("deletion_coordinates", pa.list_(_COORD_STRUCT)),
     pa.field("deletion_sizes", pa.list_(_NARROW_INT)),
@@ -654,8 +654,13 @@ ALIGNED_SCHEMA = pa.schema([
 #   - ref_aln_details          (only for the HDR/prime-editing re-alignment
 #     block and fastq_output annotation; edge #12 follow-up. The parquet
 #     backend raises NotImplementedError on those paths until wired.)
-#   - all_deletion_coordinates (only for deletions_outside_window, already
-#     computed as a scalar in the payload)
+# all_deletion_coordinates IS stored in _PAYLOAD_STRUCT (compact range form,
+# 2 int16s/deletion vs the N-expanded all_deletion_positions — 55x smaller on
+# FANC.Cas9; see design_docs/PAYLOAD_COMPRESSION.md). all_deletion_positions
+# is reconstructed from it at read-back via _expand_deletion_coords so the
+# payload dict matches the pandas-path shape. The COLLAPSED_SCHEMA still
+# stores all_deletion_positions (per-allele, low cardinality — not worth the
+# parity-breaking allele-row refactor).
 # all_substitution_values IS stored (in _PAYLOAD_STRUCT + COLLAPSED_SCHEMA)
 # as of PR 7 — it is needed by the per-base substitution count vectors
 # (all_substitution_base_vectors) built in the CRISPRessoCORE.main aggregation
@@ -738,6 +743,73 @@ def _structs_to_coords(structs):
     return [(c["start"], c["end"]) for c in structs]
 
 
+def _expand_deletion_coords(coords):
+    """Expand all_deletion_coordinates → all_deletion_positions (parity).
+
+    ``all_deletion_positions`` is the range-expanded form of
+    ``all_deletion_coordinates``: ``positions == [p for (s,e) in coords for p
+    in range(s, e)]`` (uniform half-open ``[s, e)`` semantics — the Cython
+    producer stores ``end+1`` for trailing deletions so ``range(s,e)`` is
+    always correct; verified against ``test_CRISPRessoCOREResources``).
+
+    The aligned shard (``_PAYLOAD_STRUCT``) stores the compact coord form
+    (2 int16s/deletion vs N expanded — 55x smaller on FANC.Cas9); this helper
+    reconstructs the expanded form at read-back so the payload dict matches
+    the pandas-path shape (``find_indels_substitutions`` emits both). Per-row,
+    cheap (list extend).
+    """
+    if not coords:
+        return []
+    out = []
+    for s, e in coords:
+        out.extend(range(s, e))
+    return out
+
+
+def _deletion_coords_to_structs(payload):
+    """Get all_deletion_coordinates as arrow struct dicts for storage.
+
+    Prefers the producer's ``all_deletion_coordinates`` (always emitted by
+    ``find_indels_substitutions``); falls back to compressing
+    ``all_deletion_positions`` (RLE consecutive ints → (start,end) ranges) so
+    test fixtures / payloads that only set the expanded form round-trip
+    correctly. The compression is the exact inverse of
+    :func:`_expand_deletion_coords` (positions are sorted, non-overlapping
+    runs — guaranteed by the producer's left-to-right deletion discovery).
+    """
+    coords = None
+    if not isinstance(payload, dict):
+        payload = vars(payload)
+    coords = payload.get("all_deletion_coordinates")
+    if not coords:
+        positions = payload.get("all_deletion_positions")
+        if positions:
+            coords = _compress_deletion_positions(positions)
+    return _coords_to_structs(coords)
+
+
+def _compress_deletion_positions(positions):
+    """RLE-compress a sorted run of deletion positions → (start, end) coords.
+
+    Inverse of :func:`_expand_deletion_coords`: consecutive integers form one
+    half-open range. ``[8, 9, 100, 101, 102]`` → ``[(8, 10), (100, 103)]``.
+    Used to derive ``all_deletion_coordinates`` from ``all_deletion_positions``
+    when the producer's coord field isn't present (e.g. canned test payloads).
+    """
+    if not positions:
+        return []
+    coords = []
+    start = prev = int(positions[0])
+    for p in positions[1:]:
+        p = int(p)
+        if p != prev + 1:
+            coords.append((start, prev + 1))
+            start = p
+        prev = p
+    coords.append((start, prev + 1))
+    return coords
+
+
 def _payload_to_struct(payload):
     """Convert a per-reference payload dict to an arrow struct dict.
 
@@ -771,7 +843,7 @@ def _payload_to_struct(payload):
         "insertion_positions": _to_int_list(payload.get("insertion_positions")),
         "insertion_coordinates": _coords_to_structs(payload.get("insertion_coordinates")),
         "insertion_sizes": _to_int_list(payload.get("insertion_sizes")),
-        "all_deletion_positions": _to_int_list(payload.get("all_deletion_positions")),
+        "all_deletion_coordinates": _deletion_coords_to_structs(payload),
         "deletion_positions": _to_int_list(payload.get("deletion_positions")),
         "deletion_coordinates": _coords_to_structs(payload.get("deletion_coordinates")),
         "deletion_sizes": _to_int_list(payload.get("deletion_sizes")),
@@ -810,7 +882,7 @@ def _struct_to_payload(struct_row):
         "insertion_positions": list(struct_row["insertion_positions"]) if struct_row["insertion_positions"] else [],
         "insertion_coordinates": _structs_to_coords(struct_row["insertion_coordinates"]),
         "insertion_sizes": list(struct_row["insertion_sizes"]) if struct_row["insertion_sizes"] else [],
-        "all_deletion_positions": list(struct_row["all_deletion_positions"]) if struct_row["all_deletion_positions"] else [],
+        "all_deletion_positions": _expand_deletion_coords(_structs_to_coords(struct_row.get("all_deletion_coordinates"))),
         "deletion_positions": list(struct_row["deletion_positions"]) if struct_row["deletion_positions"] else [],
         "deletion_coordinates": _structs_to_coords(struct_row["deletion_coordinates"]),
         "deletion_sizes": list(struct_row["deletion_sizes"]) if struct_row["deletion_sizes"] else [],

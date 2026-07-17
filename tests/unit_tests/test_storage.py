@@ -540,10 +540,14 @@ def test_narrow_int16_schema_and_round_trip(temp_dir):
     # schema: position/size columns are int16, not int64
     for schema in (_PAYLOAD_STRUCT, COLLAPSED_SCHEMA):
         assert schema.field("ref_positions").type == pa.list_(pa.int16())
-        assert schema.field("all_deletion_positions").type == pa.list_(pa.int16())
         assert schema.field("insertion_sizes").type == pa.list_(pa.int16())
         assert schema.field("deletion_sizes").type == pa.list_(pa.int16())
         assert schema.field("all_substitution_positions").type == pa.list_(pa.int16())
+    # COLLAPSED_SCHEMA stores all_deletion_positions expanded (per-allele);
+    # _PAYLOAD_STRUCT stores the compact all_deletion_coordinates instead.
+    assert COLLAPSED_SCHEMA.field("all_deletion_positions").type == pa.list_(pa.int16())
+    adc = _PAYLOAD_STRUCT.field("all_deletion_coordinates").type
+    assert pa.types.is_list(adc) and pa.types.is_struct(adc.value_type)
 
     # round-trip with values exercising the int16 range (incl. negative
     # insertion sentinels and repeats from deletion columns)
@@ -559,6 +563,8 @@ def test_narrow_int16_schema_and_round_trip(temp_dir):
     _, _, back = next(iter(iter_aligned_shard(shard)))
     sub_back = back["variant_ref1"]
     assert sub_back["ref_positions"] == [0, 1, 2, -3, -3, 4, 5, 32000, -32000]
+    # all_deletion_positions is reconstructed (expanded) from the compact
+    # all_deletion_coordinates stored on disk — value-equal to the input.
     assert sub_back["all_deletion_positions"] == [8, 9, 100, 101, 102]
     assert sub_back["deletion_sizes"] == [2, 3]
     # values come back as plain Python ints (not numpy) — .index() works
@@ -566,6 +572,69 @@ def test_narrow_int16_schema_and_round_trip(temp_dir):
     assert isinstance(sub_back["ref_positions"][0], int)
     assert sub_back["ref_positions"].index(4) == 5
     assert sub_back["ref_positions"].index(-3) == 3
+
+
+def test_all_deletion_coordinates_compact_storage_round_trip(temp_dir):
+    """Aligned shard stores all_deletion_coordinates (compact) instead of the
+    range-expanded all_deletion_positions (55x bloat on FANC.Cas9).
+
+    The expanded form is reconstructed at read-back via _expand_deletion_coords
+    so the payload dict matches the pandas path. Covers: (a) payloads with the
+    producer's all_deletion_coordinates, (b) payloads with only
+    all_deletion_positions (derived via RLE), (c) multiple deletions, (d)
+    trailing-deletion semantics (end+1 stored so range(s,e) is correct).
+    """
+    from CRISPResso2.storage import (
+        _expand_deletion_coords, _compress_deletion_positions,
+        _deletion_coords_to_structs, _structs_to_coords,
+    )
+
+    # expand/compress are exact inverses
+    assert _expand_deletion_coords([(8, 10)]) == [8, 9]
+    assert _expand_deletion_coords([(8, 10), (100, 103)]) == [8, 9, 100, 101, 102]
+    assert _expand_deletion_coords([]) == []
+    assert _compress_deletion_positions([8, 9, 100, 101, 102]) == [(8, 10), (100, 103)]
+    assert _compress_deletion_positions([7]) == [(7, 8)]
+    assert _compress_deletion_positions([]) == []
+    # trailing deletion: producer stores end+1 so range(s,e) covers the last base
+    assert _expand_deletion_coords([(191, 223)]) == list(range(191, 223))
+
+    # (a) payload WITH all_deletion_coordinates — stored directly
+    payload = _make_realistic_payload()
+    sub = payload["variant_ref1"]
+    sub["all_deletion_coordinates"] = [(8, 10), (100, 103)]
+    sub["all_deletion_positions"] = [8, 9, 100, 101, 102]
+    row = payload_to_row("ATCG", 1, payload)
+    shard = os.path.join(temp_dir, "coords.parquet")
+    with AlignedShardWriter(shard) as w:
+        w.write_row(row)
+    _, _, back = next(iter(iter_aligned_shard(shard)))
+    assert back["variant_ref1"]["all_deletion_positions"] == [8, 9, 100, 101, 102]
+
+    # (b) payload with ONLY all_deletion_positions (no all_deletion_coordinates)
+    # — coords derived via RLE; round-trip value-equal
+    payload = _make_realistic_payload()
+    sub = payload["variant_ref1"]
+    sub.pop("all_deletion_coordinates", None)
+    sub["all_deletion_positions"] = [5, 6, 7, 200]
+    row = payload_to_row("ATCG", 1, payload)
+    shard = os.path.join(temp_dir, "derived.parquet")
+    with AlignedShardWriter(shard) as w:
+        w.write_row(row)
+    _, _, back = next(iter(iter_aligned_shard(shard)))
+    assert back["variant_ref1"]["all_deletion_positions"] == [5, 6, 7, 200]
+
+    # (c) empty deletions round-trip to []
+    payload = _make_realistic_payload()
+    sub = payload["variant_ref1"]
+    sub["all_deletion_positions"] = []
+    sub["all_deletion_coordinates"] = []
+    row = payload_to_row("ATCG", 1, payload)
+    shard = os.path.join(temp_dir, "empty.parquet")
+    with AlignedShardWriter(shard) as w:
+        w.write_row(row)
+    _, _, back = next(iter(iter_aligned_shard(shard)))
+    assert back["variant_ref1"]["all_deletion_positions"] == []
 
 
 def test_narrow_int16_guardrail_rejects_overflow(temp_dir):
