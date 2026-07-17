@@ -643,21 +643,38 @@ ALIGNED_SCHEMA = pa.schema([
 
 
 def _to_int_list(val):
-    """Convert a numpy array, Python list, or scalar to a list of ints."""
+    """Convert a numpy array, Python list, or scalar to an int64 numpy array.
+
+    Returns a ``numpy.ndarray`` (NOT a Python list) so pyarrow's
+    ``Table.from_pylist`` builds the list<int64> column directly from the
+    contiguous buffer instead of materializing a Python list of boxed ints
+    first (a ~3x transient reduction per position-array column — see
+    ``design_docs/PARQUET_MEMORY_PROFILE.md`` item 3). Callers that consume
+    the value only via pyarrow are unaffected; the parquet round-trip reader
+    (``_struct_to_payload``) does ``list(...)`` on the way back out, so
+    read-back values remain Python lists.
+    """
     if val is None:
         return None
-    if hasattr(val, "tolist"):
-        val = val.tolist()
-    return [int(x) for x in val]
+    import numpy as _np
+    if hasattr(val, "tolist"):  # numpy array
+        return _np.asarray(val, dtype=_np.int64)
+    return _np.asarray([int(x) for x in val], dtype=_np.int64)
 
 
 def _to_str_list(val):
-    """Convert a numpy array or list to a list of Python strings."""
+    """Convert a numpy array or list to a numpy array of Python strings.
+
+    Returns a ``numpy.ndarray`` (object dtype) for the same reason as
+    :func:`_to_int_list` — pyarrow builds the list<string> column from the
+    array without a boxed-Python-str list intermediate.
+    """
     if val is None:
         return None
+    import numpy as _np
     if hasattr(val, "tolist"):
         val = val.tolist()
-    return [str(x) for x in val]
+    return _np.asarray([str(x) for x in val], dtype=object)
 
 
 def _coords_to_structs(tuples):
@@ -1287,6 +1304,7 @@ def _collapse(
     vcf_output: bool = False,
     write_parquet: bool = True,
     collapsed_path: Optional[str] = None,
+    keep_allele_rows: bool = True,
 ) -> CollapsedAlleles:
     """Stage 3: collapse aligned shards into the sorted allele table.
 
@@ -1341,6 +1359,7 @@ def _collapse(
             write_parquet=write_parquet,
             collapsed_path=collapsed_path,
             expand_ambiguous_alignments=expand_ambiguous_alignments,
+            keep_allele_rows=keep_allele_rows,
         )
 
     # 3a + 3b: stream shards into the in-memory collapse table.
@@ -1374,8 +1393,16 @@ def _collapse(
 
     # The returned allele_rows respect the get_allele_row branch (detailed vs
     # the non-detailed subset), for direct parity comparison and the PR 6 TSV
-    # sink. The persisted parquet is always full.
-    if write_detailed:
+    # sink. The persisted parquet is always full. When ``keep_allele_rows`` is
+    # False (the wired bench/streaming-TSV path — df_alleles skipped) the
+    # in-memory copy is pure dead weight: ``get_slice`` reads the parquet
+    # artifact directly, so return ``[]`` and drop ``full_rows`` before the
+    # aggregation stage allocates (design_docs/PARQUET_MEMORY_PROFILE.md
+    # item 2).
+    if not keep_allele_rows:
+        allele_rows = []
+        del full_rows
+    elif write_detailed:
         allele_rows = full_rows
     else:
         allele_rows = [
@@ -2132,6 +2159,7 @@ def _collapse_streaming_single_read(
     write_parquet: bool = True,
     collapsed_path: Optional[str] = None,
     expand_ambiguous_alignments: bool = False,
+    keep_allele_rows: bool = True,
 ) -> CollapsedAlleles:
     """Stage 3 for single-read input: streaming external-sort canonical-key merge.
 
@@ -2276,10 +2304,21 @@ def _collapse_streaming_single_read(
                 -int(r["#Reads"]), r["Aligned_Sequence"], r["Reference_Sequence"]))
             if parquet_path is not None:
                 _write_collapsed_allele_parquet(full_rows, parquet_path)
-            allele_rows = (
-                full_rows if write_detailed
-                else [{k: r[k] for k in _NON_DETAILED_ALLELE_KEYS if k in r} for r in full_rows]
-            )
+            # When ``keep_allele_rows`` is False (the wired bench/streaming-
+            # TSV path) ``allele_rows`` is never consumed — ``get_slice`` reads
+            # the persisted parquet directly. Drop ``full_rows`` now so the
+            # ~num_groups x amplicon-length transient is freed before Stage 4
+            # allocates (design_docs/PARQUET_MEMORY_PROFILE.md item 2).
+            if not keep_allele_rows:
+                allele_rows = []
+                del full_rows
+            elif write_detailed:
+                allele_rows = full_rows
+            else:
+                allele_rows = [
+                    {k: r[k] for k in _NON_DETAILED_ALLELE_KEYS if k in r}
+                    for r in full_rows
+                ]
         else:
             # Large input (bench): partitioned external gather — key-sort +
             # bucketed gather. The full row data never passes through a global
@@ -2361,15 +2400,49 @@ def _write_collapsed_allele_parquet(allele_rows: list, path: str) -> None:
     persisted artifact always carries the complete column set so PR 6's
     count-vector aggregation and PR 7's df_alleles view can project either the
     detailed or ``crispresso2Cols`` shape.
+
+    Writes in *batched* fashion (convert + ``write_table`` per batch, then
+    clear) rather than materializing the whole ``rows`` list + a single
+    ``pa.Table.from_pylist(rows)`` of the entire table at once. At 2000 bp
+    that full-table arrow materialization is the dominant transient
+    (~one full copy of every position array alive simultaneously);
+    batching bounds peak RSS by one batch regardless of allele count
+    (``design_docs/PARQUET_MEMORY_PROFILE.md`` item 1).
     """
     schema = COLLAPSED_SCHEMA
     writer = pq.ParquetWriter(path, schema)
     try:
         if not allele_rows:
             return
-        rows = [_allele_dict_to_parquet_row(d) for d in allele_rows]
-        table = pa.Table.from_pylist(rows, schema=schema)
-        writer.write_table(table)
+        # Batch sized on a byte budget so long-read amplicons (large
+        # per-row position arrays) still bound peak RSS. ~16 MB of row dicts
+        # per batch is a handful of thousand rows at 2 kb.
+        _BATCH_BYTES = 16_000_000
+        batch: list = []
+        batch_bytes = 0
+        for d in allele_rows:
+            row = _allele_dict_to_parquet_row(d)
+            batch.append(row)
+            # estimate this row's dict bytes from the position-array columns
+            # (numpy arrays expose ``.nbytes``; Python lists/scalars fall
+            # back to a coarse 8 B/element estimate, scalars → 8 B).
+            for v in row.values():
+                if v is None:
+                    continue
+                nb = getattr(v, "nbytes", None)
+                if nb is not None:
+                    batch_bytes += nb
+                elif isinstance(v, (list, tuple)):
+                    batch_bytes += len(v) * 8
+                else:
+                    batch_bytes += 8
+            if batch_bytes >= _BATCH_BYTES:
+                writer.write_table(pa.Table.from_pylist(batch, schema=schema))
+                batch.clear()
+                batch_bytes = 0
+        if batch:
+            writer.write_table(pa.Table.from_pylist(batch, schema=schema))
+            batch.clear()
     finally:
         writer.close()
 
@@ -2393,6 +2466,7 @@ def collapse_aligned_shards(
     write_parquet: bool = True,
     collapsed_path: Optional[str] = None,
     memory_budget_mb: int = DEFAULT_MEMORY_BUDGET_MB,
+    keep_allele_rows: bool = True,
 ) -> CollapsedAlleles:
     """Convenience wrapper: create a :class:`VariantStore` and collapse shards.
 
@@ -2408,6 +2482,7 @@ def collapse_aligned_shards(
         vcf_output=vcf_output,
         write_parquet=write_parquet,
         collapsed_path=collapsed_path,
+        keep_allele_rows=keep_allele_rows,
     )
 
 
@@ -2574,22 +2649,26 @@ def _compute_count_vectors(
     if batch_size is None:
         batch_size = _adaptive_batch_size(pf)
     for batch in pf.iter_batches(columns=columns, batch_size=batch_size):
-        reads = batch.column("#Reads").to_pylist()
-        refs = batch.column("Reference_Name").to_pylist()
-        ip = batch.column("all_insertion_positions").to_pylist()
-        ipl = batch.column("all_insertion_left_positions").to_pylist()
-        dp = batch.column("all_deletion_positions").to_pylist()
-        sp = batch.column("all_substitution_positions").to_pylist()
+        # Row-by-row cell access (not batch.column(...).to_pylist()) so the
+        # amplicon-length position-array columns don't materialize as whole-
+        # batch Python lists at once (~50x peak-RSS blowup for string/list
+        # columns per design_docs/PARQUET_MEMORY_PROFILE.md item 6).
+        reads_col = batch.column("#Reads")
+        refs_col = batch.column("Reference_Name")
+        ip_col = batch.column("all_insertion_positions")
+        ipl_col = batch.column("all_insertion_left_positions")
+        dp_col = batch.column("all_deletion_positions")
+        sp_col = batch.column("all_substitution_positions")
         for i in range(batch.num_rows):
-            ref_name = refs[i]
+            ref_name = refs_col[i].as_py()
             if ref_name not in ref_lengths:
                 continue  # AMBIGUOUS_*/DISCARDED_* rows don't contribute
-            count = int(reads[i])
+            count = int(reads_col[i].as_py())
             counts_total[ref_name] += count
-            _acc(ins[ref_name], ip[i], count)
-            _acc(ins_l[ref_name], ipl[i], count)
-            _acc(dele[ref_name], dp[i], count)
-            _acc(sub[ref_name], sp[i], count)
+            _acc(ins[ref_name], ip_col[i].as_py(), count)
+            _acc(ins_l[ref_name], ipl_col[i].as_py(), count)
+            _acc(dele[ref_name], dp_col[i].as_py(), count)
+            _acc(sub[ref_name], sp_col[i].as_py(), count)
 
     indelsub = {
         r: ins[r] + dele[r] + sub[r] for r in ref_lengths
@@ -3174,7 +3253,13 @@ def _aggregate_alleles(
     ]
     pf = pq.ParquetFile(path)
     if batch_size is None:
-        batch_size = _adaptive_batch_size(pf)
+        # Cap the adaptive batch so the 21 in-flight ChunkedArrays (several of
+        # them amplicon-length list columns) don't land the whole collapsed
+        # table in one batch at small scale. The row-by-row ``.as_py()`` access
+        # is batch-size-independent for correctness; a 1000-row cap bounds the
+        # arrow decompression buffer (design_docs/PARQUET_MEMORY_PROFILE.md
+        # item 5).
+        batch_size = min(_adaptive_batch_size(pf), 1000)
     for batch in pf.iter_batches(columns=columns, batch_size=batch_size):
         n = batch.num_rows
         if n == 0:

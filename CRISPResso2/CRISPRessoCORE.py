@@ -3881,6 +3881,12 @@ def main():
             # ``_read_counts.num_unique`` is stashed for the per-unique-read
             # guardrail (moved here from run_parquet_workers).
             _parquet_num_unique = _read_counts.num_unique
+            # ``_read_counts`` is no longer needed past this point — only
+            # ``num_unique`` (stashed above) is read later (the guardrail
+            # below). Drop the reference so the counted-reads dict is freed
+            # before Stage 3/4 allocate (design_docs/PARQUET_MEMORY_PROFILE.md
+            # item 4).
+            del _read_counts
             variantCache = {}
         elif args.bam_input:
             aln_stats, not_aln_variant_objects = process_bam(args.bam_input, args.bam_chr_loc, crispresso2_info['bam_output'], variantCache, ref_names, refs, args, files_to_remove, OUTPUT_DIRECTORY)
@@ -4120,6 +4126,18 @@ def main():
             # df_alleles construction (~line 4429) is guarded out below.
             from CRISPResso2.storage import VariantStore as _VS
             _pq_store = _VS(OUTPUT_DIRECTORY)
+            # Compute the df_alleles-skip flag up front so it can also gate
+            # ``keep_allele_rows`` in collapse: when both plots AND the report
+            # are suppressed (the memory-bench configuration), ``allele_rows``
+            # is never consumed — ``get_slice`` is skipped and the streaming
+            # TSV sink reads the collapsed parquet directly. Telling collapse
+            # not to build it avoids a dead ~num_groups x amplicon-length
+            # in-memory copy (design_docs/PARQUET_MEMORY_PROFILE.md item 2).
+            _parquet_skip_df_alleles = (
+                storage_backend == 'parquet'
+                and args.suppress_plots and args.suppress_report
+                and not args.vcf_output and args.dsODN == ""
+            )
             info('Collapsing aligned shards (parquet backend)...')
             _collapsed = _pq_store.collapse(
                 _shard_paths, is_paired=False,
@@ -4127,6 +4145,7 @@ def main():
                 discard_indel_reads=args.discard_indel_reads,
                 write_detailed_allele_table=args.write_detailed_allele_table,
                 vcf_output=args.vcf_output,
+                keep_allele_rows=not _parquet_skip_df_alleles,
             )
             if _collapsed.parquet_path is not None:
                 files_to_remove.append(_collapsed.parquet_path)
@@ -4147,11 +4166,6 @@ def main():
             # only read by the report/plots. Skipping the whole-frame
             # materialization keeps peak RSS flat for long-read amplicons.
             # Real runs (plots or report on) materialize df_alleles as before.
-            _parquet_skip_df_alleles = (
-                storage_backend == 'parquet'
-                and args.suppress_plots and args.suppress_report
-                and not args.vcf_output and args.dsODN == ""
-            )
             if _parquet_skip_df_alleles:
                 df_alleles = pd.DataFrame()
             else:
