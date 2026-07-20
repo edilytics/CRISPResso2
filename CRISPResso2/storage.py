@@ -577,7 +577,7 @@ _COORD_STRUCT = pa.struct([
 # amplicon-relative indices/sizes, so they are bounded by the amplicon length.
 # int16 (range -32768..32767) covers amplicons up to ~32 kb — the realistic
 # envelope for CRISPResso2 amplicon analysis (PCR amplicons are typically
-# 100 bp–3 kb; long-read amplicons rarely exceed 10–20 kb). This is a 4x
+# 100 bp-3 kb; long-read amplicons rarely exceed 10–20 kb). This is a 4x
 # reduction vs the previous int64 physical encoding (see
 # ``design_docs/PAYLOAD_COMPRESSION.md`` + ``scripts/bench_payload_shape_results.md``).
 # pyarrow raises ``ArrowInvalid`` on out-of-range values (no silent overflow),
