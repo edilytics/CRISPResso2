@@ -10,7 +10,6 @@ inside the spread is noise.
 """
 
 import argparse
-import glob
 import json
 import statistics
 import sys

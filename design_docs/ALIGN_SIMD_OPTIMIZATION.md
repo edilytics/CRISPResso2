@@ -128,3 +128,93 @@ Implications for follow-on work:
 3. **Defer true SIMD** (anti-diagonal/striped) until/unless the short-read
    per-call cost is shown to dominate a real end-to-end run; it's a large effort
    with a size-dependent, bandwidth-capped payoff.
+
+---
+
+# Part 2: pointer-free traceback (landed)
+
+**Date:** 2026-07-23
+**Status: shipped.** Recommendation #2 above panned out far better than
+expected: dropping the three pointer matrices and recomputing argmax during
+traceback is **~2.5× faster** (not the modest halving predicted), byte-identical
+outputs, and it surfaced + fixed a pre-existing crash bug. `global_align` (the
+name every caller uses) is now the pointer-free implementation; the original is
+retained as `global_align_pointers`.
+
+## The change
+
+`global_align_pointers` (the original) writes **six** int32 matrices per call —
+M/I/J scores *and* M/I/J pointers — purely so the O(N+M) traceback can follow
+stored pointers. The pointers are written every cell in the O(N*M) fill but
+read once. The new `global_align` stores **only the three score matrices**;
+traceback recomputes each cell's argmax from the scores on the fly. The
+min_score sentinels on the border make the border behave correctly with no
+special-casing; the only care is reproducing the fill's exact tie-breaking and
+the position-dependent `gap_open`/`gap_extend` (inner cells use `gap_open`, the
+last row/col use `gap_extend`).
+
+The fill also got cleaner: with no pointers to store, each cell is a plain `max`
+rather than argmax-with-side-effect.
+
+## Correctness: differential property test (hypothesis)
+
+The risk with rewriting traceback is subtle tie-breaking drift. We guard it with
+a **property-based differential test** in `tests/unit_tests/test_CRISPResso2Align.py`
+(`test_global_align_ptrfree_matches_pointers`): Hypothesis generates thousands
+of (seqj, seqi, gap_incentive, gap_open, gap_extend) inputs across three scoring
+matrices and asserts `global_align == global_align_pointers` byte-for-byte. It is
+part of the normal unit-test suite (`pixi run -e test test`), caches failing
+seeds, and `@example`-pins edge cases (length-1, indels, all-different,
+formerly-crashing inputs). Hypothesis was added as a test dependency
+(`pixi.toml`).
+
+## Pre-existing crash bug found and fixed (min_score sentinel)
+
+The property test immediately surfaced a **pre-existing** bug in the original
+`global_align`: on very short sequences and/or large `gap_incentive` at the
+border, `min_score = gap_open*max_i*max_j` is too weak a sentinel, so an optimal
+path routes through border cells whose pointer matrices are uninitialized
+(`np.empty`) — the traceback reads garbage and **raises or segfaults** (e.g.
+`global_align("A","C",...)` crashed; ~10% of random length-1 inputs, ~0.8% of
+length-2). Real CRISPR data (long reads/amplicons) never hit it because the
+sentinel is hugely negative there.
+
+Fix: use a fixed near-`-inf` sentinel (`min_score = -1000000000`) for the
+"impossible" border cells. Verified non-regressive: the 15-case golden
+(`scripts/align_golden.py`, fingerprint `43662296acce2dcf`) is unchanged and all
+**757 unit tests pass**; the formerly-crashing inputs now return sensible
+alignments (e.g. `"A"/"C"` mismatch instead of a crash).
+
+## Measured impact (A/B, 3 runs × 30 iters, clang -Ofast, arm64)
+
+`global_align_pointers` (before) vs `global_align` pointer-free (after):
+
+| amp | ns/cell before → after | delta | bufs (MB) |
+|----:|------------------------|------:|----------:|
+| 150 | 5.43 → 2.71 | −50% | 0.5 vs 0.3 |
+| 200 | 6.82 → 2.70 | −60% | 0.9 vs 0.5 |
+| 500 | 7.70 → 2.92 | −62% | 5.7 vs 2.9 |
+|1000 | 8.66 → 3.35 | −61% | 22.9 vs 11.4 |
+|2000 | 8.16 → 3.15 | −61% | 91.6 vs 45.8 |
+|5000 | 8.50 → 3.38 | −60% | 572 vs 286 |
+
+**~2.5× faster at every size** (≈60% reduction), well above the noise floor.
+The win is bigger than the predicted "half the traffic" because the pointer
+writes were pure overhead in the hot fill (the score already determined the
+pointer), so removing them cuts both memory traffic *and* instructions, and
+shrinks the working set so more stays in cache. Peak RSS per call also roughly
+halves (3 matrices instead of 6).
+
+This lands the production speedup with **no changes to `CRISPRessoCORE.py`** —
+every existing `CRISPResso2Align.global_align(...)` call site is now ~2.5× faster.
+
+## Reproduce
+
+```bash
+pixi run -e test install
+pixi run -e test python setup.py build_ext --inplace
+pixi run -e test python -m pytest tests/unit_tests/test_CRISPResso2Align.py::test_global_align_ptrfree_matches_pointers -v
+pixi run -e test python scripts/bench_align.py --func global_align         --json fast.json
+pixi run -e test python scripts/bench_align.py --func global_align_pointers --json ref.json
+pixi run -e test python scripts/compare_bench.py --before ref.json --after fast.json
+```

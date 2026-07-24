@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark CRISPResso2Align.global_align per-call wall time at representative
+r"""Benchmark CRISPResso2Align.global_align per-call wall time at representative
 amplicon/read sizes.
 
 No Cython recompile required — measures the currently-built extension.
@@ -23,7 +23,7 @@ Correctness across rebuilds is handled separately by scripts/align_golden.py.
 
 USAGE
 -----
-    pixi run -e test python scripts/bench_align.py \\
+    pixi run -e test python scripts/bench_align.py \
         --sizes 150,200,500,1000,2000,5000 --iters 20 --json baseline.json
 """
 
@@ -47,14 +47,14 @@ def random_dna(length, rng):
     return "".join(bases[idx])
 
 
-def time_calls(seqj, seqi, matrix, gi, gap_open, gap_extend, n_iters):
+def time_calls(seqj, seqi, matrix, gi, gap_open, gap_extend, n_iters, align_fn):
     """Return (list_of_per_iter_times, all_identical).
 
     Two untimed warmups prime the page cache and Python dispatch path so the
     measured iterations reflect steady-state per-call cost (the regime that
     matters when the pipeline aligns thousands of reads in a row).
     """
-    call = lambda: CRISPResso2Align.global_align(
+    call = lambda: align_fn(
         seqj, seqi, matrix=matrix, gap_incentive=gi,
         gap_open=gap_open, gap_extend=gap_extend,
     )
@@ -83,10 +83,13 @@ def fmt_ms(t):
     return f"{t * 1000:.3f} ms"
 
 
-def run(sizes, rect_ratio, iters, gap_open, gap_extend, matrix_path, seed, json_path):
+def run(sizes, rect_ratio, iters, gap_open, gap_extend, matrix_path, seed, json_path,
+        func_name="global_align"):
     rng = np.random.default_rng(seed)
     matrix = CRISPResso2Align.read_matrix(matrix_path)
+    align_fn = getattr(CRISPResso2Align, func_name)
 
+    print(f"function    : {func_name}")
     print(f"matrix      : {matrix_path}")
     print(f"gap_open={gap_open} gap_extend={gap_extend} iters={iters} seed={seed}")
     if rect_ratio != 1.0:
@@ -109,11 +112,13 @@ def run(sizes, rect_ratio, iters, gap_open, gap_extend, matrix_path, seed, json_
         gi = np.zeros(max_i + 1, dtype=np.int64)
 
         cells = max_i * max_j
-        # six int32 DP matrices, each (max_i+1)*(max_j+1)*4 bytes
-        bufs_mb = 6 * (max_i + 1) * (max_j + 1) * 4 / (1024 * 1024)
+        # global_align (pointer-free) stores 3 int32 score matrices;
+        # global_align_pointers (reference) stores 6 (3 scores + 3 pointers).
+        n_matrices = 3 if func_name == "global_align" else 6
+        bufs_mb = n_matrices * (max_i + 1) * (max_j + 1) * 4 / (1024 * 1024)
 
         times, ok = time_calls(
-            seqj, seqi, matrix, gi, gap_open, gap_extend, iters,
+            seqj, seqi, matrix, gi, gap_open, gap_extend, iters, align_fn,
         )
         med = float(np.median(times))
         mean = float(np.mean(times))
@@ -144,6 +149,7 @@ def run(sizes, rect_ratio, iters, gap_open, gap_extend, matrix_path, seed, json_
 
     if json_path:
         out = {
+            "function": func_name,
             "matrix": matrix_path, "gap_open": gap_open, "gap_extend": gap_extend,
             "iters": iters, "seed": seed, "rect_ratio": rect_ratio,
             "rows": rows,
@@ -169,10 +175,13 @@ def main(argv=None):
     ap.add_argument("--gap-extend", type=int, default=-1)
     ap.add_argument("--matrix", default=_DEFAULT_MATRIX)
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--func", default="global_align",
+                    choices=["global_align", "global_align_pointers"],
+                    help="which alignment kernel to benchmark")
     ap.add_argument("--json", default=None, help="dump results as JSON to this path")
     args = ap.parse_args(argv)
     run(args.sizes, args.rect_ratio, args.iters,
-        args.gap_open, args.gap_extend, args.matrix, args.seed, args.json)
+        args.gap_open, args.gap_extend, args.matrix, args.seed, args.json, args.func)
 
 
 if __name__ == "__main__":
