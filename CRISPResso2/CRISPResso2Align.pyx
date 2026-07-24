@@ -99,6 +99,7 @@ def make_matrix(match_score=5, mismatch_score=-4, n_mismatch_score=-2, n_match_s
     return a
 
 @cython.boundscheck(False)
+@cython.wraparound(False)
 @cython.nonecheck(False)
 def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] matrix,
           np.ndarray[DTYPE_LONG,ndim=1] gap_incentive, int gap_open=-1,
@@ -179,6 +180,7 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
 
     cdef int iFromMVal
     cdef int iExtendVal
+    cdef DTYPE_LONG gi_i, gi_im1  # gap_incentive[i], gap_incentive[i-1]; hoisted out of inner loop
     cdef int jFromMVal
     cdef int jExtendVal
     cdef int mVal, iVal, jVal
@@ -186,12 +188,17 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
     #apply NW algorithm for inside squares (not last row or column)
     for i in range(1, max_i):
         ci = seqi[i - 1] #char in i
+        # gap_incentive[i]/[i-1] are loop-invariant in j; hoist into scalars so the
+        # inner loop touches only the score/pointer matrices (stride-1, hot) and
+        # never re-reads the separate gap_incentive buffer each iteration.
+        gi_i = gap_incentive[i]
+        gi_im1 = gap_incentive[i - 1]
 
         for j in range(1, max_j):
             cj = seqj[j - 1] #char in j
 
-            iFromMVal = gap_open + mScore[i, j - 1] + gap_incentive[i]
-            iExtendVal = gap_extend + iScore[i, j - 1] + gap_incentive[i]
+            iFromMVal = gap_open + mScore[i, j - 1] + gi_i
+            iExtendVal = gap_extend + iScore[i, j - 1] + gi_i
             if iFromMVal > iExtendVal:
                 iScore[i,j] = iFromMVal
                 iPointer[i,j] = MARRAY
@@ -199,7 +206,7 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
                 iScore[i,j] = iExtendVal
                 iPointer[i,j] = IARRAY
 
-            jFromMVal = gap_open + mScore[i - 1, j] + gap_incentive[i-1]
+            jFromMVal = gap_open + mScore[i - 1, j] + gi_im1
 	    #no gap incentive here -- J already got the gap incentive when it transitioned from M, so don't add it again if we're extending.
             jExtendVal = gap_extend + jScore[i - 1, j]
             if jFromMVal > jExtendVal:
@@ -276,11 +283,14 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
     #last row
     i = max_i
     ci = seqi[i - 1]
+    # i is fixed at max_i here, so both gap_incentive reads are loop-invariant in j.
+    gi_i = gap_incentive[i]
+    gi_im1 = gap_incentive[i - 1]
     for j in range(1, max_j+1):
         cj = seqj[j - 1]
 
-        iFromMVal = gap_extend + mScore[i, j - 1] + gap_incentive[i]
-        iExtendVal = gap_extend + iScore[i, j - 1] + gap_incentive[i]
+        iFromMVal = gap_extend + mScore[i, j - 1] + gi_i
+        iExtendVal = gap_extend + iScore[i, j - 1] + gi_i
         if iFromMVal > iExtendVal:
             iScore[i,j] =  iFromMVal
             iPointer[i,j] = MARRAY
@@ -288,7 +298,7 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
             iScore[i,j] = iExtendVal
             iPointer[i,j] = IARRAY
 
-        jFromMVal = gap_extend + mScore[i - 1, j] + gap_incentive[i-1]
+        jFromMVal = gap_extend + mScore[i - 1, j] + gi_im1
         jExtendVal = gap_extend + jScore[i - 1, j]
         if jFromMVal > jExtendVal:
             jScore[i,j] =  jFromMVal
