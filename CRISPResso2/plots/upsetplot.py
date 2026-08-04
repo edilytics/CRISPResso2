@@ -47,7 +47,6 @@ Original license (BSD):
 
 import re
 import typing
-import warnings
 
 import matplotlib
 import matplotlib.gridspec
@@ -56,12 +55,19 @@ import pandas as pd
 from matplotlib import colors
 from matplotlib import pyplot as plt
 
-# matplotlib.tight_layout.get_renderer was removed in matplotlib >=3.6.
-try:
-    from matplotlib.tight_layout import get_renderer
-    _RENDERER_IMPORTED = True
-except ImportError:
-    _RENDERER_IMPORTED = False
+
+def _get_renderer(fig):
+    """Return a renderer for *fig*, or ``None`` if its canvas can't provide one.
+
+    ``matplotlib.tight_layout.get_renderer`` (and the whole ``tight_layout``
+    module) was removed in matplotlib 3.6+. The supported replacement is the
+    figure canvas's own renderer, which ``Figure``/``Text.get_window_extent``
+    use to measure extents off-screen.
+    """
+    canvas = fig.canvas
+    if canvas is not None and hasattr(canvas, "get_renderer"):
+        return canvas.get_renderer()
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -741,21 +747,11 @@ class UpSet:
             "\n".join(str(label) + "x" for label in self.totals.index.values),
             **text_kw,
         )
-        window_extent_args = {}
-        if _RENDERER_IMPORTED:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", DeprecationWarning)
-                window_extent_args["renderer"] = get_renderer(fig)
-        textw = t.get_window_extent(**window_extent_args).width
+        textw = t.get_window_extent(renderer=_get_renderer(fig)).width
         t.remove()
 
-        window_extent_args = {}
-        if _RENDERER_IMPORTED:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", DeprecationWarning)
-                window_extent_args["renderer"] = get_renderer(fig)
         figw = self._reorient(
-            fig.get_window_extent(**window_extent_args)
+            fig.get_window_extent(renderer=_get_renderer(fig))
         ).width
 
         sizes = np.asarray([p["elements"] for p in self._subset_plots])
