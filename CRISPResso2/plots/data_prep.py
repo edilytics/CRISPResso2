@@ -1610,81 +1610,159 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
     }
 
 
+def get_base_edit_row_for_target_nucleotide(row, conversion_nuc_from):
+    """Filter a single allele row down to target-nucleotide positions.
+
+    Keeps only the reference positions whose base equals
+    *conversion_nuc_from* (e.g. every C for C->T base editing), across the
+    WHOLE amplicon -- this is not a window around the cut site. The returned
+    aligned/reference sequences therefore have one character per
+    target-nucleotide occurrence in the reference.
+    """
+    include_inds = [i for i, c in enumerate(row['Reference_Sequence']) if c == conversion_nuc_from]
+
+    filtered_aligned_seq = ''.join([row['Aligned_Sequence'][i] for i in include_inds])
+    filtered_ref_seq = ''.join([row['Reference_Sequence'][i] for i in include_inds])
+
+    return (
+        filtered_aligned_seq,
+        filtered_ref_seq,
+        row['Read_Status'] == 'UNMODIFIED',
+        row['n_deleted'],
+        row['n_inserted'],
+        row['n_mutated'],
+        row['#Reads'],
+        row['%Reads']
+        )
+
+
+def get_base_edit_dataframe_for_target_nucleotide(df_alleles, conversion_nuc_inds):
+    """Build an allele DataFrame restricted to target-nucleotide positions.
+
+    Wraps :func:`get_base_edit_row_for_target_nucleotide` for every row and
+    collapses identical allele sequences. The result spans the entire
+    amplicon (one column per target-nucleotide position); it is not windowed
+    around the cut site.
+    """
+    if df_alleles.shape[0] == 0:
+        return df_alleles
+
+    df_alleles_around_cut = pd.DataFrame(
+        list(df_alleles.apply(lambda row: get_base_edit_row_for_target_nucleotide(row, conversion_nuc_inds), axis=1).values),
+        columns=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated', '#Reads',
+                 '%Reads'])
+
+    df_alleles_around_cut = df_alleles_around_cut.groupby(
+        ['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted',
+         'n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
+
+    df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
+    df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
+    return df_alleles_around_cut
+
+
 def prep_base_edit_quilt(ctx: CorePlotContext):
     """Prepare base edit quilt data for plot_10h and CSV export.
 
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
 
-    Internally calls ``CRISPRessoShared.get_base_edit_dataframe_around_cut``
-    to produce the sliced DataFrame, then applies the same windowing logic
-    as ``prep_alleles_around_cut`` (via ``_prep_windowed_alleles``).
+    Unlike :func:`prep_alleles_around_cut` (plot 9), this plot spans the
+    **entire amplicon**: it shows one column per occurrence of the target
+    nucleotide (``args.conversion_nuc_from``) in the reference sequence.
+    ``args.plot_window_size`` is **not** applied here -- there is no
+    cut-site windowing.
+
+    The allele DataFrame is built by
+    :func:`get_base_edit_dataframe_for_target_nucleotide`,
+    which keeps only the target-nucleotide positions across the whole
+    reference, then optionally collapses identical allele sequences.
 
     Internally calls :func:`prep_alleles_table` to produce a
     serialization-friendly representation for the plot worker thread.
     If no rows pass the frequency threshold, ``plot_input`` is ``None``.
 
-    Uses a symmetric window (``args.plot_window_size``) and computes
-    ``x_labels`` — the 1-indexed positions of the conversion nucleotide in
-    the full reference sequence.
+    ``x_labels`` are the 1-indexed positions of the target nucleotide in the
+    full reference sequence; their count equals the number of plotted
+    columns.
 
     .. warning::
 
-        **Mutates** the intermediate ``df_alleles_around_cut`` in place when
-        ``args.allele_plot_pcts_only_for_assigned_reference`` is True.
-        See ``_prep_windowed_alleles`` for details.
+        **Mutates** the intermediate allele DataFrame in place when
+        ``args.allele_plot_pcts_only_for_assigned_reference`` is True
+        (recomputes ``%Reads`` against the per-reference read total and
+        stashes the original value in ``%AllReads``). CORE writes this
+        mutated DataFrame to the quilt CSV.
 
-    Returns a dict with:
+    Returns a dict with (key names preserved for CORE compatibility):
 
     - ``df_alleles_around_cut``: the (possibly mutated) alleles DataFrame
-    - ``ref_seq_around_cut``: reference sequence in the window
+    - ``ref_seq_around_cut``: the target-nucleotide reference string (one
+      character per plotted column)
     - ``plot_input``: dict of kwargs for ``plot_alleles_table_prepped``, or
       ``None`` if no rows pass the frequency threshold
     """
     ref_name = ctx.ref_name
     ref = _ref(ctx)
-
-    cut_point = ref['sgRNA_cut_points'][ctx.sgRNA_ind]
-    plot_half_window = max(1, ctx.args.plot_window_size)
+    ref_sequence = ref['sequence']
     conversion_nuc_from = ctx.args.conversion_nuc_from
 
-    df_alleles_around_cut = CRISPRessoShared.get_base_edit_dataframe_around_cut(
+    # One row per allele, keeping only target-nucleotide positions across the
+    # WHOLE amplicon (e.g. every C for C->T editing). This -- not any cut-site
+    # window -- is why plot 10h spans the entire amplicon.
+    df_base_edit = get_base_edit_dataframe_for_target_nucleotide(
         ctx.df_alleles.loc[ctx.df_alleles['Reference_Name'] == ref_name],
         conversion_nuc_from,
     )
 
-    (
-        df_alleles_around_cut,
-        df_to_plot,
-        ref_seq_around_cut,
-        new_sgRNA_intervals,
-        _new_sel_cols_start,
-    ) = _prep_windowed_alleles(
-        df_alleles_around_cut=df_alleles_around_cut,
-        cut_point=cut_point,
-        window_left=plot_half_window,
-        window_right=plot_half_window,
-        ref_sequence=ref['sequence'],
-        sgRNA_intervals=ref['sgRNA_intervals'],
-        count_total=ctx.counts_total[ref_name],
-        allele_plot_pcts_only_for_assigned_reference=ctx.args.allele_plot_pcts_only_for_assigned_reference,
-        expand_allele_plots_by_quantification=ctx.args.expand_allele_plots_by_quantification,
-    )
-
+    # 1-indexed amplicon positions of every target nucleotide. These become
+    # the x-axis tick labels, and their count is the number of plotted columns.
     x_labels = [
-        ind for ind, a in enumerate(ref['sequence'], start=1)
-        if a == conversion_nuc_from
+        pos for pos, base in enumerate(ref_sequence, start=1)
+        if base == conversion_nuc_from
     ]
+    # The reference restricted to target-nucleotide positions is just the
+    # target nucleotide repeated -- one character per plotted column. Passing
+    # this (instead of a cut-site-windowed slice) keeps the renderer's
+    # reference_seq consistent with the allele row width.
+    ref_seq_target_nuc = conversion_nuc_from * len(x_labels)
 
-    # Build serialization-friendly plot input via prep_alleles_table
-    n_good = df_alleles_around_cut[
-        df_alleles_around_cut['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
-    ].shape[0]
+    # Optionally recompute %Reads against the per-reference read total.
+    # Mutates df_base_edit in place so the CSV written by CORE reflects it.
+    if ctx.args.allele_plot_pcts_only_for_assigned_reference:
+        df_base_edit['%AllReads'] = df_base_edit['%Reads']
+        df_base_edit['%Reads'] = df_base_edit['#Reads'] / ctx.counts_total[ref_name] * 100
+
+    # Collapse identical allele sequences unless asked to keep them distinct.
+    if ctx.args.expand_allele_plots_by_quantification:
+        df_to_plot = df_base_edit
+    else:
+        df_to_plot = (
+            df_base_edit
+            .groupby(['Aligned_Sequence', 'Reference_Sequence'])
+            .sum()
+            .reset_index()
+            .set_index('Aligned_Sequence')
+            .sort_values(
+                by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'],
+                ascending=[False, True, True],
+            )
+        )
 
     plot_input = None
+    n_good = df_base_edit[
+        df_base_edit['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
+    ].shape[0]
     if n_good > 0:
+        # Invariant: each allele row holds exactly one base per
+        # target-nucleotide position, so its width must match the label count.
+        assert len(df_base_edit.iloc[0]['Reference_Sequence']) == len(x_labels), (
+            "plot 10h: allele row width does not match the number of "
+            "target-nucleotide positions in the reference"
+        )
+
         prepped_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws, is_reference = prep_alleles_table(
             df_to_plot,
-            ref_seq_around_cut,
+            ref_seq_target_nuc,
             ctx.args.max_rows_alleles_around_cut_to_plot,
             ctx.args.min_frequency_alleles_around_cut_to_plot,
         )
@@ -1695,7 +1773,7 @@ def prep_base_edit_quilt(ctx: CorePlotContext):
         )
 
         plot_input = {
-            'reference_seq': ref_seq_around_cut,
+            'reference_seq': ref_seq_target_nuc,
             'prepped_df_alleles': prepped_alleles,
             'annotations': annotations,
             'y_labels': y_labels,
@@ -1714,10 +1792,10 @@ def prep_base_edit_quilt(ctx: CorePlotContext):
             'x_labels': x_labels,
         }
 
-    conversion_nuc_from = ctx.args.conversion_nuc_from
     return {
-        'df_alleles_around_cut': df_alleles_around_cut,
-        'ref_seq_around_cut': ref_seq_around_cut,
+        # Key names preserved for CORE compatibility.
+        'df_alleles_around_cut': df_base_edit,
+        'ref_seq_around_cut': ref_seq_target_nuc,
         'plot_input': plot_input,
         'caption': (
             "Figure 10h: Quilt of target nucleotide: " + conversion_nuc_from
