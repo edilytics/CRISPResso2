@@ -448,10 +448,13 @@ def propagate_crispresso_options(cmd, options, params, paramInd=None):
 # Sequence functions
 #######
 nt_complement = dict({'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N', '_': '_', '-': '-'})
+# translation table for fast reverse_complement (str.translate is C-speed;
+# unknown characters pass through unchanged, matching nt_complement for ACGTN_-)
+_RC_TRANSLATE_TABLE = str.maketrans('ACGTNacgtn_-', 'TGCANTGCAN_-')
 
 
 def reverse_complement(seq):
-    return "".join([nt_complement[c] for c in seq.upper()[-1::-1]])
+    return seq.translate(_RC_TRANSLATE_TABLE)[::-1]
 
 
 def reverse(seq):
