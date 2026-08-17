@@ -4047,11 +4047,14 @@ def main():
                          this_has_substitutions = True
 
                     nucs = ['A', 'T', 'C', 'G', 'N']
-                    for nuc in nucs:
-                        isNuc = [n == nuc for n in variant_payload['all_substitution_values']]
-                        if (np.sum(isNuc) > 0):
-                            locs = np.array(variant_payload['all_substitution_positions'])[isNuc]
-                            all_substitution_base_vectors[ref_name + "_" + nuc][locs] += variant_count
+                    all_sub_vals = variant_payload['all_substitution_values']
+                    if len(all_sub_vals) > 0:
+                        val_arr = np.asarray(all_sub_vals)
+                        pos_arr = np.asarray(variant_payload['all_substitution_positions'])
+                        for nuc in nucs:
+                            locs = np.flatnonzero(val_arr == nuc)
+                            if locs.size:
+                                all_substitution_base_vectors[ref_name + "_" + nuc][pos_arr[locs]] += variant_count
 
                 if this_has_deletions:
                     if this_has_insertions:
@@ -4071,14 +4074,17 @@ def main():
                 elif this_has_substitutions:
                     counts_only_substitution[ref_name] += variant_count
 
-                # set all_base_count_vectors
+                # set all_base_count_vectors (vectorized; equivalent to per-base loop)
                 aln_seq = variant_payload['aln_seq']
                 ref_pos = variant_payload['ref_positions']
-                for i in range(len(aln_seq)):
-                    if ref_pos[i] < 0:
-                        continue
-                    nuc = aln_seq[i]
-                    all_base_count_vectors[ref_name + "_" + nuc][ref_pos[i]] += variant_count
+                ref_pos_arr = np.asarray(ref_pos)
+                valid_mask = ref_pos_arr >= 0
+                if valid_mask.any():
+                    aln_seq_arr = np.frombuffer(aln_seq.encode('ascii'), dtype=np.uint8)
+                    for nuc in ('A', 'C', 'G', 'T', 'N', '-'):
+                        nuc_mask = valid_mask & (aln_seq_arr == ord(nuc))
+                        if nuc_mask.any():
+                            np.add.at(all_base_count_vectors[ref_name + "_" + nuc], ref_pos_arr[nuc_mask], variant_count)
 
                 exon_len_mods = refs[ref_name]['exon_len_mods']  # for each exon, how much length did this reference modify it?
                 tot_exon_len_mod = sum(exon_len_mods)  # for all exons, how much length was modified?
@@ -4265,11 +4271,14 @@ def main():
 
                     aln_seq = s1
                     ref_pos = payload['ref_positions']
-                    for i in range(len(aln_seq)):
-                        if ref_pos[i] < 0:
-                            continue
-                        nuc = aln_seq[i]
-                        ref1_all_base_count_vectors[ref_name + "_" + nuc][ref_pos[i]] += variant_count
+                    ref_pos_arr = np.asarray(ref_pos)
+                    valid_mask = ref_pos_arr >= 0
+                    if valid_mask.any():
+                        aln_seq_arr = np.frombuffer(aln_seq.encode('ascii'), dtype=np.uint8)
+                        for nuc in ('A', 'C', 'G', 'T', 'N', '-'):
+                            nuc_mask = valid_mask & (aln_seq_arr == ord(nuc))
+                            if nuc_mask.any():
+                                np.add.at(ref1_all_base_count_vectors[ref_name + "_" + nuc], ref_pos_arr[nuc_mask], variant_count)
 
         info('Done!', {'percent_complete': 30})
 
