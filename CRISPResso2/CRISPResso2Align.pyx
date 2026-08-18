@@ -100,6 +100,8 @@ def make_matrix(match_score=5, mismatch_score=-4, n_mismatch_score=-2, n_match_s
 
 @cython.boundscheck(False)
 @cython.nonecheck(False)
+@cython.wraparound(False)
+@cython.initializedcheck(False)
 def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] matrix,
           np.ndarray[DTYPE_LONG,ndim=1] gap_incentive, int gap_open=-1,
           int gap_extend=-1):
