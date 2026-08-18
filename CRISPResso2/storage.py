@@ -647,6 +647,16 @@ ALIGNED_SCHEMA = pa.schema([
     pa.field("aln_scores", pa.list_(pa.float64())),
     pa.field("caching_is_ok", pa.bool_()),
     pa.field("payloads", pa.list_(_PAYLOAD_STRUCT)),
+    # canonical_key: min(read_key, reverse_complement(read_key)) for ALIGNED
+    # single-end reads (null for unaligned rows). Computed worker-side (the
+    # worker already holds read_key; the RC is ~free next to the alignment)
+    # so collapse's Pass 1 reads only this + count — two small scalar columns,
+    # no payload rebuild and no per-row reverse_complement in the main
+    # process. Never consumed on the paired path (the paired collapse doesn't
+    # do the RC merge); null for unaligned rows. Shards are transient within
+    # a run (workers and main are the same code version), so there is no
+    # old-shard compatibility concern.
+    pa.field("canonical_key", pa.string()),
 ])
 
 # Fields NOT stored (deliberately dropped — not consumed downstream by
@@ -923,16 +933,25 @@ def payload_to_row(read_key, count, payload):
         if not payloads:
             payloads = None
     aln_scores = payload.get("aln_scores", [])
+    best_match_score = float(payload.get("best_match_score", 0))
+    canonical_key = None
+    if best_match_score > 0:
+        # RC-canonical merge key for aligned single-end reads (collapse
+        # Pass 1). Computed here, worker-side, so the main process never
+        # pays a per-row reverse_complement during collapse.
+        rc_read = CRISPRessoShared.reverse_complement(read_key)
+        canonical_key = read_key if read_key <= rc_read else rc_read
     return {
         "read_key": read_key,
         "count": int(count),
-        "best_match_score": float(payload.get("best_match_score", 0)),
+        "best_match_score": best_match_score,
         "class_name": payload.get("class_name"),
         "best_match_name": payload.get("best_match_name"),
         "aln_ref_names": list(aln_ref_names) if aln_ref_names else None,
         "aln_scores": [float(s) for s in aln_scores] if aln_scores else None,
         "caching_is_ok": bool(payload.get("caching_is_ok", True)),
         "payloads": payloads,
+        "canonical_key": canonical_key,
     }
 
 
@@ -2355,36 +2374,39 @@ def _collapse_streaming_single_read(
 
     try:
         # -- Pass 1: stream shards → text projection (canonical_key, seq_no, count).
-        # Column-projected to the 3 top-level scalars this pass needs — it must
-        # NOT read/decompress the amplicon-length ``payloads`` struct (the
-        # dominant shard cost). ``best_match_score`` is a top-level column, so
-        # the unaligned-skip needs no payload access. ``est_amplicon_len``
-        # (which only sizes the in-memory-vs-external threshold) is taken from
-        # ``len(read_key)`` — for single-read input read_key IS the read
-        # sequence, ≈ amplicon length — avoiding a dive into ``payloads``.
+        # Reads ONLY the two small scalar columns the pass needs (canonical_key
+        # was computed worker-side — no payload rebuild, no per-row
+        # reverse_complement here). ``seq_no`` counts every row (unaligned
+        # rows included) so Pass 2's seek-back indexing matches exactly.
+        # ``est_amplicon_len`` (which only sizes the in-memory-vs-external
+        # threshold) is taken from ``len(canonical_key)`` — for single-read
+        # input the canonical key IS the read sequence (or its RC), ≈ amplicon
+        # length.
         est_amplicon_len = 0
         seq_no = 0
         any_aligned = False
-        _pass1_columns = ["read_key", "count", "best_match_score"]
         with open(keys_file, "w", buffering=1 << 20) as kf:
             for path in paths:
-                for read_key, count, payload in iter_aligned_shard(
-                        path, columns=_pass1_columns):
-                    if payload.get("best_match_score", 0) <= 0:
-                        seq_no += 1  # consume seq_no for seek-back parity
-                        continue
-                    any_aligned = True
-                    rc_read = rc(read_key)
-                    canonical_key = read_key if read_key <= rc_read else rc_read
-                    if est_amplicon_len == 0:
-                        est_amplicon_len = len(read_key)
-                    kf.write(canonical_key)
-                    kf.write("\t")
-                    kf.write(str(seq_no))
-                    kf.write("\t")
-                    kf.write(str(count))
-                    kf.write("\n")
-                    seq_no += 1
+                pf = pq.ParquetFile(str(path))
+                _bs = _adaptive_batch_size(pf)
+                for batch in pf.iter_batches(
+                        batch_size=_bs, columns=["canonical_key", "count"]):
+                    ck_col = _as_single_array(
+                        batch.column("canonical_key")).to_pylist()
+                    cnt_col = _as_single_array(batch.column("count")).to_pylist()
+                    n = len(ck_col)
+                    base = seq_no
+                    lines = [
+                        "%s\t%d\t%d\n" % (ck, base + j, cnt_col[j])
+                        for j, ck in enumerate(ck_col) if ck is not None
+                    ]
+                    if lines:
+                        any_aligned = True
+                        if est_amplicon_len == 0:
+                            est_amplicon_len = len(next(
+                                ck for ck in ck_col if ck is not None))
+                        kf.write("".join(lines))
+                    seq_no += n
 
         # Empty input / all-unaligned: emit an empty parquet (parity with the
         # in-memory path's empty case).

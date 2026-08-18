@@ -861,6 +861,36 @@ def _shard_payload(ref_name="ref1", aln_seq="ATCGATCG--ATCGATCGAT",
     }
 
 
+def test_payload_to_row_canonical_key(temp_dir):
+    """P3: canonical_key = min(read_key, rc(read_key)) for aligned rows, null
+    for unaligned rows (worker-side RC-canonical merge key for collapse Pass 1)."""
+    import pyarrow.parquet as pq
+    from CRISPResso2.storage import ALIGNED_SCHEMA
+    rc = CRISPRessoShared.reverse_complement
+
+    aligned = _make_realistic_payload()  # best_match_score = 95.123
+    unaligned = _make_realistic_payload()
+    unaligned["best_match_score"] = 0.0
+    unaligned["aln_ref_names"] = []
+    unaligned["aln_scores"] = []
+
+    shard = os.path.join(temp_dir, "ck.parquet")
+    with AlignedShardWriter(shard) as w:
+        w.write_row(payload_to_row("TTTTGGGGCC", 3, aligned))
+        w.write_row(payload_to_row("AAAAAAAAAA", 1, unaligned))
+    t = pq.read_table(shard)
+    ck = t.column("canonical_key").to_pylist()
+    assert ck[0] == min("TTTTGGGGCC", rc("TTTTGGGGCC"))
+    assert ck[1] is None
+    # pass-1 projection sees exactly the aligned row's (canonical_key, count)
+    pf = pq.ParquetFile(shard)
+    rows = [(b.column("canonical_key").to_pylist(), b.column("count").to_pylist())
+            for b in pf.iter_batches(columns=["canonical_key", "count"])]
+    assert rows == [([ck[0], None], [3, 1])]
+    # schema carries the column
+    assert "canonical_key" in ALIGNED_SCHEMA.names
+
+
 def _write_shard(path, rows):
     """rows: list of (read_key, count, payload_dict). Writes one aligned shard."""
     with AlignedShardWriter(path) as w:
