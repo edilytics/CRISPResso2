@@ -1100,6 +1100,7 @@ def variant_parquet_generator_process(
     process_id,
     output_dir,
     is_paired=False,
+    seq_no_base=0,
 ):
     """Multiprocessing target: align reads and write a parquet shard.
 
@@ -1124,32 +1125,53 @@ def variant_parquet_generator_process(
     is_paired : bool
         If True, splits read_key on '+' and quals on ' ' to get R1/R2 (matching
         ``args.crispresso_merge`` in the TSV worker).
+    seq_no_base : int
+        Offset of this worker's chunk in global scan order (= cumulative size
+        of the previous workers' chunks). Used ONLY for the single-read keys
+        file so its ``seq_no`` column matches the scan-order numbering the
+        collapse pass-2 seek-back expects.
 
     """
     shard_path = os.path.join(output_dir, f"aligned_{process_id}.parquet")
+    # Single-read runs also emit the collapse Pass-1 keys projection here —
+    # the worker already holds canonical_key (computed in payload_to_row) and
+    # count, so the keys data rides along the shard write for free and the
+    # main process never re-scans the shards for it. Paired runs never use
+    # the single-read RC merge, so no keys file is written.
+    keys_fh = None
+    if not is_paired:
+        keys_fh = open(
+            os.path.splitext(shard_path)[0] + ".keys.txt", "w", buffering=1 << 20)
     num_processed = 0
-    with AlignedShardWriter(shard_path) as writer:
-        for index, (read_key, count, quals) in enumerate(read_items):
-            num_processed = index + 1
-            if is_paired:
-                fastq1_seq, fastq2_seq = read_key.split("+")
-                if quals is not None:
-                    fastq1_qual, fastq2_qual = quals.split(" ")
+    try:
+        with AlignedShardWriter(shard_path) as writer:
+            for index, (read_key, count, quals) in enumerate(read_items):
+                num_processed = index + 1
+                if is_paired:
+                    fastq1_seq, fastq2_seq = read_key.split("+")
+                    if quals is not None:
+                        fastq1_qual, fastq2_qual = quals.split(" ")
+                    else:
+                        fastq1_qual, fastq2_qual = "", ""
+                    new_variant = get_new_variant_object(
+                        args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual,
+                        refs, ref_names, aln_matrix, pe_scaffold_dna_info,
+                    )
                 else:
-                    fastq1_qual, fastq2_qual = "", ""
-                new_variant = get_new_variant_object(
-                    args, fastq1_seq, fastq2_seq, fastq1_qual, fastq2_qual,
-                    refs, ref_names, aln_matrix, pe_scaffold_dna_info,
-                )
-            else:
-                new_variant = get_new_variant_object(
-                    args, read_key, refs, ref_names, aln_matrix, pe_scaffold_dna_info,
-                )
-            new_variant["count"] = count
-            row = payload_to_row(read_key, count, new_variant)
-            writer.write_row(row)
-            if index % 10000 == 0 and index != 0:
-                info(f"Process {process_id + 1} has processed {index} unique reads", {"percent_complete": 10})
+                    new_variant = get_new_variant_object(
+                        args, read_key, refs, ref_names, aln_matrix, pe_scaffold_dna_info,
+                    )
+                new_variant["count"] = count
+                row = payload_to_row(read_key, count, new_variant)
+                writer.write_row(row)
+                if keys_fh is not None and row["canonical_key"] is not None:
+                    keys_fh.write("%s\t%d\t%d\n" % (
+                        row["canonical_key"], seq_no_base + index, count))
+                if index % 10000 == 0 and index != 0:
+                    info(f"Process {process_id + 1} has processed {index} unique reads", {"percent_complete": 10})
+    finally:
+        if keys_fh is not None:
+            keys_fh.close()
     info(f"Process {process_id + 1} has finished processing {num_processed} unique reads", {"percent_complete": 10})
 
 
@@ -1437,6 +1459,13 @@ class CollapsedAlleles:
     aln_stats: Optional[dict] = None
     aln_homology: Optional[dict] = None
     not_aln_homology: Optional[dict] = None
+    aggregates: Optional["AlleleAggregates"] = None
+    """Per-ref aggregation outputs (see :func:`_aggregate_alleles`), computed
+    during the collapse scan when ``collapse`` was called with
+    ``aggregate_refs`` (fused into Step A's flush — the collapsed parquet is
+    written and never re-read for aggregation). ``None`` when not fused
+    (small-input in-memory path, empty input, or aggregate_refs not given) —
+    callers fall back to :func:`aggregate_alleles`."""
 
     def allele_rows_dataframe(self):
         """Return ``allele_rows`` as a pandas DataFrame (sorted, with ``%Reads``).
@@ -1484,6 +1513,9 @@ def _collapse(
     write_parquet: bool = True,
     collapsed_path: Optional[str] = None,
     keep_allele_rows: bool = True,
+    aggregate_refs: Optional[dict] = None,
+    aggregate_args=None,
+    aggregate_ref_names: Optional[list] = None,
 ) -> CollapsedAlleles:
     """Stage 3: collapse aligned shards into the sorted allele table.
 
@@ -1539,6 +1571,9 @@ def _collapse(
             collapsed_path=collapsed_path,
             expand_ambiguous_alignments=expand_ambiguous_alignments,
             keep_allele_rows=keep_allele_rows,
+            aggregate_refs=aggregate_refs,
+            aggregate_args=aggregate_args,
+            aggregate_ref_names=aggregate_ref_names,
         )
 
     # 3a + 3b: stream shards into the in-memory collapse table.
@@ -1833,22 +1868,29 @@ def _ensure_nofile(needed: int) -> None:
         pass
 
 
-def _run_external_sort(input_file: str, output_file: str, workdir: str,
+def _run_external_sort(input_file, output_file: str, workdir: str,
                        key_args: list, *, sort_buffer: str = _SORT_BUFFER) -> None:
-    """External merge-sort a text file, spilling to ``workdir``.
+    """External merge-sort text file(s), spilling to ``workdir``.
 
-    ``key_args`` is the list of sort key specifiers (e.g. ``["-k1,1"]`` or
-    ``["-k1,1", "-k2,2", "-k3,3"]``). ``-s`` stable so equal-key rows preserve
-    file order (parity: the first occurrence in scan order wins per group).
-    ``-S`` caps the in-memory buffer (forces disk spill); ``-T`` sets the spill
-    dir; ``LC_ALL=C`` forces byte-wise comparison (fast, locale-independent,
-    and matches Python's code-point sort for ACGT/-/+ strings).
+    ``input_file`` may be a single path or a list of paths (sorted as one
+    logical concatenation in list order — used for the worker-produced
+    per-shard keys files). ``key_args`` is the list of sort key specifiers
+    (e.g. ``["-k1,1"]`` or ``["-k1,1", "-k2,2", "-k3,3"]``). ``-s`` stable
+    so equal-key rows preserve file order (parity: the first occurrence in
+    scan order wins per group). ``-S`` caps the in-memory buffer (forces disk
+    spill); ``-T`` sets the spill dir; ``LC_ALL=C`` forces byte-wise
+    comparison (fast, locale-independent, and matches Python's code-point
+    sort for ACGT/-/+ strings).
     """
     tmpdir = os.path.join(workdir, "sort_tmp")
     os.makedirs(tmpdir, exist_ok=True)
+    if isinstance(input_file, (list, tuple)):
+        inputs = [str(f) for f in input_file]
+    else:
+        inputs = [str(input_file)]
     sort_cmd = ["sort", "-S", sort_buffer, "-T", tmpdir, "-s", "-t", "\t"]
     sort_cmd += key_args
-    sort_cmd += ["-o", output_file, input_file]
+    sort_cmd += ["-o", output_file] + inputs
     env = dict(os.environ, LC_ALL="C")
     try:
         subprocess.run(sort_cmd, check=True, env=env)
@@ -2154,6 +2196,8 @@ def _partitioned_gather_write_unsorted(
     unsorted_parquet: str,
     gather_keys_file: str,
     homology_state: Optional["_AlnStatsHomologyState"] = None,
+    agg_state: Optional["_AggState"] = None,
+    agg_vector_refs: Optional[set] = None,
 ) -> tuple:
     r"""Step A of the partitioned gather (``LARGE_ALLELE_ORDER_PERF.md``).
 
@@ -2191,8 +2235,15 @@ def _partitioned_gather_write_unsorted(
             pa.array([row[f.name] for row in buf], type=f.type)
             for f in _COLLAPSED_SCHEMA_WITH_ROW_IDX
         ]
-        writer.write_table(
-            pa.Table.from_arrays(arrays, schema=_COLLAPSED_SCHEMA_WITH_ROW_IDX))
+        table = pa.Table.from_arrays(arrays, schema=_COLLAPSED_SCHEMA_WITH_ROW_IDX)
+        writer.write_table(table)
+        if agg_state is not None:
+            # Fused per-ref aggregation: the flush table holds exactly the
+            # rows the collapsed parquet will hold (minus the synthetic
+            # row_idx), so accumulate them here instead of re-reading the
+            # collapsed parquet in a separate pass. Order-independent.
+            _aggregate_batch_into(
+                agg_state, table.drop_columns("row_idx"), agg_vector_refs)
 
     try:
         buf: list = []
@@ -2370,6 +2421,9 @@ def _collapse_streaming_single_read(
     collapsed_path: Optional[str] = None,
     expand_ambiguous_alignments: bool = False,
     keep_allele_rows: bool = True,
+    aggregate_refs: Optional[dict] = None,
+    aggregate_args=None,
+    aggregate_ref_names: Optional[list] = None,
 ) -> CollapsedAlleles:
     """Stage 3 for single-read input: streaming external-sort canonical-key merge.
 
@@ -2388,6 +2442,18 @@ def _collapse_streaming_single_read(
     keys_file = os.path.join(workdir, "keys.txt")
     sorted_keys_file = os.path.join(workdir, "keys.sorted")
 
+    # Optional fused aggregation state (populated only on the partitioned
+    # gather path — the large-data branch; the in-memory small-input branch
+    # leaves aggregates None and the caller falls back to aggregate_alleles).
+    agg_state = None
+    agg_vector_refs = None
+    if aggregate_refs is not None:
+        _agg_ref_names = (
+            aggregate_ref_names if aggregate_ref_names is not None
+            else list(aggregate_refs))
+        agg_state = _init_agg_state(aggregate_refs, _agg_ref_names, aggregate_args)
+        agg_vector_refs = _vector_refs_for(aggregate_refs, _agg_ref_names)
+
     parquet_path = None
     if write_parquet:
         parquet_path = (
@@ -2396,44 +2462,86 @@ def _collapse_streaming_single_read(
         )
 
     try:
-        # -- Pass 1: stream shards → text projection (canonical_key, seq_no, count).
-        # Reads ONLY the two small scalar columns the pass needs (canonical_key
-        # was computed worker-side — no payload rebuild, no per-row
-        # reverse_complement here). ``seq_no`` counts every row (unaligned
-        # rows included) so Pass 2's seek-back indexing matches exactly.
-        # ``est_amplicon_len`` (which only sizes the in-memory-vs-external
-        # threshold) is taken from ``len(canonical_key)`` — for single-read
-        # input the canonical key IS the read sequence (or its RC), ≈ amplicon
-        # length.
+        # -- Pass 1: obtain the (canonical_key, seq_no, count) keys projection.
+        # Fast path: Stage 2's workers already wrote ``aligned_{i}.keys.txt``
+        # next to each shard (they hold canonical_key + count; seq_no offsets
+        # come from the worker chunk boundaries) — consume those files
+        # directly, eliminating the shard scan entirely. Fallback (direct
+        # collapse calls / test fixtures with bare shards): scan the two
+        # small scalar columns and write the workdir keys file. Either way
+        # ``seq_no`` counts every row (unaligned included) so Pass 2's
+        # seek-back indexing matches exactly, and ``est_amplicon_len``
+        # (which only sizes the in-memory-vs-external threshold) comes from
+        # ``len(canonical_key)`` — for single-read input the canonical key IS
+        # the read sequence (or its RC), ≈ amplicon length.
+        keys_inputs: list = []
+        for path in paths:
+            _kp = os.path.splitext(str(path))[0] + ".keys.txt"
+            if not os.path.exists(_kp):
+                keys_inputs = []
+                break
+            keys_inputs.append(_kp)
         est_amplicon_len = 0
-        seq_no = 0
         any_aligned = False
-        with open(keys_file, "w", buffering=1 << 20) as kf:
-            for path in paths:
-                pf = pq.ParquetFile(str(path))
-                _bs = _adaptive_batch_size(pf)
-                for batch in pf.iter_batches(
-                        batch_size=_bs, columns=["canonical_key", "count"]):
-                    ck_col = _as_single_array(
-                        batch.column("canonical_key")).to_pylist()
-                    cnt_col = _as_single_array(batch.column("count")).to_pylist()
-                    n = len(ck_col)
-                    base = seq_no
-                    lines = [
-                        "%s\t%d\t%d\n" % (ck, base + j, cnt_col[j])
-                        for j, ck in enumerate(ck_col) if ck is not None
-                    ]
-                    if lines:
-                        any_aligned = True
-                        if est_amplicon_len == 0:
-                            est_amplicon_len = len(next(
-                                ck for ck in ck_col if ck is not None))
-                        kf.write("".join(lines))
-                    seq_no += n
+        if keys_inputs:
+            # Order the worker keys files by their embedded seq_no base so
+            # the stable sort's tie-break (first line wins per group) matches
+            # scan order even if ``paths`` arrived in a different order.
+            def _first_seq_no(kp):
+                try:
+                    with open(kp, "r") as f:
+                        for line in f:
+                            return int(line.split("\t", 2)[1])
+                except (OSError, ValueError, IndexError):
+                    return 0
+            keys_inputs.sort(key=_first_seq_no)
+            for _kp in keys_inputs:
+                try:
+                    with open(_kp, "r") as f:
+                        first = f.readline()
+                except OSError:
+                    first = ""
+                if first:
+                    any_aligned = True
+                    if est_amplicon_len == 0:
+                        est_amplicon_len = len(first.split("\t", 1)[0])
+        else:
+            seq_no = 0
+            with open(keys_file, "w", buffering=1 << 20) as kf:
+                for path in paths:
+                    pf = pq.ParquetFile(str(path))
+                    _bs = _adaptive_batch_size(pf)
+                    for batch in pf.iter_batches(
+                            batch_size=_bs, columns=["canonical_key", "count"]):
+                        ck_col = _as_single_array(
+                            batch.column("canonical_key")).to_pylist()
+                        cnt_col = _as_single_array(batch.column("count")).to_pylist()
+                        n = len(ck_col)
+                        base = seq_no
+                        lines = [
+                            "%s\t%d\t%d\n" % (ck, base + j, cnt_col[j])
+                            for j, ck in enumerate(ck_col) if ck is not None
+                        ]
+                        if lines:
+                            any_aligned = True
+                            if est_amplicon_len == 0:
+                                est_amplicon_len = len(next(
+                                    ck for ck in ck_col if ck is not None))
+                            kf.write("".join(lines))
+                        seq_no += n
+            keys_inputs = [keys_file]
 
         # Empty input / all-unaligned: emit an empty parquet (parity with the
         # in-memory path's empty case).
         if not any_aligned:
+            # Consume any worker-produced keys files (all empty or absent —
+            # no aligned reads); they'd otherwise leak next to the shards.
+            for _kp in keys_inputs:
+                if _kp != keys_file:
+                    try:
+                        os.remove(_kp)
+                    except OSError:
+                        pass
             if parquet_path is not None:
                 _write_collapsed_allele_parquet([], parquet_path)
             # No aligned reads → Pass 2 won't run, so accumulate homology for
@@ -2455,8 +2563,17 @@ def _collapse_streaming_single_read(
             )
 
         # -- External sort by canonical_key (stable → ascending seq_no within a group).
-        _run_external_sort(keys_file, sorted_keys_file, workdir, ["-k1,1"],
+        _run_external_sort(keys_inputs, sorted_keys_file, workdir, ["-k1,1"],
                            sort_buffer=self.sort_buffer)
+        # Consume the worker-produced keys files now that the sorted merge
+        # holds their content (the scan fallback's keys file lives in the
+        # workdir and is cleaned with it).
+        for _kp in keys_inputs:
+            if _kp != keys_file:
+                try:
+                    os.remove(_kp)
+                except OSError:
+                    pass
 
         # -- Streaming first-per-group collapse.
         groups = _streaming_collapse_groups(sorted_keys_file)
@@ -2472,6 +2589,12 @@ def _collapse_streaming_single_read(
         # arrays of amplicon length + the two amplicon-length strings.
         est_row_size = max(1, est_amplicon_len) * 10 * 8 + 4096
         use_in_memory = num_groups * est_row_size < self.memory_budget_bytes
+        if use_in_memory:
+            # The fused aggregation is wired into the partitioned gather's
+            # flush only; on this in-memory small-input branch the caller
+            # falls back to ``aggregate_alleles`` (aggregates stays None).
+            agg_state = None
+            agg_vector_refs = None
 
         n_total = 0
         class_counts: dict = {}
@@ -2566,7 +2689,9 @@ def _collapse_streaming_single_read(
                     est_row_size=est_row_size,
                     unsorted_parquet=unsorted_parquet,
                     gather_keys_file=gather_keys_file,
-                    homology_state=_homology_st)
+                    homology_state=_homology_st,
+                    agg_state=agg_state,
+                    agg_vector_refs=agg_vector_refs)
 
             if parquet_path is not None and n_allele_rows > 0:
                 # Step B — sort the small key projection (sort keys + row_idx
@@ -2599,6 +2724,8 @@ def _collapse_streaming_single_read(
             counts_discarded=counts_discarded,
             parquet_path=parquet_path,
             aln_stats=_as, aln_homology=_ah, not_aln_homology=_nah,
+            aggregates=(
+                _finalize_aggregates(agg_state) if agg_state is not None else None),
         )
     finally:
         # All temp artifacts live under ``workdir`` (keys files, the unsorted
@@ -2681,6 +2808,9 @@ def collapse_aligned_shards(
     collapsed_path: Optional[str] = None,
     memory_budget_mb: int = DEFAULT_MEMORY_BUDGET_MB,
     keep_allele_rows: bool = True,
+    aggregate_refs: Optional[dict] = None,
+    aggregate_args=None,
+    aggregate_ref_names: Optional[list] = None,
 ) -> CollapsedAlleles:
     """Convenience wrapper: create a :class:`VariantStore` and collapse shards.
 
@@ -2697,6 +2827,9 @@ def collapse_aligned_shards(
         write_parquet=write_parquet,
         collapsed_path=collapsed_path,
         keep_allele_rows=keep_allele_rows,
+        aggregate_refs=aggregate_refs,
+        aggregate_args=aggregate_args,
+        aggregate_ref_names=aggregate_ref_names,
     )
 
 
@@ -3666,6 +3799,80 @@ class _BatchAggCols:
         self.aln_seqs = batch.column("Aligned_Sequence").to_pylist()
 
 
+def _vector_refs_for(refs: dict, ref_names: list) -> set:
+    """Refs whose per-row aggregation body is fully batchable.
+
+    A ref qualifies when it has no coding sequence AND no exon length mods —
+    for such refs the exon/splicing branch of the per-row body reduces to the
+    two length-vector loops, which :func:`_aggregate_rows_vectorized` handles
+    (gated by the same any-has-* predicate the per-row branch uses).
+    """
+    return {
+        rn for rn in ref_names
+        if not refs[rn]["contains_coding_seq"] and sum(refs[rn]["exon_len_mods"]) == 0
+    }
+
+
+_AGG_COLUMNS = [
+    "#Reads",
+    "Reference_Name",
+    "Aligned_Sequence",
+    "Reference_Sequence",
+    "Read_Status",
+    "n_inserted",
+    "n_deleted",
+    "n_mutated",
+    "ref_positions",
+    "all_insertion_positions",
+    "all_insertion_left_positions",
+    "insertion_positions",
+    "insertion_coordinates",
+    "insertion_sizes",
+    "all_deletion_positions",
+    "deletion_positions",
+    "deletion_coordinates",
+    "deletion_sizes",
+    "all_substitution_positions",
+    "substitution_positions",
+    "all_substitution_values",
+]
+
+
+def _aggregate_batch_into(st: _AggState, table, vector_refs: set) -> None:
+    """Accumulate one COLLAPSED_SCHEMA-shaped arrow table/batch into ``st``.
+
+    Shared by :func:`_aggregate_alleles` (streaming the collapsed parquet)
+    and the collapse Step-A fusion (feeding the just-written flush tables —
+    same rows, scan order instead of output order; the accumulation is
+    order-independent, so results are identical either way). Rows whose
+    Reference_Name is not in ``st.refs`` (AMBIGUOUS_* / DISCARDED_*) are
+    skipped, matching the pandas loop.
+    """
+    if table.num_rows == 0:
+        return
+    bc = _BatchAggCols(table)
+    groups: dict = {}
+    slow_rows: list = []
+    for i, ref_name in enumerate(bc.ref_names):
+        if ref_name not in st.refs:
+            continue
+        if ref_name in vector_refs:
+            groups.setdefault(ref_name, []).append(i)
+        else:
+            slow_rows.append(i)
+    for ref_name, idx_list in groups.items():
+        _aggregate_rows_vectorized(st, ref_name, np.asarray(idx_list), bc)
+    if slow_rows:
+        # Coding-sequence refs: the verbatim per-row body, with row dicts
+        # materialized only for these rows (row-by-row cell access keeps
+        # peak RSS bounded exactly as before).
+        col_arrays = {c: table.column(c) for c in _AGG_COLUMNS}
+        for i in slow_rows:
+            row = {c: col_arrays[c][i].as_py() for c in _AGG_COLUMNS}
+            p = _collapsed_row_to_payload(row)
+            _aggregate_one_row(st, bc.ref_names[i], int(row["#Reads"]), p)
+
+
 def _aggregate_alleles(
     self: "VariantStore",
     refs: dict,
@@ -3723,38 +3930,8 @@ def _aggregate_alleles(
     """
     path = collapsed_path or os.path.join(self.output_directory, "collapsed.allele.parquet")
     st = _init_agg_state(refs, ref_names, args)
-
-    # Refs whose per-row body is fully expressible as batched accumulations
-    # (no coding sequence, no exon length mods → the exon branch reduces to
-    # the length-vector loops, which the vector path handles).
-    vector_refs = {
-        rn for rn in ref_names
-        if not refs[rn]["contains_coding_seq"] and sum(refs[rn]["exon_len_mods"]) == 0
-    }
-
-    columns = [
-        "#Reads",
-        "Reference_Name",
-        "Aligned_Sequence",
-        "Reference_Sequence",
-        "Read_Status",
-        "n_inserted",
-        "n_deleted",
-        "n_mutated",
-        "ref_positions",
-        "all_insertion_positions",
-        "all_insertion_left_positions",
-        "insertion_positions",
-        "insertion_coordinates",
-        "insertion_sizes",
-        "all_deletion_positions",
-        "deletion_positions",
-        "deletion_coordinates",
-        "deletion_sizes",
-        "all_substitution_positions",
-        "substitution_positions",
-        "all_substitution_values",
-    ]
+    vector_refs = _vector_refs_for(refs, ref_names)
+    columns = _AGG_COLUMNS
     pf = pq.ParquetFile(path)
     if batch_size is None:
         # Cap the adaptive batch so the in-flight arrow columns (several of
@@ -3764,33 +3941,7 @@ def _aggregate_alleles(
         # design_docs/PARQUET_MEMORY_PROFILE.md item 5.
         batch_size = min(_adaptive_batch_size(pf), 2048)
     for batch in pf.iter_batches(columns=columns, batch_size=batch_size):
-        n = batch.num_rows
-        if n == 0:
-            continue
-        bc = _BatchAggCols(batch)
-        # Group rows by reference (AMBIGUOUS_* / DISCARDED_* rows do not
-        # contribute — the pandas loop ``continue``\ s before the per-ref body
-        # for them; their Reference_Name is not in ref_names).
-        groups: dict = {}
-        slow_rows: list = []
-        for i, ref_name in enumerate(bc.ref_names):
-            if ref_name not in st.refs:
-                continue
-            if ref_name in vector_refs:
-                groups.setdefault(ref_name, []).append(i)
-            else:
-                slow_rows.append(i)
-        for ref_name, idx_list in groups.items():
-            _aggregate_rows_vectorized(st, ref_name, np.asarray(idx_list), bc)
-        if slow_rows:
-            # Coding-sequence refs: the verbatim per-row body, with row dicts
-            # materialized only for these rows (row-by-row cell access keeps
-            # peak RSS bounded exactly as before).
-            col_arrays = {c: batch.column(c) for c in columns}
-            for i in slow_rows:
-                row = {c: col_arrays[c][i].as_py() for c in columns}
-                p = _collapsed_row_to_payload(row)
-                _aggregate_one_row(st, bc.ref_names[i], int(row["#Reads"]), p)
+        _aggregate_batch_into(st, batch, vector_refs)
 
     return _finalize_aggregates(st)
 

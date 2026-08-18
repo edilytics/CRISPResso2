@@ -1211,7 +1211,8 @@ def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_mat
             process = Process(
                 target=variant_parquet_generator_process_fn,
                 args=(chunk, get_new_variant_object, args, refs, ref_names,
-                      aln_matrix, pe_scaffold_dna_info, i, output_directory, False),
+                      aln_matrix, pe_scaffold_dna_info, i, output_directory,
+                      False, boundaries[i]),
             )
             process.start()  # pickles chunk to the worker; parent can then drop it
             processes.append(process)
@@ -1226,7 +1227,7 @@ def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_mat
         # no materialization at all (the worker iterates it once).
         variant_parquet_generator_process_fn(
             read_counts.items(), get_new_variant_object, args, refs, ref_names,
-            aln_matrix, pe_scaffold_dna_info, 0, output_directory, False,
+            aln_matrix, pe_scaffold_dna_info, 0, output_directory, False, 0,
         )
 
     for sp in shard_paths:
@@ -3873,6 +3874,10 @@ def main():
                 get_new_variant_object, _variant_parquet_generator_process,
             )
             files_to_remove.extend(_shard_paths)
+            # Worker-produced keys files (collapse consumes them on success;
+            # this covers the crash/interrupt path).
+            files_to_remove.extend(
+                os.path.splitext(p)[0] + '.keys.txt' for p in _shard_paths)
             # aln_stats + homology are now fused into Stage 3 (collapse Pass 2)
             # — pulled from ``_collapsed`` after the collapse call below.
             # ``_read_counts.num_unique`` is stashed for the per-unique-read
@@ -4143,6 +4148,8 @@ def main():
                 write_detailed_allele_table=args.write_detailed_allele_table,
                 vcf_output=args.vcf_output,
                 keep_allele_rows=not _parquet_skip_df_alleles,
+                aggregate_refs=refs, aggregate_args=args,
+                aggregate_ref_names=ref_names,
             )
             if _collapsed.parquet_path is not None:
                 files_to_remove.append(_collapsed.parquet_path)
@@ -4178,8 +4185,13 @@ def main():
             N_DISCARDED = sum(_collapsed.counts_discarded.values())
             # Stage 4b: streaming per-allele aggregation (PR 7 item 9)
             info('Aggregating per-allele vectors (parquet backend)...')
-            _agg = _pq_store.aggregate_alleles(
-                refs, args, ref_names, collapsed_path=_collapsed.parquet_path)
+            if _collapsed.aggregates is not None:
+                # Fused into the collapse scan (Step A flush tables) — the
+                # collapsed parquet is never re-read for aggregation.
+                _agg = _collapsed.aggregates
+            else:
+                _agg = _pq_store.aggregate_alleles(
+                    refs, args, ref_names, collapsed_path=_collapsed.parquet_path)
             all_insertion_count_vectors = _agg.all_insertion_count_vectors
             all_insertion_left_count_vectors = _agg.all_insertion_left_count_vectors
             all_deletion_count_vectors = _agg.all_deletion_count_vectors

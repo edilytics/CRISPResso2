@@ -3107,6 +3107,107 @@ def _assert_aggregates_equal(got, ref_st):
         assert d_got == d_ref, f"{attr}: {d_got} != {d_ref}"
 
 
+def test_worker_keys_fast_path_matches_scan(temp_dir):
+    """Pass-1 fast path: collapse via worker-produced aligned_*.keys.txt gives
+    the exact same collapsed output as the scan fallback (bare shards)."""
+    rc = CRISPRessoShared.reverse_complement
+    # reads incl. an RC pair (canonical merge), one unaligned
+    p1 = _allele_with(all_deletion_positions=[8, 9], deletion_n=2,
+                      deletion_coordinates=[(8, 10)], deletion_sizes=[2])
+    p2 = _allele_with(all_deletion_positions=[4], deletion_n=1,
+                      deletion_coordinates=[(4, 5)], deletion_sizes=[1])
+    unaln = _shard_payload()
+    unaln["best_match_score"] = 0.0
+    rows_shard0 = [("ACGTACGA", 4, p1), ("TTTTAAAA", 2, unaln)]
+    rows_shard1 = [("AAAAAAAA", 3, p2)]
+
+    # scan fallback: bare shards
+    shard0 = os.path.join(temp_dir, "aligned_0.parquet")
+    shard1 = os.path.join(temp_dir, "aligned_1.parquet")
+    _write_shard(shard0, rows_shard0)
+    _write_shard(shard1, rows_shard1)
+    res_scan = collapse_aligned_shards(
+        [shard0, shard1], temp_dir + "_scan", is_paired=False,
+        write_detailed_allele_table=True)
+
+    # fast path: same shards + hand-built worker keys files
+    # seq_no numbering: shard0 rows 0..1 (unaligned row 1 gets no line),
+    # shard1 rows 2..; canonical_key = min(key, rc(key))
+    k0 = os.path.join(temp_dir, "aligned_0.keys.txt")
+    k1 = os.path.join(temp_dir, "aligned_1.keys.txt")
+    with open(k0, "w") as f:
+        ck = min("ACGTACGA", rc("ACGTACGA"))
+        f.write(f"{ck}\t0\t4\n")
+    with open(k1, "w") as f:
+        ck = min("AAAAAAAA", rc("AAAAAAAA"))
+        f.write(f"{ck}\t2\t3\n")
+    res_fast = collapse_aligned_shards(
+        [shard0, shard1], temp_dir + "_fast", is_paired=False,
+        write_detailed_allele_table=True)
+    # fast path consumed the keys files
+    assert not os.path.exists(k0) and not os.path.exists(k1)
+
+    assert res_fast.n_total == res_scan.n_total
+    assert res_fast.class_counts == res_scan.class_counts
+    assert res_fast.counts_total == res_scan.counts_total
+    assert res_fast.allele_rows_dataframe().equals(res_scan.allele_rows_dataframe())
+    t_scan = pq.read_table(res_scan.parquet_path)
+    t_fast = pq.read_table(res_fast.parquet_path)
+    assert t_scan.equals(t_fast)
+
+
+def _force_partitioned_collapse(rows, temp_dir, **kw):
+    """collapse_aligned_shards with a tiny memory budget (forces the
+    partitioned gather path even for small inputs) + rc pair + unaligned row."""
+    os.makedirs(temp_dir, exist_ok=True)
+    shard = os.path.join(temp_dir, "aligned_0.parquet")
+    _write_shard(shard, rows)
+    return collapse_aligned_shards(
+        [shard], temp_dir + "_out", is_paired=False,
+        write_detailed_allele_table=True, memory_budget_mb=0, **kw)
+
+
+def test_collapse_fused_aggregation_parity(temp_dir):
+    """Fused aggregation (Step A flush tables) == aggregate_alleles on the
+    collapsed parquet (order-independent accumulation), on the partitioned
+    gather path."""
+    p1 = _allele_with(all_deletion_positions=[8, 9], deletion_n=2,
+                      deletion_coordinates=[(8, 10)], deletion_sizes=[2])
+    p2 = _allele_with_subvals(
+        aln_seq="ATCGATCG--ATCGATCGGT", deletion_n=2, substitution_n=1,
+        all_deletion_positions=[8, 9], deletion_positions=[8, 9],
+        deletion_coordinates=[(8, 10)], deletion_sizes=[2],
+        all_substitution_positions=[18], substitution_positions=[18],
+        all_substitution_values=["G"])
+    rows = [("ACGTACGA", 4, p1), ("ACGTACGC", 2, p2)]
+    refs = {"ref1": _ref_ref(20)}
+    args = _ArgsStub()
+    res_fused = _force_partitioned_collapse(
+        rows, temp_dir, aggregate_refs=refs, aggregate_args=args,
+        aggregate_ref_names=["ref1"])
+    assert res_fused.aggregates is not None
+    file_based = VariantStore(temp_dir + "_out").aggregate_alleles(
+        refs, args, ["ref1"], collapsed_path=res_fused.parquet_path)
+    import dataclasses
+    for f in dataclasses.fields(file_based):
+        va, vb = getattr(res_fused.aggregates, f.name), getattr(file_based, f.name)
+        if isinstance(va, dict):
+            assert set(va) == set(vb), f.name
+            for k in va:
+                x, y = va[k], vb[k]
+                if isinstance(x, np.ndarray):
+                    assert np.array_equal(x, y), f"{f.name}[{k}]"
+                elif isinstance(x, dict):
+                    assert dict(x) == dict(y), f"{f.name}[{k}]"
+                else:
+                    assert x == y, f"{f.name}[{k}]"
+        else:
+            assert va == vb, f.name
+    # and without aggregate_refs: aggregates is None (caller falls back)
+    res_plain = _force_partitioned_collapse(rows, temp_dir + "_plain")
+    assert res_plain.aggregates is None
+
+
 def test_aggregate_alleles_basic_parity(temp_dir):
     """P0: aggregate_alleles reproduces the per-ref body on a 3-allele case."""
     p1 = _allele_with_subvals(
