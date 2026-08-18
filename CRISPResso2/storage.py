@@ -3330,6 +3330,263 @@ def _collapsed_row_to_payload(row: dict) -> dict:
     }
 
 
+def _as_single_array(obj):
+    """Normalize a column-ish object to a single ``pa.Array``.
+
+    ``RecordBatch.column`` / ``ChunkedArray.take`` return ``ChunkedArray``;
+    numpy-style accessors (``.offsets``, ``.flatten``) live on ``Array``.
+    """
+    if isinstance(obj, pa.ChunkedArray):
+        obj = obj.combine_chunks()
+        if isinstance(obj, pa.ChunkedArray):
+            if obj.num_chunks == 0:
+                return pa.array([], type=obj.type)
+            return obj.chunk(0)
+    return obj
+
+
+def _take_list_values(col, idx):
+    """Concatenated list values of rows ``idx`` + per-row lengths (numpy).
+
+    ``take`` materializes a fresh array with rebased offsets (slice-safe —
+    ``ListArray.offsets`` on a sliced array returns the un-rebased buffer,
+    which would corrupt the offsets arithmetic), and ``flatten`` concatenates
+    the taken lists in row order. Null list cells contribute zero values.
+    Returns ``(values_ndarray_or_array, lens_int64)``.
+    """
+    sel = pa.array(idx, type=pa.int64())
+    sub = _as_single_array(col.take(sel))
+    offs = np.asarray(sub.offsets, dtype=np.int64)
+    lens = np.diff(offs)
+    return sub.flatten(), lens
+
+
+def _acc_bincount(vec, pos, weights):
+    """``vec[pos] += weights`` batched via ``np.bincount`` (order-independent).
+
+    Exact-equivalent to the per-row ``arr[positions] += count`` accumulation
+    when all values are integer-valued (float64 sums of integers < 2^53 are
+    exact). Raises on out-of-range or negative positions — the producer
+    guarantees non-negative amplicon-bounded positions (negative wrapping,
+    which plain numpy fancy-indexing would silently do, is corrupt data).
+    """
+    if pos.size == 0:
+        return
+    if pos.size and (pos.min() < 0):
+        raise ValueError("negative position in parquet payload column")
+    bc = np.bincount(pos, weights=weights, minlength=len(vec))
+    if bc.size > len(vec):
+        raise IndexError(
+            "position %d out of range for amplicon vector of length %d"
+            % (int(pos.max()), len(vec))
+        )
+    vec += bc
+
+
+def _counter_add(counter, vals, weights):
+    """``counter[v] += w`` for arrays of values/weights (int-exact via float64)."""
+    if vals.size == 0:
+        return
+    uniq, inv = np.unique(vals, return_inverse=True)
+    sums = np.bincount(inv, weights=weights, minlength=uniq.size)
+    for k, v in zip(uniq.tolist(), sums.tolist()):
+        counter[k] += int(v)
+
+
+def _aggregate_rows_vectorized(st: _AggState, ref_name: str, idx, bc) -> None:
+    """Vectorized batch accumulation for the rows of one non-coding ref.
+
+    Computes, per batch, exactly what :func:`_aggregate_one_row` computes per
+    row for refs where ``contains_coding_seq`` is False and
+    ``sum(exon_len_mods) == 0`` — for such refs the exon/splicing branch
+    reduces to the two length-vector loops (see below), so the entire body is
+    expressible as order-independent vector accumulations:
+
+    * position vectors via :func:`_acc_bincount` (bincount handles duplicate
+      positions across rows — and within a row for the insertion position
+      lists, where adjacent insertions share a boundary position — in one pass),
+    * per-row scalars (#Reads / n_inserted / n_deleted / n_mutated) as numpy
+      int arrays masked by the has-insertion/deletion/substitution predicates,
+    * Counters via :func:`_counter_add`,
+    * per-base substitution vectors via arrow-native ``pc.equal`` masks over
+      the flattened single-char string values,
+    * base-count vectors via one concatenated ``aln_seq`` byte buffer,
+    * insertion/deletion length vectors from the coordinate struct columns
+      (the only part of the exon branch that fires for non-coding refs).
+
+    All sums are integer-valued float64 → exact regardless of row order.
+    """
+    import pyarrow.compute as pc
+
+    refs = st.refs
+    reads = bc.reads[idx]
+    ins_n = bc.n_ins[idx]
+    del_n = bc.n_del[idx]
+    sub_n = bc.n_mut[idx]
+
+    def _pos_acc(vec, col_name):
+        vals, lens = _take_list_values(bc.batch.column(col_name), idx)
+        _acc_bincount(vec, np.asarray(vals, dtype=np.int64), np.repeat(reads, lens))
+
+    # -- always-on accumulations ---------------------------------------
+    _pos_acc(st.all_insertion_count_vectors[ref_name], "all_insertion_positions")
+    _pos_acc(st.all_insertion_left_count_vectors[ref_name], "all_insertion_left_positions")
+    _pos_acc(st.all_deletion_count_vectors[ref_name], "all_deletion_positions")
+    _pos_acc(st.all_substitution_count_vectors[ref_name], "all_substitution_positions")
+
+    # -- gated accumulations + effective length ------------------------
+    eff = np.full(idx.size, refs[ref_name]["sequence_length"], dtype=np.int64)
+    if not st.ignore_insertions:
+        eff += ins_n
+        st.counts_insertion[ref_name] += int(reads[ins_n > 0].sum())
+        _counter_add(st.inserted_n_dicts[ref_name], ins_n, reads)
+        _pos_acc(st.insertion_count_vectors[ref_name], "insertion_positions")
+    if not st.ignore_deletions:
+        eff -= del_n
+        st.counts_deletion[ref_name] += int(reads[del_n > 0].sum())
+        _counter_add(st.deleted_n_dicts[ref_name], del_n, reads)
+        _pos_acc(st.deletion_count_vectors[ref_name], "deletion_positions")
+    _counter_add(st.effective_len_dicts[ref_name], eff, reads)
+    if not st.ignore_substitutions:
+        st.counts_substitution[ref_name] += int(reads[sub_n > 0].sum())
+        _counter_add(st.substituted_n_dicts[ref_name], sub_n, reads)
+        _pos_acc(st.substitution_count_vectors[ref_name], "substitution_positions")
+
+    # -- has-* flags mirror the gated increments above ------------------
+    has_ins = (ins_n > 0) & (not st.ignore_insertions)
+    has_del = (del_n > 0) & (not st.ignore_deletions)
+    has_sub = (sub_n > 0) & (not st.ignore_substitutions)
+
+    # -- 8-bucket classification ----------------------------------------
+    st.counts_insertion_and_deletion_and_substitution[ref_name] += int(
+        reads[has_ins & has_del & has_sub].sum())
+    st.counts_insertion_and_deletion[ref_name] += int(
+        reads[has_ins & has_del & ~has_sub].sum())
+    st.counts_deletion_and_substitution[ref_name] += int(
+        reads[~has_ins & has_del & has_sub].sum())
+    st.counts_only_deletion[ref_name] += int(
+        reads[has_del & ~has_ins & ~has_sub].sum())
+    st.counts_insertion_and_substitution[ref_name] += int(
+        reads[has_ins & ~has_del & has_sub].sum())
+    st.counts_only_insertion[ref_name] += int(
+        reads[has_ins & ~has_del & ~has_sub].sum())
+    st.counts_only_substitution[ref_name] += int(
+        reads[~has_ins & ~has_del & has_sub].sum())
+
+    # -- per-base substitution vectors ----------------------------------
+    if not st.ignore_substitutions:
+        sub_vals, sub_lens = _take_list_values(
+            bc.batch.column("all_substitution_values"), idx)
+        if len(sub_vals) > 0:
+            sub_pos, pos_lens = _take_list_values(
+                bc.batch.column("all_substitution_positions"), idx)
+            if not np.array_equal(sub_lens, pos_lens):
+                raise ValueError(
+                    "all_substitution_values/all_substitution_positions "
+                    "length mismatch in collapsed parquet")
+            w = np.repeat(reads, sub_lens)
+            pos64 = np.asarray(sub_pos, dtype=np.int64)
+            for nuc in ("A", "T", "C", "G", "N"):
+                mask = pc.equal(sub_vals, pa.scalar(nuc, pa.string()))
+                m = mask.to_numpy(zero_copy_only=False).astype(bool)
+                if m.any():
+                    _acc_bincount(
+                        st.all_substitution_base_vectors[ref_name + "_" + nuc],
+                        pos64[m], w[m])
+
+    # -- base-count vectors ---------------------------------------------
+    seqs = [bc.aln_seqs[i] for i in idx.tolist()]
+    seq_bytes = np.frombuffer("".join(seqs).encode("ascii"), dtype=np.uint8)
+    seq_lens = np.fromiter((len(s) for s in seqs), dtype=np.int64, count=len(seqs))
+    ref_pos_vals, ref_pos_lens = _take_list_values(
+        bc.batch.column("ref_positions"), idx)
+    if not np.array_equal(seq_lens, ref_pos_lens):
+        raise ValueError(
+            "Aligned_Sequence/ref_positions length mismatch in collapsed parquet")
+    rp = np.asarray(ref_pos_vals, dtype=np.int64)
+    valid = rp >= 0
+    w = np.repeat(reads, ref_pos_lens)
+    for nuc in ("A", "C", "G", "T", "N", "-"):
+        m = valid & (seq_bytes == ord(nuc))
+        if m.any():
+            _acc_bincount(
+                st.all_base_count_vectors[ref_name + "_" + nuc], rp[m], w[m])
+
+    # -- length vectors (the exon-branch residue for non-coding refs) ---
+    # The per-row body enters the exon branch only when any has-* flag is
+    # set (or tot_exon_len_mod != 0 — excluded from vector_refs), and the
+    # length-vector loops run inside that branch — e.g. with every ignore
+    # flag set, a row with indel coordinates contributes NOTHING here.
+    lv_idx = idx[has_ins | has_del | has_sub]
+    ins_coords, ins_coord_lens = _take_list_values(
+        bc.batch.column("insertion_coordinates"), lv_idx)
+    if len(ins_coords) > 0:
+        starts = np.asarray(ins_coords.field("start"), dtype=np.int64)
+        ends = np.asarray(ins_coords.field("end"), dtype=np.int64)
+        sizes_vals, sizes_lens = _take_list_values(
+            bc.batch.column("insertion_sizes"), lv_idx)
+        if not np.array_equal(ins_coord_lens, sizes_lens):
+            raise ValueError(
+                "insertion_coordinates/insertion_sizes length mismatch "
+                "in collapsed parquet")
+        sizes = np.asarray(sizes_vals, dtype=np.int64)
+        w = np.repeat(bc.reads[lv_idx], ins_coord_lens) * sizes
+        vec = st.insertion_length_vectors[ref_name]
+        _acc_bincount(vec, starts, w)
+        _acc_bincount(vec, ends, w)
+
+    del_coords, del_coord_lens = _take_list_values(
+        bc.batch.column("deletion_coordinates"), lv_idx)
+    if len(del_coords) > 0:
+        starts = np.asarray(del_coords.field("start"), dtype=np.int64)
+        ends = np.asarray(del_coords.field("end"), dtype=np.int64)
+        sizes_vals, sizes_lens = _take_list_values(
+            bc.batch.column("deletion_sizes"), lv_idx)
+        if not np.array_equal(del_coord_lens, sizes_lens):
+            raise ValueError(
+                "deletion_coordinates/deletion_sizes length mismatch "
+                "in collapsed parquet")
+        sizes = np.asarray(sizes_vals, dtype=np.int64)
+        # expand each (start, end) coord to its half-open position range —
+        # ``deletion_length_vectors[range(s, e)] += size * count``
+        w_coord = np.repeat(bc.reads[lv_idx], del_coord_lens)
+        lens = ends - starts
+        total = int(lens.sum())
+        vi = np.ones(total, dtype=np.int64)
+        vi[0] = starts[0]
+        if lens.size > 1:
+            cs = np.cumsum(lens)[:-1]
+            vi[cs] = starts[1:] - ends[:-1] + 1
+        pos = np.cumsum(vi)
+        w_pos = np.repeat(sizes * w_coord, lens)
+        _acc_bincount(st.deletion_length_vectors[ref_name], pos, w_pos)
+
+
+class _BatchAggCols:
+    """Per-batch scalar columns as numpy/python lists for the aggregation.
+
+    Extracts the cheap scalar columns once per batch (native ``to_numpy`` /
+    ``to_pylist`` — bounded by the batch cap, unlike the amplicon-length list
+    columns which are consumed arrow-native by
+    :func:`_aggregate_rows_vectorized`).
+    """
+
+    __slots__ = ("batch", "reads", "n_ins", "n_del", "n_mut", "ref_names", "aln_seqs")
+
+    def __init__(self, batch):
+        self.batch = batch
+        self.reads = _as_single_array(batch.column("#Reads")).to_numpy(
+            zero_copy_only=False)
+        self.n_ins = _as_single_array(batch.column("n_inserted")).to_numpy(
+            zero_copy_only=False)
+        self.n_del = _as_single_array(batch.column("n_deleted")).to_numpy(
+            zero_copy_only=False)
+        self.n_mut = _as_single_array(batch.column("n_mutated")).to_numpy(
+            zero_copy_only=False)
+        self.ref_names = batch.column("Reference_Name").to_pylist()
+        self.aln_seqs = batch.column("Aligned_Sequence").to_pylist()
+
+
 def _aggregate_alleles(
     self: "VariantStore",
     refs: dict,
@@ -3342,12 +3599,10 @@ def _aggregate_alleles(
     """Stream the collapsed allele parquet → per-reference aggregation outputs.
 
     Replaces the per-ref body of ``CRISPRessoCORE.main``'s allele loop for the
-    parquet backend. Scans the collapsed parquet row-group by row-group
-    (``pyarrow.iter_batches``), reconstructs each row as a payload-shaped dict,
-    and runs :func:`_aggregate_one_row` for every normal (non-AMBIGUOUS,
-    non-DISCARDED) row. Peak memory is bounded by one batch + the accumulator
-    vectors (O(amplicon_length x num_refs x num_base_types) — the design's
-    stated bounded lower-order term), not by the allele count.
+    parquet backend. Scans the collapsed parquet batch-by-batch
+    (``pyarrow.iter_batches``). Peak memory is bounded by one batch + the
+    accumulator vectors (O(amplicon_length x num_refs x num_base_types) — the
+    design's stated bounded lower-order term), not by the allele count.
 
     Parameters
     ----------
@@ -3376,9 +3631,27 @@ def _aggregate_alleles(
         outputs for direct consumption by the downstream plot / quantification
         code.
 
+    Notes
+    -----
+    Rows are accumulated in **batches**: refs without coding sequence (and
+    without exon length mods) are accumulated by the order-independent
+    vectorized path (:func:`_aggregate_rows_vectorized` — bincount-based, so
+    exact regardless of row order); refs WITH coding sequence keep the
+    verbatim per-row body (:func:`_aggregate_one_row`) because the
+    exon/splicing logic is inherently per-row. Peak memory is bounded by one
+    batch + the accumulator vectors, as before.
+
     """
     path = collapsed_path or os.path.join(self.output_directory, "collapsed.allele.parquet")
     st = _init_agg_state(refs, ref_names, args)
+
+    # Refs whose per-row body is fully expressible as batched accumulations
+    # (no coding sequence, no exon length mods → the exon branch reduces to
+    # the length-vector loops, which the vector path handles).
+    vector_refs = {
+        rn for rn in ref_names
+        if not refs[rn]["contains_coding_seq"] and sum(refs[rn]["exon_len_mods"]) == 0
+    }
 
     columns = [
         "#Reads",
@@ -3405,33 +3678,40 @@ def _aggregate_alleles(
     ]
     pf = pq.ParquetFile(path)
     if batch_size is None:
-        # Cap the adaptive batch so the 21 in-flight ChunkedArrays (several of
-        # them amplicon-length list columns) don't land the whole collapsed
-        # table in one batch at small scale. The row-by-row ``.as_py()`` access
-        # is batch-size-independent for correctness; a 1000-row cap bounds the
-        # arrow decompression buffer (design_docs/PARQUET_MEMORY_PROFILE.md
-        # item 5).
-        batch_size = min(_adaptive_batch_size(pf), 1000)
+        # Cap the adaptive batch so the in-flight arrow columns (several of
+        # them amplicon-length list columns) stay bounded: the vector path
+        # holds one batch's flat values (~2048 × amplicon_length × int16 per
+        # column ≈ a few MB) plus transient take/repeat copies. See
+        # design_docs/PARQUET_MEMORY_PROFILE.md item 5.
+        batch_size = min(_adaptive_batch_size(pf), 2048)
     for batch in pf.iter_batches(columns=columns, batch_size=batch_size):
         n = batch.num_rows
         if n == 0:
             continue
-        # Row-by-row cell access (not batch.to_pylist()) so string-array
-        # columns (all_substitution_values) don't blow up peak RSS ~50x.
-        col_arrays = {c: batch.column(c) for c in columns}
-        ref_col = col_arrays["Reference_Name"]
-        reads_col = col_arrays["#Reads"]
-        for i in range(n):
-            ref_name = ref_col[i].as_py()
-            # AMBIGUOUS_* / DISCARDED_* rows do not contribute to the per-ref
-            # aggregations — the pandas loop ``continue``\ s before the per-ref
-            # body for them (class_counts / counts_discarded are handled by
-            # collapse). Their Reference_Name is not in ref_names.
+        bc = _BatchAggCols(batch)
+        # Group rows by reference (AMBIGUOUS_* / DISCARDED_* rows do not
+        # contribute — the pandas loop ``continue``\ s before the per-ref body
+        # for them; their Reference_Name is not in ref_names).
+        groups: dict = {}
+        slow_rows: list = []
+        for i, ref_name in enumerate(bc.ref_names):
             if ref_name not in st.refs:
                 continue
-            row = {c: col_arrays[c][i].as_py() for c in columns}
-            p = _collapsed_row_to_payload(row)
-            _aggregate_one_row(st, ref_name, int(reads_col[i].as_py()), p)
+            if ref_name in vector_refs:
+                groups.setdefault(ref_name, []).append(i)
+            else:
+                slow_rows.append(i)
+        for ref_name, idx_list in groups.items():
+            _aggregate_rows_vectorized(st, ref_name, np.asarray(idx_list), bc)
+        if slow_rows:
+            # Coding-sequence refs: the verbatim per-row body, with row dicts
+            # materialized only for these rows (row-by-row cell access keeps
+            # peak RSS bounded exactly as before).
+            col_arrays = {c: batch.column(c) for c in columns}
+            for i in slow_rows:
+                row = {c: col_arrays[c][i].as_py() for c in columns}
+                p = _collapsed_row_to_payload(row)
+                _aggregate_one_row(st, bc.ref_names[i], int(row["#Reads"]), p)
 
     return _finalize_aggregates(st)
 

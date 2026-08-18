@@ -3154,3 +3154,125 @@ def test_aggregate_alleles_multi_batch_parity(temp_dir):
     got = store.aggregate_alleles(refs, args, ["ref1"], collapsed_path=collapsed_path, batch_size=5)
     ref_st = _run_ref_aggregation(allele_rows, refs, ["ref1"], args)
     _assert_aggregates_equal(got, ref_st)
+def _sub_from_alignment(ref_name, read_al, ref_al, classification="MODIFIED"):
+    """Build a producer-consistent per-ref sub-payload from aligned strings.
+
+    Uses the real :func:`find_indels_substitutions` so ref_positions /
+    coords / sizes / values carry exactly the producer's invariants (the
+    vectorized aggregation is specified against those).
+    """
+    from CRISPResso2.CRISPRessoCOREResources import find_indels_substitutions
+    include = list(range(len(ref_al) - ref_al.count("-")))
+    sub = vars(find_indels_substitutions(read_al, ref_al, include)).copy()
+    sub.update({
+        "ref_name": ref_name,
+        "aln_seq": read_al,
+        "aln_ref": ref_al,
+        "aln_strand": "+",
+        "classification": classification,
+        "irregular_ends": False,
+        "insertions_outside_window": 0,
+        "deletions_outside_window": 0,
+        "substitutions_outside_window": 0,
+        "total_mods": sub["insertion_n"] + sub["deletion_n"] + sub["substitution_n"],
+        "mods_in_window": sub["insertion_n"] + sub["deletion_n"] + sub["substitution_n"],
+        "mods_outside_window": 0,
+    })
+    return sub
+
+
+def _payload_from_sub(ref_name, sub, classification="MODIFIED"):
+    return {
+        "count": 1, "aln_ref_names": [ref_name], "aln_scores": [95.0],
+        "best_match_score": 95.0,
+        "class_name": ref_name + "_" + classification,
+        "best_match_name": ref_name, "caching_is_ok": True,
+        "variant_" + ref_name: sub,
+    }
+
+
+def test_aggregate_alleles_vectorized_insertion_parity(temp_dir):
+    """P1: insertion rows (coords + duplicate boundary positions) through the
+    vectorized batch path match the reference per-row body exactly."""
+    # one insertion of T between ref positions 3 and 4
+    sub1 = _sub_from_alignment(
+        "ref1", "ATCGTATCGAAATCGATCGAT", "ATCG-ATCGAAATCGATCGAT")
+    p1 = _payload_from_sub("ref1", sub1)
+    # substitution-only row (A->G at position 18)
+    sub2 = _sub_from_alignment(
+        "ref1", "ATCGATCGAAATCGATCGGT", "ATCGATCGAAATCGATCGAT")
+    p2 = _payload_from_sub("ref1", sub2)
+    # unmodified row
+    sub3 = _sub_from_alignment(
+        "ref1", "ATCGATCGAAATCGATCGAT", "ATCGATCGAAATCGATCGAT",
+        classification="UNMODIFIED")
+    p3 = _payload_from_sub("ref1", sub3, classification="UNMODIFIED")
+    rows = [("ACGTAAAA", 5, p1), ("ACGTAAAC", 3, p2), ("ACGTAAAG", 7, p3)]
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    refs = {"ref1": _ref_ref(20)}
+    args = _ArgsStub()
+    got = aggregate_alleles_from_collapsed(collapsed_path, refs, args, ["ref1"], temp_dir)
+    ref_st = _run_ref_aggregation(allele_rows, refs, ["ref1"], args)
+    _assert_aggregates_equal(got, ref_st)
+    # spot checks: insertion bracket positions weighted by 5; sub 'G' at 18 x3
+    assert got.all_insertion_count_vectors["ref1"][3] == 5.0
+    assert got.all_insertion_count_vectors["ref1"][4] == 5.0
+    assert got.all_insertion_left_count_vectors["ref1"][3] == 5.0
+    assert got.all_insertion_left_count_vectors["ref1"][4] == 0.0
+    assert got.insertion_length_vectors["ref1"][3] == 5.0
+    assert got.insertion_length_vectors["ref1"][4] == 5.0
+    assert got.all_substitution_base_vectors["ref1_G"][18] == 3.0
+    assert got.counts_only_insertion["ref1"] == 5
+    assert got.counts_only_substitution["ref1"] == 3
+
+
+def test_aggregate_alleles_vectorized_ignore_flags_parity(temp_dir):
+    """P1: ignore_insertions/deletions/substitutions combos on the vector path."""
+    # insertion (T after 3) + deletion (AA at 8,9) + substitution (A->G at 18)
+    sub1 = _sub_from_alignment(
+        "ref1", "ATCGTATCG--ATCGATCGGT", "ATCG-ATCGAAATCGATCGAT")
+    p1 = _payload_from_sub("ref1", sub1)
+    rows = [("ACGTAAAA", 6, p1)]
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    refs = {"ref1": _ref_ref(20)}
+    for ignore_ins in (False, True):
+        for ignore_del in (False, True):
+            for ignore_sub in (False, True):
+                args = _ArgsStub(
+                    ignore_insertions=ignore_ins,
+                    ignore_deletions=ignore_del,
+                    ignore_substitutions=ignore_sub,
+                )
+                got = aggregate_alleles_from_collapsed(
+                    collapsed_path, refs, args, ["ref1"], temp_dir)
+                ref_st = _run_ref_aggregation(allele_rows, refs, ["ref1"], args)
+                _assert_aggregates_equal(got, ref_st)
+
+
+def test_aggregate_alleles_coding_ref_fallback_parity(temp_dir):
+    """P1: coding-sequence refs keep the verbatim per-row body inside the
+    batched loop (exon/splicing logic), matching the reference - including
+    when mixed in the same collapsed parquet with a non-coding ref."""
+    sub1 = _sub_from_alignment(
+        "ref1", "ATCGATCG--ATCGATCGAT", "ATCGATCGAAATCGATCGAT")
+    p1 = _payload_from_sub("ref1", sub1)
+    sub2 = _sub_from_alignment(
+        "ref2", "ATCGATCG--ATCGATCGAT", "ATCGATCGAAATCGATCGAT")
+    p2 = _payload_from_sub("ref2", sub2)
+    rows = [("ACGTACGA", 4, p1), ("ACGTACGC", 9, p2)]
+    allele_rows, n_total, collapsed_path, _ = _collapse_to_rows(rows, temp_dir)
+    refs = {
+        "ref1": _ref_ref(20, contains_coding_seq=True,
+                         exon_positions=[4, 5, 6, 7, 8, 9],
+                         splicing_positions=[7, 8]),
+        "ref2": _ref_ref(20),
+    }
+    args = _ArgsStub()
+    got = aggregate_alleles_from_collapsed(
+        collapsed_path, refs, args, ["ref1", "ref2"], temp_dir)
+    ref_st = _run_ref_aggregation(allele_rows, refs, ["ref1", "ref2"], args)
+    _assert_aggregates_equal(got, ref_st)
+    # ref1's deletion hits the exon -> modified_frameshift (len -2)
+    assert got.counts_modified_frameshift["ref1"] == 4
+    assert got.hists_frameshift["ref1"][-2] == 4
+    assert dict(got.hists_frameshift["ref1"])[0] == 0
