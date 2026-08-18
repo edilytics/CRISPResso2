@@ -3081,11 +3081,15 @@ def _aggregate_one_row(st: _AggState, ref_name: str, variant_count: int, p: dict
         nucs = ["A", "T", "C", "G", "N"]
         all_sub_values = p["all_substitution_values"]
         all_sub_positions = p["all_substitution_positions"]
-        for nuc in nucs:
-            isNuc = [n == nuc for n in all_sub_values]
-            if np.sum(isNuc) > 0:
-                locs = np.array(all_sub_positions)[isNuc]
-                st.all_substitution_base_vectors[ref_name + "_" + nuc][locs] += variant_count
+        # Vectorized (mirrors CRISPRessoCORE a57a9ef): one np.asarray per row
+        # instead of 5 per-base list comprehensions + np.sum over each.
+        if len(all_sub_values) > 0:
+            val_arr = np.asarray(all_sub_values)
+            pos_arr = np.asarray(all_sub_positions)
+            for nuc in nucs:
+                locs = np.flatnonzero(val_arr == nuc)
+                if locs.size:
+                    st.all_substitution_base_vectors[ref_name + "_" + nuc][pos_arr[locs]] += variant_count
 
     if this_has_deletions:
         if this_has_insertions:
@@ -3105,14 +3109,19 @@ def _aggregate_one_row(st: _AggState, ref_name: str, variant_count: int, p: dict
     elif this_has_substitutions:
         st.counts_only_substitution[ref_name] += variant_count
 
-    # set all_base_count_vectors
+    # set all_base_count_vectors (vectorized; equivalent to per-base loop —
+    # mirrors CRISPRessoCORE a57a9ef)
     aln_seq = p["aln_seq"]
     ref_pos = p["ref_positions"]
-    for i in range(len(aln_seq)):
-        if ref_pos[i] < 0:
-            continue
-        nuc = aln_seq[i]
-        st.all_base_count_vectors[ref_name + "_" + nuc][ref_pos[i]] += variant_count
+    ref_pos_arr = np.asarray(ref_pos)
+    valid_mask = ref_pos_arr >= 0
+    if valid_mask.any():
+        aln_seq_arr = np.frombuffer(aln_seq.encode("ascii"), dtype=np.uint8)
+        for nuc in ("A", "C", "G", "T", "N", "-"):
+            nuc_mask = valid_mask & (aln_seq_arr == ord(nuc))
+            if nuc_mask.any():
+                np.add.at(st.all_base_count_vectors[ref_name + "_" + nuc],
+                          ref_pos_arr[nuc_mask], variant_count)
 
     exon_len_mods = refs[ref_name]["exon_len_mods"]
     tot_exon_len_mod = sum(exon_len_mods)
