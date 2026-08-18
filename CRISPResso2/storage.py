@@ -698,7 +698,14 @@ def _to_int_list(val):
         # value or explain the amplicon-bounded constraint.
         widened = _np.asarray(val, dtype=_np.int64)
     else:
-        widened = _np.asarray([int(x) for x in val], dtype=_np.int64)
+        # Python list: convert C-level (per-element ``int(x)`` in a list
+        # comprehension is ~3x slower and dominates Step A of the
+        # partitioned gather). Fall back for exotic element types that
+        # numpy cannot convert directly.
+        try:
+            widened = _np.asarray(val, dtype=_np.int64)
+        except (TypeError, ValueError, OverflowError):
+            widened = _np.asarray([int(x) for x in val], dtype=_np.int64)
     if widened.size:
         amax = int(widened.max())
         amin = int(widened.min())
@@ -724,6 +731,10 @@ def _to_str_list(val):
     if val is None:
         return None
     import numpy as _np
+    if hasattr(val, "dtype") and val.dtype.kind == "U":
+        # numpy unicode array: box to str objects C-level (``astype(object)``)
+        # — the common payload shape from ``find_indels_substitutions``.
+        return val.astype(object)
     if hasattr(val, "tolist"):
         val = val.tolist()
     return _np.asarray([str(x) for x in val], dtype=object)
@@ -2121,6 +2132,26 @@ def _partitioned_gather_write_unsorted(
 
     flush_every = max(100, min(8192, 32_000_000 // max(1, est_row_size)))
     writer = pq.ParquetWriter(unsorted_parquet, _COLLAPSED_SCHEMA_WITH_ROW_IDX)
+
+    def _flush(buf):
+        """Write buffered rows column-wise (``pa.array`` per column).
+
+        Column-wise construction with an explicit type converts each column's
+        cells in one C pass — ~3x faster than ``Table.from_pylist``, which
+        re-validates every row dict (measured on 2048-row batches with
+        amplicon-length list cells). Cells are the numpy int16/str-object
+        arrays produced by :func:`_allele_dict_to_parquet_row`, plus ``None``
+        for null cells.
+        """
+        if not buf:
+            return
+        arrays = [
+            pa.array([row[f.name] for row in buf], type=f.type)
+            for f in _COLLAPSED_SCHEMA_WITH_ROW_IDX
+        ]
+        writer.write_table(
+            pa.Table.from_arrays(arrays, schema=_COLLAPSED_SCHEMA_WITH_ROW_IDX))
+
     try:
         buf: list = []
         row_idx = 0
@@ -2152,16 +2183,13 @@ def _partitioned_gather_write_unsorted(
                                 f"{row_idx:015d}\n")
                             row_idx += 1
                             if len(buf) >= flush_every:
-                                writer.write_table(pa.Table.from_pylist(
-                                    buf, schema=_COLLAPSED_SCHEMA_WITH_ROW_IDX))
+                                _flush(buf)
                                 buf.clear()
                         next_rep = next(rep_iter, None)
                     seq_no += 1
                     # No early break — homology accumulation must visit every row.
-        if buf:
-            writer.write_table(pa.Table.from_pylist(
-                buf, schema=_COLLAPSED_SCHEMA_WITH_ROW_IDX))
-            buf.clear()
+        _flush(buf)
+        buf.clear()
     finally:
         writer.close()
 
