@@ -1235,6 +1235,13 @@ _COLLAPSED_SCHEMA_WITH_ROW_IDX = COLLAPSED_SCHEMA.append(
     pa.field("row_idx", pa.int64())
 )
 
+# COLLAPSED_SCHEMA + a synthetic ``out_pos`` column (the row's position in
+# the final output order). Used by the partitioned gather's per-bucket spill
+# files: buckets stay arrow-native end-to-end (no TSV string round-trip).
+_COLLAPSED_SCHEMA_WITH_OUT_POS = COLLAPSED_SCHEMA.append(
+    pa.field("out_pos", pa.int64())
+)
+
 
 def _get_allele_row(
     reference_name: str,
@@ -2172,17 +2179,20 @@ def _partitioned_gather_emit(
     bucket_dir: str,
     parquet_path: str,
 ) -> None:
-    """Steps C-E of the partitioned gather.
+    """Steps C-E of the partitioned gather (arrow-native end to end).
 
     *C* — read ``gather_keys_sorted`` (output order) and build
     ``out_pos[row_idx] = output index``.
-    *D* — stream ``unsorted_parquet`` once; scatter each row to a per-bucket TSV
-    spill file (``out_pos`` + the row's TSV encoding). Peak RSS = K small write
-    buffers + one arrow batch.
-    *E* — per bucket (in output order): read, sort in memory by ``out_pos``, and
-    write to ``parquet_path`` (batched arrow writes). Peak RSS = one bucket.
+    *D* — stream ``unsorted_parquet`` once; per arrow batch, scatter rows to
+    per-bucket parquet spill files (``_COLLAPSED_SCHEMA_WITH_OUT_POS``) via
+    batch-wise ``take`` — no per-row ``.as_py()`` / TSV string round-trip.
+    Peak RSS = K writer buffers + one arrow batch + one take-copy.
+    *E* — per bucket (in output order): read, sort by ``out_pos`` via
+    ``pyarrow.compute.sort_indices``, drop the synthetic ``out_pos`` column,
+    and write to ``parquet_path``. Peak RSS = one bucket.
     """
     import numpy as _np
+    import pyarrow.compute as pc
 
     # -- Step C: out_pos[row_idx] = output index (from the sorted key projection).
     out_pos = _np.empty(n_allele_rows, dtype=_np.int64)
@@ -2196,76 +2206,86 @@ def _partitioned_gather_emit(
             out_pos[int(f[3])] = pos
             pos += 1
 
-    # Bucket size: one bucket materialised as Python dicts in Step E should
-    # stay within the memory budget (dict overhead ≈ 3x the arrow row).
-    chunk_size = max(1, int(self.memory_budget_bytes // max(1, est_row_size * 3)))
+    # Bucket size: one bucket materialised as an arrow table in Step E must
+    # stay within the memory budget. Size on the ACTUAL arrow bytes/row,
+    # measured from a small probe batch of ``unsorted_parquet`` (exact and
+    # schema-aware — the parquet-uncompressed footprint under-counts arrow
+    # in-memory footprint ~3x for string/list columns, and the ``est_row_size``
+    # heuristic over-counts 10x+, yielding hundreds of mostly-empty writers).
+    _probe_pf = pq.ParquetFile(unsorted_parquet)
+    _probe = next((b for b in _probe_pf.iter_batches(batch_size=2048) if b.num_rows > 0), None)
+    if _probe is not None:
+        arrow_bytes_per_row = max(1, _probe.nbytes // _probe.num_rows)
+        del _probe
+    else:
+        arrow_bytes_per_row = max(1, est_row_size)
+    del _probe_pf
+    chunk_size = max(1, int(self.memory_budget_bytes // arrow_bytes_per_row))
     n_buckets = (n_allele_rows + chunk_size - 1) // chunk_size
 
     os.makedirs(bucket_dir, exist_ok=True)
     bucket_paths = [
-        os.path.join(bucket_dir, f"bucket_{b:06d}.tsv") for b in range(n_buckets)
+        os.path.join(bucket_dir, f"bucket_{b:06d}.parquet") for b in range(n_buckets)
     ]
-    # Step D keeps all n_buckets spill files open simultaneously; raise the FD
+    # Step D keeps all n_buckets spill writers open simultaneously; raise the FD
     # soft limit so this does not hit the (often 256) default.
     _ensure_nofile(n_buckets + 128)
 
     # -- Step D: partitioned gather (one streaming pass over the unsorted parquet).
-    bucket_fhs = [open(p, "w", buffering=1 << 20) for p in bucket_paths]
+    # Per batch: vectorized bucket assignment + one take per touched bucket —
+    # replaces the per-row as_py()/TSV-encode loop (~54% of collapse self-time).
+    # The read batch is capped at budget/4 worth of arrow bytes so the batch
+    # plus its take copies stay within half the budget.
+    writers = [None] * n_buckets
     try:
         pf = pq.ParquetFile(unsorted_parquet)
-        read_batch = _adaptive_batch_size(pf)
+        read_batch = max(500, int(self.memory_budget_bytes // 4 // arrow_bytes_per_row))
         for batch in pf.iter_batches(batch_size=read_batch):
-            names = batch.schema.names
-            # Column access + per-row .as_py() (mirrors ``iter_aligned_shard``):
-            # materialises ONE row's Python objects at a time so peak RSS is the
-            # (compact) arrow batch + one payload, not the whole batch as pylist.
-            cols = {n: batch.column(n) for n in names}
-            row_idx_col = cols["row_idx"]
-            data_names = [n for n in names if n != "row_idx"]
-            for i in range(batch.num_rows):
-                ri = row_idx_col[i].as_py()
-                op = int(out_pos[ri])
-                b = op // chunk_size
-                if b >= n_buckets:  # guard against rounding edge
-                    b = n_buckets - 1
-                row = {n: cols[n][i].as_py() for n in data_names}
-                # ``_allele_row_to_tsv`` encodes coords via ``_join_coords``,
-                # which accepts the struct dicts read back from parquet.
-                bucket_fhs[b].write(f"{op:015d}\t{_allele_row_to_tsv(row, ri)}\n")
+            n = batch.num_rows
+            if n == 0:
+                continue
+            ri = batch.column("row_idx").to_numpy(zero_copy_only=False)
+            ops = out_pos[ri]
+            bs = ops // chunk_size
+            _np.clip(bs, 0, n_buckets - 1, out=bs)  # guard against rounding edge
+            for b in _np.unique(bs):
+                idx = _np.flatnonzero(bs == b)
+                tbl = pa.Table.from_batches(
+                    [batch.take(idx).drop_columns("row_idx")],
+                    schema=COLLAPSED_SCHEMA,
+                ).append_column(
+                    _COLLAPSED_SCHEMA_WITH_OUT_POS.field("out_pos"),
+                    pa.array(ops[idx], type=pa.int64()),
+                )
+                w = writers[b]
+                if w is None:
+                    w = writers[b] = pq.ParquetWriter(
+                        bucket_paths[b], _COLLAPSED_SCHEMA_WITH_OUT_POS)
+                w.write_table(tbl)
+            del ops, bs
     finally:
-        for fh in bucket_fhs:
-            try:
-                fh.close()
-            except OSError:
-                pass
+        for w in writers:
+            if w is not None:
+                try:
+                    w.close()
+                except Exception:
+                    pass
 
-    # -- Step E: emit (per bucket, in output order).
+    # -- Step E: emit (per bucket, in output order). Each bucket is read as one
+    # arrow table, sorted by out_pos (unique per row, so sort order is exact),
+    # stripped of the synthetic out_pos column, and appended to the final
+    # COLLAPSED_SCHEMA parquet in ~32MB row groups (bounds the writer's
+    # serialization buffer regardless of bucket size).
+    rows_per_row_group = max(1, 32_000_000 // arrow_bytes_per_row)
     final_writer = pq.ParquetWriter(parquet_path, COLLAPSED_SCHEMA)
     try:
-        flush_every = max(100, min(8192, 32_000_000 // max(1, est_row_size)))
         for b in range(n_buckets):
-            entries = []
-            with open(bucket_paths[b], "r", buffering=1 << 20) as bf:
-                for line in bf:
-                    line = line.rstrip("\n")
-                    if not line:
-                        continue
-                    op_s, _, rest = line.partition("\t")
-                    entries.append((int(op_s), rest))
-            entries.sort(key=lambda e: e[0])
-            buf = []
-            for _, rest in entries:
-                buf.append(_allele_dict_to_parquet_row(
-                    _tsv_line_to_allele_row(rest)))
-                if len(buf) >= flush_every:
-                    final_writer.write_table(
-                        pa.Table.from_pylist(buf, schema=COLLAPSED_SCHEMA))
-                    buf.clear()
-            if buf:
-                final_writer.write_table(
-                    pa.Table.from_pylist(buf, schema=COLLAPSED_SCHEMA))
-                buf.clear()
-            del entries
+            t = pq.read_table(bucket_paths[b])
+            idx = pc.sort_indices(t, sort_keys=[("out_pos", "ascending")])
+            t = t.take(idx).drop_columns("out_pos")
+            for off in range(0, t.num_rows, rows_per_row_group):
+                final_writer.write_table(t.slice(off, rows_per_row_group))
+            del t, idx
     finally:
         final_writer.close()
 
@@ -2452,8 +2472,9 @@ def _collapse_streaming_single_read(
             #   B. external-sort the small key projection (stable, by output
             #      keys — byte-identical order to the old global TSV sort).
             #   C. build ``out_pos[row_idx]`` (output index) from keys.sorted.
-            #   D. stream the unsorted parquet once; scatter each row to a
-            #      per-bucket TSV spill file (``out_pos`` + row TSV).
+            #   D. stream the unsorted parquet once; scatter each batch to
+            #      per-bucket parquet spill files (arrow-native, batch-wise
+            #      ``take``; no TSV string round-trip).
             #   E. per bucket (in output order): read, sort by ``out_pos`` in
             #      memory, write to the final parquet. Peak RSS = one bucket.
             #
