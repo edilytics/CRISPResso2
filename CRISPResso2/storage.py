@@ -1251,11 +1251,15 @@ COLLAPSED_SCHEMA = pa.schema([
     pa.field("all_substitution_positions", pa.list_(_NARROW_INT)),
     pa.field("substitution_positions", pa.list_(_NARROW_INT)),
     pa.field("substitution_values", pa.list_(pa.string())),
-    # all_substitution_values (see _PAYLOAD_STRUCT): per-position substituted
-    # base across the whole amplicon; needed by the streaming per-base
-    # substitution count vectors. NOT part of the detailed allele TSV
+    # all_substitution_values (see _PAYLOAD_STRUCT): the substituted base at
+    # each position in all_substitution_positions, needed by the per-base
+    # substitution count vectors (all_substitution_base_vectors) built in the
+    # aggregation pass. Stored as a single binary blob (1 byte/value — the
+    # values are single ASCII bases) instead of list<string>: ~10x smaller
+    # in memory and on disk, and the aggregation decodes it with a zero-copy
+    # np.frombuffer. NOT part of the detailed allele TSV
     # (_DETAILED_ALLELE_COLS) — the TSV sink and get_slice default projection
-    pa.field("all_substitution_values", pa.list_(pa.string())),
+    pa.field("all_substitution_values", pa.binary()),
 ])
 
 # COLLAPSED_SCHEMA + a synthetic ``row_idx`` column. Used by the partitioned
@@ -1328,6 +1332,25 @@ def _get_allele_row(
     }
 
 
+def _to_subval_bytes(val):
+    """Encode all_substitution_values as one ASCII bytes blob (COLLAPSED_SCHEMA).
+
+    The values are single bases (ASCII), so the list<string> cell collapses
+    to 1 byte per value (~10x smaller than arrow's per-string offsets+data
+    layout). Accepts the payload's numpy <U1 array, a Python list of str,
+    an existing bytes blob (idempotent), or None.
+    """
+    if val is None:
+        return None
+    if isinstance(val, (bytes, bytearray)):
+        return bytes(val)
+    if hasattr(val, "dtype") and val.dtype.kind == "U":
+        return val.astype("S1").tobytes()
+    if hasattr(val, "tolist"):
+        val = val.tolist()
+    return "".join(str(x) for x in val).encode("ascii")
+
+
 def _allele_dict_to_parquet_row(d: dict) -> dict:
     """Convert a (always-full) allele-row dict to a COLLAPSED_SCHEMA row.
 
@@ -1359,7 +1382,7 @@ def _allele_dict_to_parquet_row(d: dict) -> dict:
         "all_substitution_positions": _to_int_list(d["all_substitution_positions"]),
         "substitution_positions": _to_int_list(d["substitution_positions"]),
         "substitution_values": _to_str_list(d["substitution_values"]),
-        "all_substitution_values": _to_str_list(d.get("all_substitution_values")),
+        "all_substitution_values": _to_subval_bytes(d.get("all_substitution_values")),
     }
 
 
@@ -3525,20 +3548,26 @@ def _aggregate_rows_vectorized(st: _AggState, ref_name: str, idx, bc) -> None:
 
     # -- per-base substitution vectors ----------------------------------
     if not st.ignore_substitutions:
-        sub_vals, sub_lens = _take_list_values(
-            bc.batch.column("all_substitution_values"), idx)
+        # all_substitution_values is a binary blob (1 ASCII byte per value);
+        # decode the selected rows into one uint8 buffer aligned with the
+        # concatenated all_substitution_positions (same row-major order).
+        bin_arr = _as_single_array(bc.batch.column("all_substitution_values"))
+        sel = bin_arr.take(pa.array(idx, type=pa.int64()))
+        sub_lens = pc.binary_length(sel).fill_null(0).to_numpy(
+            zero_copy_only=False).astype(np.int64, copy=False)
+        sub_pos, pos_lens = _take_list_values(
+            bc.batch.column("all_substitution_positions"), idx)
+        if not np.array_equal(sub_lens, pos_lens):
+            raise ValueError(
+                "all_substitution_values/all_substitution_positions "
+                "length mismatch in collapsed parquet")
+        sub_vals = b"".join(x if x is not None else b"" for x in sel.to_pylist())
         if len(sub_vals) > 0:
-            sub_pos, pos_lens = _take_list_values(
-                bc.batch.column("all_substitution_positions"), idx)
-            if not np.array_equal(sub_lens, pos_lens):
-                raise ValueError(
-                    "all_substitution_values/all_substitution_positions "
-                    "length mismatch in collapsed parquet")
+            buf = np.frombuffer(sub_vals, dtype=np.uint8)
             w = np.repeat(reads, sub_lens)
             pos64 = np.asarray(sub_pos, dtype=np.int64)
             for nuc in ("A", "T", "C", "G", "N"):
-                mask = pc.equal(sub_vals, pa.scalar(nuc, pa.string()))
-                m = mask.to_numpy(zero_copy_only=False).astype(bool)
+                m = buf == ord(nuc)
                 if m.any():
                     _acc_bincount(
                         st.all_substitution_base_vectors[ref_name + "_" + nuc],
@@ -4038,9 +4067,13 @@ def _to_np_int_array(val):
 
 
 def _to_np_str_array(val):
-    """Convert a parquet list (or None) to a numpy <U1 string array (pandas parity)."""
+    """Convert a parquet list (or None) to a numpy <U1 string array (pandas cell parity)."""
     if val is None:
         return np.array([], dtype="<U1")
+    if isinstance(val, (bytes, bytearray)):
+        # binary all_substitution_values blob (COLLAPSED_SCHEMA) — ASCII
+        # single bases, 1 byte each
+        return np.frombuffer(val, dtype="S1").astype("<U1")
     return np.asarray([str(x) for x in val], dtype="<U1")
 
 
