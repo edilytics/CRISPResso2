@@ -2185,6 +2185,222 @@ def _write_collapsed_allele_parquet_from_tsv(sorted_tsv: str, path: str,
     return n
 
 
+def _accumulate_homology_batch(st: "_AlnStatsHomologyState", batch) -> None:
+    """Vectorized :meth:`_AlnStatsHomologyState.accumulate` over one arrow batch.
+
+    Pass 2's batch-wise scan replaces the per-row payload-dict materialization
+    (``iter_aligned_shard`` → ``accumulate``) that used to dominate collapse:
+    homology needs only ~6 scalar payload fields per row, so the per-ref
+    counters accumulate as numpy dot-products over the flattened
+    ``payloads`` struct children (offsets give row→entry mapping), and the
+    per-row ``aln_homology``/``not_aln_homology`` dict entries build from
+    cheap ``to_pylist`` scalars. Must stay semantics-identical to
+    ``accumulate`` (same gates, same count weighting, same skip conditions —
+    verified by test_storage.py::test_homology_batch_vs_scalar).
+    """
+    import pyarrow.compute as pc
+
+    n = batch.num_rows
+    cnt = np.asarray(
+        pc.fill_null(_as_single_array(batch.column("count")), 0),
+        dtype=np.int64,
+    )
+    best = np.asarray(
+        pc.fill_null(_as_single_array(batch.column("best_match_score")), 0.0),
+        dtype=np.float64,
+    )
+    al = best > 0
+    un = ~al
+    st.N_TOT_READS += int(cnt.sum())
+    n_un = int(un.sum())
+    if n_un:
+        st.N_COMPUTED_NOTALN += n_un
+        st.N_CACHED_NOTALN += int(cnt[un].sum()) - n_un
+    n_al = int(al.sum())
+    if n_al:
+        st.N_COMPUTED_ALN += n_al
+        st.N_CACHED_ALN += int(cnt[al].sum()) - n_al
+
+    # Per-row homology dict entries (scan order → insertion order parity with
+    # the scalar accumulate loop).
+    rk = _as_single_array(batch.column("read_key")).to_pylist()
+    sc = _as_single_array(batch.column("aln_scores")).to_pylist()
+    for i in np.flatnonzero(al):
+        st.aln_homology[rk[i]] = {
+            "aln_scores": list(sc[i] or []), "count": int(cnt[i])}
+    for i in np.flatnonzero(un):
+        st.not_aln_homology[rk[i]] = {
+            "aln_scores": list(sc[i] or []), "count": int(cnt[i])}
+
+    # Per-ref scalar accumulation over the payloads struct children.
+    pl = _as_single_array(batch.column("payloads"))
+    arn = _as_single_array(batch.column("aln_ref_names"))
+    pl_lens = np.asarray(pc.fill_null(pc.list_value_length(pl), 0), dtype=np.int64)
+    arn_lens = np.asarray(pc.fill_null(pc.list_value_length(arn), 0), dtype=np.int64)
+    # Gate: aligned AND (single-reference OR expand_ambiguous_alignments) —
+    # accumulate() only visits per-ref subs under this gate.
+    gate_rows = al & ((arn_lens == 1) | bool(st.expand_ambiguous_alignments))
+    if not gate_rows.any() or not pl_lens.any():
+        return
+    vals = pl.flatten()  # StructArray of every entry, row-major (offsets applied)
+    row_of = np.repeat(np.arange(n, dtype=np.int64), pl_lens)
+    ok = gate_rows[row_of]
+    # Membership: accumulate() visits sub = payload.get("variant_" + name)
+    # for name in aln_ref_names — i.e. an entry is visited iff its ref_name is
+    # in the row's aln_ref_names. Shards are written payloads-entry-per-
+    # aln_ref_name in the same order, so the overwhelmingly common case is
+    # positional 1:1 — checked with one vectorized string compare. Rows that
+    # deviate (never seen in practice; defensive) fall back to per-row
+    # membership sets so semantics stay exact.
+    arn_flat = arn.flatten()
+    if len(arn_flat) == len(vals) and bool(np.array_equal(pl_lens, arn_lens)):
+        eq = np.asarray(
+            pc.fill_null(pc.equal(vals.field("ref_name"), arn_flat), False),
+            dtype=bool,
+        )
+        ok &= eq
+        bad_rows = np.unique(row_of[~eq & gate_rows[row_of]])
+    else:
+        bad_rows = np.arange(n, dtype=np.int64)
+    if len(bad_rows):
+        entries = np.concatenate(([0], np.cumsum(pl_lens)))
+        for r in bad_rows:
+            r = int(r)
+            ok[int(entries[r]):int(entries[r + 1])] = False
+            if not gate_rows[r]:
+                continue
+            names = set(arn[r].as_py() or [])
+            for k in range(int(entries[r]), int(entries[r + 1])):
+                sub = vals[k].as_py()
+                if sub is not None and sub.get("ref_name") in names:
+                    ok[k] = True
+    if not ok.any():
+        return
+    cnt_of = cnt[row_of]
+    sub_n = np.asarray(pc.fill_null(vals.field("substitution_n"), 0), dtype=np.int64)
+    sow = np.asarray(
+        pc.fill_null(vals.field("substitutions_outside_window"), 0), dtype=np.int64)
+    miw = np.asarray(pc.fill_null(vals.field("mods_in_window"), 0), dtype=np.int64)
+    mow = np.asarray(pc.fill_null(vals.field("mods_outside_window"), 0), dtype=np.int64)
+    st.N_GLOBAL_SUBS += int(((sub_n + sow) * cnt_of)[ok].sum())
+    st.N_SUBS_OUTSIDE_WINDOW += int((sow * cnt_of)[ok].sum())
+    st.N_MODS_IN_WINDOW += int((miw * cnt_of)[ok].sum())
+    st.N_MODS_OUTSIDE_WINDOW += int((mow * cnt_of)[ok].sum())
+    irr = np.asarray(pc.fill_null(vals.field("irregular_ends"), False), dtype=bool)
+    st.N_READS_IRREGULAR_ENDS += int(cnt_of[ok & irr].sum())
+    if st.READ_LENGTH == 0:
+        i0 = int(np.argmax(ok))
+        st.READ_LENGTH = len(vals.field("aln_seq")[i0].as_py())
+
+
+def _iter_rep_payloads(paths: list, rep_seq_sorted, homology_state=None):
+    """Pass-2 batch-wise scan: vectorized homology + rep-only payload build.
+
+    Streams the aligned shards as arrow batches. EVERY row feeds the homology
+    accumulators (vectorized — no per-row payload dicts), but full payload
+    dicts are materialized ONLY for representative rows (``seq_no`` in
+    ``rep_seq_sorted``, a sorted list; two-pointer advance per batch). Skips
+    the ``canonical_key`` column (amplicon-length strings Pass 2 never reads —
+    ~235 MB of decode at 730k x 322 bp). Yields ``(seq_no, payload)`` per
+    representative in scan order; ``payload`` matches ``row_to_payload``.
+    """
+    cols_proj = [f.name for f in ALIGNED_SCHEMA if f.name != "canonical_key"]
+    ri = 0
+    n_reps = len(rep_seq_sorted)
+    seq_no = 0
+    for path in paths:
+        pf = pq.ParquetFile(str(path))
+        _bs = _adaptive_batch_size(pf)
+        for batch in pf.iter_batches(batch_size=_bs, columns=cols_proj):
+            n = batch.num_rows
+            if n == 0:
+                continue
+            if homology_state is not None:
+                _accumulate_homology_batch(homology_state, batch)
+            base = seq_no
+            hi = base + n
+            if ri < n_reps and rep_seq_sorted[ri] < hi:
+                cols = [(nm, _as_single_array(batch.column(nm))) for nm in cols_proj]
+                while ri < n_reps and rep_seq_sorted[ri] < hi:
+                    i = rep_seq_sorted[ri] - base
+                    row = {nm: col[i].as_py() for nm, col in cols}
+                    yield base + i, row_to_payload(row)
+                    ri += 1
+            seq_no += n
+
+
+# COLLAPSED columns passed straight through from the shard payloads struct
+# (identical arrow types on both sides: list<int16>, list<_COORD_STRUCT>,
+# list<string>) — Step A's arrow-native fanout takes these cells directly,
+# with no dict/numpy round-trip.
+_PASSTHROUGH_FIELDS = (
+    "ref_positions",
+    "all_insertion_positions",
+    "all_insertion_left_positions",
+    "insertion_positions",
+    "insertion_coordinates",
+    "insertion_sizes",
+    "deletion_positions",
+    "deletion_coordinates",
+    "deletion_sizes",
+    "all_substitution_positions",
+    "substitution_positions",
+    "substitution_values",
+)
+# COLLAPSED scalar columns assembled from Python scalars per emitted row.
+_SCALAR_FIELDS = (
+    "#Reads", "Aligned_Sequence", "Reference_Sequence",
+    "n_inserted", "n_deleted", "n_mutated", "Reference_Name", "Read_Status",
+    "Aligned_Reference_Names", "Aligned_Reference_Scores",
+)
+
+
+def _expand_all_deletion_positions(adc):
+    """all_deletion_coordinates (a taken ``list<_COORD_STRUCT>`` array) → the
+    expanded ``all_deletion_positions`` ListArray.
+
+    Vectorized :func:`_expand_deletion_coords` over whole arrow cells
+    (half-open ``[start, end)`` per coordinate — see that function for the
+    parity argument). Null/empty cells → empty lists (matching the dict path,
+    where ``_to_int_list([])`` produces an empty cell, never null).
+    """
+    import pyarrow.compute as pc
+
+    lens_rows = np.asarray(
+        pc.fill_null(pc.list_value_length(adc), 0), dtype=np.int64)
+    coords = adc.flatten()
+    s = np.asarray(pc.fill_null(coords.field("start"), 0), dtype=np.int64)
+    e = np.asarray(pc.fill_null(coords.field("end"), 0), dtype=np.int64)
+    lens = np.maximum(e - s, 0)
+    total = int(lens.sum())
+    if total:
+        grp = np.repeat(np.arange(len(lens), dtype=np.int64), lens)
+        base = np.repeat(np.cumsum(lens) - lens, lens)
+        values = (s[grp] + (np.arange(total, dtype=np.int64) - base)).astype(np.int16)
+    else:
+        values = np.zeros(0, dtype=np.int16)
+    cs = np.concatenate(([0], np.cumsum(lens)))
+    row_off = cs[np.concatenate(([0], np.cumsum(lens_rows)))]
+    return pa.ListArray.from_arrays(
+        pa.array(row_off, type=pa.int32()),
+        pa.array(values, type=pa.int16()),
+    )
+
+
+def _join_subval_binary(list_array):
+    """``list<string>`` of single ASCII bases → one ``binary`` blob per cell.
+
+    Arrow-native :func:`_to_subval_bytes` (``"".join``): cast the string list
+    to binary and join with an empty separator. Null/empty cells → ``b""``
+    (the dict path encodes them the same way via ``np.array([])``).
+    """
+    import pyarrow.compute as pc
+
+    joined = pc.binary_join(
+        list_array.cast(pa.list_(pa.binary())), pa.scalar(b"", pa.binary()))
+    return pc.fill_null(joined, b"")
+
+
 def _partitioned_gather_write_unsorted(
     self: "VariantStore",
     paths: list,
@@ -2199,16 +2415,31 @@ def _partitioned_gather_write_unsorted(
     agg_state: Optional["_AggState"] = None,
     agg_vector_refs: Optional[set] = None,
 ) -> tuple:
-    r"""Step A of the partitioned gather (``LARGE_ALLELE_ORDER_PERF.md``).
+    """Step A of the partitioned gather — arrow-native fanout (no payload dicts).
 
-    One streaming pass over the aligned shards: for each representative
-    (``seq_no`` match) run ``_collapse_fanout`` and (a) write the FULL row to
-    ``unsorted_parquet`` (native arrow, ``_COLLAPSED_SCHEMA_WITH_ROW_IDX``) and
-    (b) append the small sort-key projection to ``gather_keys_file``
-    (``neg_reads \t Aligned_Sequence \t Reference_Sequence \t row_idx``).
+    One streaming pass over the aligned shards as arrow batches:
+
+    * EVERY row feeds the homology accumulators vectorized
+      (:func:`_accumulate_homology_batch`) — no per-row payload dicts.
+    * For each representative (``seq_no`` match), the fanout gate logic runs
+      on scalar struct children (``class_name`` / ``aln_ref_names`` /
+      ``deletion_n`` / ``insertion_n`` / ``classification``), replicating
+      :meth:`_collapse_fanout` exactly, and the emitted allele rows are
+      assembled COLUMN-WISE: the 12 list/coord COLLAPSED columns are ``take``n
+      straight from the shard payloads struct (identical arrow types — no
+      dict/numpy round-trip), ``all_deletion_positions`` is expanded
+      arrow-natively from the compact coordinates, and
+      ``all_substitution_values`` joins to its binary blob in C.
+    * (a) the FULL rows go to ``unsorted_parquet``
+      (``_COLLAPSED_SCHEMA_WITH_ROW_IDX``) and (b) the small sort-key
+      projection to ``gather_keys_file``
+      (``neg_reads \t Aligned_Sequence \t Reference_Sequence \t row_idx``).
+
     Returns ``(n_allele_rows, n_total, class_counts, counts_total,
     counts_modified, counts_unmodified, counts_discarded)``.
     """
+    import pyarrow.compute as pc
+
     n_total = 0
     class_counts: dict = {}
     counts_total: dict = {}
@@ -2219,22 +2450,34 @@ def _partitioned_gather_write_unsorted(
     flush_every = max(100, min(8192, 32_000_000 // max(1, est_row_size)))
     writer = pq.ParquetWriter(unsorted_parquet, _COLLAPSED_SCHEMA_WITH_ROW_IDX)
 
-    def _flush(buf):
-        """Write buffered rows column-wise (``pa.array`` per column).
+    scalar_bufs = {nm: [] for nm in _SCALAR_FIELDS}
+    chunk_bufs = {nm: [] for nm in _PASSTHROUGH_FIELDS}
+    delpos_bufs: list = []
+    subval_bufs: list = []
+    row_idx_buf: list = []
+    pending = 0
 
-        Column-wise construction with an explicit type converts each column's
-        cells in one C pass — ~3x faster than ``Table.from_pylist``, which
-        re-validates every row dict (measured on 2048-row batches with
-        amplicon-length list cells). Cells are the numpy int16/str-object
-        arrays produced by :func:`_allele_dict_to_parquet_row`, plus ``None``
-        for null cells.
-        """
-        if not buf:
+    def _flush():
+        nonlocal pending
+        if pending == 0:
             return
-        arrays = [
-            pa.array([row[f.name] for row in buf], type=f.type)
-            for f in _COLLAPSED_SCHEMA_WITH_ROW_IDX
-        ]
+        arrays = []
+        for f in _COLLAPSED_SCHEMA_WITH_ROW_IDX:
+            nm = f.name
+            if nm == "row_idx":
+                arr = pa.array(row_idx_buf, type=pa.int64())
+            elif nm in chunk_bufs:
+                chunks = chunk_bufs[nm]
+                arr = chunks[0] if len(chunks) == 1 else pa.concat_arrays(chunks)
+            elif nm == "all_deletion_positions":
+                arr = (delpos_bufs[0] if len(delpos_bufs) == 1
+                       else pa.concat_arrays(delpos_bufs))
+            elif nm == "all_substitution_values":
+                arr = (subval_bufs[0] if len(subval_bufs) == 1
+                       else pa.concat_arrays(subval_bufs))
+            else:
+                arr = pa.array(scalar_bufs[nm], type=f.type)
+            arrays.append(arr)
         table = pa.Table.from_arrays(arrays, schema=_COLLAPSED_SCHEMA_WITH_ROW_IDX)
         writer.write_table(table)
         if agg_state is not None:
@@ -2244,45 +2487,135 @@ def _partitioned_gather_write_unsorted(
             # collapsed parquet in a separate pass. Order-independent.
             _aggregate_batch_into(
                 agg_state, table.drop_columns("row_idx"), agg_vector_refs)
+        for bufs in scalar_bufs.values():
+            bufs.clear()
+        for bufs in chunk_bufs.values():
+            bufs.clear()
+        delpos_bufs.clear()
+        subval_bufs.clear()
+        row_idx_buf.clear()
+        pending = 0
 
+    cols_proj = [f.name for f in ALIGNED_SCHEMA if f.name != "canonical_key"]
+    ri = 0
+    n_reps = len(rep_seq_sorted)
+    seq_no = 0
+    row_idx = 0
     try:
-        buf: list = []
-        row_idx = 0
-        seq_no = 0
-        rep_iter = iter(rep_seq_sorted)
-        next_rep = next(rep_iter, None)
         with open(gather_keys_file, "w", buffering=1 << 20) as kf:
             for path in paths:
-                for read_key, count, payload in iter_aligned_shard(path):
+                pf = pq.ParquetFile(str(path))
+                _bs = _adaptive_batch_size(pf)
+                for batch in pf.iter_batches(batch_size=_bs, columns=cols_proj):
+                    n = batch.num_rows
+                    if n == 0:
+                        continue
                     if homology_state is not None:
-                        homology_state.accumulate(read_key, int(count), payload)
-                    if next_rep is not None and seq_no == next_rep:
-                        ck, tc = rep_map[seq_no]
-                        store = {ck: {"count": tc, "payload": payload}}
-                        rows, nt, cc, ct, cm, cu, cd = self._collapse_fanout(
-                            store, discard_indel_reads=discard_indel_reads)
-                        n_total += nt
-                        _accumulate_agg(class_counts, counts_total, counts_modified,
-                                        counts_unmodified, counts_discarded,
-                                        cc, ct, cm, cu, cd)
-                        for r in rows:
-                            d = _allele_dict_to_parquet_row(r)
-                            d["row_idx"] = row_idx
-                            buf.append(d)
-                            kf.write(
-                                f"{10**15 - int(r['#Reads']):015d}\t"
-                                f"{r['Aligned_Sequence']}\t"
-                                f"{r['Reference_Sequence']}\t"
-                                f"{row_idx:015d}\n")
-                            row_idx += 1
-                            if len(buf) >= flush_every:
-                                _flush(buf)
-                                buf.clear()
-                        next_rep = next(rep_iter, None)
-                    seq_no += 1
-                    # No early break — homology accumulation must visit every row.
-        _flush(buf)
-        buf.clear()
+                        _accumulate_homology_batch(homology_state, batch)
+                    base = seq_no
+                    hi = base + n
+                    if ri >= n_reps or rep_seq_sorted[ri] >= hi:
+                        seq_no = hi
+                        continue
+                    # -- fanout for this batch's representatives (arrow-native)
+                    pl = _as_single_array(batch.column("payloads"))
+                    vals = pl.flatten()
+                    pl_lens = np.asarray(
+                        pc.fill_null(pc.list_value_length(pl), 0), dtype=np.int64)
+                    entries = np.concatenate(([0], np.cumsum(pl_lens)))
+                    cn_col = _as_single_array(batch.column("class_name"))
+                    arn_col = _as_single_array(batch.column("aln_ref_names"))
+                    asc_col = _as_single_array(batch.column("aln_scores"))
+                    ref_names_flat = vals.field("ref_name")
+                    deln = np.asarray(
+                        pc.fill_null(vals.field("deletion_n"), 0), dtype=np.int64)
+                    insn = np.asarray(
+                        pc.fill_null(vals.field("insertion_n"), 0), dtype=np.int64)
+                    subn = np.asarray(
+                        pc.fill_null(vals.field("substitution_n"), 0), dtype=np.int64)
+                    clfn = vals.field("classification").to_pylist()
+                    alnseq = vals.field("aln_seq")
+                    alnref = vals.field("aln_ref")
+                    emit_idx: list = []
+
+                    def _emit(k, refname_out, tc, arn_str, asc_str):
+                        nonlocal row_idx
+                        seq_s = alnseq[k].as_py()
+                        ref_s = alnref[k].as_py()
+                        scalar_bufs["#Reads"].append(tc)
+                        scalar_bufs["Aligned_Sequence"].append(seq_s)
+                        scalar_bufs["Reference_Sequence"].append(ref_s)
+                        scalar_bufs["n_inserted"].append(int(insn[k]))
+                        scalar_bufs["n_deleted"].append(int(deln[k]))
+                        scalar_bufs["n_mutated"].append(int(subn[k]))
+                        scalar_bufs["Reference_Name"].append(refname_out)
+                        scalar_bufs["Read_Status"].append(clfn[k])
+                        scalar_bufs["Aligned_Reference_Names"].append(arn_str)
+                        scalar_bufs["Aligned_Reference_Scores"].append(asc_str)
+                        emit_idx.append(int(k))
+                        row_idx_buf.append(row_idx)
+                        kf.write(
+                            f"{10**15 - tc:015d}\t{seq_s}\t{ref_s}\t{row_idx:015d}\n")
+                        row_idx += 1
+
+                    while ri < n_reps and rep_seq_sorted[ri] < hi:
+                        seq_rep = rep_seq_sorted[ri]
+                        ck, tc = rep_map[seq_rep]
+                        if tc != 0:
+                            i = seq_rep - base
+                            cn = cn_col[i].as_py()
+                            n_total += tc
+                            class_counts[cn] = class_counts.get(cn, 0) + tc
+                            arn = arn_col[i].as_py() or []
+                            arn_str = "&".join(arn)
+                            asc = asc_col[i].as_py() or []
+                            asc_str = "&".join([str(x) for x in asc])
+                            lo, hi_e = int(entries[i]), int(entries[i + 1])
+                            names_in = ref_names_flat.slice(
+                                lo, hi_e - lo).to_pylist()
+
+                            def _entry(name, _lo=lo, _names=names_in):
+                                try:
+                                    return _lo + _names.index(name)
+                                except ValueError:
+                                    raise KeyError("variant_" + str(name))
+
+                            if cn == "AMBIGUOUS":
+                                _emit(_entry(arn[0]), "AMBIGUOUS_" + arn[0],
+                                      tc, arn_str, asc_str)
+                            else:
+                                for nm in arn:
+                                    k = _entry(nm)
+                                    if discard_indel_reads and (
+                                            deln[k] > 0 or insn[k] > 0):
+                                        counts_discarded[nm] = \
+                                            counts_discarded.get(nm, 0) + tc
+                                        _emit(k, "DISCARDED_" + arn[0],
+                                              tc, arn_str, asc_str)
+                                        continue
+                                    counts_total[nm] = counts_total.get(nm, 0) + tc
+                                    if clfn[k] == "MODIFIED":
+                                        counts_modified[nm] = \
+                                            counts_modified.get(nm, 0) + tc
+                                    else:
+                                        counts_unmodified[nm] = \
+                                            counts_unmodified.get(nm, 0) + tc
+                                    _emit(k, nm, tc, arn_str, asc_str)
+                        ri += 1
+
+                    if emit_idx:
+                        take_idx = pa.array(emit_idx, type=pa.int64())
+                        for nm in _PASSTHROUGH_FIELDS:
+                            chunk_bufs[nm].append(vals.field(nm).take(take_idx))
+                        delpos_bufs.append(_expand_all_deletion_positions(
+                            vals.field("all_deletion_coordinates").take(take_idx)))
+                        subval_bufs.append(_join_subval_binary(
+                            vals.field("all_substitution_values").take(take_idx)))
+                        pending += len(emit_idx)
+                        if pending >= flush_every:
+                            _flush()
+                    seq_no = hi
+        _flush()
     finally:
         writer.close()
 
@@ -2614,27 +2947,19 @@ def _collapse_streaming_single_read(
             # sort, write parquet, populate allele_rows — same shape as the
             # in-memory path. One variant's payload in flight at a time.
             full_rows: list = []
-            seq_no = 0
-            rep_iter = iter(rep_seq_sorted)
-            next_rep = next(rep_iter, None)
-            for path in paths:
-                for read_key, count, payload in iter_aligned_shard(path):
-                    _homology_st.accumulate(read_key, int(count), payload)
-                    if next_rep is not None and seq_no == next_rep:
-                        ck, tc = rep_map[seq_no]
-                        store = {ck: {"count": tc, "payload": payload}}
-                        rows, nt, cc, ct, cm, cu, cd = self._collapse_fanout(
-                            store, discard_indel_reads=discard_indel_reads)
-                        full_rows.extend(rows)
-                        n_total += nt
-                        _accumulate_agg(class_counts, counts_total, counts_modified,
-                                        counts_unmodified, counts_discarded,
-                                        cc, ct, cm, cu, cd)
-                        next_rep = next(rep_iter, None)
-                    seq_no += 1
-                    # NOTE: no early break once reps are consumed — homology
-                    # accumulation (fused into this scan) must visit EVERY row,
-                    # including unaligned reads trailing the last representative.
+            # Batch-wise Pass 2: vectorized homology + rep-only payload build
+            # (shared with the partitioned branch via ``_iter_rep_payloads``).
+            for seq_no, payload in _iter_rep_payloads(
+                    paths, rep_seq_sorted, _homology_st):
+                ck, tc = rep_map[seq_no]
+                store = {ck: {"count": tc, "payload": payload}}
+                rows, nt, cc, ct, cm, cu, cd = self._collapse_fanout(
+                    store, discard_indel_reads=discard_indel_reads)
+                full_rows.extend(rows)
+                n_total += nt
+                _accumulate_agg(class_counts, counts_total, counts_modified,
+                                counts_unmodified, counts_discarded,
+                                cc, ct, cm, cu, cd)
 
             full_rows.sort(key=lambda r: (
                 -int(r["#Reads"]), r["Aligned_Sequence"], r["Reference_Sequence"]))

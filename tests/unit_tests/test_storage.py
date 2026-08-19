@@ -392,6 +392,115 @@ def _make_realistic_payload(ref_name="ref1", aln_len=20):
     }
 
 
+
+def _homology_states_equal(a, b):
+    """Compare two _AlnStatsHomologyState instances field-for-field (and
+    insertion order of the homology dicts)."""
+    for f in ("N_TOT_READS", "N_CACHED_ALN", "N_CACHED_NOTALN", "N_COMPUTED_ALN",
+              "N_COMPUTED_NOTALN", "N_GLOBAL_SUBS", "N_SUBS_OUTSIDE_WINDOW",
+              "N_MODS_IN_WINDOW", "N_MODS_OUTSIDE_WINDOW", "N_READS_IRREGULAR_ENDS",
+              "READ_LENGTH"):
+        assert getattr(a, f) == getattr(b, f), f
+    assert list(a.aln_homology.keys()) == list(b.aln_homology.keys())
+    assert list(a.not_aln_homology.keys()) == list(b.not_aln_homology.keys())
+    assert a.aln_homology == b.aln_homology
+    assert a.not_aln_homology == b.not_aln_homology
+
+
+def _p6_shard(temp_dir, name="p6.parquet"):
+    """Shard exercising every homology gate: aligned single-ref, unaligned,
+    ambiguous multi-ref, irregular ends, arn/payloads length mismatch (the
+    defensive membership-fallback path), and aligned-with-empty-refs."""
+    from CRISPResso2.storage import _AlnStatsHomologyState  # noqa: F401
+
+    p1 = _make_realistic_payload("ref1")
+    p2 = _make_realistic_payload("ref2")
+    p1["variant_ref1"]["irregular_ends"] = True
+    p1["variant_ref1"]["mods_in_window"] = 2
+    p1["variant_ref1"]["mods_outside_window"] = 1
+    p1["variant_ref1"]["substitution_n"] = 1
+    p1["variant_ref1"]["substitutions_outside_window"] = 0
+    p2["variant_ref2"]["irregular_ends"] = False
+    p2["variant_ref2"]["mods_in_window"] = 0
+    p2["variant_ref2"]["mods_outside_window"] = 3
+    p2["variant_ref2"]["substitution_n"] = 4
+    p2["variant_ref2"]["substitutions_outside_window"] = 2
+
+    multi = {
+        "count": 1, "aln_ref_names": ["ref1", "ref2"], "aln_scores": [95.0, 94.0],
+        "best_match_score": 95.0, "class_name": "AMBIGUOUS",
+        "best_match_name": "ref1", "caching_is_ok": True,
+        "variant_ref1": p1["variant_ref1"], "variant_ref2": p2["variant_ref2"],
+    }
+    rows = [
+        payload_to_row("AAAAAACCCCCC", 7, _make_realistic_payload("ref1")),
+        # unaligned: null payloads, small scores
+        payload_to_row("TTTTTTGGGGGG", 2, {"count": 1, "aln_scores": [5.0, 3.0], "best_match_score": 0}),
+        payload_to_row("ACGTACGTACGT", 3, multi),
+        payload_to_row("GGGGGGTTTTTT", 4, p1),
+    ]
+    # mismatch row: payloads has TWO entries but aln_ref_names lists ONE —
+    # exercises the per-row membership fallback in _accumulate_homology_batch.
+    mm = payload_to_row("CCCCCCTTTTTT", 5, multi)
+    mm["aln_ref_names"] = ["ref1"]
+    rows.append(mm)
+    # aligned with empty refs: N_COMPUTED_ALN counts, but no per-ref visits.
+    e = payload_to_row("ATATATATATAT", 6, {
+        "count": 1, "aln_ref_names": [], "aln_scores": [50.0],
+        "best_match_score": 50.0, "class_name": "ref1", "best_match_name": "ref1",
+        "caching_is_ok": True,
+    })
+    rows.append(e)
+    shard = os.path.join(temp_dir, name)
+    with AlignedShardWriter(shard) as w:
+        for r in rows:
+            w.write_row(r)
+    return shard
+
+
+def test_homology_batch_vs_scalar(temp_dir):
+    """Vectorized _accumulate_homology_batch == per-row accumulate, exactly."""
+    from CRISPResso2.storage import (
+        _AlnStatsHomologyState,
+        _accumulate_homology_batch,
+        _adaptive_batch_size,
+    )
+    import pyarrow.parquet as pq
+
+    shard = _p6_shard(temp_dir)
+    for expand in (False, True):
+        scalar = _AlnStatsHomologyState(expand_ambiguous_alignments=expand)
+        for rk, cnt, payload in iter_aligned_shard(shard):
+            scalar.accumulate(rk, int(cnt), payload)
+        vec = _AlnStatsHomologyState(expand_ambiguous_alignments=expand)
+        pf = pq.ParquetFile(shard)
+        for batch in pf.iter_batches(batch_size=_adaptive_batch_size(pf)):
+            _accumulate_homology_batch(vec, batch)
+        _homology_states_equal(vec, scalar)
+        assert vec.READ_LENGTH > 0  # at least one visit happened
+
+
+def test_iter_rep_payloads_matches_scan(temp_dir):
+    """_iter_rep_payloads yields exactly the representative rows' payloads and
+    accumulates homology for EVERY row (aligned and unaligned alike)."""
+    from CRISPResso2.storage import _AlnStatsHomologyState, _iter_rep_payloads
+
+    shard = _p6_shard(temp_dir)
+    # scan-order payloads by seq_no (every row, including unaligned)
+    all_rows = {i: p for i, (_, _, p) in enumerate(iter_aligned_shard(shard))}
+
+    for reps in ([0, 2, 4], [1, 3, 5], [], list(range(6))):
+        st = _AlnStatsHomologyState()
+        got = list(_iter_rep_payloads([shard], reps, st))
+        assert [s for s, _ in got] == reps
+        for (s, payload), rep in zip(got, reps):
+            np.testing.assert_equal(payload, all_rows[rep])
+        # homology must have seen every row regardless of reps
+        assert st.N_TOT_READS == 7 + 2 + 3 + 4 + 5 + 6
+        assert st.N_COMPUTED_NOTALN == 1 and st.N_CACHED_NOTALN == 1
+        assert len(st.aln_homology) == 5 and len(st.not_aln_homology) == 1
+
+
 def test_s2_round_trip_all_fields(temp_dir):
     """Spike S2: every payload field round-trips through parquet with correct type."""
     payload = _make_realistic_payload()
