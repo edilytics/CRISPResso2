@@ -18,6 +18,7 @@ cdef extern from "Python.h":
     ctypedef void PyObject
 
 ctypedef long DTYPE_LONG
+ctypedef int DTYPE_INT
 
 cdef size_t UP = 1, LEFT = 2, DIAG = 3, NONE = 4
 cdef size_t MARRAY = 1, IARRAY = 2, JARRAY = 3
@@ -458,6 +459,44 @@ def global_align_pointers(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG,
     return align_j[::-1], align_i[::-1], round(final_score, 3)
 
 
+cdef void _diag_cell(size_t k, size_t d, int* LOF, int* OFF,
+                     int* dM, int* dI, int* dJ, int* gi, int* sc,
+                     int gap_open, int gap_extend,
+                     size_t max_i, size_t max_j) noexcept nogil:
+    """Compute one interior diagonal cell via the total (i,j)->slot mapping.
+
+    Used for the <=4 edge cells of each diagonal (neighbor windows and the
+    gap-rule endpoints j==max_j / i==max_i, which use gap_extend instead of
+    gap_open exactly like the row-major last row/col blocks).
+    """
+    cdef size_t i = <size_t> LOF[d] + k
+    cdef size_t j = d - i
+    cdef int go = gap_extend if (i == max_i or j == max_j) else gap_open
+    cdef size_t dd, i_n
+    # left neighbor (i, j-1) on diagonal d-1
+    dd = i + j - 1
+    i_n = i - <size_t> LOF[dd]
+    cdef int a = go + dM[OFF[dd] + i_n] + gi[i]
+    cdef int b = gap_extend + dI[OFF[dd] + i_n] + gi[i]
+    dI[<size_t> OFF[d] + k] = a if a > b else b
+    # up neighbor (i-1, j) on diagonal d-1
+    i_n = (i - 1) - <size_t> LOF[dd]
+    cdef int c = go + dM[OFF[dd] + i_n] + gi[i - 1]
+    cdef int e = gap_extend + dJ[OFF[dd] + i_n]
+    dJ[<size_t> OFF[d] + k] = c if c > e else e
+    # diagonal neighbor (i-1, j-1) on diagonal d-2
+    dd = i + j - 2
+    i_n = (i - 1) - <size_t> LOF[dd]
+    cdef int m = dM[OFF[dd] + i_n]
+    cdef int iv = dI[OFF[dd] + i_n]
+    cdef int jv = dJ[OFF[dd] + i_n]
+    if iv > m:
+        m = iv
+    if jv > m:
+        m = jv
+    dM[<size_t> OFF[d] + k] = m + sc[k]
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.nonecheck(False)
@@ -465,21 +504,31 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
           np.ndarray[DTYPE_LONG,ndim=1] gap_incentive, int gap_open=-1,
           int gap_extend=-1):
     """
-    Global sequence alignment (needleman-wunsch) -- pointer-free implementation.
+    Global sequence alignment (needleman-wunsch) -- diagonal-major fill.
 
-    The classic global_align stores three extra int32 "pointer" matrices
-    (one per DP state) purely to guide traceback, then reads them once. That is
-    12 extra bytes/cell of memory traffic in the O(N*M) forward pass — the
-    bottleneck at long-read scale (see design_docs/ALIGN_SIMD_OPTIMIZATION.md).
+    Same DP recurrences and edge rules as ``global_align_pointers`` (the
+    original row-major implementation, kept as the differential-test
+    reference); scores and alignment strings are byte-identical. Two changes
+    make the fill ~2-3x faster at long-read sizes:
 
-    This variant drops all three pointer matrices. Traceback instead recomputes
-    each cell's argmax from the score matrices on the fly. Traceback is O(N+M),
-    so the recompute cost is negligible; the win is ~halving the fill's memory
-    traffic (6 matrices -> 3). The min_score sentinels on the border row/col
-    make the border behave correctly with no special-casing.
+    * **Diagonal-major storage.** The three score matrices (M/I/J) are stored
+      one anti-diagonal at a time in flat buffers with per-diagonal offsets,
+      instead of row-major. Cell (i, j) lives at ``BUF[i+j] + i - LO[i+j]``.
+      The recurrences' only intra-row serial dependency (I[i,j] needs
+      I[i,j-1]) vanishes along an anti-diagonal — every cell's inputs
+      (left/up on diagonal d-1, diagonal on d-2) sit at *constant offsets*
+      from its own lane, so the per-diagonal inner loop auto-vectorizes
+      (NEON) with contiguous loads/stores. Border cells (i==0 or j==0) are
+      initialized into their diagonal slots with the same closed-form
+      formulas the row-major version writes, making the (i,j) mapping total:
+      traceback needs no special cases. Traceback itself walks diagonals in
+      decreasing d order, so it reads the buffers near-sequentially.
+    * **Pointer-free traceback** (as before): no pointer matrices; the walk
+      recomputes each cell's argmax from the score buffers, reproducing the
+      original tie-breaking exactly.
 
-    Validated bit-identical to global_align_pointers by the hypothesis
-    differential test tests/unit_tests/test_CRISPResso2Align.py::test_global_align_ptrfree_matches_pointers.
+    Validated bit-identical to ``global_align_pointers`` by the hypothesis
+    differential test (tests/unit_tests/test_CRISPResso2Align.py).
     """
 
     byte_seqj = pystr_seqj.encode('UTF-8')
@@ -499,111 +548,142 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
     cdef char ci
     cdef char cj
 
-    # Only the three score matrices are stored — no pointer matrices.
-    cdef int [:,:] mScore = np.empty((max_i + 1, max_j + 1), dtype=np.dtype("i"))
-    cdef int [:,:] iScore = np.empty((max_i + 1, max_j + 1), dtype=np.dtype("i"))
-    cdef int [:,:] jScore = np.empty((max_i + 1, max_j + 1), dtype=np.dtype("i"))
-
-    # Near -infinity sentinel for "impossible" border cells (see global_align).
+    # Near -infinity sentinel for "impossible" border cells.
     cdef int min_score = -1000000000
 
-    #init match matrix
-    mScore[0,1:] = min_score
-    mScore[1:,0] = min_score
-    mScore[0,0] = 0
+    # --- setup: int32 matrix/gap-incentive copies, diagonal index tables ---
+    mat32n = np.ascontiguousarray(matrix, dtype=np.dtype("i"))
+    mat32n = mat32n.reshape(-1)
+    gi32n = np.ascontiguousarray(gap_incentive, dtype=np.dtype("i"))
+    cdef np.ndarray[DTYPE_INT, ndim=1] mat32 = mat32n
+    cdef np.ndarray[DTYPE_INT, ndim=1] gi32 = gi32n
+    cdef int* mat = <int*> mat32.data
+    cdef int* gi = <int*> gi32.data
+    cdef size_t Wm = <size_t> matrix.shape[1]
 
-    #init i matrix
-    for i in range(1,max_j+1):
-        iScore[0,i] = gap_extend * i + gap_incentive[0]
-    iScore[0:,0] = min_score
+    cdef size_t D = max_i + max_j          # last diagonal index
+    cdef np.ndarray[DTYPE_INT, ndim=1] offn = np.empty(D + 1, dtype=np.dtype("i"))
+    cdef np.ndarray[DTYPE_INT, ndim=1] lofn = np.empty(D + 1, dtype=np.dtype("i"))
+    cdef int* OFF = <int*> offn.data
+    cdef int* LOF = <int*> lofn.data
 
-    #init j matrix
-    for i in range(1,max_i+1):
-        jScore[i,0] = gap_extend * i + gap_incentive[0]
-    jScore[0,0:] = min_score
+    # lo_full(d) = max(0, d - max_j); hi_full(d) = min(max_i, d)
+    cdef size_t cells = (max_i + 1) * (max_j + 1)
+    cdef np.ndarray[DTYPE_INT, ndim=1] dMn = np.empty(cells, dtype=np.dtype("i"))
+    cdef np.ndarray[DTYPE_INT, ndim=1] dIn = np.empty(cells, dtype=np.dtype("i"))
+    cdef np.ndarray[DTYPE_INT, ndim=1] dJn = np.empty(cells, dtype=np.dtype("i"))
+    cdef int* dM = <int*> dMn.data
+    cdef int* dI = <int*> dIn.data
+    cdef int* dJ = <int*> dJn.data
 
-    cdef int iFromMVal
-    cdef int iExtendVal
-    cdef DTYPE_LONG gi_i, gi_im1  # gap_incentive[i], gap_incentive[i-1]; hoisted out of inner loop
-    cdef int jFromMVal
-    cdef int jExtendVal
-    cdef int mVal, iVal, jVal
+    cdef size_t d, k, n, o
+    o = 0
+    for d in range(D + 1):
+        OFF[d] = <int> o
+        k = d - max_j
+        if k > d:  # never (max_j >= 0); keep C-friendly
+            k = 0
+        if <long> k < 0:
+            k = 0
+        LOF[d] = <int> k
+        # length = min(max_i, d) - k + 1
+        n = d if d < max_i else max_i
+        n = n - k + 1
+        o += n
 
-    #apply NW algorithm for inside squares (not last row or column)
-    for i in range(1, max_i):
-        ci = seqi[i - 1] #char in i
-        gi_i = gap_incentive[i]
-        gi_im1 = gap_incentive[i - 1]
+    # scratch: substitution scores per diagonal (both indices vary per lane)
+    cdef size_t cap = (max_i if max_i < max_j else max_j) + 2
+    cdef np.ndarray[DTYPE_INT, ndim=1] scn = np.empty(cap, dtype=np.dtype("i"))
+    cdef int* sc = <int*> scn.data
 
-        for j in range(1, max_j):
-            cj = seqj[j - 1] #char in j
+    # --- border init (same closed forms as the row-major version) ---
+    # row 0: M=min (M[0,0]=0), I=gap_extend*j+gi[0] (I[0,0]=min), J=min
+    # col 0: M=min, J=gap_extend*i+gi[0], I=min
+    dM[0] = 0
+    dI[0] = min_score
+    dJ[0] = min_score
+    for d in range(1, D + 1):
+        o = <size_t> OFF[d]
+        if d <= max_j:  # cell (0, d)
+            dM[o] = min_score
+            dI[o] = gap_extend * <int> d + gi[0]
+            dJ[o] = min_score
+        if d <= max_i:  # cell (d, 0): last slot of diagonal d
+            k = <size_t> ((d if d < max_i else max_i) - LOF[d])
+            dM[o + k] = min_score
+            dI[o + k] = min_score
+            dJ[o + k] = gap_extend * <int> d + gi[0]
 
-            iFromMVal = gap_open + mScore[i, j - 1] + gi_i
-            iExtendVal = gap_extend + iScore[i, j - 1] + gi_i
-            iScore[i,j] = iFromMVal if iFromMVal > iExtendVal else iExtendVal
+    # --- fill, one diagonal at a time ---
+    cdef int gi0 = gi[0]
+    cdef int a, b, c, e, m, iv, jv
+    cdef int i_lo, i_hi, k0, k1, kv0, kv1
+    cdef size_t ke0, ks1
+    cdef size_t offL, offD, dd
+    cdef int *M1p, *I1p, *J1p, *M0p, *I0p, *J0p, *M2p, *I2p, *J2p
+    cdef int* gii
+    cdef int* gim
+    for d in range(2, D + 1):
+        # interior cells: i in [max(1, d-max_j), min(max_i, d-1)]
+        i_lo = <int> (d - max_j)
+        if i_lo < 1:
+            i_lo = 1
+        i_hi = <int> (d - 1)
+        if i_hi > <long> max_i:
+            i_hi = <int> max_i
+        if i_lo > i_hi:
+            continue
+        k0 = i_lo - LOF[d]          # interior start index within the diagonal
+        k1 = i_hi - LOF[d]
+        n = <size_t> (k1 - k0 + 1)
+        o = <size_t> OFF[d]
+        M2p = dM + o; I2p = dI + o; J2p = dJ + o
+        # score gather (per-lane matrix lookup; scalar)
+        for k in range(<size_t> k0, <size_t> k1 + 1):
+            i = <size_t> (LOF[d] + <int> k)
+            sc[k] = mat[<size_t> seqi[i - 1] * Wm + <size_t> seqj[d - i - 1]]
+        # scalar edge cells: k in [k0, k0+1] and [k1-1, k1] (neighbor windows),
+        # which subsume the <=2 gap-rule endpoint cells (j==max_j at k0 when
+        # d > max_j; i==max_i at k1 when d > max_i)
+        ke0 = <size_t> (k0 + 1 if k0 + 1 < k1 else k1)
+        for k in range(<size_t> k0, ke0 + 1):
+            _diag_cell(k, d, LOF, OFF, dM, dI, dJ, gi, sc,
+                       gap_open, gap_extend, max_i, max_j)
+        ks1 = <size_t> (k1 - 1 if k1 - 1 > k0 + 1 else k0 + 2)
+        for k in range(ks1, <size_t> k1 + 1):
+            _diag_cell(k, d, LOF, OFF, dM, dI, dJ, gi, sc,
+                       gap_open, gap_extend, max_i, max_j)
+        # vector middle: constant-offset neighbor loads from diagonals d-1/d-2
+        kv0 = k0 + 2
+        kv1 = k1 - 2
+        if kv1 >= kv0:
+            offL = <size_t> (LOF[d] - LOF[d - 1])          # in {0, 1}
+            offD = <size_t> (LOF[d] - LOF[d - 2] - 1)      # diag on d-2
+            M1p = dM + <size_t> OFF[d - 1]; I1p = dI + <size_t> OFF[d - 1]; J1p = dJ + <size_t> OFF[d - 1]
+            M0p = dM + <size_t> OFF[d - 2]; I0p = dI + <size_t> OFF[d - 2]; J0p = dJ + <size_t> OFF[d - 2]
+            # k is the ABSOLUTE index within the diagonal (i = LOF[d] + k),
+            # so gi[i] = gii[k] with gii based at LOF[d] — not at the
+            # interior start i_lo (whose k0 offset differs for d <= max_j).
+            gii = gi + <size_t> LOF[d]
+            gim = gii - 1
+            for k in range(<size_t> kv0, <size_t> kv1 + 1):
+                a = gap_open + M1p[k + offL] + gii[k]
+                b = gap_extend + I1p[k + offL] + gii[k]
+                I2p[k] = a if a > b else b
+                c = gap_open + M1p[k + offL - 1] + gim[k]
+                e = gap_extend + J1p[k + offL - 1]
+                J2p[k] = c if c > e else e
+                m = M0p[k + offD]
+                iv = I0p[k + offD]
+                jv = J0p[k + offD]
+                if iv > m:
+                    m = iv
+                if jv > m:
+                    m = jv
+                M2p[k] = m + sc[k]
 
-            jFromMVal = gap_open + mScore[i - 1, j] + gi_im1
-            jExtendVal = gap_extend + jScore[i - 1, j]
-            jScore[i,j] = jFromMVal if jFromMVal > jExtendVal else jExtendVal
-
-            mVal = mScore[i - 1, j - 1]
-            iVal = iScore[i - 1, j - 1]
-            jVal = jScore[i - 1, j - 1]
-            if iVal > mVal:
-                mVal = iVal
-            if jVal > mVal:
-                mVal = jVal
-            mScore[i, j] = mVal + matrix[ci,cj]
-
-    #for last column and last row, ignore gap opening penalty
-    #last column
-    j = max_j
-    cj = seqj[j-1]
-    for i in range(1, max_i):
-        ci = seqi[i-1]
-
-        iFromMVal = gap_extend + mScore[i, j - 1] + gap_incentive[i]
-        iExtendVal = gap_extend + iScore[i, j - 1] + gap_incentive[i]
-        iScore[i,j] = iFromMVal if iFromMVal > iExtendVal else iExtendVal
-
-        jFromMVal = gap_extend + mScore[i - 1, j] + gap_incentive[i-1]
-        jExtendVal = gap_extend + jScore[i - 1, j]
-        jScore[i,j] = jFromMVal if jFromMVal > jExtendVal else jExtendVal
-
-        mVal = mScore[i - 1, j - 1]
-        iVal = iScore[i - 1, j - 1]
-        jVal = jScore[i - 1, j - 1]
-        if iVal > mVal:
-            mVal = iVal
-        if jVal > mVal:
-            mVal = jVal
-        mScore[i, j] = mVal + matrix[ci,cj]
-
-    #last row
-    i = max_i
-    ci = seqi[i - 1]
-    gi_i = gap_incentive[i]
-    gi_im1 = gap_incentive[i - 1]
-    for j in range(1, max_j+1):
-        cj = seqj[j - 1]
-
-        iFromMVal = gap_extend + mScore[i, j - 1] + gi_i
-        iExtendVal = gap_extend + iScore[i, j - 1] + gi_i
-        iScore[i,j] = iFromMVal if iFromMVal > iExtendVal else iExtendVal
-
-        jFromMVal = gap_extend + mScore[i - 1, j] + gi_im1
-        jExtendVal = gap_extend + jScore[i - 1, j]
-        jScore[i,j] = jFromMVal if jFromMVal > jExtendVal else jExtendVal
-
-        mVal = mScore[i - 1, j - 1]
-        iVal = iScore[i - 1, j - 1]
-        jVal = jScore[i - 1, j - 1]
-        if iVal > mVal:
-            mVal = iVal
-        if jVal > mVal:
-            mVal = jVal
-        mScore[i, j] = mVal + matrix[ci,cj]
-
+    # --- traceback: identical walk to global_align_pointers, reading scores
+    # through the total diagonal mapping X(i,j) = dX[OFF[i+j] + i - LOF[i+j]].
     seqlen = max_i + max_j
     cdef char* tmp_align_j = get_c_string_with_length(seqlen)
     cdef char* tmp_align_i = get_c_string_with_length(seqlen)
@@ -611,17 +691,21 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
     cdef int matchCount = 0
     i = max_i
     j = max_j
-    ci = seqi[i - 1]
-    cj = seqj[j - 1]
+    ci = seqi[i - 1] if i > 0 else seqi[0]
+    cj = seqj[j - 1] if j > 0 else seqj[0]
     cdef int currMatrix
     currMatrix = MARRAY
-    if mScore[i,j] > jScore[i,j]:
-        if mScore[i,j] > iScore[i,j]:
+    dd = i + j
+    m = dM[OFF[dd] + i - LOF[dd]]
+    iv = dI[OFF[dd] + i - LOF[dd]]
+    jv = dJ[OFF[dd] + i - LOF[dd]]
+    if m > jv:
+        if m > iv:
             currMatrix = MARRAY
         else:
             currMatrix = IARRAY
     else:
-        if jScore[i,j] > iScore[i,j]:
+        if jv > iv:
             currMatrix = JARRAY
         else:
             currMatrix = IARRAY
@@ -630,19 +714,22 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
     # used during the fill: gap_open only in the strictly-inner region
     # (i < max_i and j < max_j); the last row/col use gap_extend. Matching this
     # exactly is what makes the recomputed argmax reproduce the pointer path.
-    cdef int mm, ii, jj, gap_pen
+    cdef int mm, ii2, jj2, gap_pen, jFromMVal, jExtendVal, iFromMVal, iExtendVal
+    cdef size_t i_n, j_n
     while i > 0 or j > 0:
         if currMatrix == MARRAY: # came from a match/mismatch: diagonal move
             # which state did the M-cell at (i,j) transition from? argmax of the
             # three predecessor scores at (i-1,j-1); ties resolved toward IARRAY
             # to match the forward fill's nested-if tie-breaking.
-            mm = mScore[i - 1, j - 1]
-            ii = iScore[i - 1, j - 1]
-            jj = jScore[i - 1, j - 1]
-            if mm > jj:
-                currMatrix = MARRAY if mm > ii else IARRAY
+            dd = (i - 1) + (j - 1)
+            i_n = i - 1 - LOF[dd]
+            mm = dM[OFF[dd] + i_n]
+            ii2 = dI[OFF[dd] + i_n]
+            jj2 = dJ[OFF[dd] + i_n]
+            if mm > jj2:
+                currMatrix = MARRAY if mm > ii2 else IARRAY
             else:
-                currMatrix = JARRAY if jj > ii else IARRAY
+                currMatrix = JARRAY if jj2 > ii2 else IARRAY
             tmp_align_j[align_counter] = cj
             tmp_align_i[align_counter] = ci
             if cj == ci:
@@ -661,8 +748,10 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
                 cj = seqj[j]
         elif currMatrix == JARRAY: # gap in read (deletion in ref): move up in i
             gap_pen = gap_open if (i < max_i and j < max_j) else gap_extend
-            jFromMVal = gap_pen + mScore[i - 1, j] + gap_incentive[i-1]
-            jExtendVal = gap_extend + jScore[i - 1, j]
+            dd = (i - 1) + j
+            i_n = i - 1 - LOF[dd]
+            jFromMVal = gap_pen + dM[OFF[dd] + i_n] + gi[i - 1]
+            jExtendVal = gap_extend + dJ[OFF[dd] + i_n]
             currMatrix = MARRAY if jFromMVal > jExtendVal else JARRAY
             tmp_align_j[align_counter] = c"-"
             tmp_align_i[align_counter] = ci
@@ -674,8 +763,10 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
                 ci = seqi[i]
         elif currMatrix == IARRAY: # gap in ref (insertion in read): move left in j
             gap_pen = gap_open if (i < max_i and j < max_j) else gap_extend
-            iFromMVal = gap_pen + mScore[i, j - 1] + gap_incentive[i]
-            iExtendVal = gap_extend + iScore[i, j - 1] + gap_incentive[i]
+            dd = i + (j - 1)
+            i_n = i - LOF[dd]
+            iFromMVal = gap_pen + dM[OFF[dd] + i_n] + gi[i]
+            iExtendVal = gap_extend + dI[OFF[dd] + i_n] + gi[i]
             currMatrix = MARRAY if iFromMVal > iExtendVal else IARRAY
             tmp_align_j[align_counter] = cj
             tmp_align_i[align_counter] = c"-"
@@ -703,3 +794,5 @@ def global_align(str pystr_seqj, str pystr_seqi, np.ndarray[DTYPE_LONG, ndim=2] 
 
     final_score = 100*matchCount/float(align_counter)
     return align_j[::-1], align_i[::-1], round(final_score, 3)
+
+
