@@ -4881,35 +4881,67 @@ def _collapsed_get_slice(
     read_cols = [c for c in read_cols if not (c in seen or seen.add(c))]
 
     path = collapsed_path or self.parquet_path
-    row_dicts: list = []
+    n_kept = 0
 
     if path is not None and os.path.exists(path):
+        # Column-wise reconstruction: one C-level ``to_pylist`` per (batch,
+        # column) instead of a per-cell Python call for every row x column
+        # (the row-dict path cost ~8.6M ``_reconstruct_slice_cell`` calls on
+        # a 376k-row full dataset — 64s). Cell types are identical: pyarrow's
+        # ``to_pylist`` on ``list<int16>`` yields exactly the Python
+        # int-lists ``find_indels_substitutions`` emits; coordinate structs
+        # convert dict->tuple per cell; ``substitution_values`` becomes
+        # per-cell numpy ``<U1`` *views* into one flat batch array (O(1) per
+        # cell; dtype and length match the fresh arrays the row path built).
+        import pyarrow as pa
+        import pyarrow.compute as pc
         import pyarrow.parquet as pq
 
         pf = pq.ParquetFile(path)
         if batch_size is None:
             batch_size = _adaptive_batch_size(pf)
+        col_data: dict = {c: [] for c in read_cols}
         for batch in pf.iter_batches(columns=read_cols, batch_size=batch_size):
             n = batch.num_rows
             if n == 0:
                 continue
-            col_values = {c: batch.column(c).to_pylist() for c in read_cols}
-            ref_col = col_values.get("Reference_Name")
-            for i in range(n):
-                if ref_name is not None:
-                    rn = ref_col[i] if ref_col is not None else None
-                    if rn != ref_name:
-                        continue
-                row = {c: _reconstruct_slice_cell(c, col_values[c][i]) for c in read_cols}
-                if include_pct_reads and "%Reads" in select:
-                    reads = int(row["#Reads"])
-                    row["%Reads"] = (reads / self.n_total * 100) if self.n_total > 0 else 0.0
-                row_dicts.append(row)
+            take_idx = None
+            if ref_name is not None:
+                mask = np.asarray(pc.equal(
+                    _as_single_array(batch.column("Reference_Name")), ref_name))
+                if not mask.any():
+                    continue
+                take_idx = np.nonzero(mask)[0]
+            for c in read_cols:
+                col = _as_single_array(batch.column(c))
+                if take_idx is not None:
+                    col = col.take(pa.array(take_idx, type=pa.int64()))
+                if c in _INT_ARRAY_SLICE_COLS:
+                    col_data[c].extend(
+                        x if x is not None else [] for x in col.to_pylist())
+                elif c in _COORD_SLICE_COLS:
+                    col_data[c].extend(
+                        [(d["start"], d["end"]) for d in cell] if cell is not None else []
+                        for cell in col.to_pylist())
+                elif c in _STR_ARRAY_SLICE_COLS:
+                    lens = np.asarray(
+                        pc.fill_null(pc.list_value_length(col), 0), dtype=np.int64)
+                    flat = col.flatten().to_pylist()
+                    big = (np.array(flat, dtype="<U1") if flat
+                           else np.zeros(0, dtype="<U1"))
+                    cs = np.concatenate(([0], np.cumsum(lens)))
+                    col_data[c].extend(
+                        big[cs[i]:cs[i + 1]] for i in range(len(lens)))
+                else:
+                    col_data[c].extend(col.to_pylist())
+            n_kept += len(take_idx) if take_idx is not None else n
+        row_dicts = None  # marker: parquet path used column-wise assembly
     else:
         # In-memory fallback (e.g. write_parquet=False): allele_rows already
         # carry native cell types from _get_allele_row, but the position arrays
         # round-tripped through the parquet shard as Python lists — reconstruct
         # them to numpy so the slice matches df_alleles on both paths.
+        row_dicts: list = []
         for r in self.allele_rows:
             if ref_name is not None and r.get("Reference_Name") != ref_name:
                 continue
@@ -4918,12 +4950,21 @@ def _collapsed_get_slice(
                 reads = int(r.get("#Reads", 0))
                 row["%Reads"] = (reads / self.n_total * 100) if self.n_total > 0 else 0.0
             row_dicts.append(row)
+        n_kept = len(row_dicts)
 
-    if not row_dicts:
+    if n_kept == 0:
         # Empty slice: return a frame with the requested columns, zero rows.
         return pd.DataFrame({c: pd.Series(dtype=object) for c in select})
 
-    df = pd.DataFrame(row_dicts)
+    if row_dicts is not None:
+        df = pd.DataFrame(row_dicts)
+    else:
+        df = pd.DataFrame({c: col_data[c] for c in read_cols if c in col_data})
+        if include_pct_reads and "%Reads" in select and "#Reads" in df.columns:
+            if self.n_total > 0:
+                df["%Reads"] = df["#Reads"] / self.n_total * 100
+            else:
+                df["%Reads"] = np.zeros(n_kept, dtype=float)
     # Cast n_* to int (parity with df_alleles ~line 4310).
     for c in ("n_deleted", "n_inserted", "n_mutated"):
         if c in df.columns:
