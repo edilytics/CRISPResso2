@@ -1173,6 +1173,7 @@ def variant_parquet_generator_process(
         if keys_fh is not None:
             keys_fh.close()
     info(f"Process {process_id + 1} has finished processing {num_processed} unique reads", {"percent_complete": 10})
+    return process_id, shard_path
 
 
 # ---------------------------------------------------------------------------

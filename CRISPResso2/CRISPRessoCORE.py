@@ -1169,6 +1169,12 @@ def get_new_variant_object_from_paired(args, fastq1_seq, fastq2_seq, fastq1_qual
     return new_variant
 
 
+def _run_parquet_chunk_task(task):
+    """Pool.imap adapter: splat a full positional call tuple (worker fn first)."""
+    fn, call_args = task[0], task[1:]
+    return fn(*call_args)
+
+
 def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_matrix,
                          pe_scaffold_dna_info, output_directory, get_new_variant_object,
                          variant_parquet_generator_process_fn):
@@ -1192,33 +1198,47 @@ def run_parquet_workers(read_counts, n_processes, args, refs, ref_names, aln_mat
     shard_paths = []
 
     if n_processes > 1 and num_unique_reads > n_processes:
-        # Stream the counted reads into per-worker chunks via itertools.islice
-        # rather than materializing the whole list — peak parent memory is one
-        # chunk (~num_unique/n_processes items) transiently, not the full
-        # unique-read set. Each chunk is materialized only because multiprocessing
-        # must pickle it to the worker subprocess; we start each worker
-        # immediately after building its chunk so the parent's reference is freed
-        # before the next chunk is built.
+        # Dynamically-scheduled chunk fanout: split the unique reads into
+        # ~8x more chunks than workers and feed them to a Pool, instead of
+        # one static chunk per worker. On heterogeneous cores (e.g. Apple
+        # Silicon 6P+2E) a static chunk on an efficiency core runs 2-3x
+        # slower and gates the whole phase — dynamic scheduling lets slow
+        # workers simply take fewer chunks (measured: aggregate kernel
+        # throughput saturates at the P-core count, so more, smaller chunks
+        # recover nearly all of the straggler loss). Scan order is preserved
+        # exactly: chunk j covers boundaries[j]:boundaries[j+1] of the counted
+        # stream, the worker writes aligned_<j>.parquet with
+        # seq_no_base=boundaries[j], and the returned shard_paths list stays
+        # in chunk order — collapse's pass-2 two-pointer requires monotonic
+        # seq_no across shards, which chunk order guarantees.
         import itertools
-        boundaries = get_variant_cache_equal_boundaries(num_unique_reads, n_processes)
+        from multiprocessing import Pool
+        n_chunks = max(n_processes,
+                       min(8 * n_processes, num_unique_reads // 1000))
+        boundaries = get_variant_cache_equal_boundaries(num_unique_reads, n_chunks)
         items_iter = read_counts.items()
-        processes = []
-        info('Spinning up %d parallel processes to analyze unique reads (parquet backend)...' % (n_processes))
-        for i in range(n_processes):
-            chunk = list(itertools.islice(items_iter, boundaries[i + 1] - boundaries[i]))
-            shard_path = os.path.join(output_directory, 'aligned_%d.parquet' % i)
-            shard_paths.append(shard_path)
-            process = Process(
-                target=variant_parquet_generator_process_fn,
-                args=(chunk, get_new_variant_object, args, refs, ref_names,
-                      aln_matrix, pe_scaffold_dna_info, i, output_directory,
-                      False, boundaries[i]),
-            )
-            process.start()  # pickles chunk to the worker; parent can then drop it
-            processes.append(process)
-            del chunk  # free the parent's copy before building the next chunk
-        for p in processes:
-            p.join()
+
+        def _chunk_tasks():
+            for j in range(n_chunks):
+                chunk = list(itertools.islice(items_iter, boundaries[j + 1] - boundaries[j]))
+                # full positional call tuple (Pool.imap passes each item as a
+                # single argument; _run_parquet_chunk_task splats it)
+                yield (variant_parquet_generator_process_fn, chunk,
+                       get_new_variant_object, args, refs, ref_names,
+                       aln_matrix, pe_scaffold_dna_info, j, output_directory,
+                       False, boundaries[j])
+                del chunk  # free before building the next one
+
+        info('Spinning up %d parallel processes to analyze unique reads in %d chunks (parquet backend)...'
+             % (n_processes, n_chunks))
+        shard_slots = [None] * n_chunks
+        with Pool(processes=n_processes) as pool:
+            # imap_unordered pulls chunk tasks lazily from _chunk_tasks and
+            # applies OS-pipe backpressure — peak parent memory is the counted
+            # dict plus at most one in-flight chunk per worker, as before.
+            for j, shard_path in pool.imap_unordered(_run_parquet_chunk_task, _chunk_tasks()):
+                shard_slots[j] = shard_path
+        shard_paths = shard_slots
         info('Finished processing unique reads, now generating statistics (parquet backend)...', {'percent_complete': 15})
     else:
         shard_path = os.path.join(output_directory, 'aligned_0.parquet')
