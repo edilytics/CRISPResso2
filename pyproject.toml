@@ -161,7 +161,5 @@ ignore = [
 max-args = 10
 
 [tool.ruff.lint.per-file-ignores]
-# Embedded awk scripts have long lines that cannot be easily broken
-"CRISPResso2/CRISPRessoPooledCORE.py" = ["E501"]
 # setup.py requires conditional imports for Cython detection
 "setup.py" = ["E402"]

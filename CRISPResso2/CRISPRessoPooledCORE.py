@@ -10,10 +10,12 @@ from copy import deepcopy
 from datetime import datetime
 import subprocess as sb
 import glob
-import gzip
 import re
+import shlex
+import shutil
 import zipfile
 from CRISPResso2 import CRISPRessoShared
+from CRISPResso2 import CRISPRessoPooledDemux
 from CRISPResso2 import CRISPRessoMultiProcessing
 from CRISPResso2.CRISPRessoReports import CRISPRessoReport
 
@@ -31,6 +33,61 @@ debug = logger.debug
 info = logger.info
 
 _ROOT = os.path.abspath(os.path.dirname(__file__))
+
+
+def run_logged_command(command, log_filename):
+    """Run a command list and append both streams to the pooled log."""
+    with open(log_filename, 'a', encoding='utf-8') as log_file:
+        result = sb.run(command, stdout=log_file, stderr=sb.STDOUT)
+    return result.returncode
+
+
+def run_logged_command_string(command, log_filename):
+    """Execute a legacy command string without shell redirection."""
+    tokens = shlex.split(command)
+    cleaned = []
+    skip_next = False
+    for token in tokens:
+        if skip_next:
+            skip_next = False
+            continue
+        if token == '>>':
+            skip_next = True
+        elif token != '2>&1':
+            cleaned.append(token)
+    return run_logged_command(cleaned, log_filename)
+
+
+def run_command_to_file(command, output_filename, log_filename):
+    """Run a command with stdout in a file and stderr in the pooled log."""
+    with open(output_filename, 'w', encoding='utf-8') as output, open(log_filename, 'a', encoding='utf-8') as log_file:
+        result = sb.run(command, stdout=output, stderr=log_file)
+    return result.returncode
+
+
+def align_reads_to_bam(index_name, reads_filename, output_filename, bowtie_options, threads, log_filename, sort_bam=False):
+    """Run bowtie2 and samtools as a checked Python-managed pipeline."""
+    bowtie_command = ['bowtie2', '-x', index_name, '-p', str(threads), *shlex.split(bowtie_options), '-U', reads_filename]
+    with open(log_filename, 'a', encoding='utf-8') as log_file:
+        bowtie = sb.Popen(bowtie_command, stdout=sb.PIPE, stderr=log_file)
+        if sort_bam:
+            view = sb.Popen(['samtools', 'view', '-bS', '-'], stdin=bowtie.stdout, stdout=sb.PIPE, stderr=log_file)
+            sorter = sb.Popen(['samtools', 'sort', '-@', str(threads), '-', '-o', output_filename], stdin=view.stdout, stdout=sb.DEVNULL, stderr=log_file)
+            bowtie.stdout.close()
+            view.stdout.close()
+            sort_status = sorter.wait()
+        else:
+            with open(output_filename, 'wb') as bam_output:
+                view = sb.Popen(['samtools', 'view', '-bS', '-'], stdin=bowtie.stdout, stdout=bam_output, stderr=log_file)
+                bowtie.stdout.close()
+                sort_status = 0
+                view_status = view.wait()
+        if sort_bam:
+            view_status = view.wait()
+        bowtie_status = bowtie.wait()
+    if bowtie_status or view_status or sort_status:
+        return bowtie_status or view_status or sort_status
+    return 0
 
 
 # Support functions###
@@ -110,19 +167,19 @@ def print_full_pandas_df(x):
 # get n_reads and region data from region fastq file (location is pulled from filename)
 def summarize_region_fastq_chunk(input_arr):
     ret_val = []
-    for input in input_arr:
-#        print('doing region ' + str(input))
-        region_fastq, uncompressed_reference = input.split(" ")
+    for region_input in input_arr:
+        if isinstance(region_input, str):
+            region_fastq, uncompressed_reference = region_input.rsplit(' ', 1)
+        else:
+            region_fastq, uncompressed_reference = region_input
         # region format: REGION_chr8_1077_1198.fastq.gz
         # But if the chr has underscores, it could look like this:
         #    REGION_chr8_KI270812v1_alt_1077_1198.fastq.gz
         region_info = os.path.basename(region_fastq).replace('.fastq.gz', '').replace('.fastq', '').split('_')
-        chr_string = "_".join(region_info[1:len(region_info) - 2])  # in case there are underscores
+        chr_string = "_".join(region_info[1:len(region_info) - 2])
         region_string = '%s:%s-%d' % (chr_string, region_info[-2], int(region_info[-1]) - 1)
-        p = sb.Popen("samtools faidx %s %s | grep -v ^\\> | tr -d '\n'" % (uncompressed_reference, region_string), shell=True, stdout=sb.PIPE)
-        seq = p.communicate()[0].decode('utf-8')
-        p = sb.Popen(('z' if region_fastq.endswith('.gz') else '') + "cat < %s | wc -l" % region_fastq, shell=True, stdout=sb.PIPE)
-        n_reads = int(float(p.communicate()[0]) / 4.0)
+        seq = CRISPRessoPooledDemux.extract_fasta_sequence(uncompressed_reference, region_string)
+        n_reads = CRISPRessoPooledDemux.count_fastq_records(region_fastq)
         ret_val.append([chr_string] + region_info[-2:] + [region_fastq, n_reads, seq])
     return ret_val
 
@@ -153,8 +210,8 @@ def get_read_length_from_cigar(cigar_string):
 
 
 def get_n_reads_bam(bam_filename):
-    p = sb.Popen("samtools view -c %s" % bam_filename, shell=True, stdout=sb.PIPE)
-    return int(p.communicate()[0])
+    result = sb.run(['samtools', 'view', '-c', bam_filename], check=True, capture_output=True, text=True)
+    return int(result.stdout.strip())
 
 
 def calculate_aligned_samtools_exclude_flags(samtools_exclude_flags):
@@ -176,13 +233,23 @@ def calculate_aligned_samtools_exclude_flags(samtools_exclude_flags):
 
 
 def get_n_aligned_bam(bam_filename, samtools_exclude_flags):
-    p = sb.Popen(f"samtools view -F {calculate_aligned_samtools_exclude_flags(samtools_exclude_flags)} -c {bam_filename}", shell=True, stdout=sb.PIPE)
-    return int(p.communicate()[0])
+    result = sb.run(
+        ['samtools', 'view', '-F', calculate_aligned_samtools_exclude_flags(samtools_exclude_flags), '-c', bam_filename],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return int(result.stdout.strip())
 
 
 def get_n_aligned_bam_region(bam_filename, chr_name, chr_start, chr_end, samtools_exclude_flags):
-    p = sb.Popen(f"samtools view -F {calculate_aligned_samtools_exclude_flags(samtools_exclude_flags)} -c {bam_filename} {chr_name}:{chr_start}-{chr_end}", shell=True, stdout=sb.PIPE)
-    return int(p.communicate()[0])
+    result = sb.run(
+        ['samtools', 'view', '-F', calculate_aligned_samtools_exclude_flags(samtools_exclude_flags), '-c', bam_filename, f'{chr_name}:{chr_start}-{chr_end}'],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return int(result.stdout.strip())
 
 
 def find_overlapping_genes(row, df_genes):
@@ -496,7 +563,7 @@ def main():
                         html_report=_jp('fastp_report.html'),
                         log=log_filename,
                     )
-                    fastp_status = sb.call(trim_cmd, shell=True)
+                    fastp_status = run_logged_command_string(trim_cmd, log_filename)
 
                     if fastp_status:
                         raise CRISPRessoShared.FastpException('FASTP failed to run, please check the log file.')
@@ -548,7 +615,7 @@ def main():
                 if args.debug:
                     info('Fastp command: {0}'.format(fastp_cmd))
 
-                fastp_status = sb.call(fastp_cmd, shell=True)
+                fastp_status = run_logged_command_string(fastp_cmd, log_filename)
 
                 if fastp_status:
                     raise CRISPRessoShared.FastpException('Fastp failed to run, please check the log file.')
@@ -567,12 +634,14 @@ def main():
                 new_merged_filename = _jp('out.forcemerged_uncombined.fastq.gz')
                 num_reads_force_merged = CRISPRessoShared.force_merge_pairs(not_combined_1_filename, not_combined_2_filename, new_merged_filename)
                 new_output_filename = _jp('out.forcemerged.fastq.gz')
-                merge_command = "cat {0} {1} > {2}".format(processed_output_filename, new_merged_filename, new_output_filename)
-                merge_status = sb.call(merge_command, shell=True)
-                if merge_status:
-                    raise CRISPRessoShared.FastpException('Force-merging read pairs failed to run, please check the log file.')
-                else:
-                    info(f'Forced {num_reads_force_merged} read pairs together.')
+                try:
+                    with open(new_output_filename, 'wb') as merged_out:
+                        for input_filename in (processed_output_filename, new_merged_filename):
+                            with open(input_filename, 'rb') as input_file:
+                                shutil.copyfileobj(input_file, merged_out)
+                except OSError as exc:
+                    raise CRISPRessoShared.FastpException('Force-merging read pairs failed to run, please check the log file.') from exc
+                info(f'Forced {num_reads_force_merged} read pairs together.')
                 processed_output_filename = new_output_filename
 
                 if not args.keep_intermediate:
@@ -787,61 +856,43 @@ def main():
             df_template['Demultiplexed_fastq.gz_filename'] = fastq_gz_amplicon_filenames
             info('Creating a custom index file with all the amplicons...')
             custom_index_filename = _jp('CUSTOM_BOWTIE2_INDEX')
-            sb.call('bowtie2-build %s %s >>%s 2>&1' % (amplicon_fa_filename, custom_index_filename, log_filename), shell=True)
+            bowtie_build_status = run_logged_command(
+                ['bowtie2-build', amplicon_fa_filename, custom_index_filename],
+                log_filename,
+            )
+            if bowtie_build_status:
+                raise CRISPRessoShared.AlignmentException('Bowtie2-build failed, please check the output log.')
 
             # align the file to the amplicons (MODE 1)
             info('Align reads to the amplicons...')
             bam_filename_amplicons = _jp('CRISPResso_AMPLICONS_ALIGNED.bam')
-            aligner_command = 'bowtie2 -x %s -p %s %s -U %s 2>>%s | samtools view -bS - > %s' % (custom_index_filename, n_processes_for_pooled, bowtie2_options_string, processed_output_filename, log_filename, bam_filename_amplicons)
+            aligner_command = 'bowtie2 -x %s -p %s %s -U %s | samtools view -bS - > %s' % (custom_index_filename, n_processes_for_pooled, bowtie2_options_string, processed_output_filename, bam_filename_amplicons)
 
             info('Alignment command: ' + aligner_command, {'percent_complete': 15})
-            sb.call(aligner_command, shell=True)
+            alignment_status = align_reads_to_bam(
+                custom_index_filename,
+                processed_output_filename,
+                bam_filename_amplicons,
+                bowtie2_options_string,
+                n_processes_for_pooled,
+                log_filename,
+            )
+            if alignment_status:
+                raise CRISPRessoShared.AlignmentException('Bowtie2 failed to align reads to amplicons, please check the output log.')
 
             N_READS_ALIGNED = get_n_aligned_bam(bam_filename_amplicons, args.samtools_exclude_flags)
 
-            if args.limit_open_files_for_demux:
-                bam_iter = CRISPRessoShared.get_command_output(
-                    '(samtools sort {bam_file} | samtools view -F {samtools_exclude_flags}) 2>> {log_file}'.format(
-                        bam_file=bam_filename_amplicons,
-                        samtools_exclude_flags=args.samtools_exclude_flags,
-                        log_file=log_filename,
-                    ),
-                )
-                curr_file, curr_chr = None, None
-                for bam_line in bam_iter:
-                    bam_line_els = bam_line.split('\t')
-                    if len(bam_line_els) < 9:
-                        if args.debug:
-                            info('ERROR got unexpected line from bam: {0} with els: {1}'.format(
-                                bam_line, str(bam_line_els),
-                            ))
-                        continue
-                    line_chr = bam_line_els[2]
-
-                    # at the first line open new file, or at next amplicon
-                    # close previous file and open new one
-                    if curr_chr != line_chr:
-                        if curr_file is not None:
-                            curr_file.close()
-                        curr_file = gzip.open(
-                            _jp('{0}.fastq.gz'.format(line_chr)),
-                            'wt',
-                        )
-                    curr_file.write('@{read_name}\n{seq}\n+\n{qual}\n'.format(
-                        read_name=bam_line_els[0],
-                        seq=bam_line_els[9],
-                        qual=bam_line_els[10],
-                    ))
-                    curr_chr = line_chr
-                if curr_file is not None:
-                    curr_file.close()
-            else:
-                s1 = rf"samtools view -F {args.samtools_exclude_flags} {bam_filename_amplicons} 2>>{log_filename} | grep -v ^'@'"
-                s2 = r'''|awk '{ gzip_filename=sprintf("gzip >> OUTPUTPATH%s.fastq.gz",$3);\
-                print "@"$1"\n"$10"\n+\n"$11  | gzip_filename;}' '''
-
-                cmd = s1 + s2.replace('OUTPUTPATH', _jp(''))
-                sb.call(cmd, shell=True)
+            demux_exclude_flags = calculate_aligned_samtools_exclude_flags(args.samtools_exclude_flags)
+            demux_output_paths = {
+                CRISPRessoShared.clean_filename('AMPL_' + idx): row['Demultiplexed_fastq.gz_filename']
+                for idx, row in df_template.iterrows()
+            }
+            CRISPRessoPooledDemux.demultiplex_bam_to_fastq(
+                bam_filename_amplicons,
+                demux_output_paths,
+                demux_exclude_flags,
+                max_open_files=1 if args.limit_open_files_for_demux else None,
+            )
 
             alternate_alleles = {}
             if args.alternate_alleles:
@@ -957,11 +1008,16 @@ def main():
                     for idx, row in df_template.iterrows():
                         fastas.write('>%s\n%s\n' % (row.run_name, row.amplicon_seq))
 
-                aligner_command = 'bowtie2 -x %s -p %s %s -f -U %s --no-hd --no-sq 2> %s > %s ' % (args.bowtie2_index, n_processes_for_pooled, bowtie2_options_string,
-                    filename_amplicon_seqs_fasta, filename_aligned_amplicons_sam_log, filename_aligned_amplicons_sam)
-                bowtie_status = sb.call(aligner_command, shell=True)
+                aligner_command = 'bowtie2 -x %s -p %s %s -f -U %s --no-hd --no-sq' % (args.bowtie2_index, n_processes_for_pooled, bowtie2_options_string,
+                    filename_amplicon_seqs_fasta)
+                bowtie_status = run_command_to_file(
+                    ['bowtie2', '-x', args.bowtie2_index, '-p', str(n_processes_for_pooled), *shlex.split(bowtie2_options_string),
+                     '-f', '-U', filename_amplicon_seqs_fasta, '--no-hd', '--no-sq'],
+                    filename_aligned_amplicons_sam,
+                    filename_aligned_amplicons_sam_log,
+                )
                 if bowtie_status:
-                        raise CRISPRessoShared.AlignmentException('Bowtie2 failed to align amplicons to the genome, please check the output file.')
+                    raise CRISPRessoShared.AlignmentException('Bowtie2 failed to align amplicons to the genome, please check the output file.')
 
                 additional_columns = []
                 with open(filename_aligned_amplicons_sam) as aln:
@@ -1020,12 +1076,18 @@ def main():
                 # uncompressed_reference=os.path.join(GENOME_LOCAL_FOLDER,'UNCOMPRESSED_REFERENCE_FROM_'+args.bowtie2_index.replace('/','_')+'.fa')
                 info('Extracting uncompressed reference from the provided bowtie2 index since it is not available... Please be patient!')
 
-                cmd_to_uncompress = 'bowtie2-inspect %s > %s 2>>%s' % (args.bowtie2_index, uncompressed_reference, log_filename)
-                sb.call(cmd_to_uncompress, shell=True)
+                inspect_status = run_command_to_file(
+                    ['bowtie2-inspect', args.bowtie2_index],
+                    uncompressed_reference,
+                    log_filename,
+                )
+                if inspect_status:
+                    raise CRISPRessoShared.AlignmentException('Bowtie2-inspect failed, please check the output log.')
 
                 info('Indexing fasta file with samtools...')
-                # !samtools faidx {uncompressed_reference}
-                sb.call('samtools faidx %s 2>>%s ' % (uncompressed_reference, log_filename), shell=True)
+                faidx_status = run_logged_command(['samtools', 'faidx', uncompressed_reference], log_filename)
+                if faidx_status:
+                    raise CRISPRessoShared.AlignmentException('samtools faidx failed, please check the output log.')
 
         # align reads to the genome in an unbiased way
         if RUNNING_MODE == 'ONLY_GENOME' or RUNNING_MODE == 'AMPLICONS_AND_GENOME':
@@ -1048,7 +1110,9 @@ def main():
                     info('Index file for input .bam file exists, skipping generation.')
                 else:
                     info('Index file for input .bam file does not exist. Generating bam index file.')
-                    sb.call('samtools index %s' % bam_filename_genome, shell=True)
+                    index_status = run_logged_command(['samtools', 'index', bam_filename_genome], log_filename)
+                    if index_status:
+                        raise CRISPRessoShared.AlignmentException('samtools index failed, please check the output log.')
 
                 N_READS_ALIGNED = get_n_aligned_bam(bam_filename_genome, args.samtools_exclude_flags)
                 # save progress up to this point
@@ -1059,13 +1123,25 @@ def main():
             # otherwise, align reads to the genome and count reads
             else:
                 info('Aligning reads to the provided genome index...')
-                aligner_command = 'bowtie2 -x %s -p %s %s -U %s 2>>%s| samtools view -bS - | samtools sort -@ %d - -o %s' % (args.bowtie2_index, n_processes_for_pooled,
-                    bowtie2_options_string, processed_output_filename, log_filename, n_processes_for_pooled, bam_filename_genome)
+                aligner_command = 'bowtie2 -x %s -p %s %s -U %s | samtools view -bS - | samtools sort -@ %d - -o %s' % (args.bowtie2_index, n_processes_for_pooled,
+                    bowtie2_options_string, processed_output_filename, n_processes_for_pooled, bam_filename_genome)
                 if args.debug:
                     info('Aligning with command: ' + aligner_command)
-                sb.call(aligner_command, shell=True)
+                alignment_status = align_reads_to_bam(
+                    args.bowtie2_index,
+                    processed_output_filename,
+                    bam_filename_genome,
+                    bowtie2_options_string,
+                    n_processes_for_pooled,
+                    log_filename,
+                    sort_bam=True,
+                )
+                if alignment_status:
+                    raise CRISPRessoShared.AlignmentException('Bowtie2 failed to align reads to the genome, please check the output log.')
 
-                sb.call('samtools index %s' % bam_filename_genome, shell=True)
+                index_status = run_logged_command(['samtools', 'index', bam_filename_genome], log_filename)
+                if index_status:
+                    raise CRISPRessoShared.AlignmentException('samtools index failed, please check the output log.')
 
                 N_READS_ALIGNED = get_n_aligned_bam(bam_filename_genome, args.samtools_exclude_flags)
 
@@ -1089,164 +1165,130 @@ def main():
                 # first get rid of all files in the output directory
                 if os.path.exists(MAPPED_REGIONS):
                     info('Deleting partially-completed demultiplexing in %s...' % MAPPED_REGIONS)
-                    cmd = "rm -rf %s" % MAPPED_REGIONS
-                    p = sb.call(cmd, shell=True)
+                    shutil.rmtree(MAPPED_REGIONS)
 
-                # make the output directory
                 os.mkdir(MAPPED_REGIONS)
 
-                # if we should only demultiplex where amplicons aligned... (as opposed to the whole genome)
+                demux_exclude_flags = calculate_aligned_samtools_exclude_flags(args.samtools_exclude_flags)
+                demux_jobs = []
+                chr_output_filenames = []
+                # If we should only demultiplex where amplicons aligned, create one
+                # streaming worker per unique amplicon interval.
                 if RUNNING_MODE == 'AMPLICONS_AND_GENOME' and not args.demultiplex_genome_wide:
-                    s1 = rf'''samtools view -F {args.samtools_exclude_flags} {bam_filename_genome} __REGIONCHR__:__REGIONSTART__-__REGIONEND__ 2>>{log_filename} |''' +\
-                    r'''awk 'BEGIN{OFS="\t";num_records=0;fastq_filename="__OUTPUTPATH__REGION___REGIONCHR_____REGIONSTART_____REGIONEND__.fastq";} \
-                        { \
-                            print "@"$1"\n"$10"\n+\n"$11 > fastq_filename; \
-                            num_records++; \
-                        } \
-                    END{ \
-                      close(fastq_filename); \
-                        if (num_records < __MIN_READS__) { \
-                            record_log_str = "__REGIONCHR__\t__REGIONSTART__\t__REGIONEND__\t"num_records"\tNA\n"; \
-                        } else { \
-                            system("gzip -f "fastq_filename);  \
-                            record_log_str = "__REGIONCHR__\t__REGIONSTART__\t__REGIONEND__\t"num_records"\t"fastq_filename".gz\n"; \
-                        } \
-                      print record_log_str > "__DEMUX_CHR_LOGFILENAME__"; \
-                    } ' '''
-                    cmd = (s1).replace('__OUTPUTPATH__', MAPPED_REGIONS)
-                    cmd = cmd.replace("__MIN_READS__", str(args.min_reads_to_use_region))
-                    with open(REPORT_ALL_DEPTH, 'w') as f:
-                        f.write('chr_id\tstart\tend\tnumber of reads\toutput filename\n')
-
                     info('Preparing to demultiplex reads aligned to positions overlapping amplicons in the genome...')
-                    # make command for each amplicon
+                    with open(REPORT_ALL_DEPTH, 'w', encoding='utf-8') as f:
+                        f.write('chr_id\tstart\tend\tnumber of reads\toutput filename\n')
+                    seen_intervals = set()
+                    for _, row in df_template.iterrows():
+                        interval = (str(row.chr_id), int(row.bpstart), int(row.bpend))
+                        if interval in seen_intervals:
+                            continue
+                        seen_intervals.add(interval)
+                        chr_output_filename = _jp('MAPPED_REGIONS/REGION_%s_%s_%s.info' % interval)
+                        demux_jobs.append({
+                            'mode': 'interval',
+                            'arguments': {
+                                'bam_filename': bam_filename_genome,
+                                'chromosome': interval[0],
+                                'start': interval[1],
+                                'end': interval[2],
+                                'output_directory': MAPPED_REGIONS,
+                                'minimum_reads': int(args.min_reads_to_use_region),
+                                'exclude_flags': demux_exclude_flags,
+                                'info_filename': chr_output_filename,
+                            },
+                        })
+                        chr_output_filenames.append(chr_output_filename)
 
-                    chr_commands = []
-                    chr_output_filenames = []
-                    for idx, row in df_template.iterrows():
-                        chr_output_filename = _jp('MAPPED_REGIONS/REGION_%s_%s_%s.info' % (row.chr_id, row.bpstart, row.bpend))
-                        sub_chr_command = cmd.replace('__REGIONCHR__', str(row.chr_id)).replace('__REGIONSTART__', str(row.bpstart)).replace('__REGIONEND__', str(row.bpend)).replace("__DEMUX_CHR_LOGFILENAME__", chr_output_filename)
-                        if chr_output_filename not in chr_output_filenames:  # sometimes multiple amplicons map to the same region so we don't want the region to be written to by multiple processes
-                            chr_commands.append(sub_chr_command)
-                            chr_output_filenames.append(chr_output_filename)
-
-                # if we should demultiplex everwhere (not just where amplicons aligned)
+                # Genome-wide mode groups reads by the alignment span calculated
+                # from the CIGAR string in a streaming Python worker.
                 else:
-                    # next, create the general demux command
-                    # variables like __CHR__ will be subbed out below for each iteration
-                    s1 = rf'''samtools view -F {args.samtools_exclude_flags} {bam_filename_genome} __CHR____REGION__ 2>>{log_filename} |''' + \
-                    r'''awk 'BEGIN {OFS="\t"} {bpstart=$4;  bpend=bpstart; split ($6,a,"[MIDNSHP]"); n=0;\
-                    for (i=1; i in a; i++){\
-                        n+=1+length(a[i]);\
-                        if (substr($6,n,1)=="S"){\
-                            if (bpend==$4)\
-                                bpstart-=a[i];\
-                            else \
-                                bpend+=a[i]; \
-                            }\
-                        else if( (substr($6,n,1)!="I")  && (substr($6,n,1)!="H") )\
-                                bpend+=a[i];\
-                        }\
-                        if (($2 % 32)>=16)\
-                            print $3,bpstart,bpend,"-",$1,$10,$11;\
-                        else\
-                            print $3,bpstart,bpend,"+",$1,$10,$11;}' | '''
-
-                    s2 = r'''  sort -k1,1 -k2,2n  | awk \
-                     'BEGIN{chr_id="NA";bpstart=-1;bpend=-1; fastq_filename="NA";num_records=0;fastq_records="";fastq_record_sep="";record_log_str = ""}\
-                    { if ( (chr_id!=$1) || (bpstart!=$2) || (bpend!=$3) )\
-                        {\
-                        if (fastq_filename!="NA") {if (num_records < __MIN_READS__){\
-                            record_log_str = record_log_str chr_id"\t"bpstart"\t"bpend"\t"num_records"\tNA\n"} \
-                    else{print(fastq_records)>fastq_filename;close(fastq_filename); system("gzip -f "fastq_filename); record_log_str = record_log_str chr_id"\t"bpstart"\t"bpend"\t"num_records"\t"fastq_filename".gz\n"} \
-                        }\
-                        chr_id=$1; bpstart=$2; bpend=$3;\
-                        fastq_filename=sprintf("__OUTPUTPATH__REGION_%s_%s_%s.fastq",$1,$2,$3);\
-                        num_records = 0;\
-                        fastq_records="";\
-                        fastq_record_sep="";\
-                        }\
-                    fastq_records=fastq_records fastq_record_sep "@"$5"\n"$6"\n+\n"$7; \
-                    fastq_record_sep="\n"; \
-                    num_records++; \
-                    } \
-                    END{ \
-                        if (fastq_filename!="NA") {if (num_records < __MIN_READS__){\
-                            record_log_str = record_log_str chr_id"\t"bpstart"\t"bpend"\t"num_records"\tNA\n"} \
-                    else{print(fastq_records)>fastq_filename;close(fastq_filename); system("gzip -f "fastq_filename); record_log_str = record_log_str chr_id"\t"bpstart"\t"bpend"\t"num_records"\t"fastq_filename".gz\n"} \
-                        }\
-                        print record_log_str > "__DEMUX_CHR_LOGFILENAME__" \
-                    }' '''
-                    cmd = (s1 + s2).replace('__OUTPUTPATH__', MAPPED_REGIONS)
-                    cmd = cmd.replace("__MIN_READS__", str(args.min_reads_to_use_region))
-
                     info('Preparing to demultiplex reads aligned to the genome...')
-                    # next, get all of the chromosome names (for parallelization)
-                    enumerate_chr_cmd = "samtools view -H %s" % bam_filename_genome
-                    p = sb.Popen(enumerate_chr_cmd, shell=True, stdout=sb.PIPE)
-                    chr_lines = p.communicate()[0].decode('utf-8').split("\n")
-                    chrs = []
-                    chr_lens = {}
-                    for chr_line in chr_lines:
-                        m = re.match(r'@SQ\s+SN:(\S+)\s+LN:(\d+)', chr_line)
-                        if m:
-                            chrs.append(m.group(1))
-                            chr_lens[m.group(1)] = int(m.group(2))
-
-                    chr_commands = []
-                    chr_output_filenames = []
-                    for chr_str in chrs:
-                        chr_cmd = cmd.replace('__CHR__', chr_str)
-                        # if we have a lot of reads, split up the chrs too
-                        # with a step size of 10M, there are about 220 regions in hg19
-                        # with a step size of 5M, there are about 368 regions in hg19
-                        chr_step_size = 5000000  # step size for splitting up chrs
-                        chr_len = chr_lens[chr_str]
+                    references = CRISPRessoPooledDemux.get_bam_references(bam_filename_genome)
+                    chr_step_size = 5000000
+                    for chr_str, chr_len in references.items():
                         if N_READS_ALIGNED > 10000000 and chr_len > chr_step_size * 2:
                             curr_pos = 0
                             curr_end = curr_pos + chr_step_size
                             while curr_end < chr_len:
-                                # make sure there aren't any reads at this breakpoint
-                                n_reads_at_end = get_n_aligned_bam_region(bam_filename_genome, chr_str, curr_end - 5, curr_end + 5, args.samtools_exclude_flags)
+                                n_reads_at_end = get_n_aligned_bam_region(
+                                    bam_filename_genome, chr_str, curr_end - 5, curr_end + 5, args.samtools_exclude_flags,
+                                )
                                 while n_reads_at_end > 0:
-                                    curr_end += 500  # look for another place with no reads
+                                    curr_end += 500
                                     if curr_end >= chr_len:
                                         curr_end = chr_len
                                         break
-                                    n_reads_at_end = get_n_aligned_bam_region(bam_filename_genome, chr_str, curr_end - 5, curr_end + 5, args.samtools_exclude_flags)
-
-                                chr_output_filename = _jp('MAPPED_REGIONS/%s_%s_%s.info' % (chr_str, curr_pos, curr_end))
-                                sub_chr_command = chr_cmd.replace("__REGION__", ":%d-%d " % (curr_pos, curr_end)).replace("__DEMUX_CHR_LOGFILENAME__", chr_output_filename)
-                                chr_commands.append(sub_chr_command)
-                                chr_output_filenames.append(chr_output_filename)
+                                    n_reads_at_end = get_n_aligned_bam_region(
+                                        bam_filename_genome, chr_str, curr_end - 5, curr_end + 5, args.samtools_exclude_flags,
+                                    )
+                                info_filename = _jp('MAPPED_REGIONS/%s_%s_%s.info' % (chr_str, curr_pos, curr_end))
+                                demux_jobs.append({
+                                    'mode': 'genome',
+                                    'arguments': {
+                                        'bam_filename': bam_filename_genome,
+                                        'chromosome': chr_str,
+                                        'region_start': curr_pos,
+                                        'region_end': curr_end,
+                                        'output_directory': MAPPED_REGIONS,
+                                        'minimum_reads': int(args.min_reads_to_use_region),
+                                        'exclude_flags': demux_exclude_flags,
+                                        'info_filename': info_filename,
+                                    },
+                                })
+                                chr_output_filenames.append(info_filename)
                                 curr_pos = curr_end
                                 curr_end = curr_pos + chr_step_size
                             if curr_pos < chr_len:
-                                chr_output_filename = _jp('MAPPED_REGIONS/%s_%s_%s.info' % (chr_str, curr_pos, chr_len))
-                                sub_chr_command = chr_cmd.replace("__REGION__", ":%d-%d " % (curr_pos, chr_len)).replace("__DEMUX_CHR_LOGFILENAME__", chr_output_filename)
-                                chr_commands.append(sub_chr_command)
-                                chr_output_filenames.append(chr_output_filename)
-
+                                info_filename = _jp('MAPPED_REGIONS/%s_%s_%s.info' % (chr_str, curr_pos, chr_len))
+                                demux_jobs.append({
+                                    'mode': 'genome',
+                                    'arguments': {
+                                        'bam_filename': bam_filename_genome,
+                                        'chromosome': chr_str,
+                                        'region_start': curr_pos,
+                                        'region_end': chr_len,
+                                        'output_directory': MAPPED_REGIONS,
+                                        'minimum_reads': int(args.min_reads_to_use_region),
+                                        'exclude_flags': demux_exclude_flags,
+                                        'info_filename': info_filename,
+                                    },
+                                })
+                                chr_output_filenames.append(info_filename)
                         else:
-                            # otherwise do the whole chromosome
-                            chr_output_filename = _jp('MAPPED_REGIONS/%s.info' % (chr_str))
-                            sub_chr_command = chr_cmd.replace("__REGION__", "").replace("__DEMUX_CHR_LOGFILENAME__", chr_output_filename)
-                            chr_commands.append(sub_chr_command)
-                            chr_output_filenames.append(chr_output_filename)
+                            info_filename = _jp('MAPPED_REGIONS/%s.info' % chr_str)
+                            demux_jobs.append({
+                                'mode': 'genome',
+                                'arguments': {
+                                    'bam_filename': bam_filename_genome,
+                                    'chromosome': chr_str,
+                                    'region_start': None,
+                                    'region_end': None,
+                                    'output_directory': MAPPED_REGIONS,
+                                    'minimum_reads': int(args.min_reads_to_use_region),
+                                    'exclude_flags': demux_exclude_flags,
+                                    'info_filename': info_filename,
+                                },
+                            })
+                            chr_output_filenames.append(info_filename)
 
                 if args.debug:
                     demux_file = _jp('DEMUX_COMMANDS.txt')
-                    with open(demux_file, 'w') as fout:
-                        fout.write("\n\n\n".join(chr_commands))
-                    info('Wrote demultiplexing commands to ' + demux_file)
+                    with open(demux_file, 'w', encoding='utf-8') as fout:
+                        fout.write('\n\n\n'.join(repr(job) for job in demux_jobs))
+                    info('Wrote demultiplexing jobs to ' + demux_file)
 
-                info('Demultiplexing reads by location (%d genomic regions)...' % len(chr_commands), {'percent_complete': 85})
-                CRISPRessoMultiProcessing.run_parallel_commands(chr_commands, n_processes=n_processes_for_pooled, descriptor='Demultiplexing reads by location', continue_on_fail=args.skip_failed)
+                info('Demultiplexing reads by location (%d genomic regions)...' % len(demux_jobs), {'percent_complete': 85})
+                CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(
+                    demux_jobs,
+                    CRISPRessoPooledDemux.demultiplex_jobs_chunk,
+                    n_processes=n_processes_for_pooled,
+                )
 
-                with open(REPORT_ALL_DEPTH, 'w') as f:
+                with open(REPORT_ALL_DEPTH, 'w', encoding='utf-8') as f:
                     f.write('chr_id\tstart\tend\tnumber of reads\toutput filename\n')
                     for chr_output_filename in chr_output_filenames:
-                        with open(chr_output_filename, 'r') as f_in:
+                        with open(chr_output_filename, encoding='utf-8') as f_in:
                             for line in f_in:
                                 f.write(line)
 
@@ -1369,7 +1411,7 @@ def main():
                     df_regions = pd.read_csv(filename_problematic_regions, sep='\t')
                 else:
                     info('Reporting problematic regions...')
-                    summarize_region_fastq_input = [f + " " + uncompressed_reference for f in files_to_match]  # pass both params to parallel function
+                    summarize_region_fastq_input = [(f, uncompressed_reference) for f in files_to_match]  # pass both params to parallel function
                     coordinates = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(summarize_region_fastq_input, summarize_region_fastq_chunk, n_processes=n_processes_for_pooled)
                     df_regions = pd.DataFrame(coordinates, columns=['chr_id', 'bpstart', 'bpend', 'fastq_file', 'n_reads', 'Reference_sequence'])
                     df_regions.dropna(inplace=True)  # remove regions in chrUn
@@ -1405,7 +1447,7 @@ def main():
             else:
                 info('Parsing the demultiplexed files and extracting locations and reference sequences...')
                 files_to_match = list(df_all_demux['output filename'].dropna())
-                summarize_region_fastq_input = [f + " " + uncompressed_reference for f in files_to_match]  # pass both params to parallel function
+                summarize_region_fastq_input = [(f, uncompressed_reference) for f in files_to_match]  # pass both params to parallel function
                 coordinates = CRISPRessoMultiProcessing.run_function_on_array_chunk_parallel(summarize_region_fastq_input, summarize_region_fastq_chunk, n_processes=n_processes_for_pooled)
                 df_regions = pd.DataFrame(coordinates, columns=['chr_id', 'bpstart', 'bpend', 'fastq_file', 'n_reads', 'sequence'])
 
@@ -1661,22 +1703,10 @@ def main():
             # if less than 1/2 of reads aligned, find most common unaligned reads and advise the user
             if N_READS_INPUT > 0 and tot_reads / float(N_READS_INPUT) < 0.5:
                 warn('Less than half (%d/%d) of reads aligned to amplicons. Finding most frequent unaligned reads.' % (tot_reads, N_READS_INPUT))
-                ###
-                # this results in the unpretty messages being printed:
-                # sort: write failed: standard output: Broken pipe
-                # sort: write error
-                ###
-                # cmd = "samtools view -f 4 %s | awk '{print $10}' | sort | uniq -c | sort -nr | head -n 10"%this_bam_filename
-                import signal
-
-                def default_sigpipe():
-                    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-
-                cmd = "samtools view -f 4 %s | head -n 10000 | awk '{print $10}' | sort | uniq -c | sort -nr | head -n 10 | awk '{print $2}'" % this_bam_filename
-#    			print("command is: "+cmd)
-#    		    p = sb.Popen(cmd, shell=True,stdout=sb.PIPE)
-                p = sb.Popen(cmd, shell=True, stdout=sb.PIPE, preexec_fn=default_sigpipe)
-                top_unaligned = p.communicate()[0].decode('utf-8')
+                # Use a bounded Python counter instead of a shell pipeline so
+                # truncated output cannot produce broken-pipe warnings.
+                top_unaligned_sequences = CRISPRessoPooledDemux.top_unaligned_sequences(this_bam_filename)
+                top_unaligned = ''.join(sequence + '\n' for sequence in top_unaligned_sequences)
                 top_unaligned_filename = _jp('CRISPRessoPooled_TOP_UNALIGNED.txt')
 
                 with open(top_unaligned_filename, 'w') as outfile:
