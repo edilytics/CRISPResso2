@@ -17,9 +17,9 @@ Determinism is global_align's invariant, so byte-equality is the right check
 USAGE
 -----
     # 1. on baseline build:
-    pixi run -e test python scripts/align_golden.py --save scripts/align_golden.json
+    pixi run -e test python CRISPResso2/tests/align_golden.py --save CRISPResso2/tests/align_golden.json
     # 2. edit .pyx, rebuild, then:
-    pixi run -e test python scripts/align_golden.py --check scripts/align_golden.json
+    pixi run -e test python CRISPResso2/tests/align_golden.py --check CRISPResso2/tests/align_golden.json
 """
 
 import argparse

@@ -39,7 +39,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(HERE)
+REPO_ROOT = os.path.dirname(os.path.dirname(HERE))
 WORKER = os.path.join(HERE, "_ab_worker.py")
 MATRIX = os.path.join(REPO_ROOT, "CRISPResso2", "EDNAFULL")
 

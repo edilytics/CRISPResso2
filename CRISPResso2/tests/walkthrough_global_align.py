@@ -7,7 +7,7 @@ traceback), but in plain Python and with everything printed: the three DP
 matrices and a step-by-step traceback. The final (align_j, align_i, score) is
 asserted equal to the compiled global_align so you can trust the trace.
 
-    pixi run -e test python scripts/walkthrough_global_align.py
+    pixi run -e test python CRISPResso2/tests/walkthrough_global_align.py
 """
 
 import numpy as np

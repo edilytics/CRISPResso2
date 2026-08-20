@@ -27,7 +27,7 @@ M[i,j] = max(M[i-1,j-1], I[i-1,j-1], J[i-1,j-1]) + matrix[ci,cj]
 
 ## Method
 
-Built a reproducible harness in `scripts/` (all in the worktree):
+Built a reproducible harness in `CRISPResso2/tests/` (all in the worktree):
 
 | script | purpose |
 |--------|---------|
@@ -43,11 +43,11 @@ Apple arm64. Correctness gate run on every rebuild: `align_golden --check` +
 Reproduce:
 ```bash
 pixi run -e test python setup.py build_ext --inplace
-pixi run -e test python scripts/align_golden.py --save scripts/align_golden.json   # baseline
-pixi run -e test python scripts/bench_align.py --iters 30 --json bench.json
+pixi run -e test python CRISPResso2/tests/align_golden.py --save CRISPResso2/tests/align_golden.json   # baseline
+pixi run -e test python CRISPResso2/tests/bench_align.py --iters 30 --json bench.json
 # ...edit .pyx, rebuild...
-pixi run -e test python scripts/align_golden.py --check scripts/align_golden.json
-pixi run -e test python scripts/compare_bench.py --before base*.json --after opt*.json
+pixi run -e test python CRISPResso2/tests/align_golden.py --check CRISPResso2/tests/align_golden.json
+pixi run -e test python CRISPResso2/tests/compare_bench.py --before base*.json --after opt*.json
 ```
 
 ## What changed (the small win)
@@ -181,7 +181,7 @@ sentinel is hugely negative there.
 
 Fix: use a fixed near-`-inf` sentinel (`min_score = -1000000000`) for the
 "impossible" border cells. Verified non-regressive: the 15-case golden
-(`scripts/align_golden.py`, fingerprint `43662296acce2dcf`) is unchanged and all
+(`CRISPResso2/tests/align_golden.py`, fingerprint `43662296acce2dcf`) is unchanged and all
 **757 unit tests pass**; the formerly-crashing inputs now return sensible
 alignments (e.g. `"A"/"C"` mismatch instead of a crash).
 
@@ -214,7 +214,7 @@ every existing `CRISPResso2Align.global_align(...)` call site is now ~2.5× fast
 pixi run -e test install
 pixi run -e test python setup.py build_ext --inplace
 pixi run -e test python -m pytest tests/unit_tests/test_CRISPResso2Align.py::test_global_align_ptrfree_matches_pointers -v
-pixi run -e test python scripts/bench_align.py --func global_align         --json fast.json
-pixi run -e test python scripts/bench_align.py --func global_align_pointers --json ref.json
-pixi run -e test python scripts/compare_bench.py --before ref.json --after fast.json
+pixi run -e test python CRISPResso2/tests/bench_align.py --func global_align         --json fast.json
+pixi run -e test python CRISPResso2/tests/bench_align.py --func global_align_pointers --json ref.json
+pixi run -e test python CRISPResso2/tests/compare_bench.py --before ref.json --after fast.json
 ```

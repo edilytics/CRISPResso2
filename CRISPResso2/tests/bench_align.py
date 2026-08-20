@@ -19,11 +19,11 @@ It also self-checks that every iteration returns a byte-identical result
 (global_align is deterministic) so a flaky timing run is never mistaken for
 a correctness change.
 
-Correctness across rebuilds is handled separately by scripts/align_golden.py.
+Correctness across rebuilds is handled separately by CRISPResso2/tests/align_golden.py.
 
 USAGE
 -----
-    pixi run -e test python scripts/bench_align.py \
+    pixi run -e test python CRISPResso2/tests/bench_align.py \
         --sizes 150,200,500,1000,2000,5000 --iters 20 --json baseline.json
 """
 
