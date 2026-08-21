@@ -34,6 +34,7 @@ current pandas path for parity.
 
 from __future__ import annotations
 
+import contextlib
 import gzip
 import logging
 import os
@@ -66,6 +67,18 @@ DEFAULT_MEMORY_BUDGET_MB = 128
 # design rather than grabbing a fraction of available RAM (spike S1b showed BSD
 # sort defaults to a large buffer that defeats the spill on a 16GB host).
 _SORT_BUFFER = "64M"
+# Compression for intermediate store artifacts written and read within a
+# single run (collapsed-allele parquet passes). These files are consumed
+# value-wise by get_slice / detailed-table writers — never byte-compared
+# — so prefer the cheapest codec: LZ4 compresses ~2-3x faster than the
+# default snappy at a similar ratio and decompresses just as fast.
+# Statistics are unused (full scans, no predicate pushdown).
+_INTERMEDIATE_PARQUET_COMPRESSION = "lz4"
+# Upper bound on the in-memory footprint of the gather-sort key projection
+# before the partitioned gather falls back to the external text sort (which
+# spills within _SORT_BUFFER). ~730k unique alleles at 322 bp ≈ 0.5 GB fits;
+# multi-million-allele datasets fall back.
+_ARROW_SORT_MAX_BYTES = 1 << 30
 
 # Per-entry overhead estimate for the eager dedup dict (CPython dict slot +
 # list value + str refs). Used for the spectrum memory accounting.
@@ -2411,7 +2424,7 @@ def _partitioned_gather_write_unsorted(
     discard_indel_reads: bool,
     est_row_size: int,
     unsorted_parquet: str,
-    gather_keys_file: str,
+    gather_keys_file: Optional[str] = None,
     homology_state: Optional["_AlnStatsHomologyState"] = None,
     agg_state: Optional["_AggState"] = None,
     agg_vector_refs: Optional[set] = None,
@@ -2432,9 +2445,12 @@ def _partitioned_gather_write_unsorted(
       arrow-natively from the compact coordinates, and
       ``all_substitution_values`` joins to its binary blob in C.
     * (a) the FULL rows go to ``unsorted_parquet``
-      (``_COLLAPSED_SCHEMA_WITH_ROW_IDX``) and (b) the small sort-key
-      projection to ``gather_keys_file``
+      (``_COLLAPSED_SCHEMA_WITH_ROW_IDX``) and (b) optionally the small
+      sort-key projection to ``gather_keys_file``
       (``neg_reads \t Aligned_Sequence \t Reference_Sequence \t row_idx``).
+      When ``gather_keys_file`` is None (the default arrow-sort path) Step B
+      sorts the same four fields straight out of the unsorted parquet and no
+      text keys file is produced at all.
 
     Returns ``(n_allele_rows, n_total, class_counts, counts_total,
     counts_modified, counts_unmodified, counts_discarded)``.
@@ -2449,7 +2465,10 @@ def _partitioned_gather_write_unsorted(
     counts_discarded: dict = {}
 
     flush_every = max(100, min(8192, 32_000_000 // max(1, est_row_size)))
-    writer = pq.ParquetWriter(unsorted_parquet, _COLLAPSED_SCHEMA_WITH_ROW_IDX)
+    writer = pq.ParquetWriter(
+        unsorted_parquet, _COLLAPSED_SCHEMA_WITH_ROW_IDX,
+        compression=_INTERMEDIATE_PARQUET_COMPRESSION,
+        write_statistics=False)
 
     scalar_bufs = {nm: [] for nm in _SCALAR_FIELDS}
     chunk_bufs = {nm: [] for nm in _PASSTHROUGH_FIELDS}
@@ -2502,8 +2521,10 @@ def _partitioned_gather_write_unsorted(
     n_reps = len(rep_seq_sorted)
     seq_no = 0
     row_idx = 0
+    kf_ctx = (open(gather_keys_file, "w", buffering=1 << 20)
+              if gather_keys_file is not None else contextlib.nullcontext(None))
     try:
-        with open(gather_keys_file, "w", buffering=1 << 20) as kf:
+        with kf_ctx as kf:
             for path in paths:
                 pf = pq.ParquetFile(str(path))
                 _bs = _adaptive_batch_size(pf)
@@ -2555,8 +2576,10 @@ def _partitioned_gather_write_unsorted(
                         scalar_bufs["Aligned_Reference_Scores"].append(asc_str)
                         emit_idx.append(int(k))
                         row_idx_buf.append(row_idx)
-                        kf.write(
-                            f"{10**15 - tc:015d}\t{seq_s}\t{ref_s}\t{row_idx:015d}\n")
+                        if kf is not None:
+                            kf.write(
+                                f"{10**15 - tc:015d}\t{seq_s}\t{ref_s}"
+                                f"\t{row_idx:015d}\n")
                         row_idx += 1
 
                     while ri < n_reps and rep_seq_sorted[ri] < hi:
@@ -2630,14 +2653,22 @@ def _partitioned_gather_emit(
     n_allele_rows: int,
     est_row_size: int,
     unsorted_parquet: str,
-    gather_keys_sorted: str,
+    gather_keys_sorted: Optional[str],
     bucket_dir: str,
     parquet_path: str,
 ) -> None:
     """Steps C-E of the partitioned gather (arrow-native end to end).
 
-    *C* — read ``gather_keys_sorted`` (output order) and build
-    ``out_pos[row_idx] = output index``.
+    *C* — build ``out_pos[row_idx] = output index``. When
+    ``gather_keys_sorted`` is None (arrow path) the output order is computed
+    directly from the unsorted parquet: project the four sort fields
+    (``10**15 - #Reads``, ``Aligned_Sequence``, ``Reference_Sequence``,
+    ``row_idx``) and ``pyarrow.compute.sort_indices`` them. Equivalent to the
+    text path by construction — the old ``sort -k1,1 -k2,2 -k3,3 -k4,4
+    LC_ALL=C`` compares fixed-width zero-padded decimals (== int64 order) and
+    raw bytes (== arrow memcmp for these ACGT/- strings), and ``row_idx`` is
+    unique so the four keys form a total order with no tie-break to worry
+    about. Otherwise parse ``gather_keys_sorted`` line by line as before.
     *D* — stream ``unsorted_parquet`` once; per arrow batch, scatter rows to
     per-bucket parquet spill files (``_COLLAPSED_SCHEMA_WITH_OUT_POS``) via
     batch-wise ``take`` — no per-row ``.as_py()`` / TSV string round-trip.
@@ -2651,15 +2682,36 @@ def _partitioned_gather_emit(
 
     # -- Step C: out_pos[row_idx] = output index (from the sorted key projection).
     out_pos = _np.empty(n_allele_rows, dtype=_np.int64)
-    pos = 0
-    with open(gather_keys_sorted, "r", buffering=1 << 20) as sf:
-        for line in sf:
-            line = line.rstrip("\n")
-            if not line:
-                continue
-            f = line.split("\t")
-            out_pos[int(f[3])] = pos
-            pos += 1
+    if gather_keys_sorted is None:
+        _kt = pq.read_table(
+            unsorted_parquet,
+            columns=["#Reads", "Aligned_Sequence", "Reference_Sequence",
+                     "row_idx"])
+        _k1 = pc.subtract(
+            pa.scalar(10 ** 15, pa.int64()),
+            _as_single_array(_kt.column("#Reads")).cast(pa.int64()))
+        _kt = _kt.drop_columns("#Reads").append_column(
+            pa.field("_k1", pa.int64()), _k1)
+        _idx = pc.sort_indices(
+            _kt,
+            sort_keys=[("_k1", "ascending"),
+                       ("Aligned_Sequence", "ascending"),
+                       ("Reference_Sequence", "ascending"),
+                       ("row_idx", "ascending")])
+        _sorted_rows = _as_single_array(_kt.column("row_idx")).take(
+            _idx).to_numpy(zero_copy_only=False)
+        out_pos[_sorted_rows] = _np.arange(n_allele_rows, dtype=_np.int64)
+        del _kt, _idx, _sorted_rows
+    else:
+        pos = 0
+        with open(gather_keys_sorted, "r", buffering=1 << 20) as sf:
+            for line in sf:
+                line = line.rstrip("\n")
+                if not line:
+                    continue
+                f = line.split("\t")
+                out_pos[int(f[3])] = pos
+                pos += 1
 
     # Bucket size: one bucket materialised as an arrow table in Step E must
     # stay within the memory budget. Size on the ACTUAL arrow bytes/row,
@@ -2715,7 +2767,9 @@ def _partitioned_gather_emit(
                 w = writers[b]
                 if w is None:
                     w = writers[b] = pq.ParquetWriter(
-                        bucket_paths[b], _COLLAPSED_SCHEMA_WITH_OUT_POS)
+                        bucket_paths[b], _COLLAPSED_SCHEMA_WITH_OUT_POS,
+                        compression=_INTERMEDIATE_PARQUET_COMPRESSION,
+                        write_statistics=False)
                 w.write_table(tbl)
             del ops, bs
     finally:
@@ -2732,7 +2786,10 @@ def _partitioned_gather_emit(
     # COLLAPSED_SCHEMA parquet in ~32MB row groups (bounds the writer's
     # serialization buffer regardless of bucket size).
     rows_per_row_group = max(1, 32_000_000 // arrow_bytes_per_row)
-    final_writer = pq.ParquetWriter(parquet_path, COLLAPSED_SCHEMA)
+    final_writer = pq.ParquetWriter(
+        parquet_path, COLLAPSED_SCHEMA,
+        compression=_INTERMEDIATE_PARQUET_COMPRESSION,
+        write_statistics=False)
     try:
         for b in range(n_buckets):
             t = pq.read_table(bucket_paths[b])
@@ -3007,6 +3064,18 @@ def _collapse_streaming_single_read(
             gather_keys_sorted = os.path.join(workdir, "gather.keys.sorted")
             bucket_dir = os.path.join(workdir, "buckets")
 
+            # Arrow-native sort path: the four sort fields all live in the
+            # unsorted parquet already, so when their projected footprint is
+            # a comfortable transient (< _ARROW_SORT_MAX_BYTES; ~2 strings of
+            # amplicon length + 2 int64 per allele row) Step B becomes a
+            # ``pyarrow.compute.sort_indices`` over the projection and no
+            # text keys file is written or sorted at all. Oversized inputs
+            # (multi-million unique alleles) keep the external text sort,
+            # which spills and merges within ``sort_buffer``.
+            _est_sort_bytes = int(len(rep_map) * 1.5) * (
+                2 * max(1, est_amplicon_len) + 24)
+            _arrow_sort = _est_sort_bytes <= _ARROW_SORT_MAX_BYTES
+
             (n_allele_rows, n_total, class_counts, counts_total,
              counts_modified, counts_unmodified, counts_discarded) = \
                 _partitioned_gather_write_unsorted(
@@ -3014,17 +3083,24 @@ def _collapse_streaming_single_read(
                     discard_indel_reads=discard_indel_reads,
                     est_row_size=est_row_size,
                     unsorted_parquet=unsorted_parquet,
-                    gather_keys_file=gather_keys_file,
+                    gather_keys_file=None if _arrow_sort else gather_keys_file,
                     homology_state=_homology_st,
                     agg_state=agg_state,
                     agg_vector_refs=agg_vector_refs)
 
             if parquet_path is not None and n_allele_rows > 0:
-                # Step B — sort the small key projection (sort keys + row_idx
-                # only; ~4 kB/row at 2 kb amplicon vs ~26 kB/row for full TSV).
-                _run_external_sort(gather_keys_file, gather_keys_sorted, workdir,
-                                   ["-k1,1", "-k2,2", "-k3,3", "-k4,4"],
-                                   sort_buffer=self.sort_buffer)
+                if _arrow_sort:
+                    # Step B is folded into Step C (sort_indices over the
+                    # projected columns; see _partitioned_gather_emit).
+                    gather_keys_sorted = None
+                else:
+                    # Step B — sort the small key projection (sort keys +
+                    # row_idx only; ~4 kB/row at 2 kb amplicon vs ~26 kB/row
+                    # for full TSV).
+                    _run_external_sort(gather_keys_file, gather_keys_sorted,
+                                       workdir,
+                                       ["-k1,1", "-k2,2", "-k3,3", "-k4,4"],
+                                       sort_buffer=self.sort_buffer)
                 # Steps C-E — bucket assignment + gather + emit.
                 _partitioned_gather_emit(
                     self,
@@ -3077,7 +3153,10 @@ def _write_collapsed_allele_parquet(allele_rows: list, path: str) -> None:
     (``design_docs/PARQUET_MEMORY_PROFILE.md`` item 1).
     """
     schema = COLLAPSED_SCHEMA
-    writer = pq.ParquetWriter(path, schema)
+    writer = pq.ParquetWriter(
+        path, schema,
+        compression=_INTERMEDIATE_PARQUET_COMPRESSION,
+        write_statistics=False)
     try:
         if not allele_rows:
             return
