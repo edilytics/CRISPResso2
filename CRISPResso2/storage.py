@@ -67,13 +67,23 @@ DEFAULT_MEMORY_BUDGET_MB = 128
 # design rather than grabbing a fraction of available RAM (spike S1b showed BSD
 # sort defaults to a large buffer that defeats the spill on a 16GB host).
 _SORT_BUFFER = "64M"
-# Compression for intermediate store artifacts written and read within a
+# Writer options for intermediate store artifacts written and read within a
 # single run (collapsed-allele parquet passes). These files are consumed
-# value-wise by get_slice / detailed-table writers — never byte-compared
-# — so prefer the cheapest codec: LZ4 compresses ~2-3x faster than the
-# default snappy at a similar ratio and decompresses just as fast.
-# Statistics are unused (full scans, no predicate pushdown).
-_INTERMEDIATE_PARQUET_COMPRESSION = "lz4"
+# value-wise by get_slice / detailed-table writers — never byte-compared —
+# and deleted with the run's workdir, so the cheapest page encoding wins:
+# NO compression (measured 4-6x faster to write and ~2x faster to read than
+# snappy/lz4 at this row width; the codec CPU outweighs the disk I/O on
+# modern NVMe), no dictionary encoding (the big string columns are
+# near-all-unique at high allele cardinality, so hashing them into a
+# dictionary is pure overhead), no statistics (full scans, no predicate
+# pushdown), and large data pages (fewer page headers). Disk cost ~2x the
+# compressed size — ~0.5 GB per 730k allele rows at 322 bp, transient.
+_INTERMEDIATE_PARQUET_OPTS = dict(
+    compression=None,
+    use_dictionary=False,
+    write_statistics=False,
+    data_page_size=4 << 20,
+)
 # Upper bound on the in-memory footprint of the gather-sort key projection
 # before the partitioned gather falls back to the external text sort (which
 # spills within _SORT_BUFFER). ~730k unique alleles at 322 bp ≈ 0.5 GB fits;
@@ -2401,6 +2411,25 @@ def _expand_all_deletion_positions(adc):
     )
 
 
+def _binary_join_flat(arr):
+    """Flat string/binary array -> one Python ``bytes`` (row-major concat).
+
+    Arrow-native ``b"".join(arr.to_pylist())``: wraps the flat array as a
+    single-cell ``list`` and joins with an empty separator — no per-element
+    Python objects.
+    """
+    import pyarrow.compute as pc
+
+    if len(arr) == 0:
+        return b""
+    if pa.types.is_string(arr.type):
+        arr = arr.cast(pa.binary())
+    offsets = pa.array([0, len(arr)], type=pa.int32())
+    joined = pc.binary_join(
+        pa.ListArray.from_arrays(offsets, arr), pa.scalar(b"", pa.binary()))
+    return joined[0].as_py() or b""
+
+
 def _join_subval_binary(list_array):
     """``list<string>`` of single ASCII bases → one ``binary`` blob per cell.
 
@@ -2467,8 +2496,7 @@ def _partitioned_gather_write_unsorted(
     flush_every = max(100, min(8192, 32_000_000 // max(1, est_row_size)))
     writer = pq.ParquetWriter(
         unsorted_parquet, _COLLAPSED_SCHEMA_WITH_ROW_IDX,
-        compression=_INTERMEDIATE_PARQUET_COMPRESSION,
-        write_statistics=False)
+        **_INTERMEDIATE_PARQUET_OPTS)
 
     scalar_bufs = {nm: [] for nm in _SCALAR_FIELDS}
     chunk_bufs = {nm: [] for nm in _PASSTHROUGH_FIELDS}
@@ -2768,8 +2796,7 @@ def _partitioned_gather_emit(
                 if w is None:
                     w = writers[b] = pq.ParquetWriter(
                         bucket_paths[b], _COLLAPSED_SCHEMA_WITH_OUT_POS,
-                        compression=_INTERMEDIATE_PARQUET_COMPRESSION,
-                        write_statistics=False)
+                        **_INTERMEDIATE_PARQUET_OPTS)
                 w.write_table(tbl)
             del ops, bs
     finally:
@@ -2788,8 +2815,7 @@ def _partitioned_gather_emit(
     rows_per_row_group = max(1, 32_000_000 // arrow_bytes_per_row)
     final_writer = pq.ParquetWriter(
         parquet_path, COLLAPSED_SCHEMA,
-        compression=_INTERMEDIATE_PARQUET_COMPRESSION,
-        write_statistics=False)
+        **_INTERMEDIATE_PARQUET_OPTS)
     try:
         for b in range(n_buckets):
             t = pq.read_table(bucket_paths[b])
@@ -3153,10 +3179,7 @@ def _write_collapsed_allele_parquet(allele_rows: list, path: str) -> None:
     (``design_docs/PARQUET_MEMORY_PROFILE.md`` item 1).
     """
     schema = COLLAPSED_SCHEMA
-    writer = pq.ParquetWriter(
-        path, schema,
-        compression=_INTERMEDIATE_PARQUET_COMPRESSION,
-        write_statistics=False)
+    writer = pq.ParquetWriter(path, schema, **_INTERMEDIATE_PARQUET_OPTS)
     try:
         if not allele_rows:
             return
@@ -4099,7 +4122,7 @@ def _aggregate_rows_vectorized(st: _AggState, ref_name: str, idx, bc) -> None:
             raise ValueError(
                 "all_substitution_values/all_substitution_positions "
                 "length mismatch in collapsed parquet")
-        sub_vals = b"".join(x if x is not None else b"" for x in sel.to_pylist())
+        sub_vals = _binary_join_flat(sel)
         if len(sub_vals) > 0:
             buf = np.frombuffer(sub_vals, dtype=np.uint8)
             w = np.repeat(reads, sub_lens)
@@ -4112,9 +4135,15 @@ def _aggregate_rows_vectorized(st: _AggState, ref_name: str, idx, bc) -> None:
                         pos64[m], w[m])
 
     # -- base-count vectors ---------------------------------------------
-    seqs = [bc.aln_seqs[i] for i in idx.tolist()]
-    seq_bytes = np.frombuffer("".join(seqs).encode("ascii"), dtype=np.uint8)
-    seq_lens = np.fromiter((len(s) for s in seqs), dtype=np.int64, count=len(seqs))
+    # Arrow-native: take the selected rows' sequences and join them into ONE
+    # byte buffer (no per-row Python strings), with utf8_length supplying the
+    # per-row lengths (must equal ref_positions' list lengths).
+    sel_seqs = _as_single_array(bc.batch.column("Aligned_Sequence")).take(
+        pa.array(idx, type=pa.int64()))
+    seq_bytes = np.frombuffer(
+        _binary_join_flat(sel_seqs), dtype=np.uint8)
+    seq_lens = np.asarray(
+        pc.fill_null(pc.utf8_length(sel_seqs), 0), dtype=np.int64)
     ref_pos_vals, ref_pos_lens = _take_list_values(
         bc.batch.column("ref_positions"), idx)
     if not np.array_equal(seq_lens, ref_pos_lens):
@@ -4188,7 +4217,7 @@ class _BatchAggCols:
     :func:`_aggregate_rows_vectorized`).
     """
 
-    __slots__ = ("batch", "reads", "n_ins", "n_del", "n_mut", "ref_names", "aln_seqs")
+    __slots__ = ("batch", "reads", "n_ins", "n_del", "n_mut", "ref_names")
 
     def __init__(self, batch):
         self.batch = batch
@@ -4201,7 +4230,6 @@ class _BatchAggCols:
         self.n_mut = _as_single_array(batch.column("n_mutated")).to_numpy(
             zero_copy_only=False)
         self.ref_names = batch.column("Reference_Name").to_pylist()
-        self.aln_seqs = batch.column("Aligned_Sequence").to_pylist()
 
 
 def _vector_refs_for(refs: dict, ref_names: list) -> set:
