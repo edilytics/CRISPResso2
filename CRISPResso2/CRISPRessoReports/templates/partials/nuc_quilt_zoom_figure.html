@@ -1,0 +1,67 @@
+{# ==========================================================================
+   Nucleotide quilt figure — drop-in replacement for CRISPRessoPro's
+   partials/nuc_quilt_zoom_figure.html.
+
+   WHY THIS FILE EXISTS IN TWO REPOS
+   --------------------------------
+   The hover-zoom bugs (blank strip, dead zoom after hidden-tab hovers,
+   "zoomed" 2b smaller than the plain figure) shipped because Pro and
+   CRISPRessoReports carried two drifting copies of the zoom markup. The
+   shared implementation now lives in CRISPRessoReports
+   (shared/partials/figure_zoom.html); this shim is the thin quilt-specific
+   wrapper around it.
+
+   Resolution by environment:
+     - CRISPRessoWEB (web reports): this copy is loaded from the app's own
+       templates directory, which is FIRST in the Jinja choice loader, so it
+       shadows CRISPRessoPro's shipped partial. No Pro release required.
+     - CRISPResso2 CLI without Pro: unused (the legacy report.html calls the
+       shared macro directly).
+     - CRISPResso2 CLI with Pro: CRISPRessoPro's own template environment
+       loads its bundled partial first, so this copy only takes effect once
+       a Pro release adopts it (Pro's partial can become a one-line
+       redirect to this path).
+
+   Rendering branches (same contract as Pro's partial: receives fig, the
+   uniform figure dict from assemble_figures(), and data_path, the relative
+   prefix to the run output):
+     fig.json_data -> interactive D3 widget (Pro plotly mode); initialized
+                      by batch_d3.html from nucleotide_quilt_slugs, which
+                      Pro collects by matching this partial's PATH STRING
+                      (do not rename this file).
+     fig.html      -> pre-rendered HTML fragment
+     zoomable      -> shared hover-zoom macro (figure 2a quilts)
+     otherwise     -> plain image + PDF link (figure 2b quilts: the sgRNA
+                      window is narrow, a zoom strip would render it
+                      SMALLER than the plain figure)
+
+   Zoomability is declared by the plot registry (fig.zoom, set by
+   CRISPRessoPro >= next on the amplicon-wide quilt). Releases that do not
+   populate it fall back to scope: only amplicon-wide quilts
+   (sgRNA_index is none) are wide enough to zoom.
+   ========================================================================== #}
+{% from 'shared/partials/figure_zoom.html' import figure_zoom %}
+{% set safe_id = fig.root | replace('.', '_') | replace('-', '_') | replace(' ', '_') %}
+{% set wants_zoom = fig.zoom if fig.zoom is defined and fig.zoom is not none else (fig.sgRNA_index is defined and fig.sgRNA_index is none) %}
+<div id="fig_{{ fig.id }}{% if fig.amplicon %}_{{ fig.amplicon }}{% endif %}{% if fig.sgRNA_index is defined and fig.sgRNA_index is not none %}_sg{{ fig.sgRNA_index }}{% endif %}" class="d-flex flex-column align-items-center mb-3">
+    {% if fig.json_data %}
+        <div class="d-flex justify-content-between" style="max-height: 80vh; overflow-y: auto;" id="nuc_quilt_{{ safe_id }}"></div>
+        <script type="text/javascript">const nuc_quilt_{{ safe_id }} = {{ fig.json_data|safe }};</script>
+    {% elif fig.html %}
+        {{ fig.html|safe }}
+    {% elif wants_zoom %}
+        {{ figure_zoom(
+            img_src=data_path~fig.root~'.png',
+            pdf_href=data_path~fig.root~'.pdf',
+            uid=safe_id,
+            width='95%') }}
+    {% else %}
+        <a href="{{ data_path }}{{ fig.root }}.pdf"><img src="{{ data_path }}{{ fig.root }}.png" width='{{ fig.width|default('100%') }}'></a>
+    {% endif %}
+    {% if fig.caption %}
+    <label class="labelpadding">{{ fig.caption }}</label>
+    {% endif %}
+    {% for item in fig.data_files %}
+        <p class="m-0"><small>Data: <a href="{{ data_path }}{{ item[1] }}">{{ item[0] }}</a></small></p>
+    {% endfor %}
+</div>
