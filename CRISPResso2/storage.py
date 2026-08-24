@@ -600,7 +600,7 @@ _COORD_STRUCT = pa.struct([
 # amplicon-relative indices/sizes, so they are bounded by the amplicon length.
 # int16 (range -32768..32767) covers amplicons up to ~32 kb — the realistic
 # envelope for CRISPResso2 amplicon analysis (PCR amplicons are typically
-# 100 bp–3 kb; long-read amplicons rarely exceed 10–20 kb). This is a 4x
+# 100 bp-3 kb; long-read amplicons rarely exceed 10-20 kb). This is a 4x
 # reduction vs the previous int64 physical encoding (see
 # ``design_docs/PAYLOAD_COMPRESSION.md`` + ``scripts/bench_payload_shape_results.md``).
 # pyarrow raises ``ArrowInvalid`` on out-of-range values (no silent overflow),
@@ -2458,7 +2458,7 @@ def _partitioned_gather_write_unsorted(
     agg_state: Optional["_AggState"] = None,
     agg_vector_refs: Optional[set] = None,
 ) -> tuple:
-    """Step A of the partitioned gather — arrow-native fanout (no payload dicts).
+    r"""Step A of the partitioned gather — arrow-native fanout (no payload dicts).
 
     One streaming pass over the aligned shards as arrow batches:
 
@@ -2588,21 +2588,24 @@ def _partitioned_gather_write_unsorted(
                     alnref = vals.field("aln_ref")
                     emit_idx: list = []
 
-                    def _emit(k, refname_out, tc, arn_str, asc_str):
+                    def _emit(k, refname_out, tc, arn_str, asc_str,
+                              _alnseq=alnseq, _alnref=alnref,
+                              _insn=insn, _deln=deln, _subn=subn,
+                              _clfn=clfn, _emit_idx=emit_idx):
                         nonlocal row_idx
-                        seq_s = alnseq[k].as_py()
-                        ref_s = alnref[k].as_py()
+                        seq_s = _alnseq[k].as_py()
+                        ref_s = _alnref[k].as_py()
                         scalar_bufs["#Reads"].append(tc)
                         scalar_bufs["Aligned_Sequence"].append(seq_s)
                         scalar_bufs["Reference_Sequence"].append(ref_s)
-                        scalar_bufs["n_inserted"].append(int(insn[k]))
-                        scalar_bufs["n_deleted"].append(int(deln[k]))
-                        scalar_bufs["n_mutated"].append(int(subn[k]))
+                        scalar_bufs["n_inserted"].append(int(_insn[k]))
+                        scalar_bufs["n_deleted"].append(int(_deln[k]))
+                        scalar_bufs["n_mutated"].append(int(_subn[k]))
                         scalar_bufs["Reference_Name"].append(refname_out)
-                        scalar_bufs["Read_Status"].append(clfn[k])
+                        scalar_bufs["Read_Status"].append(_clfn[k])
                         scalar_bufs["Aligned_Reference_Names"].append(arn_str)
                         scalar_bufs["Aligned_Reference_Scores"].append(asc_str)
-                        emit_idx.append(int(k))
+                        _emit_idx.append(int(k))
                         row_idx_buf.append(row_idx)
                         if kf is not None:
                             kf.write(
@@ -4217,7 +4220,7 @@ class _BatchAggCols:
     :func:`_aggregate_rows_vectorized`).
     """
 
-    __slots__ = ("batch", "reads", "n_ins", "n_del", "n_mut", "ref_names")
+    __slots__ = ("batch", "n_del", "n_ins", "n_mut", "reads", "ref_names")
 
     def __init__(self, batch):
         self.batch = batch
@@ -4369,7 +4372,7 @@ def _aggregate_alleles(
     if batch_size is None:
         # Cap the adaptive batch so the in-flight arrow columns (several of
         # them amplicon-length list columns) stay bounded: the vector path
-        # holds one batch's flat values (~2048 × amplicon_length × int16 per
+        # holds one batch's flat values (~2048 x amplicon_length x int16 per
         # column ≈ a few MB) plus transient take/repeat copies. See
         # design_docs/PARQUET_MEMORY_PROFILE.md item 5.
         batch_size = min(_adaptive_batch_size(pf), 2048)

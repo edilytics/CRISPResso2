@@ -29,20 +29,17 @@ from __future__ import annotations
 
 import argparse
 import os
-import statistics
 import sys
 from types import SimpleNamespace
-from typing import Any, Iterable
 
 import numpy as np
 
 # Import submodules directly to dodge the top-level __init__ circular import
 # (CRISPResso2/__init__.py -> plots -> data_prep -> CRISPRessoShared -> CRISPResso2Align
 #  fails when CRISPResso2 is partially initialized).
-import CRISPResso2.CRISPResso2Align as CRISPResso2Align
-import CRISPResso2.CRISPRessoCOREResources as CRISPRessoCOREResources
-import CRISPResso2.CRISPRessoShared as CRISPRessoShared
-import CRISPResso2.CRISPRessoCORE as CRISPRessoCORE
+from CRISPResso2 import CRISPResso2Align
+from CRISPResso2 import CRISPRessoShared
+from CRISPResso2 import CRISPRessoCORE
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -75,7 +72,8 @@ def _fanc_workload():
 
 def _hek3_workload():
     """HEK3.Cas9: 250 reads. Amplicon/guide inferred from the read sequence
-    (HEK3 is a well-known target); we use a published HEK3 amplicon."""
+    (HEK3 is a well-known target); we use a published HEK3 amplicon.
+    """
     fastq = os.path.join(TESTS, "HEK3.Cas9.fastq")
     # HEK3 RNF2 amplicon (published); guide within.
     amplicon = (
@@ -268,7 +266,7 @@ def _pct(values, p):
     if not values:
         return 0
     s = sorted(values)
-    k = max(0, min(len(s) - 1, int(round(p / 100.0 * (len(s) - 1)))))
+    k = max(0, min(len(s) - 1, round(p / 100.0 * (len(s) - 1))))
     return s[k]
 
 
@@ -380,7 +378,8 @@ def _per_read_total_bytes(payloads):
 def _ref_positions_redundancy(payloads):
     """Special-case ref_positions: how much of it is reconstructable from
     aln_ref's gap pattern? Report #negative (insertion sentinels) and the
-    delta distribution."""
+    delta distribution.
+    """
     neg_frac = []
     delta_runs = []  # lengths of consecutive +1 runs (the "free" part)
     for p in payloads:
@@ -478,15 +477,15 @@ def _render_workload(label, payloads, out):
             file=out,
         )
     print(f"| **TOTAL** | | | | | | | | | **{tot_cur:,}** | **{tot_nar:,}** | "
-          f"**{tot_cur/tot_nar:.2f}x** |" if tot_nar else "", file=out)
+          f"**{tot_cur / tot_nar:.2f}x** |" if tot_nar else "", file=out)
 
     # per-read totals
     cur, nar = _per_read_total_bytes(payloads)
     if cur:
         print(f"\n**Per-read list-field bytes** (int arrays only + str): "
-              f"median current = {_pct(cur,50):,} B, median narrow = {_pct(nar,50):,} B "
-              f"(median ratio { _pct(cur,50) / max(1,_pct(nar,50)) :.2f}x; "
-              f"p90 current = {_pct(cur,90):,} B, p90 narrow = {_pct(nar,90):,} B)\n",
+              f"median current = {_pct(cur, 50):,} B, median narrow = {_pct(nar, 50):,} B "
+              f"(median ratio { _pct(cur, 50) / max(1, _pct(nar, 50)):.2f}x; "
+              f"p90 current = {_pct(cur, 90):,} B, p90 narrow = {_pct(nar, 90):,} B)\n",
               file=out)
 
     # ref_positions structure

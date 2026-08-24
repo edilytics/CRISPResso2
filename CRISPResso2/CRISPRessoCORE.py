@@ -3861,7 +3861,7 @@ def main():
                 VariantStore as _VariantStore,
                 count_reads_from_fastq as _count_reads_from_fastq,
                 variant_parquet_generator_process as _variant_parquet_generator_process,
-                _CRISPRESSO2_COLS as _pq_crispresso2_cols,
+                _CRISPRESSO2_COLS,
             )
             # aln_matrix + pe_scaffold_dna_info are computed inside process_fastq
             # for the pandas path; replicate that here since we bypass it.
@@ -4193,22 +4193,21 @@ def main():
             # Real runs (plots or report on) materialize df_alleles as before.
             if _parquet_skip_df_alleles:
                 df_alleles = pd.DataFrame()
+            # Downstream (allele-frequency TSV, plots, report) reads only
+            # the crispresso2Cols scalars plus ref_positions (the
+            # around-cut plot calls row['ref_positions'].index(cut_point))
+            # in the default configuration; the other 11 payload columns
+            # have no consumer unless the detailed allele table or the
+            # prime-editing scaffold analysis is requested. Materializing
+            # them anyway costs ~50s of to_pylist object creation at full
+            # long-read scale (hundreds of millions of Python ints), so
+            # project them away unless a consumer needs them.
+            elif (args.write_detailed_allele_table
+                    or getattr(args, 'prime_editing_pegRNA_extension_seq', '') != ''):
+                df_alleles = _collapsed.get_slice()
             else:
-                # Downstream (allele-frequency TSV, plots, report) reads only
-                # the crispresso2Cols scalars plus ref_positions (the
-                # around-cut plot calls row['ref_positions'].index(cut_point))
-                # in the default configuration; the other 11 payload columns
-                # have no consumer unless the detailed allele table or the
-                # prime-editing scaffold analysis is requested. Materializing
-                # them anyway costs ~50s of to_pylist object creation at full
-                # long-read scale (hundreds of millions of Python ints), so
-                # project them away unless a consumer needs them.
-                if (args.write_detailed_allele_table
-                        or getattr(args, 'prime_editing_pegRNA_extension_seq', '') != ''):
-                    df_alleles = _collapsed.get_slice()
-                else:
-                    df_alleles = _collapsed.get_slice(
-                        columns=_pq_crispresso2_cols + ['ref_positions'])
+                df_alleles = _collapsed.get_slice(
+                    columns=_CRISPRESSO2_COLS + ['ref_positions'])
             N_TOTAL = _collapsed.n_total
             class_counts = _collapsed.class_counts
             # merge per-ref counts (keep the 0-init entries from the init block

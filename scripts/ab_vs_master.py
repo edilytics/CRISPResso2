@@ -62,7 +62,8 @@ def run_one(python, cwd, req):
     try:
         proc = subprocess.run(
             [python, WORKER], input=json.dumps(req),
-            capture_output=True, text=True, timeout=60, cwd=cwd)
+            capture_output=True, text=True, timeout=60, cwd=cwd,
+            check=False)
     except subprocess.TimeoutExpired:
         return {"crashed": True, "detail": "timeout (60s)"}
     if proc.returncode != 0:
@@ -120,7 +121,7 @@ def _broken_kind(out, seqj, seqi):
 # --------------------------------------------------------------------------- #
 # Deterministic corpus
 # --------------------------------------------------------------------------- #
-import random  # noqa: E402
+import random
 
 
 def _rand_seq(rng, n, alphabet="ACGTN"):
@@ -278,7 +279,7 @@ def main(argv=None):
     if n_comparable:
         print(f"\n  On the {n_comparable} inputs where master produces a VALID "
               f"alignment, current agrees byte-for-byte on "
-              f"{len(cats['a_agree'])} ({100*len(cats['a_agree'])/n_comparable:.1f}%).")
+              f"{len(cats['a_agree'])} ({100 * len(cats['a_agree']) / n_comparable:.1f}%).")
     print(f"  Master is broken (crash/garbage) on {nb} inputs -- the documented "
           f"sentinel bug, fixed in current.")
 
