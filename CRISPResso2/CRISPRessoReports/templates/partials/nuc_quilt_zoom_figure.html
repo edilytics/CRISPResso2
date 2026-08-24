@@ -24,7 +24,9 @@
 
    Rendering branches (same contract as Pro's partial: receives fig, the
    uniform figure dict from assemble_figures(), and data_path, the relative
-   prefix to the run output):
+   prefix to the run output; optional keys id/caption/data_files default
+   safely — iterating an undefined data_files raises even in non-strict
+   jinja environments, and older Pro releases may omit them):
      fig.json_data -> interactive D3 widget (Pro plotly mode); initialized
                       by batch_d3.html from nucleotide_quilt_slugs, which
                       Pro collects by matching this partial's PATH STRING
@@ -43,7 +45,7 @@
 {% from 'shared/partials/figure_zoom.html' import figure_zoom %}
 {% set safe_id = fig.root | replace('.', '_') | replace('-', '_') | replace(' ', '_') %}
 {% set wants_zoom = fig.zoom if fig.zoom is defined and fig.zoom is not none else (fig.sgRNA_index is defined and fig.sgRNA_index is none) %}
-<div id="fig_{{ fig.id }}{% if fig.amplicon %}_{{ fig.amplicon }}{% endif %}{% if fig.sgRNA_index is defined and fig.sgRNA_index is not none %}_sg{{ fig.sgRNA_index }}{% endif %}" class="d-flex flex-column align-items-center mb-3">
+<div id="fig_{{ fig.id|default('') }}{% if fig.amplicon %}_{{ fig.amplicon }}{% endif %}{% if fig.sgRNA_index is defined and fig.sgRNA_index is not none %}_sg{{ fig.sgRNA_index }}{% endif %}" class="d-flex flex-column align-items-center mb-3">
     {% if fig.json_data %}
         <div class="d-flex justify-content-between" style="max-height: 80vh; overflow-y: auto;" id="nuc_quilt_{{ safe_id }}"></div>
         <script type="text/javascript">const nuc_quilt_{{ safe_id }} = {{ fig.json_data|safe }};</script>
@@ -61,7 +63,7 @@
     {% if fig.caption %}
     <label class="labelpadding">{{ fig.caption }}</label>
     {% endif %}
-    {% for item in fig.data_files %}
+    {% for item in fig.data_files|default([], true) %}
         <p class="m-0"><small>Data: <a href="{{ data_path }}{{ item[1] }}">{{ item[0] }}</a></small></p>
     {% endfor %}
 </div>
