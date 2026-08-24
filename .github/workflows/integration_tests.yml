@@ -86,6 +86,7 @@ jobs:
         with:
           repository: edilytics/CRISPResso2_tests
           # ref: '<BRANCH-NAME>' # update to specific branch
+          ref: cole/fix-zoom-nuc-comp
           path: CRISPResso2_tests
 
       - name: Checkout CRISPRessoPro
