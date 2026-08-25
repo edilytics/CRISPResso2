@@ -8,8 +8,8 @@ Take care when committing into these files as not to mix unrelated git histories
 
 `shared/partials/figure_zoom.html` (+ inline `figure_zoom.js`) is the single hover-zoom
 implementation, used by this repo's `report.html` and by the nucleotide-quilt partial
-(`partials/nuc_quilt_zoom_figure.html`) that replaces CRISPRessoPro's copy in web
-reports. Behavior contract:
+(`partials/nuc_quilt_zoom_figure.html`; web reports shadow CRISPRessoPro's copy with
+a synced clone of it in CRISPRessoWEB's own templates). Behavior contract:
 
 - The zoom strip must keep an explicit `width:100%` (it collapses to 0px inside
   flex-column figure wrappers) and `overflow:hidden`.
@@ -18,9 +18,10 @@ reports. Behavior contract:
 - Only WIDE figures zoom (amplicon-wide nucleotide quilt). sgRNA-scoped quilts render
   as plain images; a zoom strip would show them smaller than the plain figure.
 
-Tests live in `tests/unit_tests/test_report_figure_zoom.py` (markup contract) and in
-C2Web's `js_tests/figure_zoom.test.js` (pure geometry) — keep both in sync with any
-change to the macro or JS.
+Tests live in `tests/unit_tests/test_report_figure_zoom.py` (markup contract, this
+repo). Pure-geometry tests for `computeZoom` live in C2Web's
+`js_tests/figure_zoom.test.js`, which lands together with C2Web's shadow copy of the
+quilt partial — keep both in sync with any change to the macro or JS.
 
 ## How do I work with this repo?
 

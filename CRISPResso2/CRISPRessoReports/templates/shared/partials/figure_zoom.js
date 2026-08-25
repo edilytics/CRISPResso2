@@ -53,12 +53,21 @@
     };
   }
 
+  /* Build a quoted attribute-value selector for a uid. Amplicon names come
+   * from user FASTA headers and are not guaranteed quote-free; an unescaped
+   * quote or backslash would make querySelector throw (killing wiring for
+   * every figure not yet wired). Escaping " and \\ suffices inside a
+   * quoted CSS string. */
+  function selFor(attr, uid) {
+    return '[' + attr + '="' + uid.replace(/["\\]/g, '\\$&') + '"]';
+  }
+
   function wireOne(figure) {
     var uid = figure.getAttribute('data-cr-zoom-figure');
-    var img = figure.querySelector('[data-cr-zoom-img="' + uid + '"]');
-    var lens = figure.querySelector('[data-cr-zoom-lens="' + uid + '"]');
-    var strip = figure.ownerDocument.querySelector('[data-cr-zoom-strip="' + uid + '"]');
-    var stripImg = strip && strip.querySelector('[data-cr-zoom-strip-img="' + uid + '"]');
+    var img = figure.querySelector(selFor('data-cr-zoom-img', uid));
+    var lens = figure.querySelector(selFor('data-cr-zoom-lens', uid));
+    var strip = figure.ownerDocument.querySelector(selFor('data-cr-zoom-strip', uid));
+    var stripImg = strip && strip.querySelector(selFor('data-cr-zoom-strip-img', uid));
     if (!img || !lens || !strip || !stripImg) { return; }
 
     function update(e) {

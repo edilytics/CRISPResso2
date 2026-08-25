@@ -12,15 +12,19 @@
    wrapper around it.
 
    Resolution by environment:
-     - CRISPRessoWEB (web reports): this copy is loaded from the app's own
-       templates directory, which is FIRST in the Jinja choice loader, so it
-       shadows CRISPRessoPro's shipped partial. No Pro release required.
+     - CRISPRessoWEB (web reports): the app does NOT load this file directly.
+       Its Jinja choice loader is app-templates -> Pro -> CRISPRessoReports,
+       so the shadow must be a synced copy of this partial inside
+       CRISPRessoWEB/templates/partials/ (first in the loader) — that copy
+       is what overrides Pro's bundled partial on the web. This file is the
+       canonical source C2Web syncs from; the web fix takes effect when
+       C2Web lands that copy (no Pro release required).
      - CRISPResso2 CLI without Pro: unused (the legacy report.html calls the
        shared macro directly).
      - CRISPResso2 CLI with Pro: CRISPRessoPro's own template environment
-       loads its bundled partial first, so this copy only takes effect once
-       a Pro release adopts it (Pro's partial can become a one-line
-       redirect to this path).
+       loads its bundled partial first, so Pro CLI reports keep Pro's copy
+       (and its zoom bugs) until a Pro release adopts this one (Pro's
+       partial can become a one-line redirect to this path).
 
    Rendering branches (same contract as Pro's partial: receives fig, the
    uniform figure dict from assemble_figures(), and data_path, the relative

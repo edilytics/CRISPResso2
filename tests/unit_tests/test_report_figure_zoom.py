@@ -68,7 +68,7 @@ class TestFigureZoomMarkup:
         assert "overflow:hidden" in strip_style.replace(" ", "")
 
     def test_all_five_elements_carry_matching_data_attributes(self, flask_like):
-        """strip / strip-img / figure / lens / img are bound by data-cr-zoom-*."""
+        """Strip / strip-img / figure / lens / img are bound by data-cr-zoom-*."""
         html = _render(flask_like)
         for attr in ("data-cr-zoom-strip=", "data-cr-zoom-strip-img=",
                      "data-cr-zoom-figure=", "data-cr-zoom-lens=", "data-cr-zoom-img="):
@@ -98,7 +98,8 @@ class TestFigureZoomMarkup:
 
     def test_strip_images_defy_bootstrap_img_clamping(self, flask_like):
         """Bootstrap's img{max-width:100%} would clamp and distort the
-        full-height strip copy; the macro must opt out explicitly."""
+        full-height strip copy; the macro must opt out explicitly.
+        """
         html = _render(flask_like)
         assert html.count("max-width:none") >= 2  # zoom copy + tablet scroll copy
 
@@ -107,6 +108,21 @@ class TestFigureZoomMarkup:
         html = _render(flask_like)
         assert 'class="d-lg-none"' in html
         assert "overflow-x:auto" in html.replace(" ", "")
+
+    def test_inline_js_escapes_uid_in_selectors(self, flask_like):
+        """Amplicon names come from user FASTA headers — not quote-free.
+
+        The JS reads the uid from the DOM and splices it into quoted
+        attribute-value selectors; an unescaped quote or backslash makes
+        querySelector throw, which would kill wiring for every figure not
+        yet wired on the page. Selectors must route through an escaper.
+        """
+        html = _render(flask_like)
+        assert "function selFor" in html
+        # every selector routes through the escaper; the raw-splice form
+        # querySelector('[data-cr-zoom-...="' + uid ...) must be gone
+        assert html.count("querySelector(selFor(") >= 4
+        assert "querySelector('[data-cr-zoom-" not in html
 
 
 def test_uid_is_escaped_in_flask_env():
@@ -123,13 +139,13 @@ def test_uid_is_escaped_in_flask_env():
     assert html.count('data-cr-zoom-figure="' + escaped) == 1
 
 
-
 class TestNucQuiltPartial:
     """``partials/nuc_quilt_zoom_figure.html`` is the quilt shim around the
     shared macro (the drop-in for CRISPRessoPro's partial). Its four
     rendering branches and the zoom-precedence rule are pinned here because
     a wrong branch silently changes the report figure (e.g. zooming an
-    sgRNA-scoped quilt renders it SMALLER than the plain figure)."""
+    sgRNA-scoped quilt renders it SMALLER than the plain figure).
+    """
 
     def _render_fig(self, **overrides):
         fig = {
@@ -189,7 +205,8 @@ class TestNucQuiltPartial:
 
 class TestReportZoomWiring:
     """report.html must wire plot_2a locs through the shared macro (and must
-    not resurrect the removed per-amplicon zoom ids/JS it used to inline)."""
+    not resurrect the removed per-amplicon zoom ids/JS it used to inline).
+    """
 
     def test_plot_2a_locs_render_shared_zoom(self):
         from CRISPResso2.CRISPRessoReports.jinja_partials import (
