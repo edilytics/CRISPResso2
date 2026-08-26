@@ -4,7 +4,8 @@
 
    Used by:
      - CRISPRessoReports report.html (no-Pro reports)
-     - CRISPRessoPro partials/nuc_quilt_zoom_figure.html (when fig.zoom)
+     - CRISPRessoPro partials/nuc_quilt_zoom_figure.html (imports it via
+       Pro's CRISPRessoReports fallback loader)
    Both renderers load CRISPRessoReports/templates, so this resolves for
    everyone and the two report paths can never drift apart again.
 
