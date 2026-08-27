@@ -335,7 +335,10 @@ def demultiplex_genome_chunk(
 ) -> str:
     """Group a chromosome/chunk by calculated alignment span."""
     os.makedirs(output_directory, exist_ok=True)
-    region = None if region_start is None else f"{chromosome}:{region_start}-{region_end}"
+    # A chromosome-wide job still needs a samtools region restriction.  Passing
+    # no region would stream every reference in the BAM into every chromosome
+    # worker, producing duplicate manifest rows and ambiguous dataframe lookups.
+    region = chromosome if region_start is None else f"{chromosome}:{region_start}-{region_end}"
     writer = FastqShardWriter(output_directory, max_open_files=32)
     for record in iter_sam_records(
         bam_filename,

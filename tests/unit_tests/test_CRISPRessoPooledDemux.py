@@ -70,6 +70,24 @@ def test_count_fastq_records_and_extract_fasta(tmp_path):
     assert demux.extract_fasta_sequence("ref.fa", "chr1:1-4", str(script)) == "ACGT"
 
 
+def test_genome_chunk_restricts_chromosome_wide_jobs(tmp_path):
+    args_file = tmp_path / "samtools.args"
+    script = tmp_path / "samtools"
+    script.write_text(
+        f"#!/bin/sh\nprintf '%s\\n' \"$@\" > '{args_file}'\n"
+        "cat <<'EOF'\n"
+        + SAM
+        + "EOF\n"
+    )
+    script.chmod(script.stat().st_mode | stat.S_IXUSR)
+
+    demux.demultiplex_genome_chunk(
+        "reads.bam", "chr1", None, None, str(tmp_path), 1, "0x900", str(tmp_path / "chunk.info"), str(script)
+    )
+
+    assert args_file.read_text().splitlines()[-1] == "chr1"
+
+
 def test_interval_and_genome_chunk_reports(tmp_path):
     samtools = fake_samtools(tmp_path)
     mapped = tmp_path / "mapped"
