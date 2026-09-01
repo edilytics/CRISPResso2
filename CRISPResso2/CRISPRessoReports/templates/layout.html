@@ -151,6 +151,14 @@
             Home
           </a>
         </li>
+        {% if current_user.is_authenticated and plot_assistant_enabled and plot_assistant_folder_id %}
+        <li class="nav-item">
+           <a class="nav-link" href="/plot-assistant/{{ plot_assistant_folder_id }}"
+              title="Create custom plots with AI">
+            <i class="fas fa-magic"></i> AI Plot Assistant
+          </a>
+        </li>
+        {% endif %}
       {% endif %}
       {% block extranavs %}{% endblock %}
       {% if current_user.role == "Admin" %}
