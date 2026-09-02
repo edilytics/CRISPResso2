@@ -20,10 +20,14 @@ script is included from figure_zoom.js and must stay unescaped everywhere —
 a report zip opened from file:// cannot load external scripts.
 """
 
+import json
 import os
+import shutil
+import subprocess
 
 import pytest
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pathlib import Path
 
 from CRISPResso2 import CRISPRessoReports
 
@@ -80,13 +84,9 @@ class TestFigureZoomMarkup:
         assert 'src="out/2a.REF1.Nucleotide_percentage_quilt.png"' in html
 
     def test_inline_script_is_the_shared_stateless_js(self, flask_like):
-        """The figure embeds figure_zoom.js verbatim (reports are self-contained).
-
-        Unescaped in every environment: escaping would break require()-based
-        unit tests parity and, more importantly, the browser script itself.
-        """
+        """The figure embeds figure_zoom.js verbatim (reports are self-contained)."""
         html = _render(flask_like)
-        js = open(JS_PATH).read()
+        js = Path(JS_PATH).read_text()
         assert js in html, "figure_zoom.js must be inlined verbatim by the macro"
 
     def test_script_is_stateless_no_cached_geometry(self, flask_like):
@@ -125,18 +125,86 @@ class TestFigureZoomMarkup:
         assert "querySelector('[data-cr-zoom-" not in html
 
 
-def test_uid_is_escaped_in_flask_env():
-    """A hostile uid must not break out of the attribute in the Flask env.
+@pytest.mark.parametrize("flask_like", [False, True], ids=["cli/pro-env", "flask-env"])
+def test_uid_is_escaped_in_attribute(flask_like):
+    """A hostile uid must not break out of the attribute in any environment.
 
-    (The CLI/Pro jinja environments run without autoescape — same trust model
-    as the pre-existing report code: fig roots come from run output, not user
-    input. The internet-facing path is C2Web's Flask env, which escapes.)
+    The CLI/Pro jinja environments run with autoescape OFF, so the macro
+    applies |e explicitly (attribute-breaking was possible there before:
+    a quoted amplicon name truncated the attribute and broke the JS wiring).
+    Under autoescape (the Flask env) |e is idempotent — Markup escapes
+    are stable under re-escaping.
     """
-    html = _render(flask_like=True, uid='a"><script>')
+    html = _render(flask_like, uid='a"><script>')
     escaped = 'a&#34;&gt;&lt;script&gt;'
-    assert escaped in html, 'uid must be HTML-escaped in the Flask env'
+    assert escaped in html, 'uid must be HTML-escaped in both environments'
     assert html.count('data-cr-zoom-strip="' + escaped) == 1
     assert html.count('data-cr-zoom-figure="' + escaped) == 1
+
+
+pytestmark_node = pytest.mark.skipif(
+    shutil.which("node") is None, reason="node is not installed"
+)
+
+
+class TestComputeZoomGeometry:
+    """Numeric contract for computeZoom — the fix itself — via a node harness.
+
+    computeZoom is pure geometry; these cases pin the zoom math (lens width,
+    both clamps, centering) and the two bail-outs (zero geometry -> null,
+    fits-in-strip -> centered, no zoom). Expected values are hand-computed
+    from the documented semantics:
+      k = stripH / imgH;  lensW = stripW / k;  lensX = clamp(cursorX -
+      lensW/2, 0, imgW - lensW);  translateX = -round(k * lensX)
+    """
+
+    HARNESS = (
+        "const { computeZoom } = require(process.argv[1]);"
+        "console.log(JSON.stringify(computeZoom.apply(null, JSON.parse(process.argv[2]))));"
+    )
+
+    def _compute(self, img_w, img_h, strip_w, strip_h, cursor_x):
+        proc = subprocess.run(
+            ["node", "-e", self.HARNESS, JS_PATH,
+             json.dumps([img_w, img_h, strip_w, strip_h, cursor_x])],
+            capture_output=True, text=True, check=True,
+        )
+        return json.loads(proc.stdout)
+
+    @pytestmark_node
+    def test_mid_figure_zoom_unit_scale(self):
+        z = self._compute(1000, 100, 200, 100, 500)
+        assert z == {"fits": False, "lensW": 200, "lensX": 400, "translateX": -400}
+
+    @pytestmark_node
+    def test_mid_figure_zoom_half_scale(self):
+        # k = 50/100 = 0.5: lensW = 200/0.5 = 400, lensX = 500-200 = 300,
+        # translateX = -round(0.5 * 300) = -150
+        z = self._compute(1000, 100, 200, 50, 500)
+        assert z == {"fits": False, "lensW": 400, "lensX": 300, "translateX": -150}
+
+    @pytestmark_node
+    def test_left_edge_clamps_to_zero(self):
+        z = self._compute(1000, 100, 200, 100, 0)
+        assert z == {"fits": False, "lensW": 200, "lensX": 0, "translateX": 0}
+
+    @pytestmark_node
+    def test_right_edge_clamps_to_imgW_minus_lensW(self):
+        z = self._compute(1000, 100, 200, 100, 1000)
+        assert z == {"fits": False, "lensW": 200, "lensX": 800, "translateX": -800}
+
+    @pytestmark_node
+    def test_zero_geometry_returns_null(self):
+        # hidden tab / not laid out yet: the caller retries on the next event
+        assert self._compute(1000, 100, 0, 100, 500) is None
+        assert self._compute(0, 100, 200, 100, 500) is None
+
+    @pytestmark_node
+    def test_narrow_figure_fits_and_centers(self):
+        # scaledW = 200 * (100/100) = 200 <= stripW 400: nothing to zoom,
+        # the scaled figure is centered instead
+        z = self._compute(200, 100, 400, 100, 999)
+        assert z == {"fits": True, "lensW": 200, "lensX": 0, "translateX": 100}
 
 
 class TestReportZoomWiring:

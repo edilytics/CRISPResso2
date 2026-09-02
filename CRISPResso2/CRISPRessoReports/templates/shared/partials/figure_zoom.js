@@ -13,8 +13,8 @@
  * impossible: a hidden or unloaded figure simply bails out (computeZoom
  * returns null) and works on the next event once laid out.
  *
- * Kept in sync with js_tests/figure_zoom.test.js in CRISPRessoWEB, which
- * unit-tests computeZoom() directly from this file.
+ * computeZoom() is unit-tested (numeric cases, via a small node harness)
+ * by tests/unit_tests/test_report_figure_zoom.py in this repo.
  */
 (function () {
   'use strict';
@@ -68,7 +68,7 @@
     var lens = figure.querySelector(selFor('data-cr-zoom-lens', uid));
     var strip = figure.ownerDocument.querySelector(selFor('data-cr-zoom-strip', uid));
     var stripImg = strip && strip.querySelector(selFor('data-cr-zoom-strip-img', uid));
-    if (!img || !lens || !strip || !stripImg) { return; }
+    if (!img || !lens || !strip || !stripImg) { return false; }
 
     function update(e) {
       var z = computeZoom(
@@ -83,13 +83,18 @@
     }
 
     figure.addEventListener('pointermove', update, { passive: true });
+    return true;
   }
 
   function wireAll(doc) {
     var figures = doc.querySelectorAll('[data-cr-zoom-figure]:not([data-cr-zoom-wired])');
     for (var i = 0; i < figures.length; i++) {
-      figures[i].setAttribute('data-cr-zoom-wired', '1');
-      wireOne(figures[i]);
+      /* stamp only on success: a figure whose elements are missing stays
+       * unwired and gets retried by the next include instead of being
+       * silently skipped forever. */
+      if (wireOne(figures[i])) {
+        figures[i].setAttribute('data-cr-zoom-wired', '1');
+      }
     }
   }
 
@@ -100,7 +105,8 @@
     wireAll(document);
   }
 
-  /* Test/module loading (jest in CRISPRessoWEB): expose the pure function. */
+  /* Test loading: expose the pure function for the node-based geometry
+   * tests (TestComputeZoomGeometry in this repo's unit tests). */
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { computeZoom: computeZoom };
   }
