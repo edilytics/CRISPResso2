@@ -94,7 +94,6 @@ jobs:
         with:
           repository: edilytics/CRISPRessoPro
           # ref: '<BRANCH-NAME>' # update to specific branch
-          ref: cole/fix-zoom-on-nuc-comp-plot
           token: ${{ secrets.CRISPRESSOPRO_PAT }}
           path: CRISPRessoPro
 
