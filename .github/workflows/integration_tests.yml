@@ -3,7 +3,7 @@ name: Run Integration Tests
 on:
   push:
 
-  pull_request:
+  pull_request_target:
     types: [opened, reopened]
 
 concurrency:
