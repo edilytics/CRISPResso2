@@ -2579,7 +2579,7 @@ def get_and_save_homology_scores(variantCache, not_aln_variant_objects, alleles_
     alleles_homology_scores_and_counts.sort(key=lambda x: (x['homology_score'], x['sequence']), reverse=True)
 
     df = pd.DataFrame(alleles_homology_scores_and_counts)
-    df.to_csv(alleles_homology_scores_filename, sep='\t', header=True, index=None)
+    df.to_csv(alleles_homology_scores_filename, sep='\t', header=True, index=None, compression='gzip')
     return homology_scores, counts
 
 
@@ -4797,7 +4797,7 @@ def main():
         n_refs = len(ref_names)
 
         # Compute homology scores (needed by both Pro and non-Pro paths)
-        alleles_homology_scores_filename = _jp('Alleles_homology_scores.txt')
+        alleles_homology_scores_filename = _jp('Alleles_homology_scores.txt.gz')
         homology_scores, homology_counts = get_and_save_homology_scores(
             variantCache, not_aln_variant_objects,
             alleles_homology_scores_filename,
