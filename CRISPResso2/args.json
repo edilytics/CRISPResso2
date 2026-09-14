@@ -432,6 +432,13 @@
             "default": 20,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
+        "large_del_min": {
+            "keys": ["--large-del-min", "--large_del_min"],
+            "type": "int",
+            "help": "Minimum deletion size in base pairs for boundary-spanning deletions to be visualized in Figure 9. Deletions must be larger than this value.",
+            "default": 50,
+            "tools": ["Core", "Batch", "Pooled", "WGS"]
+        },
         "min_frequency_alleles_around_cut_to_plot": {
             "keys": ["--min_frequency_alleles_around_cut_to_plot"],
             "type": "float",

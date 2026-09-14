@@ -1515,12 +1515,14 @@ def get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right):
     return row['Aligned_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1], row['Reference_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1], row['Read_Status'] == 'UNMODIFIED', row['n_deleted'], row['n_inserted'], row['n_mutated'], row['#Reads'], row['%Reads']
 
 
-def _large_deletion_markers_for_row(row, slice_start, slice_end):
-    """Return boundary-spanning deletion descriptors for one full alignment.
+def _large_deletion_markers_for_row(row, slice_start, slice_end, large_del_min=50):
+    """Return qualifying boundary-spanning deletion descriptors.
 
-    Coordinates in the returned tuples are local to ``[slice_start, slice_end)``:
+    A deletion qualifies when it crosses the plotted window boundary and its
+    full reference length is greater than ``large_del_min``. Coordinates in
+    the returned tuples are local to ``[slice_start, slice_end)``:
     ``(full_length, visible_start, visible_end, continues_left,
-    continues_right)``.  Keeping this as a tuple makes it safe to use in a
+    continues_right)``. Keeping this as a tuple makes it safe to use in a
     pandas grouping key and safe to serialize for the Pro plot.
     """
     aligned = row['Aligned_Sequence']
@@ -1537,7 +1539,7 @@ def _large_deletion_markers_for_row(row, slice_start, slice_end):
             1 for i in range(run_start, run_end)
             if reference[i] != '-'
         )
-        if full_length == 0 or run_end <= slice_start or run_start >= slice_end:
+        if full_length <= large_del_min or run_end <= slice_start or run_start >= slice_end:
             return
         left = run_start < slice_start
         right = run_end > slice_end
@@ -1565,13 +1567,15 @@ def _large_deletion_markers_for_row(row, slice_start, slice_end):
 
 def get_dataframe_around_cut_asymmetrical(
     df_alleles, cut_point, plot_left, plot_right, collapse_by_sequence=True,
-    return_deletion_markers=False,
+    return_deletion_markers=False, large_del_min=50,
 ):
     """Slice alleles around a cut and optionally return long-deletion markers.
 
-    Marker detection deliberately happens before slicing.  The default return
+    Marker detection deliberately happens before slicing. The default return
     value remains the historical DataFrame; callers that need plot metadata can
     request ``(dataframe, markers)`` with ``return_deletion_markers=True``.
+    ``large_del_min`` controls the strict minimum full deletion length for a
+    marker.
     """
     if df_alleles.shape[0] == 0:
         if return_deletion_markers:
@@ -1589,7 +1593,9 @@ def get_dataframe_around_cut_asymmetrical(
             row['Reference_Sequence'][slice_start:slice_end],
             row['Read_Status'] == 'UNMODIFIED', row['n_deleted'],
             row['n_inserted'], row['n_mutated'], row['#Reads'], row['%Reads'],
-            _large_deletion_markers_for_row(row, slice_start, slice_end),
+            _large_deletion_markers_for_row(
+                row, slice_start, slice_end, large_del_min=large_del_min,
+            ),
         )
 
     df_around = pd.DataFrame(

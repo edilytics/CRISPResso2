@@ -1453,6 +1453,51 @@ def test_assert_fastq_format_gzipped():
 
 
 # =============================================================================
+# Tests for large-deletion Figure 9 markers
+# =============================================================================
+
+
+def _make_boundary_deletion_row(deletion_length):
+    reference = 'A' * 80
+    aligned = '-' * deletion_length + 'A' * (80 - deletion_length)
+    return {
+        'Aligned_Sequence': aligned,
+        'Reference_Sequence': reference,
+        'ref_positions': list(range(80)),
+        'Read_Status': 'MODIFIED',
+        'n_deleted': deletion_length,
+        'n_inserted': 0,
+        'n_mutated': 0,
+        '#Reads': 1,
+        '%Reads': 100.0,
+        'Reference_Name': 'r',
+    }
+
+
+def test_large_deletion_marker_requires_boundary_and_strict_length():
+    row = _make_boundary_deletion_row(55)
+    df = pd.DataFrame([row])
+
+    _, markers = CRISPRessoShared.get_dataframe_around_cut_asymmetrical(
+        df, cut_point=60, plot_left=10, plot_right=10,
+        return_deletion_markers=True, large_del_min=50,
+    )
+    assert markers == [((55, 0, 4, True, False),)]
+
+    _, markers_at_threshold = CRISPRessoShared.get_dataframe_around_cut_asymmetrical(
+        df, cut_point=60, plot_left=10, plot_right=10,
+        return_deletion_markers=True, large_del_min=55,
+    )
+    assert markers_at_threshold == [()]
+
+    _, markers_without_boundary = CRISPRessoShared.get_dataframe_around_cut_asymmetrical(
+        df, cut_point=60, plot_left=100, plot_right=100,
+        return_deletion_markers=True, large_del_min=50,
+    )
+    assert markers_without_boundary == [()]
+
+
+# =============================================================================
 # Tests for getCRISPRessoArgParser function
 # =============================================================================
 
@@ -1463,6 +1508,13 @@ def test_getCRISPRessoArgParser_core():
     assert parser is not None
     # Should have version action
     assert "--version" in [a.option_strings[0] for a in parser._actions if a.option_strings]
+
+
+def test_getCRISPRessoArgParser_large_del_min():
+    parser = CRISPRessoShared.getCRISPRessoArgParser("Core")
+
+    assert parser._option_string_actions['--large-del-min'].default == 50
+    assert parser.parse_args(['--large-del-min', '75']).large_del_min == 75
 
 
 def test_getCRISPRessoArgParser_batch():
