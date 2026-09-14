@@ -1515,20 +1515,112 @@ def get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right):
     return row['Aligned_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1], row['Reference_Sequence'][cut_idx - plot_left + 1:cut_idx + plot_right + 1], row['Read_Status'] == 'UNMODIFIED', row['n_deleted'], row['n_inserted'], row['n_mutated'], row['#Reads'], row['%Reads']
 
 
-def get_dataframe_around_cut_asymmetrical(df_alleles, cut_point, plot_left, plot_right, collapse_by_sequence=True):
+def _large_deletion_markers_for_row(row, slice_start, slice_end):
+    """Return boundary-spanning deletion descriptors for one full alignment.
+
+    Coordinates in the returned tuples are local to ``[slice_start, slice_end)``:
+    ``(full_length, visible_start, visible_end, continues_left,
+    continues_right)``.  Keeping this as a tuple makes it safe to use in a
+    pandas grouping key and safe to serialize for the Pro plot.
+    """
+    aligned = row['Aligned_Sequence']
+    reference = row['Reference_Sequence']
+    markers = []
+    run_start = None
+
+    def finish(run_end):
+        if run_start is None:
+            return
+        # A read-gap run consumes reference bases only.  The alignment columns
+        # are contiguous here, so its length is also the visible geometry.
+        full_length = sum(
+            1 for i in range(run_start, run_end)
+            if reference[i] != '-'
+        )
+        if full_length == 0 or run_end <= slice_start or run_start >= slice_end:
+            return
+        left = run_start < slice_start
+        right = run_end > slice_end
+        if not (left or right):
+            return
+        visible_start = max(run_start, slice_start) - slice_start
+        visible_end = min(run_end, slice_end) - slice_start
+        if visible_start < visible_end:
+            markers.append((
+                int(full_length), int(visible_start), int(visible_end),
+                bool(left), bool(right),
+            ))
+
+    for i, (read_base, ref_base) in enumerate(zip(aligned, reference)):
+        is_deleted_column = read_base == '-' and ref_base != '-'
+        if is_deleted_column:
+            if run_start is None:
+                run_start = i
+        elif run_start is not None:
+            finish(i)
+            run_start = None
+    finish(len(aligned))
+    return tuple(markers)
+
+
+def get_dataframe_around_cut_asymmetrical(
+    df_alleles, cut_point, plot_left, plot_right, collapse_by_sequence=True,
+    return_deletion_markers=False,
+):
+    """Slice alleles around a cut and optionally return long-deletion markers.
+
+    Marker detection deliberately happens before slicing.  The default return
+    value remains the historical DataFrame; callers that need plot metadata can
+    request ``(dataframe, markers)`` with ``return_deletion_markers=True``.
+    """
     if df_alleles.shape[0] == 0:
+        if return_deletion_markers:
+            return df_alleles, []
         return df_alleles
-    ref1 = df_alleles['Reference_Sequence'].iloc[0]
-    ref1 = ref1.replace('-', '')
 
-    df_alleles_around_cut = pd.DataFrame(list(df_alleles.apply(lambda row: get_row_around_cut_asymmetrical(row, cut_point, plot_left, plot_right), axis=1).values),
-                    columns=['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated', '#Reads', '%Reads'])
+    def make_row(row):
+        cut_idx = row['ref_positions'].index(cut_point)
+        slice_start = max(0, cut_idx - plot_left + 1)
+        slice_end = min(
+            len(row['Aligned_Sequence']), cut_idx + plot_right + 1,
+        )
+        return (
+            row['Aligned_Sequence'][slice_start:slice_end],
+            row['Reference_Sequence'][slice_start:slice_end],
+            row['Read_Status'] == 'UNMODIFIED', row['n_deleted'],
+            row['n_inserted'], row['n_mutated'], row['#Reads'], row['%Reads'],
+            _large_deletion_markers_for_row(row, slice_start, slice_end),
+        )
 
-    df_alleles_around_cut = df_alleles_around_cut.groupby(['Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted', 'n_mutated']).sum().reset_index().set_index('Aligned_Sequence')
+    df_around = pd.DataFrame(
+        list(df_alleles.apply(make_row, axis=1).values),
+        columns=[
+            'Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted',
+            'n_inserted', 'n_mutated', '#Reads', '%Reads',
+            '_large_deletion_markers',
+        ],
+    )
 
-    df_alleles_around_cut.sort_values(by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'], inplace=True, ascending=[False, True, True])
-    df_alleles_around_cut['Unedited'] = df_alleles_around_cut['Unedited'] > 0
-    return df_alleles_around_cut
+    # Include the descriptor in the key: two clipped rows can look identical
+    # while representing different full-length deletions.
+    group_columns = [
+        'Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted',
+        'n_inserted', 'n_mutated', '_large_deletion_markers',
+    ]
+    df_around = (
+        df_around.groupby(group_columns, dropna=False)
+        .sum(numeric_only=True).reset_index().set_index('Aligned_Sequence')
+    )
+    df_around.sort_values(
+        by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence',
+            '_large_deletion_markers'],
+        inplace=True, ascending=[False, True, True, True],
+    )
+    df_around['Unedited'] = df_around['Unedited'] > 0
+    markers = [tuple(x) for x in df_around.pop('_large_deletion_markers')]
+    if return_deletion_markers:
+        return df_around, markers
+    return df_around
 
 
 def get_row_around_cut_debug(row, cut_point, offset):

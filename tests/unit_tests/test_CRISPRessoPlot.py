@@ -705,6 +705,42 @@ def test_plot_alleles_heatmap():
         assert os.path.exists(fig_root + ".pdf")
 
 
+def test_plot_alleles_heatmap_large_deletion_marker(monkeypatch):
+    """Large deletion labels include flanking lines and use the larger font."""
+    import matplotlib
+    import numpy as np
+    import os
+    import tempfile
+
+    captured_marker_text = []
+    original_text = matplotlib.axes.Axes.text
+
+    def capture_text(self, x, y, s, *args, **kwargs):
+        if isinstance(s, str) and s.endswith('bp----'):
+            captured_marker_text.append((s, kwargs.get('fontsize')))
+        return original_text(self, x, y, s, *args, **kwargs)
+
+    monkeypatch.setattr(matplotlib.axes.Axes, 'text', capture_text)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fig_root = os.path.join(tmpdir, 'test_large_deletion')
+        CRISPRessoPlot.plot_alleles_heatmap(
+            reference_seq='ATCG',
+            X=np.array([[0, 0, 0, 0]]),
+            annot=np.array([['-', '-', '-', '-']]),
+            y_labels=['50.0% (500)'],
+            insertion_dict={},
+            per_element_annot_kws=np.array([[{}, {}, {}, {}]], dtype=object),
+            fig_filename_root=fig_root,
+            SAVE_ALSO_PNG=False,
+            plot_cut_point=False,
+            large_deletion_markers=[[(1200, 0, 4, True, True)]],
+        )
+        assert os.path.exists(fig_root + '.pdf')
+
+    assert captured_marker_text == [('----1200bp----', 18)]
+
+
 def test_plot_amplicon_modifications():
     """Test plot_amplicon_modifications creates a PDF with valid data."""
     import numpy as np
