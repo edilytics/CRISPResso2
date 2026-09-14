@@ -432,8 +432,8 @@
             "default": 20,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },
-        "large_del_min": {
-            "keys": ["--large-del-min", "--large_del_min"],
+        "min_large_del": {
+            "keys": ["--min_large_del"],
             "type": "int",
             "help": "Minimum deletion size in base pairs for boundary-spanning deletions to be visualized in Figure 9. Deletions must be larger than this value.",
             "default": 50,

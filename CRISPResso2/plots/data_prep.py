@@ -1579,7 +1579,7 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
         plot_half_window_left,
         plot_half_window_right,
         return_deletion_markers=True,
-        large_del_min=getattr(ctx.args, 'large_del_min', 50),
+        min_large_del=getattr(ctx.args, 'min_large_del', 50),
     )
 
     (
