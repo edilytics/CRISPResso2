@@ -1495,14 +1495,32 @@ def _prep_windowed_alleles(
     if not expand_allele_plots_by_quantification:
         df_with_markers = df_alleles_around_cut.copy()
         df_with_markers['_large_deletion_markers'] = plot_markers
-        df_to_plot = df_with_markers.groupby(
-            ['Aligned_Sequence', 'Reference_Sequence', '_large_deletion_markers'],
-        ).sum(numeric_only=True).reset_index().set_index('Aligned_Sequence')
+
+        # Collapse rows by their visible sequence, as the historical plot did.
+        # Marker metadata is visual annotation rather than allele identity: a
+        # clipped 53 bp deletion and a clipped 74 bp deletion can have the same
+        # visible row and must contribute to that row's displayed read count.
+        group_columns = ['Aligned_Sequence', 'Reference_Sequence']
+        grouped = df_with_markers.groupby(group_columns, sort=True)
+        df_to_plot = grouped.sum(numeric_only=True).reset_index()
+
+        def combine_markers(marker_rows):
+            unique_markers = {}
+            for row_markers in marker_rows:
+                for marker in row_markers:
+                    marker = tuple(marker)
+                    unique_markers[marker] = None
+            return tuple(sorted(unique_markers, key=repr))
+
+        marker_groups = grouped['_large_deletion_markers'].agg(combine_markers)
+        marker_groups = marker_groups.rename('_large_deletion_markers').reset_index()
+        df_to_plot = df_to_plot.merge(
+            marker_groups, on=group_columns, how='left', validate='one_to_one',
+        ).set_index('Aligned_Sequence')
         df_to_plot.sort_values(
-            by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence',
-                '_large_deletion_markers'],
+            by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'],
             inplace=True,
-            ascending=[False, True, True, True],
+            ascending=[False, True, True],
         )
         plot_markers = [tuple(m) for m in df_to_plot.pop('_large_deletion_markers')]
 
@@ -1613,9 +1631,10 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
     # nucleotide quilt uses, would land this one column to the right here
     new_include_idx = [x - new_sel_cols_start - 1 for x in ref['include_idxs']]
 
-    # Build serialization-friendly plot input via prep_alleles_table
-    n_good = df_alleles_around_cut[
-        df_alleles_around_cut['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
+    # Apply the threshold after visual aggregation so the displayed row count
+    # and plot eligibility describe the same set of rows.
+    n_good = df_to_plot[
+        df_to_plot['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
     ].shape[0]
 
     plot_input = None
@@ -1756,9 +1775,10 @@ def prep_base_edit_quilt(ctx: CorePlotContext):
         if a == conversion_nuc_from
     ]
 
-    # Build serialization-friendly plot input via prep_alleles_table
-    n_good = df_alleles_around_cut[
-        df_alleles_around_cut['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
+    # Apply the threshold after visual aggregation so the displayed row count
+    # and plot eligibility describe the same set of rows.
+    n_good = df_to_plot[
+        df_to_plot['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
     ].shape[0]
 
     plot_input = None

@@ -3262,6 +3262,10 @@ def plot_alleles_heatmap(
 
     shown_marker = False
     for row_index, row_markers in enumerate(markers):
+        # Collapsed visual rows can represent several full-length deletions.
+        # Draw one label per visible span so distinct lengths are not rendered
+        # directly on top of one another.
+        marker_groups = {}
         for marker in row_markers:
             if isinstance(marker, dict):
                 length = marker.get('full_length', 0)
@@ -3273,9 +3277,14 @@ def plot_alleles_heatmap(
             end = max(start, min(N_COLUMNS, int(end)))
             if end <= start:
                 continue
+            marker_groups.setdefault((start, end), set()).add(int(length))
+
+        for (start, end), lengths in sorted(marker_groups.items()):
             shown_marker = True
+            length_label = '/'.join(str(length) for length in sorted(lengths))
             ax_hm.text(
-                (start + end) / 2.0, row_index + 0.5, '----{}bp----'.format(int(length)),
+                (start + end) / 2.0, row_index + 0.5,
+                '----{}bp----'.format(length_label),
                 ha='center', va='center', color='black', zorder=5,
                 fontsize=14 if end - start <= 2 else 18, clip_on=True,
             )
