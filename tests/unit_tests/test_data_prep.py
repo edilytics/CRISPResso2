@@ -669,6 +669,45 @@ class TestPrepWindowedAlleles:
         assert ref_seq == 'AC'
         assert len(intervals) == 1
 
+    def test_collapsed_visual_allele_includes_long_deletion_reads(self):
+        """Long-deletion markers must not split a visually identical row."""
+        marker_53 = ((53, 0, 4, True, False),)
+        marker_57 = ((57, 0, 4, True, False),)
+        marker_74 = ((74, 0, 4, True, False),)
+        df = pd.DataFrame({
+            'Aligned_Sequence': ['ACGT'] * 4,
+            'Reference_Sequence': ['ACGT'] * 4,
+            '#Reads': [120, 3, 3, 3],
+            '%Reads': [12.0, 0.3, 0.3, 0.3],
+        })
+        original = df.copy(deep=True)
+
+        df_out, df_plot, _, _, _, markers = _prep_windowed_alleles(
+            df_alleles_around_cut=df,
+            cut_point=1,
+            window_left=1,
+            window_right=1,
+            ref_sequence='AACGG',
+            sgRNA_intervals=[(0, 4)],
+            count_total=1000,
+            allele_plot_pcts_only_for_assigned_reference=False,
+            expand_allele_plots_by_quantification=False,
+            large_deletion_markers=[(), marker_53, marker_57, marker_74],
+            return_deletion_markers=True,
+        )
+
+        assert len(df_plot) == 1
+        assert df_plot.iloc[0]['#Reads'] == 129
+        assert df_plot.iloc[0]['%Reads'] == 12.9
+        assert markers == [(marker_53[0], marker_57[0], marker_74[0])]
+        assert '_large_deletion_markers' not in df_out.columns
+        pd.testing.assert_frame_equal(df_out, original)
+
+        _, _, y_labels, _, _, _ = prep_alleles_table(
+            df_plot, 'ACGT', MAX_N_ROWS=10, MIN_FREQUENCY=1.0,
+        )
+        assert y_labels == ['12.90% (129 reads)']
+
 
 # =============================================================================
 # Tests: prep_class_piechart_and_barplot (utility, not CorePlotContext-based)
