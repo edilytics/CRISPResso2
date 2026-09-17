@@ -29,6 +29,7 @@ pillow = "*"
 [feature.test.pypi-dependencies]
 ydiff = "*"
 inline-snapshot = "*"
+hypothesis = "*"
 
 [feature.pro.dependencies]
 plotly = "==5.18.0"
