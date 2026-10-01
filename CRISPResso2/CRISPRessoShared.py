@@ -27,6 +27,7 @@ import textwrap
 import unicodedata
 
 from inspect import getmodule, stack
+from typing import NamedTuple
 
 from CRISPResso2 import CRISPResso2Align
 from CRISPResso2 import CRISPRessoCOREResources
@@ -1522,8 +1523,9 @@ def _large_deletion_markers_for_row(row, slice_start, slice_end, min_large_del=5
     full reference length is greater than ``min_large_del``. Coordinates in
     the returned tuples are local to ``[slice_start, slice_end)``:
     ``(full_length, visible_start, visible_end, continues_left,
-    continues_right)``. Keeping this as a tuple makes it safe to use in a
-    pandas grouping key and safe to serialize for the Pro plot.
+    continues_right)``. Tuples keep the metadata hashable and serializable
+    for the Pro plot. The continuation flags describe which boundaries are
+    crossed; the current renderers label lengths without directional glyphs.
     """
     aligned = row['Aligned_Sequence']
     reference = row['Reference_Sequence']
@@ -1565,22 +1567,39 @@ def _large_deletion_markers_for_row(row, slice_start, slice_end, min_large_del=5
     return tuple(markers)
 
 
+class AllelesAroundCut(NamedTuple):
+    """Public allele table and separate, positionally aligned plot metadata."""
+
+    dataframe: pd.DataFrame
+    large_deletion_markers: list
+
+
+def combine_deletion_markers(marker_rows):
+    """Deterministically union marker metadata without changing allele identity."""
+    return tuple(sorted({tuple(marker) for row in marker_rows for marker in row}))
+
+
 def get_dataframe_around_cut_asymmetrical(
     df_alleles, cut_point, plot_left, plot_right, collapse_by_sequence=True,
-    return_deletion_markers=False, min_large_del=50,
 ):
-    """Slice alleles around a cut and optionally return long-deletion markers.
+    """Return the historical allele DataFrame, without plot metadata columns."""
+    return get_alleles_around_cut_with_markers(
+        df_alleles, cut_point, plot_left, plot_right,
+    ).dataframe
 
-    Marker detection deliberately happens before slicing. The default return
-    value remains the historical DataFrame; callers that need plot metadata can
-    request ``(dataframe, markers)`` with ``return_deletion_markers=True``.
-    ``min_large_del`` controls the strict minimum full deletion length for a
-    marker.
+
+def get_alleles_around_cut_with_markers(
+    df_alleles, cut_point, plot_left, plot_right, min_large_del=50,
+):
+    """Slice alleles and return an :class:`AllelesAroundCut` result.
+
+    Detect markers before slicing, then union them within the historical allele
+    groups. Metadata must not split exported rows or alter counts/percentages.
+    Only boundary-spanning deletions strictly longer than ``min_large_del``
+    receive a full-length label.
     """
     if df_alleles.shape[0] == 0:
-        if return_deletion_markers:
-            return df_alleles, []
-        return df_alleles
+        return AllelesAroundCut(df_alleles, [])
 
     def make_row(row):
         cut_idx = row['ref_positions'].index(cut_point)
@@ -1607,26 +1626,22 @@ def get_dataframe_around_cut_asymmetrical(
         ],
     )
 
-    # Include the descriptor in the key: two clipped rows can look identical
-    # while representing different full-length deletions.
     group_columns = [
         'Aligned_Sequence', 'Reference_Sequence', 'Unedited', 'n_deleted',
-        'n_inserted', 'n_mutated', '_large_deletion_markers',
+        'n_inserted', 'n_mutated',
     ]
-    df_around = (
-        df_around.groupby(group_columns, dropna=False)
-        .sum(numeric_only=True).reset_index().set_index('Aligned_Sequence')
-    )
+    grouped = df_around.groupby(group_columns, dropna=False)
+    df_around = grouped.agg({
+        '#Reads': 'sum', '%Reads': 'sum',
+        '_large_deletion_markers': combine_deletion_markers,
+    }).reset_index().set_index('Aligned_Sequence')
     df_around.sort_values(
-        by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence',
-            '_large_deletion_markers'],
-        inplace=True, ascending=[False, True, True, True],
+        by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'],
+        inplace=True, ascending=[False, True, True],
     )
     df_around['Unedited'] = df_around['Unedited'] > 0
-    markers = [tuple(x) for x in df_around.pop('_large_deletion_markers')]
-    if return_deletion_markers:
-        return df_around, markers
-    return df_around
+    markers = list(df_around.pop('_large_deletion_markers'))
+    return AllelesAroundCut(df_around, markers)
 
 
 def get_row_around_cut_debug(row, cut_point, offset):

@@ -435,7 +435,7 @@
         "min_large_del": {
             "keys": ["--min_large_del"],
             "type": "int",
-            "help": "Minimum deletion size in base pairs for boundary-spanning deletions to be visualized in Figure 9. Deletions must be larger than this value.",
+            "help": "Full-length label threshold in reference base pairs for deletions crossing a Figure 9 plot-window boundary. Only deletions strictly longer than this value receive a label; other deletions remain displayed normally.",
             "default": 50,
             "tools": ["Core", "Batch", "Pooled", "WGS"]
         },

@@ -3260,6 +3260,9 @@ def plot_alleles_heatmap(
         custom_heatmap(ref_seq_hm, annot=ref_seq_annot_hm, annot_kws={'size': 16}, cmap=cmap, fmt='s', ax=ax_hm_ref, vmin=0, vmax=5, square=True)
     custom_heatmap(X, annot=np.array(annot), annot_kws={'size': 16}, cmap=cmap, fmt='s', ax=ax_hm, vmin=0, vmax=5, square=True, per_element_annot_kws=per_element_annot_kws)
 
+    # Continuation flags in each descriptor record which window boundaries
+    # are crossed. This renderer uses the visible span and full length only:
+    # the length label intentionally has no directional glyphs.
     shown_marker = False
     for row_index, row_markers in enumerate(markers):
         # Collapsed visual rows can represent several full-length deletions.
