@@ -3138,6 +3138,7 @@ def plot_alleles_heatmap(
         sgRNA_mismatches=None,
         plot_reference_sequence_above=True,
         x_labels=None,
+        large_deletion_markers=None,
         **kwargs):
     """Plots alleles in a heatmap (nucleotides color-coded for easy visualization)
     input:
@@ -3195,8 +3196,22 @@ def plot_alleles_heatmap(
     ref_seq_hm = np.expand_dims(seq_to_numbers(reference_seq), 1).T
     ref_seq_annot_hm = np.expand_dims(list(reference_seq), 1).T
 
-    annot = annot[::-1]
+    # Keep marker geometry separate from the fixed-width nucleotide matrix.
+    markers = [list(row_markers or []) for row_markers in (large_deletion_markers or [])]
+    marker_annotations = [list(row) for row in annot]
+    for row_markers, row_annot in zip(markers, marker_annotations):
+        for marker in row_markers:
+            if isinstance(marker, dict):
+                start, end = marker.get('visible_start', 0), marker.get('visible_end', 0)
+            else:
+                start, end = marker[1], marker[2]
+            for col in range(max(0, int(start)), min(len(row_annot), int(end))):
+                if row_annot[col] == '-':
+                    row_annot[col] = ''
+
+    annot = marker_annotations[::-1]
     X = X[::-1]
+    markers = markers[::-1]
 
     N_ROWS = len(X)
     N_COLUMNS = plot_nuc_len
@@ -3244,6 +3259,47 @@ def plot_alleles_heatmap(
     if plot_reference_sequence_above:
         custom_heatmap(ref_seq_hm, annot=ref_seq_annot_hm, annot_kws={'size': 16}, cmap=cmap, fmt='s', ax=ax_hm_ref, vmin=0, vmax=5, square=True)
     custom_heatmap(X, annot=np.array(annot), annot_kws={'size': 16}, cmap=cmap, fmt='s', ax=ax_hm, vmin=0, vmax=5, square=True, per_element_annot_kws=per_element_annot_kws)
+
+    # Continuation flags in each descriptor record which window boundaries
+    # are crossed. This renderer uses the visible span and full length only:
+    # the length label intentionally has no directional glyphs.
+    shown_marker = False
+    single_cell_labels = {}
+    for row_index, row_markers in enumerate(markers):
+        # Collapsed visual rows can represent several full-length deletions.
+        # Draw one label per visible span so distinct lengths are not rendered
+        # directly on top of one another.
+        marker_groups = {}
+        for marker in row_markers:
+            if isinstance(marker, dict):
+                length = marker.get('full_length', 0)
+                start = marker.get('visible_start', 0)
+                end = marker.get('visible_end', 0)
+            else:
+                length, start, end = marker[:3]
+            start = max(0, min(N_COLUMNS, int(start)))
+            end = max(start, min(N_COLUMNS, int(end)))
+            if end <= start:
+                continue
+            marker_groups.setdefault((start, end), set()).add(int(length))
+
+        for (start, end), lengths in sorted(marker_groups.items()):
+            shown_marker = True
+            length_label = '/'.join(str(length) for length in sorted(lengths))
+            # A full label cannot fit in one cell: centering it clips the
+            # length at the plot boundary and overwrites adjacent bases.
+            # Keep a compact reference in the cell and the full length(s) in
+            # the legend, reusing references for identical deletion lengths.
+            if end - start == 1:
+                number = single_cell_labels.setdefault(length_label, len(single_cell_labels) + 1)
+                label = str(number)
+            else:
+                label = '----{}bp----'.format(length_label)
+            ax_hm.text(
+                (start + end) / 2.0, row_index + 0.5, label,
+                ha='center', va='center', color='black', zorder=5,
+                fontsize=14 if end - start <= 2 else 18, clip_on=True,
+            )
 
     ax_hm.yaxis.tick_right()
     ax_hm.yaxis.set_ticklabels(y_labels[::-1], rotation=True, va='center')
@@ -3310,6 +3366,17 @@ def plot_alleles_heatmap(
               matplotlib.lines.Line2D([0], [0], linestyle='none', mfc='none',
                     mec='black', marker='_', ms=2,)]
     descriptions = ['Substitutions', 'Insertions', 'Deletions']
+    if shown_marker:
+        proxies.append(matplotlib.lines.Line2D(
+            [0], [0], linestyle='none', marker='s', mfc='none', mec='black', ms=8,
+        ))
+        descriptions.append('Full length of boundary-spanning deletion')
+    for length_label, number in single_cell_labels.items():
+        proxies.append(matplotlib.lines.Line2D(
+            [0], [0], linestyle='none', marker='${}$'.format(number),
+            mfc='black', mec='none', ms=8,
+        ))
+        descriptions.append('{}bp boundary-spanning deletion'.format(length_label))
 
     if plot_cut_point:
         proxies.append(
@@ -3472,7 +3539,8 @@ def plot_alleles_heatmap_hist(reference_seq, X, annot, y_labels, insertion_dict,
 
 def plot_alleles_table_prepped(reference_seq, prepped_df_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws,
         is_reference, fig_filename_root=None, custom_colors=None, SAVE_ALSO_PNG=False, plot_cut_point=True, cut_point_ind=None,
-        sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, annotate_wildtype_allele='****', plot_reference_sequence_above=True, x_labels=None, **kwargs,):
+        sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, annotate_wildtype_allele='****', plot_reference_sequence_above=True, x_labels=None,
+        large_deletion_markers=None, **kwargs,):
     """Plot an allele table for a pre-filtered dataframe with allele frequencies.
 
     Parameters
@@ -3543,6 +3611,7 @@ def plot_alleles_table_prepped(reference_seq, prepped_df_alleles, annotations, y
         sgRNA_mismatches=sgRNA_mismatches,
         plot_reference_sequence_above=plot_reference_sequence_above,
         x_labels=x_labels,
+        large_deletion_markers=large_deletion_markers,
     )
 
 

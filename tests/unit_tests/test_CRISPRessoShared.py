@@ -1457,6 +1457,101 @@ def test_assert_fastq_format_gzipped():
 
 
 # =============================================================================
+# Tests for large-deletion Figure 9 markers
+# =============================================================================
+
+
+def _make_boundary_deletion_row(*runs):
+    reference = 'A' * 160
+    aligned = list(reference)
+    for start, end in runs:
+        aligned[start:end] = '-' * (end - start)
+    return {
+        'Aligned_Sequence': ''.join(aligned),
+        'Reference_Sequence': reference,
+        'ref_positions': list(range(len(reference))),
+        'Read_Status': 'MODIFIED',
+        'n_deleted': sum(end - start for start, end in runs),
+        'n_inserted': 0,
+        'n_mutated': 0,
+        '#Reads': 1,
+        '%Reads': 100.0,
+        'Reference_Name': 'r',
+    }
+
+
+@pytest.mark.parametrize('runs, threshold, expected', [
+    ([(10, 65)], 50, ((55, 0, 4, True, False),)),
+    ([(75, 130)], 50, ((55, 14, 20, False, True),)),
+    ([(10, 130)], 50, ((120, 0, 20, True, True),)),
+    ([(0, 160)], 50, ((160, 0, 20, True, True),)),
+    ([(10, 65), (75, 130)], 50,
+     ((55, 0, 4, True, False), (55, 14, 20, False, True))),
+    ([(10, 65)], 55, ()),  # Strict threshold equality.
+    ([(10, 65)], 56, ()),
+    ([(65, 77)], 10, ()),  # Long enough, but wholly inside the window.
+    ([(61, 81)], 10, ()),  # Entire window deleted, but neither boundary crossed.
+    ([(0, 61)], 50, ()),   # Touching the window without overlapping it.
+    ([(81, 160)], 50, ()),
+    ([], 50, ()),
+])
+def test_large_deletion_marker_boundaries(runs, threshold, expected):
+    df = pd.DataFrame([_make_boundary_deletion_row(*runs)])
+    result = CRISPRessoShared.get_alleles_around_cut_with_markers(
+        df, cut_point=70, plot_left=10, plot_right=10, min_large_del=threshold,
+    )
+    assert isinstance(result, CRISPRessoShared.AllelesAroundCut)
+    assert result.large_deletion_markers == [expected]
+    assert result.dataframe.index[0] == df.iloc[0]['Aligned_Sequence'][61:81]
+    assert result.dataframe.iloc[0]['#Reads'] == 1
+    pd.testing.assert_frame_equal(
+        result.dataframe,
+        CRISPRessoShared.get_dataframe_around_cut_asymmetrical(df, 70, 10, 10),
+    )
+
+
+def test_large_deletion_markers_do_not_split_exported_alleles():
+    # Both rows have n_deleted=74 and the same visible sequence at [81, 101).
+    short = _make_boundary_deletion_row((32, 85), (110, 131))
+    long = _make_boundary_deletion_row((11, 85))
+    short.update({'#Reads': 3, '%Reads': 30.0})
+    long.update({'#Reads': 7, '%Reads': 70.0})
+    df = pd.DataFrame([short, long])
+    original = df.copy(deep=True)
+
+    result = CRISPRessoShared.get_alleles_around_cut_with_markers(df, 90, 10, 10)
+    assert len(result.dataframe) == 1
+    assert result.dataframe.iloc[0]['#Reads'] == 10
+    assert result.dataframe.iloc[0]['%Reads'] == 100.0
+    assert result.dataframe.iloc[0]['n_deleted'] == 74
+    assert result.large_deletion_markers == [
+        ((53, 0, 4, True, False), (74, 0, 4, True, False)),
+    ]
+    assert list(result.dataframe.columns) == [
+        'Reference_Sequence', 'Unedited', 'n_deleted', 'n_inserted',
+        'n_mutated', '#Reads', '%Reads',
+    ]
+    pd.testing.assert_frame_equal(df, original)
+    # Label thresholds must never alter the public table or its TSV.
+    without_labels = CRISPRessoShared.get_alleles_around_cut_with_markers(
+        df, 90, 10, 10, min_large_del=100,
+    )
+    assert without_labels.large_deletion_markers == [()]
+    assert result.dataframe.to_csv(sep='\t') == without_labels.dataframe.to_csv(sep='\t')
+
+
+def test_large_deletion_markers_empty_table():
+    df = pd.DataFrame([_make_boundary_deletion_row()]).iloc[:0]
+    result = CRISPRessoShared.get_alleles_around_cut_with_markers(df, 70, 10, 10)
+    assert isinstance(result, CRISPRessoShared.AllelesAroundCut)
+    assert result.large_deletion_markers == []
+    pd.testing.assert_frame_equal(result.dataframe, df)
+    pd.testing.assert_frame_equal(
+        CRISPRessoShared.get_dataframe_around_cut_asymmetrical(df, 70, 10, 10), df,
+    )
+
+
+# =============================================================================
 # Tests for getCRISPRessoArgParser function
 # =============================================================================
 
@@ -1467,6 +1562,13 @@ def test_getCRISPRessoArgParser_core():
     assert parser is not None
     # Should have version action
     assert "--version" in [a.option_strings[0] for a in parser._actions if a.option_strings]
+
+
+def test_getCRISPRessoArgParser_min_large_del():
+    parser = CRISPRessoShared.getCRISPRessoArgParser("Core")
+
+    assert parser._option_string_actions['--min_large_del'].default == 50
+    assert parser.parse_args(['--min_large_del', '75']).min_large_del == 75
 
 
 def test_getCRISPRessoArgParser_batch():
