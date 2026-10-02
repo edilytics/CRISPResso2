@@ -820,6 +820,60 @@ def test_plot_alleles_heatmap_keeps_separate_marker_spans(monkeypatch):
     assert captured_marker_text == ['----53bp----', '----74bp----']
 
 
+@pytest.mark.parametrize('start', [0, 3])
+@pytest.mark.parametrize('lengths', [(60,), (53, 74, 1200)])
+def test_plot_alleles_heatmap_single_cell_deletion(monkeypatch, tmp_path, start, lengths):
+    """One-cell edge labels fit the cell; the legend preserves full lengths."""
+    import matplotlib
+    import numpy as np
+
+    labels = []
+    legend_labels = []
+    original_text = matplotlib.axes.Axes.text
+    original_legend = matplotlib.axes.Axes.legend
+
+    def capture_text(self, x, y, s, *args, **kwargs):
+        artist = original_text(self, x, y, s, *args, **kwargs)
+        if kwargs.get('zorder') == 5:
+            labels.append(artist)
+        return artist
+
+    def capture_legend(self, handles, descriptions, *args, **kwargs):
+        legend_labels.extend(descriptions)
+        return original_legend(self, handles, descriptions, *args, **kwargs)
+
+    monkeypatch.setattr(matplotlib.axes.Axes, 'text', capture_text)
+    monkeypatch.setattr(matplotlib.axes.Axes, 'legend', capture_legend)
+    annotation = list('ATCG')
+    annotation[start] = '-'
+    CRISPRessoPlot.plot_alleles_heatmap(
+        reference_seq='ATCG',
+        X=np.array([[0 if i == start else 1 for i in range(4)]] * 2),
+        annot=np.array([annotation] * 2),
+        y_labels=['50.0% (50)', '50.0% (50)'],
+        insertion_dict={},
+        per_element_annot_kws=np.array([[{}, {}, {}, {}]] * 2, dtype=object),
+        fig_filename_root=str(tmp_path / 'single_cell'),
+        SAVE_ALSO_PNG=True,
+        plot_cut_point=False,
+        large_deletion_markers=[[
+            (length, start, start + 1, start == 0, start == 3)
+            for length in lengths
+        ]] * 2,
+    )
+    assert (tmp_path / 'single_cell.pdf').exists()
+    assert (tmp_path / 'single_cell.png').exists()
+    assert [label.get_text() for label in labels] == ['1', '1']
+    description = '/'.join(map(str, lengths)) + 'bp boundary-spanning deletion'
+    assert legend_labels.count(description) == 1
+    for label in labels:
+        label.figure.canvas.draw()
+        bbox = label.get_window_extent(label.figure.canvas.get_renderer())
+        left = label.axes.transData.transform((start, 0))[0]
+        right = label.axes.transData.transform((start + 1, 0))[0]
+        assert left <= bbox.x0 < bbox.x1 <= right
+
+
 def test_plot_amplicon_modifications():
     """Test plot_amplicon_modifications creates a PDF with valid data."""
     import numpy as np

@@ -3264,6 +3264,7 @@ def plot_alleles_heatmap(
     # are crossed. This renderer uses the visible span and full length only:
     # the length label intentionally has no directional glyphs.
     shown_marker = False
+    single_cell_labels = {}
     for row_index, row_markers in enumerate(markers):
         # Collapsed visual rows can represent several full-length deletions.
         # Draw one label per visible span so distinct lengths are not rendered
@@ -3285,9 +3286,17 @@ def plot_alleles_heatmap(
         for (start, end), lengths in sorted(marker_groups.items()):
             shown_marker = True
             length_label = '/'.join(str(length) for length in sorted(lengths))
+            # A full label cannot fit in one cell: centering it clips the
+            # length at the plot boundary and overwrites adjacent bases.
+            # Keep a compact reference in the cell and the full length(s) in
+            # the legend, reusing references for identical deletion lengths.
+            if end - start == 1:
+                number = single_cell_labels.setdefault(length_label, len(single_cell_labels) + 1)
+                label = str(number)
+            else:
+                label = '----{}bp----'.format(length_label)
             ax_hm.text(
-                (start + end) / 2.0, row_index + 0.5,
-                '----{}bp----'.format(length_label),
+                (start + end) / 2.0, row_index + 0.5, label,
                 ha='center', va='center', color='black', zorder=5,
                 fontsize=14 if end - start <= 2 else 18, clip_on=True,
             )
@@ -3362,6 +3371,12 @@ def plot_alleles_heatmap(
             [0], [0], linestyle='none', marker='s', mfc='none', mec='black', ms=8,
         ))
         descriptions.append('Full length of boundary-spanning deletion')
+    for length_label, number in single_cell_labels.items():
+        proxies.append(matplotlib.lines.Line2D(
+            [0], [0], linestyle='none', marker='${}$'.format(number),
+            mfc='black', mec='none', ms=8,
+        ))
+        descriptions.append('{}bp boundary-spanning deletion'.format(length_label))
 
     if plot_cut_point:
         proxies.append(
