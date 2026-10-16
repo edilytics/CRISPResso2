@@ -98,20 +98,42 @@
             {% endfor %}
           {% endif %}
 
-          {% if compact_plots_to_show|length > 0 %}
-            <div class='card text-center mb-2'>
-              <div class='card-header'>
-                <h5>Summary Plots</h5>
-              </div>
-              <div class='card-body p-0'>
-                <div class="list-group list-group-flush scrollable-list-tall">
-							  {% for compact_plot in compact_plots_to_show %}
-	              <a href="{{report_data['crispresso_data_path']}}{{compact_plots_to_show[compact_plot]['href']}}" data-toggle="tooltip" title="{{compact_plot}}" class="list-group-item list-group-item-action p-0"><img src="{{report_data['crispresso_data_path']}}{{compact_plots_to_show[compact_plot]['img']}}" width='100%' ></a>
-                  {% endfor %}
-                </div>
+          {% if allele_modification_heatmap_plot_names|length > 0 %}
+            <div class="card text-center mb-2" id="aggregate-modification-summary">
+              <div class="card-header"><h5>Summary Plots</h5></div>
+              <div class="card-body">
+                {% for heatmap_name in allele_modification_heatmap_plot_names %}
+                  {% set line_name = allele_modification_line_plot_names[loop.index0] %}
+                  {% set pair_id = 'aggregate-modification-' ~ loop.index0 %}
+                  <h5>{{ allele_modification_heatmap_plot_titles[heatmap_name] }}</h5>
+                  <ul class="nav nav-tabs justify-content-center" role="tablist">
+                    <li class="nav-item" role="presentation">
+                      <button class="nav-link active" id="{{ pair_id }}-heatmap-tab" data-bs-toggle="tab" data-bs-target="#{{ pair_id }}-heatmap" role="tab" aria-controls="{{ pair_id }}-heatmap" aria-selected="true">Heatmap</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                      <button class="nav-link" id="{{ pair_id }}-line-tab" data-bs-toggle="tab" data-bs-target="#{{ pair_id }}-line" role="tab" aria-controls="{{ pair_id }}-line" aria-selected="false">Line</button>
+                    </li>
+                  </ul>
+                  <div class="tab-content mb-4">
+                    <div class="tab-pane fade show active" id="{{ pair_id }}-heatmap" role="tabpanel" aria-labelledby="{{ pair_id }}-heatmap-tab">
+                      {{ allele_modification_heatmap_plot_htmls[heatmap_name] | safe }}
+                      <figcaption class="labelpadding">{{ allele_modification_heatmap_plot_labels[heatmap_name] }}</figcaption>
+                      {% for data_label, data_path in allele_modification_heatmap_plot_datas[heatmap_name] %}
+                        <p class="cr-data-link">Data: <a href="{{ report_data['crispresso_data_path'] }}{{ data_path }}">{{ data_label }}</a></p>
+                      {% endfor %}
+                    </div>
+                    <div class="tab-pane fade" id="{{ pair_id }}-line" role="tabpanel" aria-labelledby="{{ pair_id }}-line-tab">
+                      {{ allele_modification_line_plot_htmls[line_name] | safe }}
+                      <figcaption class="labelpadding">{{ allele_modification_line_plot_labels[line_name] }}</figcaption>
+                      {% for data_label, data_path in allele_modification_line_plot_datas[line_name] %}
+                        <p class="cr-data-link">Data: <a href="{{ report_data['crispresso_data_path'] }}{{ data_path }}">{{ data_label }}</a></p>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endfor %}
               </div>
             </div>
-            {% endif %}
+          {% endif %}
 
             {{render_partial('shared/partials/report_footer_buttons.html', report_zip_filename=report_zip_filename, report_path=report_path)}}
 			{{ render_partial('shared/partials/pro_banner.html') }}
@@ -126,4 +148,12 @@
 {% endblock %}
 
 {% block foot %}
+<script>
+  document.querySelectorAll('#aggregate-modification-summary [data-bs-toggle="tab"]').forEach((tab) => {
+    tab.addEventListener('shown.bs.tab', () => {
+      const pane = document.getElementById(tab.getAttribute('aria-controls'));
+      pane.querySelectorAll('.plotly-graph-div').forEach((plot) => Plotly.Plots.resize(plot));
+    });
+  });
+</script>
 {% endblock %}
