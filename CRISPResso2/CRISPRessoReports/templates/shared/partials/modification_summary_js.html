@@ -1,0 +1,8 @@
+<script>
+  document.querySelectorAll('#{{ modification_summary_prefix }}-modification-summary [data-bs-toggle="tab"]').forEach((tab) => {
+    tab.addEventListener('shown.bs.tab', () => {
+      const pane = document.getElementById(tab.getAttribute('aria-controls'));
+      pane.querySelectorAll('.plotly-graph-div').forEach((plot) => Plotly.Plots.resize(plot));
+    });
+  });
+</script>

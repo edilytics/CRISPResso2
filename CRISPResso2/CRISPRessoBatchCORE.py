@@ -613,6 +613,7 @@ def main():
             all_summary_filenames[amplicon_name] = {
                 'nucleotide_frequency': nucleotide_frequency_summary_filename,
                 'modification_frequency': modification_frequency_summary_filename,
+                'modification_percentage': modification_percentage_summary_filename,
             }
         # end pass 1
 
