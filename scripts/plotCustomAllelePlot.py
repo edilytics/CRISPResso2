@@ -30,9 +30,9 @@ def main():
     if args.use_matplotlib or not CRISPRessoShared.is_C2Pro_installed():
         from CRISPResso2.plots import CRISPRessoPlot
     else:
-        from CRISPRessoPro import plot as CRISPRessoPlot  # noqa: F401
+        from CRISPRessoPro import plot as CRISPRessoPlot
 
-    plot_alleles_tables_from_folder(args.CRISPResso2_folder, args.output_root, MIN_FREQUENCY=args.min_freq, MAX_N_ROWS=args.max_rows, SAVE_ALSO_PNG=args.save_png, plot_cut_point=args.plot_cut_point, plot_left=args.plot_left, plot_right=args.plot_right, plot_center=args.plot_center)
+    plot_alleles_tables_from_folder(args.CRISPResso2_folder, args.output_root, MIN_FREQUENCY=args.min_freq, MAX_N_ROWS=args.max_rows, SAVE_ALSO_PNG=args.save_png, plot_cut_point=args.plot_cut_point, plot_left=args.plot_left, plot_right=args.plot_right, plot_center=args.plot_center, plot_module=CRISPRessoPlot)
 
 
 def arrStr_to_arr(val):
@@ -62,7 +62,7 @@ def get_dataframe_around_cut_asymmetrical(df_alleles, cut_point, plot_left, plot
     return df_alleles_around_cut
 
 
-def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root, plot_left=20, plot_right=20, plot_center=None, MIN_FREQUENCY=None, MAX_N_ROWS=None, SAVE_ALSO_PNG=False, custom_colors=None, plot_cut_point=True, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None):
+def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root, plot_left=20, plot_right=20, plot_center=None, MIN_FREQUENCY=None, MAX_N_ROWS=None, SAVE_ALSO_PNG=False, custom_colors=None, plot_cut_point=True, sgRNA_intervals=None, sgRNA_names=None, sgRNA_mismatches=None, plot_module=None):
     """Plots an allele table plot from a completed CRISPResso run but plots a specified number of bases left and right from the cut site
     This function is only used for one-off plotting purposes and not for the general CRISPResso analysis
     Important: The run must have been run with the --write_detailed_allele_table parameter
@@ -75,6 +75,10 @@ def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root,
     plot_left: number of bases left to plot from cut point
     plot_right: number of bases right to plot from cut point
     """
+    if plot_module is None:
+        from CRISPResso2.plots import CRISPRessoPlot
+        plot_module = CRISPRessoPlot
+
     crispresso2_info = CRISPRessoShared.load_crispresso_info(crispresso_output_folder)
 
     if not crispresso2_info['running_info']['args'].write_detailed_allele_table:
@@ -128,7 +132,7 @@ def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root,
                 new_sgRNA_intervals += [(int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1)]
 
             fig_filename_root = fig_filename_root + "_" + ref_name + "_" + sgRNA_label
-            CRISPRessoPlot.plot_alleles_table(ref_seq_around_cut,
+            plot_module.plot_alleles_table(ref_seq_around_cut,
                                               df_alleles=df_alleles_around_cut,
                                               fig_filename_root=fig_filename_root,
                                               cut_point_ind=cut_point - new_sel_cols_start,
@@ -169,7 +173,7 @@ def plot_alleles_tables_from_folder(crispresso_output_folder, fig_filename_root,
                     new_sgRNA_intervals += [(int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1)]
 
                 fig_filename_root = fig_filename_root + "_" + ref_name + "_" + sgRNA_label
-                CRISPRessoPlot.plot_alleles_table(ref_seq_around_cut,
+                plot_module.plot_alleles_table(ref_seq_around_cut,
                                                   df_alleles=df_alleles_around_cut,
                                                   fig_filename_root=fig_filename_root,
                                                   cut_point_ind=cut_point - new_sel_cols_start,

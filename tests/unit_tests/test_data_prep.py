@@ -8,11 +8,13 @@ import os
 
 import numpy as np
 import pandas as pd
+import pytest
 from collections import Counter
 from types import SimpleNamespace
 
 from CRISPResso2.plots.data_prep import (
     _prep_windowed_alleles,
+    _prep_windowed_alleles_with_markers,  # noqa: PLC2701
     amino_acids_to_numbers,
     get_base_edit_target_sequence,
     get_bp_substitutions,
@@ -20,6 +22,7 @@ from CRISPResso2.plots.data_prep import (
     get_upset_plot_counts,
     prep_alleles_around_cut,
     prep_alleles_table,
+    prep_alleles_table_with_markers,
     prep_alleles_table_compare,
     prep_alternate_allele_counts,
     prep_amino_acid_table,
@@ -669,6 +672,120 @@ class TestPrepWindowedAlleles:
         assert ref_seq == 'AC'
         assert len(intervals) == 1
 
+    @pytest.mark.parametrize('expand', [False, True])
+    def test_visual_allele_includes_long_deletion_reads(self, expand):
+        """Markers follow rows in both visual aggregation modes."""
+        marker_53 = ((53, 0, 4, True, False),)
+        marker_57 = ((57, 0, 4, True, False),)
+        marker_74 = ((74, 0, 4, True, False),)
+        df = pd.DataFrame({
+            'Aligned_Sequence': ['ACGT'] * 4,
+            'Reference_Sequence': ['ACGT'] * 4,
+            '#Reads': [120, 3, 3, 3],
+            '%Reads': [12.0, 0.3, 0.3, 0.3],
+        })
+        original = df.copy(deep=True)
+
+        df_out, df_plot, _, _, _, markers = _prep_windowed_alleles_with_markers(
+            df_alleles_around_cut=df,
+            cut_point=1,
+            window_left=1,
+            window_right=1,
+            ref_sequence='AACGG',
+            sgRNA_intervals=[(0, 4)],
+            count_total=1000,
+            allele_plot_pcts_only_for_assigned_reference=False,
+            expand_allele_plots_by_quantification=expand,
+            large_deletion_markers=[(), marker_53, marker_57, marker_74],
+        )
+
+        if expand:
+            pd.testing.assert_frame_equal(df_plot, original)
+            assert markers == [(), marker_53, marker_57, marker_74]
+        else:
+            assert len(df_plot) == 1
+            assert df_plot.iloc[0]['#Reads'] == 129
+            assert df_plot.iloc[0]['%Reads'] == 12.9
+            assert markers == [(marker_53[0], marker_57[0], marker_74[0])]
+        assert '_large_deletion_markers' not in df_out.columns
+        pd.testing.assert_frame_equal(df_out, original)
+
+        prepped = prep_alleles_table_with_markers(
+            df_plot.set_index('Aligned_Sequence') if expand else df_plot,
+            'ACGT', MAX_N_ROWS=10, MIN_FREQUENCY=1.0,
+            large_deletion_markers=markers,
+        )
+        assert prepped.y_labels == (['12.00% (120 reads)'] if expand else ['12.90% (129 reads)'])
+        assert prepped.large_deletion_markers == ([()] if expand else markers)
+
+
+# =============================================================================
+# Tests: marker selection after frequency / row-limit cuts
+# =============================================================================
+
+
+@pytest.mark.parametrize('max_rows, min_frequency, positions', [
+    (2, 1.0, [1, 3]),
+    (10, 1.0, [1, 3, 4]),
+    (1, 0.0, [0]),
+    (0, 0.0, []),
+    (10, 100.0, []),
+])
+def test_allele_markers_follow_original_positions(max_rows, min_frequency, positions):
+    # Duplicate indexes and interspersed low-frequency rows defeat both label
+    # lookup and the incorrect "first N markers of the original table" approach.
+    df = pd.DataFrame({
+        'Aligned_Sequence': ['----'] * 5,
+        'Reference_Sequence': ['AAAA'] * 5,
+        '#Reads': [1, 40, 2, 30, 27],
+        '%Reads': [0.1, 4.0, 0.2, 3.0, 2.7],
+    }).set_index('Aligned_Sequence')
+    markers = [((51 + i, 0, 4, True, True),) for i in range(5)]
+    result = prep_alleles_table_with_markers(
+        df, 'AAAA', max_rows, min_frequency, large_deletion_markers=markers,
+    )
+    assert result.large_deletion_markers == [markers[i] for i in positions]
+    assert result.y_labels == [
+        '%.2f%% (%d reads)' % (df.iloc[i]['%Reads'], df.iloc[i]['#Reads'])
+        for i in positions
+    ]
+    assert len(result.X) == len(result.annot) == len(result.large_deletion_markers)
+    assert len(prep_alleles_table(df, 'AAAA', max_rows, min_frequency)) == 6
+    without_markers = prep_alleles_table_with_markers(df, 'AAAA', max_rows, min_frequency)
+    assert without_markers.large_deletion_markers == [()] * len(positions)
+
+
+@pytest.mark.parametrize('expand', [False, True])
+def test_empty_windowed_alleles_with_markers(expand):
+    df = pd.DataFrame({
+        'Aligned_Sequence': ['AAAA'], 'Reference_Sequence': ['AAAA'],
+        '#Reads': [1], '%Reads': [100.0],
+    }).set_index('Aligned_Sequence').iloc[:0]
+    result = _prep_windowed_alleles_with_markers(
+        df, 1, 1, 1, 'AAAA', [], 1, False, expand, large_deletion_markers=[],
+    )
+    assert result.df_to_plot.empty
+    assert result.large_deletion_markers == []
+    prepped = prep_alleles_table_with_markers(
+        result.df_to_plot, 'AA', 10, 0, large_deletion_markers=[],
+    )
+    assert prepped.X == prepped.y_labels == prepped.large_deletion_markers == []
+
+
+@pytest.mark.parametrize('markers', [[], [(), ()]])
+def test_allele_marker_length_mismatch_is_rejected(markers):
+    df = pd.DataFrame({
+        'Aligned_Sequence': ['AAAA'], 'Reference_Sequence': ['AAAA'],
+        '#Reads': [1], '%Reads': [100.0],
+    }).set_index('Aligned_Sequence')
+    with pytest.raises(ValueError, match='number of allele rows'):
+        prep_alleles_table_with_markers(df, 'AAAA', 10, 0, large_deletion_markers=markers)
+    with pytest.raises(ValueError, match='number of allele rows'):
+        _prep_windowed_alleles_with_markers(
+            df, 1, 1, 1, 'AAAA', [], 1, False, True,
+            large_deletion_markers=markers,
+        )
+
 
 # =============================================================================
 # Tests: prep_class_piechart_and_barplot (utility, not CorePlotContext-based)
@@ -1187,6 +1304,51 @@ def _make_df_alleles(ref_name, aligned_seqs, ref_seq, reads, read_status=None):
 
 
 class TestPrepAllelesAroundCut:
+
+    @pytest.mark.parametrize('expand', [False, True])
+    def test_large_deletions_keep_export_and_plot_metadata_aligned(self, expand):
+        reference = 'A' * 160
+        sequences = [
+            reference,
+            'A' * 32 + '-' * 53 + 'A' * 25 + '-' * 21 + 'A' * 29,
+            'A' * 11 + '-' * 74 + 'A' * 75,
+            'A' * 32 + '-' * 53 + 'A' * 75,
+        ]
+        df = _make_df_alleles('r', sequences, reference, [100, 3, 7, 5])
+        ctx = _make_ctx(
+            ref_names=['r'],
+            refs={'r': _ref_dict(
+                sequence=reference, sequence_length=len(reference),
+                sgRNA_cut_points=[90], sgRNA_plot_cut_points=[True],
+                sgRNA_intervals=[(81, 100)], sgRNA_names=['guide'],
+                sgRNA_mismatches=[],
+            )},
+            counts_total={'r': 115}, df_alleles=df,
+            args=SimpleNamespace(
+                plot_window_size=10, min_large_del=50,
+                min_frequency_alleles_around_cut_to_plot=1,
+                max_rows_alleles_around_cut_to_plot=10,
+                allele_plot_pcts_only_for_assigned_reference=False,
+                expand_allele_plots_by_quantification=expand,
+                annotate_wildtype_allele='',
+            ),
+        )
+        ctx.ref_name, ctx.sgRNA_ind = 'r', 0
+        result = prep_alleles_around_cut(ctx)
+        marker_53 = (53, 0, 4, True, False)
+        marker_74 = (74, 0, 4, True, False)
+        table = result['df_alleles_around_cut']
+        assert table['#Reads'].tolist() == [100, 10, 5]
+        assert result['large_deletion_markers'] == [(), (marker_53, marker_74), (marker_53,)]
+        assert '_large_deletion_markers' not in table.columns
+        plot_input = result['plot_input']
+        assert plot_input['large_deletion_markers'] == (
+            result['large_deletion_markers'] if expand else [(), (marker_53, marker_74)]
+        )
+        assert plot_input['y_labels'] == (
+            ['86.96% (100 reads)', '8.70% (10 reads)', '4.35% (5 reads)'] if expand
+            else ['86.96% (100 reads)', '13.04% (15 reads)']
+        )
 
     def test_basic(self):
         """Smoke test: single allele, unmodified, returns expected keys."""
