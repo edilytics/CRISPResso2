@@ -51,6 +51,10 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["CRISPResso2*"]
+# CRISPResso2/tests holds dev-only bench/golden harnesses (not a real package;
+# no __init__.py). Namespace-package discovery would still pick it up and ship
+# it in wheels, so exclude it explicitly.
+exclude = ["CRISPResso2.tests*"]
 
 [tool.ruff]
 cache-dir = "/tmp/.ruff_cache"
