@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 import os
 import re
 from collections import Counter, defaultdict
+from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
@@ -338,7 +339,37 @@ def amino_acids_to_numbers(seq):
     return [_AA_TO_NUMBERS[aa] for aa in seq]
 
 
+class PreppedAllelesTable(NamedTuple):
+    """Heatmap inputs and markers in the same filtered row order."""
+
+    X: list
+    annot: list
+    y_labels: list
+    insertion_dict: dict
+    per_element_annot_kws: list
+    is_reference: list
+    large_deletion_markers: list
+
+
+def _normalize_deletion_markers(markers, row_count):
+    if markers is None:
+        return [()] * row_count
+    if len(markers) != row_count:
+        raise ValueError('Deletion markers must match the number of allele rows')
+    return [tuple(row) for row in markers]
+
+
 def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
+    """Return the historical six heatmap inputs without deletion metadata."""
+    return prep_alleles_table_with_markers(
+        df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY,
+    )[:6]
+
+
+def prep_alleles_table_with_markers(
+    df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY,
+    large_deletion_markers=None,
+):
     """Prepare a DataFrame of alleles for heatmap plotting.
 
     Converts aligned sequences to numeric arrays, detects insertions and
@@ -360,9 +391,10 @@ def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
 
     Returns
     -------
-    tuple
-        ``(X, annot, y_labels, insertion_dict, per_element_annot_kws,
-        is_reference)``
+    PreppedAllelesTable
+        Named heatmap inputs including positionally aligned deletion markers.
+        If supplied, ``large_deletion_markers`` must have one entry per input
+        row (including rows that will be filtered out).
 
     """
     X = []
@@ -371,9 +403,20 @@ def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
     insertion_dict = defaultdict(list)
     per_element_annot_kws = []
     is_reference = []
+    selected_markers = []
+
+    marker_by_position = _normalize_deletion_markers(large_deletion_markers, len(df_alleles))
+    # Keep ORIGINAL positions through both cuts: filtered positions restart at
+    # zero, and Aligned_Sequence labels need not be unique.
+    selected_positions = np.flatnonzero(
+        (df_alleles['%Reads'] >= MIN_FREQUENCY).to_numpy(),
+    )[:MAX_N_ROWS]
+    selected = df_alleles.iloc[selected_positions]
 
     idx_row = 0
-    for idx, row in df_alleles[df_alleles['%Reads'] >= MIN_FREQUENCY][:MAX_N_ROWS].iterrows():
+    for position, (idx, row) in zip(selected_positions, selected.iterrows()):
+        selected_markers.append(marker_by_position[position])
+
         X.append(_seq_to_numbers(idx.upper()))
         annot.append(list(idx))
 
@@ -398,7 +441,10 @@ def prep_alleles_table(df_alleles, reference_seq, MAX_N_ROWS, MIN_FREQUENCY):
         to_append[idxs_sub] = {'weight': 'bold', 'color': 'black', 'size': 16}
         per_element_annot_kws.append(to_append)
 
-    return X, annot, y_labels, insertion_dict, per_element_annot_kws, is_reference
+    return PreppedAllelesTable(
+        X, annot, y_labels, insertion_dict, per_element_annot_kws,
+        is_reference, selected_markers,
+    )
 
 
 def prep_alleles_table_compare(df_alleles, sample_name_1, sample_name_2,
@@ -1422,7 +1468,35 @@ def prep_amino_acid_table(ctx: CorePlotContext):
     }
 
 
+class WindowedAlleles(NamedTuple):
+    """Export table and visually aggregated table with aligned marker metadata."""
+
+    df_alleles_around_cut: pd.DataFrame
+    df_to_plot: pd.DataFrame
+    ref_seq_around_cut: str
+    new_sgRNA_intervals: list
+    new_sel_cols_start: int
+    large_deletion_markers: list
+
+
 def _prep_windowed_alleles(
+    df_alleles_around_cut, cut_point, window_left, window_right, ref_sequence,
+    sgRNA_intervals, count_total, allele_plot_pcts_only_for_assigned_reference,
+    expand_allele_plots_by_quantification,
+):
+    """Return five legacy windowing outputs without marker metadata.
+
+    Mutates percentages when ``allele_plot_pcts_only_for_assigned_reference``
+    is true; see :func:`_prep_windowed_alleles_with_markers` for details.
+    """
+    return _prep_windowed_alleles_with_markers(
+        df_alleles_around_cut, cut_point, window_left, window_right, ref_sequence,
+        sgRNA_intervals, count_total, allele_plot_pcts_only_for_assigned_reference,
+        expand_allele_plots_by_quantification,
+    )[:5]
+
+
+def _prep_windowed_alleles_with_markers(
     df_alleles_around_cut,
     cut_point,
     window_left,
@@ -1432,6 +1506,7 @@ def _prep_windowed_alleles(
     count_total,
     allele_plot_pcts_only_for_assigned_reference,
     expand_allele_plots_by_quantification,
+    large_deletion_markers=None,
 ):
     """Shared logic for ``prep_alleles_around_cut`` and ``prep_base_edit_quilt``.
 
@@ -1452,9 +1527,11 @@ def _prep_windowed_alleles(
        is False)
     4. sgRNA interval coordinate adjustment to the local window frame
 
-    Returns ``(df_alleles_around_cut, df_to_plot, ref_seq_around_cut,
-    new_sgRNA_intervals, new_sel_cols_start)``.
+    Returns a :class:`WindowedAlleles` with markers aligned to ``df_to_plot``.
     """
+    plot_markers = _normalize_deletion_markers(
+        large_deletion_markers, len(df_alleles_around_cut),
+    )
     if allele_plot_pcts_only_for_assigned_reference:
         df_alleles_around_cut['%AllReads'] = df_alleles_around_cut['%Reads']
         df_alleles_around_cut['%Reads'] = df_alleles_around_cut['#Reads'] / count_total * 100
@@ -1464,15 +1541,35 @@ def _prep_windowed_alleles(
     ]
 
     df_to_plot = df_alleles_around_cut
+    # Keep marker metadata out of the public dataframe (and therefore out of
+    # the allele TSV), but carry it through the optional visual aggregation.
     if not expand_allele_plots_by_quantification:
-        df_to_plot = df_alleles_around_cut.groupby(
-            ['Aligned_Sequence', 'Reference_Sequence'],
-        ).sum().reset_index().set_index('Aligned_Sequence')
+        df_with_markers = df_alleles_around_cut.copy()
+        # Explicit object dtype keeps even an empty metadata column out of
+        # sum(numeric_only=True), avoiding duplicate columns in the merge.
+        df_with_markers['_large_deletion_markers'] = pd.Series(
+            plot_markers, index=df_with_markers.index, dtype=object,
+        )
+
+        # Collapse rows by their visible sequence, as the historical plot did.
+        # Marker metadata is visual annotation rather than allele identity: a
+        # clipped 53 bp deletion and a clipped 74 bp deletion can have the same
+        # visible row and must contribute to that row's displayed read count.
+        group_columns = ['Aligned_Sequence', 'Reference_Sequence']
+        grouped = df_with_markers.groupby(group_columns, sort=True)
+        df_to_plot = grouped.sum(numeric_only=True).reset_index()
+
+        marker_groups = grouped['_large_deletion_markers'].agg(CRISPRessoShared.combine_deletion_markers)
+        marker_groups = marker_groups.rename('_large_deletion_markers').reset_index()
+        df_to_plot = df_to_plot.merge(
+            marker_groups, on=group_columns, how='left', validate='one_to_one',
+        ).set_index('Aligned_Sequence')
         df_to_plot.sort_values(
             by=['#Reads', 'Aligned_Sequence', 'Reference_Sequence'],
             inplace=True,
             ascending=[False, True, True],
         )
+        plot_markers = [tuple(m) for m in df_to_plot.pop('_large_deletion_markers')]
 
     new_sgRNA_intervals = []
     new_sel_cols_start = cut_point - window_left
@@ -1481,12 +1578,13 @@ def _prep_windowed_alleles(
             (int_start - new_sel_cols_start - 1, int_end - new_sel_cols_start - 1),
         )
 
-    return (
+    return WindowedAlleles(
         df_alleles_around_cut,
         df_to_plot,
         ref_seq_around_cut,
         new_sgRNA_intervals,
         new_sel_cols_start,
+        plot_markers,
     )
 
 
@@ -1496,11 +1594,11 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
     Requires ``ctx.ref_name`` and ``ctx.sgRNA_ind``.
 
     Computes asymmetric window sizes, calls
-    ``CRISPRessoShared.get_dataframe_around_cut_asymmetrical``, then applies
+    ``CRISPRessoShared.get_alleles_around_cut_with_markers``, then applies
     percentage adjustment, optional groupby collapse, and sgRNA interval
-    recomputation via ``_prep_windowed_alleles``.
+    recomputation via ``_prep_windowed_alleles_with_markers``.
 
-    Internally calls :func:`prep_alleles_table` to produce a
+    Internally calls :func:`prep_alleles_table_with_markers` to produce a
     serialization-friendly representation for the plot worker thread.
     If no rows pass the frequency threshold, ``plot_input`` is ``None``.
 
@@ -1534,11 +1632,12 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
     plot_half_window_left, plot_half_window_right, window_truncated = \
         _compute_half_windows(cut_point, plot_window_size, ref_len)
 
-    df_alleles_around_cut = CRISPRessoShared.get_dataframe_around_cut_asymmetrical(
+    df_alleles_around_cut, large_deletion_markers = CRISPRessoShared.get_alleles_around_cut_with_markers(
         ctx.df_alleles.loc[ctx.df_alleles['Reference_Name'] == ref_name],
         cut_point,
         plot_half_window_left,
         plot_half_window_right,
+        min_large_del=getattr(ctx.args, 'min_large_del', 50),
     )
 
     (
@@ -1547,7 +1646,8 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
         ref_seq_around_cut,
         new_sgRNA_intervals,
         new_sel_cols_start,
-    ) = _prep_windowed_alleles(
+        plot_markers,
+    ) = _prep_windowed_alleles_with_markers(
         df_alleles_around_cut=df_alleles_around_cut,
         cut_point=cut_point,
         window_left=plot_half_window_left,
@@ -1557,6 +1657,7 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
         count_total=ctx.counts_total[ref_name],
         allele_plot_pcts_only_for_assigned_reference=ctx.args.allele_plot_pcts_only_for_assigned_reference,
         expand_allele_plots_by_quantification=ctx.args.expand_allele_plots_by_quantification,
+        large_deletion_markers=large_deletion_markers,
     )
 
     new_cut_point = None
@@ -1569,18 +1670,24 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
     # nucleotide quilt uses, would land this one column to the right here
     new_include_idx = [x - new_sel_cols_start - 1 for x in ref['include_idxs']]
 
-    # Build serialization-friendly plot input via prep_alleles_table
-    n_good = df_alleles_around_cut[
-        df_alleles_around_cut['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
+    # Apply the threshold after visual aggregation so the displayed row count
+    # and plot eligibility describe the same set of rows.
+    n_good = df_to_plot[
+        df_to_plot['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
     ].shape[0]
 
     plot_input = None
+    selected_markers = []
     if n_good > 0:
-        prepped_alleles, annotations, y_labels, insertion_dict, per_element_annot_kws, is_reference = prep_alleles_table(
+        (
+            prepped_alleles, annotations, y_labels, insertion_dict,
+            per_element_annot_kws, is_reference, selected_markers,
+        ) = prep_alleles_table_with_markers(
             df_to_plot,
             ref_seq_around_cut,
             ctx.args.max_rows_alleles_around_cut_to_plot,
             ctx.args.min_frequency_alleles_around_cut_to_plot,
+            large_deletion_markers=plot_markers,
         )
 
         fig_filename_root = _make_fig_filename_root(
@@ -1605,11 +1712,13 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
             'sgRNA_names': ref['sgRNA_names'],
             'sgRNA_mismatches': ref['sgRNA_mismatches'],
             'annotate_wildtype_allele': ctx.args.annotate_wildtype_allele,
+            'large_deletion_markers': selected_markers,
         }
 
     sgRNA_legend = _sgRNA_legend(ctx)
     return {
         'df_alleles_around_cut': df_alleles_around_cut,
+        'large_deletion_markers': large_deletion_markers,
         'ref_seq_around_cut': ref_seq_around_cut,
         'new_sgRNA_intervals': new_sgRNA_intervals,
         'quantification_window_idxs': new_include_idx,
@@ -1630,6 +1739,8 @@ def prep_alleles_around_cut(ctx: CorePlotContext):
             "bold font. Red rectangles highlight inserted sequences. Horizontal dashed lines "
             "indicate deleted sequences. The vertical dashed line indicates the predicted "
             "cleavage site."
+            + (" Boundary-spanning deletions are labeled with their full length in reference bases."
+               if any(selected_markers) else "")
         ),
         'data_files': [('Allele frequency table', _data_file_basename(ctx, _ref_plot_name(ctx) + 'Alleles_frequency_table_around_' + _sgRNA_label(ctx) + '.txt'))],
     }
@@ -1700,9 +1811,10 @@ def prep_base_edit_quilt(ctx: CorePlotContext):
         if a == conversion_nuc_from
     ]
 
-    # Build serialization-friendly plot input via prep_alleles_table
-    n_good = df_alleles_around_cut[
-        df_alleles_around_cut['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
+    # Apply the threshold after visual aggregation so the displayed row count
+    # and plot eligibility describe the same set of rows.
+    n_good = df_to_plot[
+        df_to_plot['%Reads'] >= ctx.args.min_frequency_alleles_around_cut_to_plot
     ].shape[0]
 
     plot_input = None
