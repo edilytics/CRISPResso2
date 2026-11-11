@@ -1347,6 +1347,9 @@ def prep_amino_acid_table(ctx: CorePlotContext):
 
     # Find the sgRNA with cut_point closest to this coding sequence's exon interval
     exon_start, exon_end = ref['exon_intervals'][coding_seq_ind]
+    # An exon wholly missing from this reference has no amino acids, and its start may be past the last base
+    if exon_start >= exon_end:
+        df_alleles_for_ref = df_alleles_for_ref.iloc[0:0]
     best_cut_point, best_plot_cut_point = find_closest_sgRNA_cut_point(
         exon_start, exon_end, sgRNA_cut_points, sgRNA_plot_cut_points,
     )
@@ -3316,7 +3319,8 @@ def prep_compare_modification_positions(ctx):
     sig_count_quant_window = np.nan
     quant_windows_are_equal = np.array_equal(ctx.quant_windows_1, ctx.quant_windows_2)
     if quant_windows_are_equal:
-        qvals_in_quant = np.take(qval_bonferroni, ctx.quant_windows_1)
+        # An empty window loads from JSON as a float array, which np.take rejects
+        qvals_in_quant = np.take(qval_bonferroni, np.asarray(ctx.quant_windows_1, dtype=int))
         sig_count_quant_window = len(np.where(qvals_in_quant <= ctx.args.reported_qvalue_cutoff)[0])
 
     amplicon_plot_name = amp + "."
