@@ -8,6 +8,8 @@
 
 ### FIXED
 
+- Fix coordinates cloned from another amplicon (`-e` or extra `-a` amplicons). Cut points, sgRNA intervals, quantification windows and exons landed on the wrong bases when the two sequences had an indel between them, so results for those references change. Exons now also clone when no guide is provided, which adds frameshift analysis for those references. Exon bases past either end of a cloned reference no longer count as a length change, and a cloned quantification window that covers no bases now warns by [@Snicker7](https://github.com/Snicker7)
+
 - Fix the `Aligned_Sequence` column being dropped from the CRISPRessoCompare output table (the index was set to `None` when writing the file) by [@Colelyman](https://github.com/Colelyman) in [#646](https://github.com/pinellolab/CRISPResso2/pull/646)
 
 - Fix an off-by-one error that clipped the quantification window one base short when it extended to the end of the reference sequence by [@Colelyman](https://github.com/Colelyman) in [#651](https://github.com/pinellolab/CRISPResso2/pull/651)

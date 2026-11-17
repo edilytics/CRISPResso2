@@ -421,7 +421,7 @@ def get_include_idxs_from_quant_window_coordinates(quant_window_coordinates):
 
 
 def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinates, idxs):
-    """Get the include_idxs from the quantification window coordinates, but adjusted according to s1ind.
+    """Get this reference's include_idxs from quantification window coordinates given on the reference it clones from.
 
     Parameters
     ----------
@@ -429,14 +429,14 @@ def get_cloned_include_idxs_from_quant_window_coordinates(quant_window_coordinat
         The quantification window coordinates, in the form "5-10_100-101", where
         the "_" delimits separate ranges and the "-" delimits the range itself.
     idxs: list of int
-        The index values mapped to the amplicon from which this is being cloned.
+        For each position of this reference, the position it aligns to in the reference it clones from.
 
     Returns
     -------
     list of int
         The include_idxs to be used for quantification, which is the quantification
         window coordinates expanded to include all individual indexes contained therein,
-        but adjusted according to s1inds.
+        in this reference's coordinates.
 
     """
     include_idxs = []
@@ -3300,7 +3300,7 @@ def main():
                     info("Using exons positions from %s as template for other references" % ref_name)
                 clone_ref_name = ref_name
                 clone_ref_idx = idx
-                clone_has_exon_positions = True
+                clone_has_exons = True
                 if cut_points:
                     clone_has_cut_points = True
                 break
@@ -3344,6 +3344,8 @@ def main():
                 if not needs_cut_points and not needs_sgRNA_intervals and not needs_exon_positions and args.quantification_window_coordinates is None:
                     continue
 
+                window_cloned = False
+
                 fws1, fws2, fwscore = CRISPResso2Align.global_align(
                     refs[clone_ref_name]['sequence'],
                     refs[ref_name]['sequence'],
@@ -3360,10 +3362,14 @@ def main():
                 if needs_exon_positions and clone_has_exons and args.debug:
                     info("Reference '%s' has NO exon_positions defined. Inferring from '%s'." % (ref_name, clone_ref_name))
                 # Create a list such that the nucleotide at ix in the old reference corresponds to s1inds[ix]
-                s1inds, _ = CRISPRessoShared.get_relative_coordinates(fws1, fws2)
+                # A start in a gap takes the base to its right, so it stays inside the feature and is never -1
+                s1inds, s1inds_right = CRISPRessoShared.get_relative_coordinates(fws2, fws1)
+                # The inverse: the clone position for each base of this reference
+                clone_inds_left, clone_inds_right = CRISPRessoShared.get_relative_coordinates(fws1, fws2)
 
                 if (needs_cut_points or needs_sgRNA_intervals) and clone_has_cut_points:
-                    this_cut_points = [s1inds[X] for X in refs[clone_ref_name]['sgRNA_cut_points']]
+                    # A cut point in bases missing from this reference's 5' end maps to -1
+                    this_cut_points = [max(s1inds[X], 0) for X in refs[clone_ref_name]['sgRNA_cut_points']]
                     this_gap_incentive = np.zeros(refs[ref_name]['sequence_length'] + 1, dtype=int)
                     for cut_point in this_cut_points:
                         this_gap_incentive[cut_point + 1] = args.needleman_wunsch_gap_incentive
@@ -3372,17 +3378,20 @@ def main():
                     this_sgRNA_mismatches = []
                     this_sgRNA_plot_idxs = []
                     for idx, (sgRNA_interval_start, sgRNA_interval_end) in enumerate(refs[clone_ref_name]['sgRNA_intervals']):
-                        this_sgRNA_intervals.append((s1inds[sgRNA_interval_start], s1inds[sgRNA_interval_end]))
+                        this_sgRNA_intervals.append((s1inds_right[sgRNA_interval_start], s1inds[sgRNA_interval_end]))
 
-                        sgRNA_cut_point_this = s1inds[refs[clone_ref_name]['sgRNA_cut_points'][idx]]
+                        sgRNA_cut_point_this = this_cut_points[idx]
                         sgRNA_seq_clone = refs[clone_ref_name]['sequence'][sgRNA_interval_start:sgRNA_interval_end + 1]
-                        sgRNA_seq_this = refs[ref_name]['sequence'][s1inds[sgRNA_interval_start]:s1inds[sgRNA_interval_end] + 1]
+                        sgRNA_seq_this = refs[ref_name]['sequence'][s1inds_right[sgRNA_interval_start]:s1inds[sgRNA_interval_end] + 1]
                         sgRNA_seq_orig_seq = refs[clone_ref_name]['sgRNA_orig_sequences'][idx]
-                        fw_mismatches = CRISPRessoShared.get_mismatches(sgRNA_seq_this, sgRNA_seq_orig_seq, aln_matrix, args.needleman_wunsch_gap_open, args.needleman_wunsch_gap_extend)
-                        rv_mismatches = CRISPRessoShared.get_mismatches(sgRNA_seq_this, CRISPRessoShared.reverse_complement(sgRNA_seq_orig_seq), aln_matrix, args.needleman_wunsch_gap_open, args.needleman_wunsch_gap_extend)
-                        best_aln_mismatches = fw_mismatches
-                        if len(rv_mismatches) < len(fw_mismatches):
-                            best_aln_mismatches = rv_mismatches
+                        # global_align crashes on an empty sequence, which a guide missing from this reference leaves
+                        best_aln_mismatches = []
+                        if sgRNA_seq_this:
+                            fw_mismatches = CRISPRessoShared.get_mismatches(sgRNA_seq_this, sgRNA_seq_orig_seq, aln_matrix, args.needleman_wunsch_gap_open, args.needleman_wunsch_gap_extend)
+                            rv_mismatches = CRISPRessoShared.get_mismatches(sgRNA_seq_this, CRISPRessoShared.reverse_complement(sgRNA_seq_orig_seq), aln_matrix, args.needleman_wunsch_gap_open, args.needleman_wunsch_gap_extend)
+                            best_aln_mismatches = fw_mismatches
+                            if len(rv_mismatches) < len(fw_mismatches):
+                                best_aln_mismatches = rv_mismatches
                         this_sgRNA_mismatches.append(sorted(best_aln_mismatches))
 
                         ref_seq_length = len(refs[ref_name]['sequence'])
@@ -3391,10 +3400,6 @@ def main():
                         en = min(ref_seq_length, sgRNA_cut_point_this + window_around_cut + 1)
                         this_sgRNA_plot_idxs.append(sorted(list(range(st, en))))
 
-                    old_this_sgRNA_plot_idxs = []
-                    for plot_idx_list in refs[clone_ref_name]['sgRNA_plot_idxs']:
-                        old_this_sgRNA_plot_idxs.append([s1inds[x] for x in plot_idx_list])
-
                     this_include_idxs = []
                     start_val = -1
                     last_val = -1
@@ -3402,12 +3407,12 @@ def main():
                         if start_val == -1:
                             start_val = val
                         elif val != last_val + 1:
-                            this_include_idxs.extend(list(range(s1inds[start_val], s1inds[last_val] + 1)))
+                            this_include_idxs.extend(list(range(s1inds_right[start_val], s1inds[last_val] + 1)))
                             start_val = val
                         last_val = val
 
                     if start_val != -1:
-                        this_include_idxs.extend(list(range(s1inds[start_val], s1inds[last_val] + 1)))
+                        this_include_idxs.extend(list(range(s1inds_right[start_val], s1inds[last_val] + 1)))
 
                     # subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
                     this_exclude_idxs = sorted(list(set(refs[ref_name]['exclude_idxs'])))
@@ -3424,15 +3429,17 @@ def main():
                     refs[ref_name]['sgRNA_names'] = refs[clone_ref_name]['sgRNA_names']
                     refs[ref_name]['include_idxs'] = np.array(this_include_idxs)
                     refs[ref_name]['contains_guide'] = refs[clone_ref_name]['contains_guide']
+                    window_cloned = True
 
                 # quantification window coordinates override other options
                 if amplicon_quant_window_coordinates_arr[clone_ref_idx] != "" and amplicon_quant_window_coordinates_arr[this_ref_idx] != '0':
                     if amplicon_quant_window_coordinates_arr[this_ref_idx] != "":
                         this_include_idxs = get_include_idxs_from_quant_window_coordinates(amplicon_quant_window_coordinates_arr[this_ref_idx])
                     else:
+                        # This helper searches for clone positions, so it takes the inverse of s1inds
                         this_include_idxs = get_cloned_include_idxs_from_quant_window_coordinates(
                             amplicon_quant_window_coordinates_arr[clone_ref_idx],
-                            s1inds.copy(),
+                            clone_inds_left,
                         )
 
                     # subtract any indices in 'exclude_idxs' -- e.g. in case some of the cloned include_idxs were near the read ends (excluded)
@@ -3440,6 +3447,10 @@ def main():
                     this_include_idxs = sorted(map(int, set(np.setdiff1d(this_include_idxs, this_exclude_idxs))))
                     refs[ref_name]['include_idxs'] = np.array(this_include_idxs)
                     refs[ref_name]['exclude_idxs'] = np.array(this_exclude_idxs)
+                    window_cloned = True
+
+                if window_cloned and len(refs[ref_name]['include_idxs']) == 0 and len(refs[clone_ref_name]['include_idxs']) > 0:
+                    warn(f"The quantification window copied from '{clone_ref_name}' covers no bases of '{ref_name}', so reads aligned to '{ref_name}' are reported as unmodified.")
 
                 if needs_exon_positions and clone_has_exons:
                     this_exon_positions = set()
@@ -3447,11 +3458,15 @@ def main():
                     this_exon_intervals = []
                     this_exon_len_mods = []
                     this_seq_length = refs[ref_name]['sequence_length']
+                    # Exon bases past either end of this reference are not covered, not deleted, so they don't change its length
+                    covered_start = clone_inds_right[0]
+                    covered_end = clone_inds_left[-1] + 1
                     for (exon_interval_start, exon_interval_end) in refs[clone_ref_name]['exon_intervals']:
-                        this_exon_start = s1inds[exon_interval_start]
+                        this_exon_start = s1inds_right[exon_interval_start]
                         this_exon_end = s1inds[exon_interval_end - 1] + 1  # in case where exon is entire amplicon, because the exon_end is beyond the upper bound, we have to make this change
                         this_exon_intervals.append((this_exon_start, this_exon_end))
-                        this_exon_len_mods.append(((this_exon_end - this_exon_start) - (exon_interval_end - exon_interval_start)))
+                        covered_exon_len = max(0, min(exon_interval_end, covered_end) - max(exon_interval_start, covered_start))
+                        this_exon_len_mods.append((this_exon_end - this_exon_start) - covered_exon_len)
                         this_exon_positions = this_exon_positions.union(set(range(this_exon_start, this_exon_end)))
                         # consider 2 base pairs before and after each exon
                         this_splicing_positions += [max(0, this_exon_start - 2), max(0, this_exon_start - 1), min(this_seq_length - 1, this_exon_end), min(this_seq_length - 1, this_exon_end + 1)]
