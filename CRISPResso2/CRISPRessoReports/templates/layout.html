@@ -12,9 +12,7 @@
     {% include 'shared/partials/crispresso_styles.html' %}
     <style>
       {% if is_web %}
-        {% if not is_default_user %}
-      body { padding-top: 60px; }
-        {% endif %}
+      /* The web navbar stays in document flow, including when expanded. */
       {% endif %}
       @media (max-width: 1015px) {
         #left_help_div  { display: none; }
@@ -104,8 +102,8 @@
 
     {% endif %}
 
-  {# if default user (normal crispresso mode) #}
-  {% if not is_web or is_default_user %}
+  {# Standalone reports retain their original header; every web session shares a navbar. #}
+  {% if not is_web %}
   <div class="container">
       <div class="row pb-2">
         <div class="col-sm-1"></div>
@@ -127,23 +125,23 @@
 
 
     {% else %}
-      {# if doing user sessions #}
-  <nav class="navbar fixed-top ms-1 navbar-expand-md bg-light navbar-light">
-  <!-- Brand -->
+      {% set signed_in = current_user.is_authenticated and not is_default_user %}
+  <nav id="cr-site-nav" class="navbar sticky-top navbar-expand-xl bg-light navbar-light screen-only" aria-label="Main navigation">
+  <div class="container-fluid">
   <a class="navbar-brand" href="/">
-{{config['BANNER_TEXT']}}</a>
-
-  <!-- Toggler/collapsibe Button -->
-  <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#collapsibleNavbar">
+    <img src="/static/imgs/CRISPResso_justcup.svg" width="32" height="32" alt="">
+    <span>{{ 'CRISPResso2' if PUBLIC_BUILD else (config.get('BANNER_TEXT') or 'CRISPResso2') }}</span>
+  </a>
+  <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#collapsibleNavbar"
+          aria-controls="collapsibleNavbar" aria-expanded="false" aria-label="Toggle navigation">
     <span class="navbar-toggler-icon"></span>
   </button>
-  <!-- Navbar links -->
     <div class="collapse navbar-collapse" id="collapsibleNavbar">
       <ul class="navbar-nav ms-auto">
-      {% if not is_default_user %}
+      {% if signed_in %}
         <li class="nav-item">
-           <a class="nav-link" href="{{url_for('home')}}">
-            <i class="fas fa-user"></i> {{ current_user.email}}
+           <a class="nav-link cr-nav-account" href="{{url_for('home')}}" title="{{ current_user.email }}">
+            <i class="fas fa-user" aria-hidden="true"></i> {{ current_user.email}}
           </a>
         </li>
         <li class="nav-item">
@@ -161,27 +159,28 @@
         {% endif %}
       {% endif %}
       {% block extranavs %}{% endblock %}
-      {% if current_user.role == "Admin" %}
+      {% if signed_in and current_user.role == "Admin" %}
          <li class="nav-item">
            <a class="nav-link" href="{{url_for('admin.index')}}">Admin</a>
          </li>
       {% endif %}
-      {% if not is_default_user and not current_user.is_authenticated %}
-         <li class="nav-item">
-           <a class="nav-link" href="{{url_for('login')}}">Log in</a>
-         </li>
-      {% else %}
+      {% if signed_in %}
          <li class="nav-item">
            <a class="nav-link" href="{{url_for('logout')}}">Logout</a>
+         </li>
+      {% elif request is not defined or request.endpoint not in ('login', 'register') %}
+         <li class="nav-item">
+           <a class="nav-link" href="{{url_for('login')}}">{{ 'CRISPRessoPro Log In' if PUBLIC_BUILD else 'Log in' }}</a>
          </li>
       {% endif %}
       </ul>
     </div>
+  </div>
   </nav>
   <div class="container">
   {% endif %}
 
-      <div id='top_help_div'>
+      {% block page_intro %}{% endblock %}<div id='top_help_div'>
         <div class="row">
           <div class="col-sm-1"></div>
           <div class='col-sm-10 pb-2 crispresso_body_div'>
@@ -193,7 +192,7 @@
 
       {% block content %}{% endblock %}
 
-      {% if not is_web or is_default_user %}
+      {% if not is_web %}
       <div class="row">
       <div class="col-sm-1"></div>
       <footer class="col-sm-10 crispresso_body_div screen-only py-5">
@@ -217,7 +216,10 @@
     {% else %}
       <div class="row">
       <div class="col-sm-1"></div>
-      <footer id="copyright_div" class="col-sm-10 crispresso_body_div py-5">
+      <footer id="copyright_div" class="col-sm-10 crispresso_body_div screen-only py-5">
+        <p class="text-center">If you use CRISPResso2, please cite
+          <a href="https://doi.org/10.1038/s41587-019-0032-3">Clement et al., Nature Biotechnology (2019)</a>.
+        </p>
         <p class="text-center"><small> &copy; Copyright <a href="http://edilytics.com">Edilytics</a></small></p>
       </footer>
       <div class="col-sm-1"></div>
