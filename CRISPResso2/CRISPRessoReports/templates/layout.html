@@ -170,7 +170,7 @@
          </li>
       {% elif request is not defined or request.endpoint not in ('login', 'register') %}
          <li class="nav-item">
-           <a class="nav-link" href="{{url_for('login')}}">{{ 'CRISPRessoPro Log In' if PUBLIC_BUILD else 'Log in' }}</a>
+           <a class="nav-link" href="{{url_for('login')}}">{{ 'CRISPRessoPro log in' if PUBLIC_BUILD else 'Log in' }}</a>
          </li>
       {% endif %}
       </ul>
