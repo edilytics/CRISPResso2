@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 
 
 TEMPLATES = Path(__file__).parents[2] / 'CRISPResso2' / 'CRISPRessoReports' / 'templates'
@@ -83,3 +83,78 @@ def test_standalone_chrome_has_no_web_dependencies():
     assert 'id="cr-site-nav"' not in html
     assert 'Nat Biotechnol. 2019' in html
     assert 'Kendell Clement and Luca Pinello</a>' in html
+
+
+LOGIN_PARTIAL = 'shared/partials/pro_login_button.html'
+LOGIN_MARKER = '<div id="cr-pro-login-btn">STUB</div>'
+
+
+def _layout_env(partials):
+    return Environment(
+        loader=ChoiceLoader([FileSystemLoader(str(TEMPLATES)), DictLoader(partials)]),
+        autoescape=True,
+    )
+
+
+def _layout_context(is_web, is_default_user=False, authenticated=True):
+    return {
+        'is_web': is_web,
+        'is_default_user': is_default_user,
+        'current_user': SimpleNamespace(is_authenticated=authenticated, email='a@b.c', role='User'),
+        'config': {'BANNER_TEXT': 'CRISPResso'},
+        'get_flashed_messages': lambda **kwargs: [],
+        'url_for': lambda endpoint: '/' + endpoint,
+    }
+
+
+@pytest.mark.parametrize('is_default_user, authenticated', [(True, True), (False, True), (False, False)])
+def test_web_layout_ignores_obsolete_floating_login_partial(is_default_user, authenticated):
+    html = _layout_env({LOGIN_PARTIAL: LOGIN_MARKER}).get_template('layout.html').render(
+        **_layout_context(True, is_default_user, authenticated))
+    assert 'cr-pro-login-btn' not in html
+    assert html.count('id="cr-site-nav"') == 1
+
+
+def test_web_layout_renders_without_login_partial():
+    html = _layout_env({}).get_template('layout.html').render(**_layout_context(True, True))
+    assert 'cr-pro-login-btn' not in html
+    assert '</body>' in html
+
+
+def test_cli_layout_never_includes_login_partial():
+    with_partial = _layout_env({LOGIN_PARTIAL: LOGIN_MARKER}).get_template('layout.html').render(**_layout_context(False))
+    without_partial = _layout_env({}).get_template('layout.html').render(**_layout_context(False))
+    assert 'cr-pro-login-btn' not in with_partial
+    assert with_partial == without_partial
+
+
+def test_default_user_navbar_has_one_login_link():
+    """An older C2Web floating partial must not duplicate the navbar sign-in."""
+    button = '<a id="cr-pro-login-btn" href="/login">STUB</a>'
+    html = _layout_env({LOGIN_PARTIAL: button}).get_template('layout.html').render(**_layout_context(True, True))
+    assert html.count('href="/login"') == 1
+
+
+@pytest.mark.parametrize('is_web', [False, True])
+def test_layout_loads_twitter_widget_only_outside_the_web(is_web):
+    # C2Web loads widgets.js itself, after cookie consent.
+    html = _layout_env({}).get_template('layout.html').render(**_layout_context(is_web, is_default_user=True))
+    assert ('twitter-share-button' in html) is (not is_web)
+    assert ('platform.twitter.com/widgets.js' in html) is (not is_web)
+
+
+def test_cli_layout_twitter_loader_bytes_are_unchanged():
+    # CRISPResso2_tests diffs report HTML against baselines, so the web gate must not move a byte here.
+    import logging
+
+    from CRISPResso2.CRISPRessoReports.CRISPRessoReport import get_jinja_loader
+
+    env = get_jinja_loader(str(TEMPLATES.parents[1]), logging.getLogger(__name__))
+    html = env.get_template('layout.html').render(is_web=False, is_default_user=False)
+    assert '</script>\n\n\n  <script>!function(d,s,id){' in html
+    assert "(document, 'script', 'twitter-wjs');</script>\n  \n\n  </head>" in html
+
+
+def test_layout_loads_twitter_widget_when_is_web_is_not_passed():
+    html = _layout_env({}).get_template('layout.html').render()
+    assert html.count('platform.twitter.com/widgets.js') == 1
