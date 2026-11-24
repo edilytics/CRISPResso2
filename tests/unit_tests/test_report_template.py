@@ -72,7 +72,12 @@ def test_web_chrome_brand_and_actions_follow_identity(default, authenticated):
     signed_in = authenticated and not default
     brand = 'CRISPRessoPro' if signed_in else 'CRISPResso2'
     assert f'<span>{brand}</span>' in html
-    assert 'class="crispresso-header"' not in html
+    assert html.count('class="crispresso-header"') == (0 if signed_in else 1)
+    if not signed_in:
+        assert html.index('</nav>') < html.index('class="crispresso-header"') < html.index("id='top_help_div'")
+    nav = html.split('<nav id="cr-site-nav"', 1)[1].split('</nav>', 1)[0]
+    assert '/static/imgs/CRISPResso_report_header.svg' in nav
+    assert '/static/imgs/CRISPResso_justcup.svg' not in nav
     assert 'id="copyright_div"' in html
     assert ('href="/logout"' in html) == signed_in
     assert ('>Admin</a>' in html) == signed_in
@@ -82,7 +87,7 @@ def test_web_chrome_brand_and_actions_follow_identity(default, authenticated):
 def test_standalone_chrome_has_no_web_dependencies():
     env = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=True)
     html = env.get_template('layout.html').render(is_web=False)
-    assert 'class="crispresso-header"' in html
+    assert html.count('class="crispresso-header"') == 1
     assert 'id="cr-site-nav"' not in html
     assert '/static/js/site_chrome.js' not in html
     assert 'Nat Biotechnol. 2019' in html
