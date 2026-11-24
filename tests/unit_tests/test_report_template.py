@@ -57,6 +57,43 @@ def test_core_report_header_uses_feature_flag_and_explicit_target():
     assert 'href="/plot-assistant/{{ report_data[\'folder_id\'] }}"' not in source
 
 
+@pytest.mark.parametrize('default,authenticated', [(False, False), (True, True), (False, True)])
+def test_web_chrome_brand_and_actions_follow_identity(default, authenticated):
+    env = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=True)
+    html = env.get_template('layout.html').render(
+        is_web=True, is_default_user=default, PUBLIC_BUILD=True,
+        current_user=SimpleNamespace(is_authenticated=authenticated, email='user@example.edu', role='Admin'),
+        config={'BANNER_TEXT': 'Legacy branding'},
+        get_flashed_messages=lambda **kwargs: [], url_for=lambda endpoint: '/' + endpoint,
+    )
+    assert html.count('id="cr-site-nav"') == 1
+    assert '<script src="/static/js/site_chrome.js" defer></script>' in html
+    assert "<div id='left_help_div'>" in html
+    signed_in = authenticated and not default
+    brand = 'CRISPRessoPro' if signed_in else 'CRISPResso2'
+    assert f'<span>{brand}</span>' in html
+    assert html.count('class="crispresso-header"') == (0 if signed_in else 1)
+    if not signed_in:
+        assert html.index('</nav>') < html.index('class="crispresso-header"') < html.index("id='top_help_div'")
+    nav = html.split('<nav id="cr-site-nav"', 1)[1].split('</nav>', 1)[0]
+    assert '/static/imgs/CRISPResso_report_header.svg' in nav
+    assert '/static/imgs/CRISPResso_justcup.svg' not in nav
+    assert 'id="copyright_div"' in html
+    assert ('href="/logout"' in html) == signed_in
+    assert ('>Admin</a>' in html) == signed_in
+    assert ('href="/login"' in html) == (not signed_in)
+
+
+def test_standalone_chrome_has_no_web_dependencies():
+    env = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=True)
+    html = env.get_template('layout.html').render(is_web=False)
+    assert html.count('class="crispresso-header"') == 1
+    assert 'id="cr-site-nav"' not in html
+    assert '/static/js/site_chrome.js' not in html
+    assert 'Nat Biotechnol. 2019' in html
+    assert 'Kendell Clement and Luca Pinello</a>' in html
+
+
 LOGIN_PARTIAL = 'shared/partials/pro_login_button.html'
 LOGIN_MARKER = '<div id="cr-pro-login-btn">STUB</div>'
 
@@ -80,10 +117,11 @@ def _layout_context(is_web, is_default_user=False, authenticated=True):
 
 
 @pytest.mark.parametrize('is_default_user, authenticated', [(True, True), (False, True), (False, False)])
-def test_web_layout_includes_login_partial_once(is_default_user, authenticated):
+def test_web_layout_ignores_obsolete_floating_login_partial(is_default_user, authenticated):
     html = _layout_env({LOGIN_PARTIAL: LOGIN_MARKER}).get_template('layout.html').render(
         **_layout_context(True, is_default_user, authenticated))
-    assert html.count('cr-pro-login-btn') == 1
+    assert 'cr-pro-login-btn' not in html
+    assert html.count('id="cr-site-nav"') == 1
 
 
 def test_web_layout_renders_without_login_partial():
@@ -99,15 +137,8 @@ def test_cli_layout_never_includes_login_partial():
     assert with_partial == without_partial
 
 
-def test_login_partial_sees_layout_context():
-    """C2Web's partial reads current_user and is_default_user, so the include must pass the render context."""
-    partial = '{% if current_user.email == "a@b.c" and is_default_user %}CTX-OK{% endif %}'
-    html = _layout_env({LOGIN_PARTIAL: partial}).get_template('layout.html').render(**_layout_context(True, True))
-    assert 'CTX-OK' in html
-
-
-def test_default_user_header_has_no_separate_login_link():
-    """C2Web's login button is the one sign-in; a second header link implied a separate login."""
+def test_default_user_navbar_has_one_login_link():
+    """An older C2Web floating partial must not duplicate the navbar sign-in."""
     button = '<a id="cr-pro-login-btn" href="/login">STUB</a>'
     html = _layout_env({LOGIN_PARTIAL: button}).get_template('layout.html').render(**_layout_context(True, True))
     assert html.count('href="/login"') == 1
@@ -117,7 +148,7 @@ def test_default_user_header_has_no_separate_login_link():
 def test_layout_loads_twitter_widget_only_outside_the_web(is_web):
     # C2Web loads widgets.js itself, after cookie consent.
     html = _layout_env({}).get_template('layout.html').render(**_layout_context(is_web, is_default_user=True))
-    assert 'twitter-share-button' in html
+    assert ('twitter-share-button' in html) is (not is_web)
     assert ('platform.twitter.com/widgets.js' in html) is (not is_web)
 
 
