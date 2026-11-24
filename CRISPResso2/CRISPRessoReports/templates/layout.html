@@ -33,6 +33,7 @@
     {% if is_web %}
     <link rel="icon" href="/static/imgs/CRISPResso_justcup.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/static/css/main.css">
+    <script src="/static/js/site_chrome.js" defer></script>
     <script src="/static/js/htmx-1.9.1.min.js"></script>
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     {% else %}
@@ -53,7 +54,7 @@
 
   <body class="m-2">
     {% if is_web %}
-    <div id='left_help_div' style='position:fixed;top:50%;transform:translateY(-50%);left:1%;width:290px;z-index:99'>
+    <div id='left_help_div'>
       {{ self.help_block() }}
     </div>
 
@@ -130,7 +131,7 @@
   <div class="container-fluid">
   <a class="navbar-brand" href="/">
     <img src="/static/imgs/CRISPResso_justcup.svg" width="32" height="32" alt="">
-    <span>{{ 'CRISPResso2' if PUBLIC_BUILD else (config.get('BANNER_TEXT') or 'CRISPResso2') }}</span>
+    <span>{{ (config.get('BANNER_TEXT') if not PUBLIC_BUILD else none) or ('CRISPRessoPro' if signed_in else 'CRISPResso2') }}</span>
   </a>
   <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#collapsibleNavbar"
           aria-controls="collapsibleNavbar" aria-expanded="false" aria-label="Toggle navigation">

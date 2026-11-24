@@ -58,7 +58,7 @@ def test_core_report_header_uses_feature_flag_and_explicit_target():
 
 
 @pytest.mark.parametrize('default,authenticated', [(False, False), (True, True), (False, True)])
-def test_web_chrome_does_not_change_with_identity(default, authenticated):
+def test_web_chrome_brand_and_actions_follow_identity(default, authenticated):
     env = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=True)
     html = env.get_template('layout.html').render(
         is_web=True, is_default_user=default, PUBLIC_BUILD=True,
@@ -67,10 +67,13 @@ def test_web_chrome_does_not_change_with_identity(default, authenticated):
         get_flashed_messages=lambda **kwargs: [], url_for=lambda endpoint: '/' + endpoint,
     )
     assert html.count('id="cr-site-nav"') == 1
-    assert '<span>CRISPResso2</span>' in html
+    assert '<script src="/static/js/site_chrome.js" defer></script>' in html
+    assert "<div id='left_help_div'>" in html
+    signed_in = authenticated and not default
+    brand = 'CRISPRessoPro' if signed_in else 'CRISPResso2'
+    assert f'<span>{brand}</span>' in html
     assert 'class="crispresso-header"' not in html
     assert 'id="copyright_div"' in html
-    signed_in = authenticated and not default
     assert ('href="/logout"' in html) == signed_in
     assert ('>Admin</a>' in html) == signed_in
     assert ('href="/login"' in html) == (not signed_in)
@@ -81,6 +84,7 @@ def test_standalone_chrome_has_no_web_dependencies():
     html = env.get_template('layout.html').render(is_web=False)
     assert 'class="crispresso-header"' in html
     assert 'id="cr-site-nav"' not in html
+    assert '/static/js/site_chrome.js' not in html
     assert 'Nat Biotechnol. 2019' in html
     assert 'Kendell Clement and Luca Pinello</a>' in html
 
